@@ -16,6 +16,7 @@ import "github.com/untangle/packetd/support"
 import "github.com/untangle/packetd/example"
 import "github.com/untangle/packetd/classify"
 import "github.com/untangle/packetd/geoip"
+import "github.com/untangle/packetd/restd"
 
 /*---------------------------------------------------------------------------*/
 
@@ -60,6 +61,9 @@ func main() {
 		}
 		close(ch)
 	}(ch)
+
+	// Start REST HTTP daemon
+	go restd.StartRestDaemon()
 
 	support.LogMessage("RUNNING ON CONSOLE - HIT ENTER TO EXIT\n")
 
