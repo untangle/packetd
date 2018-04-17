@@ -34,6 +34,7 @@ func main() {
 	var lastmin int
 	var counter int
 
+	support.Startup()
 	C.common_startup()
 
 	support.LogMessage("Untangle Packet Daemon Version %s\n", "1.00")
@@ -86,10 +87,10 @@ stdinloop:
 			}
 		case <-time.After(1 * time.Second):
 			current := time.Now()
-			if (current.Minute() != lastmin) {
+			if current.Minute() != lastmin {
 				lastmin = current.Minute()
 				counter++
-				support.LogMessage("Calling perodic conntrack dump %d\n", counter);
+				support.LogMessage("Calling perodic conntrack dump %d\n", counter)
 				C.conntrack_dump()
 			}
 		}

@@ -117,11 +117,16 @@ return(0);
 /*--------------------------------------------------------------------------*/
 static void conntrack_shutdown(void)
 {
+if (nfcth == NULL) return;
+
 // unregister the callback handler
 nfct_callback_unregister(nfcth);
 
 // close the conntrack netlink handler
 nfct_close(nfcth);
+
+// clear our conntrack handle
+nfcth = NULL;
 }
 /*--------------------------------------------------------------------------*/
 static int conntrack_thread(void)
