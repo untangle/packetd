@@ -30,6 +30,9 @@ static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrac
 {
 struct conntrack_info	info;
 
+// if the shutdown flag is set return stop to interrupt nfct_catch
+if (g_shutdown != 0) return(NFCT_CB_STOP);
+
 	switch(type)
 	{
 		case NFCT_T_NEW:
@@ -156,12 +159,25 @@ return(0);
 /*--------------------------------------------------------------------------*/
 static void conntrack_goodbye(void)
 {
-int		value;
+u_int32_t	family;
 
 g_shutdown = 1;
 if (nfcth == NULL) return;
 
-value = AF_INET;
-nfct_send(nfcth,NFCT_Q_DUMP,&value);
+// dump the conntrack table to interrupt the nfct_catch function
+family = AF_INET;
+nfct_send(nfcth,NFCT_Q_DUMP,&family);
+}
+/*--------------------------------------------------------------------------*/
+static void conntrack_dump(void)
+{
+u_int32_t	family;
+int			ret;
+
+if (nfcth == NULL) return;
+
+family = AF_INET;
+ret = nfct_send(nfcth,NFCT_Q_DUMP,&family);
+logmessage(LOG_INFO,"nfct_send() result = %d\n",ret);
 }
 /*--------------------------------------------------------------------------*/

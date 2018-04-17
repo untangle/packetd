@@ -31,7 +31,9 @@ var childsync sync.WaitGroup
 
 /*---------------------------------------------------------------------------*/
 func main() {
+	var lastmin int
 	var counter int
+
 	C.common_startup()
 
 	support.LogMessage("Untangle Packet Daemon Version %s\n", "1.00")
@@ -83,8 +85,13 @@ stdinloop:
 				break stdinloop
 			}
 		case <-time.After(1 * time.Second):
-			counter++
-			//			support.LogMessage("Waiting for input %d...\n", counter)
+			current := time.Now()
+			if (current.Minute() != lastmin) {
+				lastmin = current.Minute()
+				counter++
+				support.LogMessage("Calling perodic conntrack dump %d\n", counter);
+				C.conntrack_dump()
+			}
 		}
 	}
 
