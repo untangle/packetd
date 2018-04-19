@@ -27,18 +27,13 @@ func Plugin_netfilter_handler(ch chan<- int32,buffer []byte, length int) {
 }
 
 /*---------------------------------------------------------------------------*/
-func Plugin_conntrack_handler(tracker *support.Tracker) {
-	fmt.Printf("CONNTRACK OSA:%s RSA:%s ODA:%s RDA:%s OSP:%d RSP:%d ODP:%d RDP:%d OP:%d RP:%d\n",
-		support.Int2Ip(tracker.Orig_src_addr),
-		support.Int2Ip(tracker.Repl_src_addr),
-		support.Int2Ip(tracker.Orig_dst_addr),
-		support.Int2Ip(tracker.Repl_dst_addr),
-		tracker.Orig_src_port,
-		tracker.Repl_src_port,
-		tracker.Orig_dst_port,
-		tracker.Repl_dst_port,
-		tracker.Orig_protocol,
-		tracker.Repl_protocol)
+func Plugin_conntrack_handler(entry *support.ConntrackEntry) {
+	fmt.Printf("CONNTRACK PROTO:%d SADDR:%s SPORT:%d DADDR:%s DPORT:%d\n",
+		entry.SessionTuple.Protocol,
+		entry.SessionTuple.ClientAddr,
+		entry.SessionTuple.ClientPort,
+		entry.SessionTuple.ServerAddr,
+		entry.SessionTuple.ServerPort)
 }
 
 /*---------------------------------------------------------------------------*/

@@ -22,32 +22,15 @@ type Tuple  struct {
 /*---------------------------------------------------------------------------*/
 type ConntrackEntry struct {
 	SessionId			uint64
-	SessionStartTime	time.Time
+	SessionCreation		time.Time
 	SessionTuple		Tuple
-	C2Cbytes			uint64
+	UpdateCount			uint64
+	C2Sbytes			uint64
 	S2Cbytes			uint64
 	TotalBytes			uint64
-	C2SRate				float32
-	S2CRate				float32
+	C2Srate				float32
+	S2Crate				float32
 	TotalRate			float32
-}
-
-/*---------------------------------------------------------------------------*/
-type Tracker struct {
-	Orig_src_addr uint32
-	Repl_src_addr uint32
-
-	Orig_dst_addr uint32
-	Repl_dst_addr uint32
-
-	Orig_src_port uint16
-	Repl_src_port uint16
-
-	Orig_dst_port uint16
-	Repl_dst_port uint16
-
-	Orig_protocol uint8
-	Repl_protocol uint8
 }
 
 /*---------------------------------------------------------------------------*/
@@ -62,6 +45,23 @@ type Logger struct {
 	DstPort		uint16
 	Mark		uint32
 	Prefix		string
+}
+
+/*---------------------------------------------------------------------------*/
+func Startup() {
+	// capture startup time
+	runtime = time.Now()
+
+	// create the conntrack table
+	conntrackTable = make(map[string]ConntrackEntry)
+
+	// initialize the sessionIndex counter
+    // highest 16 bits are zero
+    // middle  32 bits should be epoch
+    // lowest  16 bits are zero
+    // this means that sessionIndex should be ever increasing despite restarts
+    // (unless there are more than 16 bits or 65k sessions per sec on average)
+	sessionIndex = ((uint64(runtime.Unix()) & 0xFFFFFFFF) << 16)
 }
 
 /*---------------------------------------------------------------------------*/
@@ -108,15 +108,14 @@ func NextSessionId() uint64 {
 	return(value)
 }
 /*---------------------------------------------------------------------------*/
-func Startup() {
-	runtime = time.Now()
-	conntrackTable = make(map[string]ConntrackEntry)
-
-    // highest 16 bits are zero
-    // middle  32 bits should be epoch
-    // lowest  16 bits are zero
-    // this means that sessionIndex should be ever increasing despite restarts
-    // (unless there are more than 16 bits or 65k sessions per sec on average)
-	sessionIndex = ((uint64(runtime.Unix()) & 0xFFFFFFFF) << 16)
+func FindConntrackEntry(finder string) (ConntrackEntry, bool) {
+	entry, status := conntrackTable[finder]
+	return entry, status
 }
+
+/*---------------------------------------------------------------------------*/
+func InsertConntrackEntry(finder string, entry ConntrackEntry) {
+	conntrackTable[finder] = entry
+}
+
 /*---------------------------------------------------------------------------*/

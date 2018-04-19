@@ -11,11 +11,13 @@
 struct conntrack_info
 {
 	u_int8_t	msg_type;
-	u_int32_t	orig_saddr,repl_saddr;
-	u_int32_t	orig_daddr,repl_daddr;
-	u_int16_t	orig_sport,repl_sport;
-	u_int16_t	orig_dport,repl_dport;
-	u_int8_t	orig_proto,repl_proto;
+	u_int8_t	orig_proto;
+	u_int32_t	orig_saddr;
+	u_int32_t	orig_daddr;
+	u_int16_t	orig_sport;
+	u_int16_t	orig_dport;
+	u_int64_t	orig_bytes;
+	u_int64_t	repl_bytes;
 };
 /*--------------------------------------------------------------------------*/
 extern void go_conntrack_callback(struct conntrack_info* info);
@@ -49,37 +51,30 @@ if (g_shutdown != 0) return(NFCT_CB_STOP);
 			return(NFCT_CB_CONTINUE);
 	}
 
-info.msg_type = type;
 info.orig_proto = nfct_get_attr_u8(ct,ATTR_ORIG_L4PROTO);
-info.repl_proto = nfct_get_attr_u8(ct,ATTR_REPL_L4PROTO);
-
-	if (info.orig_proto != info.repl_proto)
-	{
-	logmessage(LOG_WARNING,"Protocol mismatch %d != %d in conntrack handler\n",info.orig_proto,info.repl_proto);
-	return(NFCT_CB_CONTINUE);
-	}
 
 // ignore everything except TCP and UDP
 if ((info.orig_proto != IPPROTO_TCP) && (info.orig_proto != IPPROTO_UDP)) return(NFCT_CB_CONTINUE);
 
-// get all of the source and destination addresses
+// get the source and destination addresses
 info.orig_saddr = nfct_get_attr_u32(ct,ATTR_ORIG_IPV4_SRC);
 info.orig_daddr = nfct_get_attr_u32(ct,ATTR_ORIG_IPV4_DST);
-info.repl_saddr = nfct_get_attr_u32(ct,ATTR_REPL_IPV4_SRC);
-info.repl_daddr = nfct_get_attr_u32(ct,ATTR_REPL_IPV4_DST);
 
 // ignore anything on the loopback interface by looking at the least
 // significant byte because these values are in network byte order
 if ((info.orig_saddr & 0x000000FF) == 0x0000007F) return(NFCT_CB_CONTINUE);
 if ((info.orig_daddr & 0x000000FF) == 0x0000007F) return(NFCT_CB_CONTINUE);
-if ((info.repl_saddr & 0x000000FF) == 0x0000007F) return(NFCT_CB_CONTINUE);
-if ((info.repl_daddr & 0x000000FF) == 0x0000007F) return(NFCT_CB_CONTINUE);
+
+// save the conntrack message type
+info.msg_type = type;
 
 // get all of the source and destination ports
-info.orig_sport = ntohs(nfct_get_attr_u16(ct,ATTR_ORIG_PORT_SRC));
-info.orig_dport = ntohs(nfct_get_attr_u16(ct,ATTR_ORIG_PORT_DST));
-info.repl_sport = ntohs(nfct_get_attr_u16(ct,ATTR_REPL_PORT_SRC));
-info.repl_dport = ntohs(nfct_get_attr_u16(ct,ATTR_REPL_PORT_DST));
+info.orig_sport = be16toh(nfct_get_attr_u16(ct,ATTR_ORIG_PORT_SRC));
+info.orig_dport = be16toh(nfct_get_attr_u16(ct,ATTR_ORIG_PORT_DST));
+
+// get the byte counts
+info.orig_bytes = be64toh(nfct_get_attr_u64(ct,ATTR_ORIG_COUNTER_BYTES));
+info.repl_bytes = be64toh(nfct_get_attr_u64(ct,ATTR_REPL_COUNTER_BYTES));
 
 go_conntrack_callback(&info);
 

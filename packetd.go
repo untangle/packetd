@@ -8,10 +8,12 @@ package main
 import "C"
 
 import "os"
+import "net"
 import "time"
 import "sync"
 import "bufio"
 import "unsafe"
+import "encoding/binary"
 import "github.com/untangle/packetd/support"
 import "github.com/untangle/packetd/example"
 import "github.com/untangle/packetd/classify"
@@ -154,22 +156,70 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int) int32 {
 /*---------------------------------------------------------------------------*/
 //export go_conntrack_callback
 func go_conntrack_callback(info *C.struct_conntrack_info) {
-	var tracker support.Tracker
+	var tuple support.Tuple
+	var entry support.ConntrackEntry
 
-	tracker.Orig_src_addr = uint32(info.orig_saddr)
-	tracker.Repl_src_addr = uint32(info.repl_saddr)
-	tracker.Orig_dst_addr = uint32(info.orig_daddr)
-	tracker.Repl_dst_addr = uint32(info.repl_daddr)
-	tracker.Orig_src_port = uint16(info.orig_sport)
-	tracker.Repl_src_port = uint16(info.repl_sport)
-	tracker.Orig_dst_port = uint16(info.orig_dport)
-	tracker.Repl_dst_port = uint16(info.repl_dport)
-	tracker.Orig_protocol = uint8(info.orig_proto)
-	tracker.Repl_protocol = uint8(info.repl_proto)
+	var ok bool
+
+	tuple.Protocol = uint8(info.orig_proto)
+
+	tuple.ClientAddr = make(net.IP, 4)
+	binary.LittleEndian.PutUint32(tuple.ClientAddr, uint32(info.orig_saddr))
+	tuple.ClientPort = uint16(info.orig_sport)
+
+	tuple.ServerAddr = make(net.IP, 4)
+	binary.LittleEndian.PutUint32(tuple.ServerAddr, uint32(info.orig_daddr))
+	tuple.ServerPort = uint16(info.orig_dport)
+
+	finder := support.Tuple2String(tuple)
+
+	// if we have a conntrack entry update it
+	if entry, ok = support.FindConntrackEntry(finder); ok {
+		support.LogMessage("Found %s in table\n", finder)
+		entry.UpdateCount++
+
+		oldC2sBytes := entry.C2Sbytes
+		newC2sBytes := uint64(info.orig_bytes)
+		oldS2cBytes := entry.S2Cbytes
+		newS2cBytes := uint64(info.repl_bytes)
+		oldTotalBytes := entry.TotalBytes
+		newTotalBytes := (newC2sBytes + newS2cBytes)
+		diffC2sBytes := (newC2sBytes - oldC2sBytes)
+		diffS2cBytes := (newS2cBytes - oldS2cBytes)
+		diffTotalBytes := (newTotalBytes - oldTotalBytes)
+		c2sRate := float32(diffC2sBytes / 60)
+		s2cRate := float32(diffS2cBytes / 60)
+		totalRate := float32(diffTotalBytes / 60)
+
+		// In some cases, specifically UDP, a new session takes the place of an old session with the same tuple.
+		// In this case the counts go down because its actually a new session.
+		// If the total bytes is low, this is probably the case and just assume it went from zero to current total bytes
+		// If not, just discard the event with a warning
+		if ((diffC2sBytes < 0) || (diffS2cBytes < 0)) {
+			return
+		}
+
+		entry.C2Sbytes = newC2sBytes
+		entry.S2Cbytes = newS2cBytes
+		entry.TotalBytes = newTotalBytes
+		entry.C2Srate = c2sRate
+		entry.S2Crate = s2cRate
+		entry.TotalRate = totalRate
+	// not found so create new conntrack entry
+	} else {
+		entry.SessionId = support.NextSessionId()
+		entry.SessionCreation = time.Now()
+		entry.SessionTuple = tuple
+		entry.UpdateCount = 0
+		entry.C2Sbytes = uint64(info.orig_bytes)
+		entry.S2Cbytes = uint64(info.repl_bytes)
+		support.InsertConntrackEntry(finder, entry)
+		support.LogMessage("Adding %s to table\n", finder)
+	}
 
 	// ********** Call all plugin conntrack handler functions here
 
-	go example.Plugin_conntrack_handler(&tracker)
+	go example.Plugin_conntrack_handler(&entry)
 
 	// ********** End of plugin netfilter callback functions
 
