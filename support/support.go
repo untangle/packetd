@@ -7,6 +7,7 @@ import "sync"
 
 var runtime time.Time
 var conntrackTable map[string]ConntrackEntry
+var conntrackMutex sync.Mutex
 var sessionMutex sync.Mutex
 var sessionIndex uint64
 
@@ -23,6 +24,7 @@ type Tuple  struct {
 type ConntrackEntry struct {
 	SessionId			uint64
 	SessionCreation		time.Time
+	SessionActivity		time.Time
 	SessionTuple		Tuple
 	UpdateCount			uint64
 	C2Sbytes			uint64
@@ -31,6 +33,7 @@ type ConntrackEntry struct {
 	C2Srate				float32
 	S2Crate				float32
 	TotalRate			float32
+	PurgeFlag			bool
 }
 
 /*---------------------------------------------------------------------------*/
@@ -109,13 +112,39 @@ func NextSessionId() uint64 {
 }
 /*---------------------------------------------------------------------------*/
 func FindConntrackEntry(finder string) (ConntrackEntry, bool) {
+	conntrackMutex.Lock()
 	entry, status := conntrackTable[finder]
+	conntrackMutex.Unlock()
 	return entry, status
 }
 
 /*---------------------------------------------------------------------------*/
 func InsertConntrackEntry(finder string, entry ConntrackEntry) {
+	conntrackMutex.Lock()
 	conntrackTable[finder] = entry
+	conntrackMutex.Unlock()
+}
+
+/*---------------------------------------------------------------------------*/
+func RemoveConntrackEntry(finder string) {
+	conntrackMutex.Lock()
+	delete(conntrackTable, finder)
+	conntrackMutex.Unlock()
+}
+/*---------------------------------------------------------------------------*/
+func CleanConntrackTable() {
+	var counter int = 0
+	nowtime := time.Now()
+
+	for key, val := range conntrackTable {
+		if (val.PurgeFlag == false) { continue }
+		if ((nowtime.Unix() - val.SessionActivity.Unix()) < 60) { continue }
+		RemoveConntrackEntry(key)
+		counter++
+		LogMessage("Removing %s from table\n", key)
+	}
+
+	LogMessage("REMOVED:%d REMAINING:%d\n",counter, len(conntrackTable))
 }
 
 /*---------------------------------------------------------------------------*/

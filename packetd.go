@@ -94,6 +94,7 @@ stdinloop:
 				counter++
 				support.LogMessage("Calling perodic conntrack dump %d\n", counter)
 				C.conntrack_dump()
+				support.CleanConntrackTable()
 			}
 		}
 	}
@@ -173,53 +174,68 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 
 	finder := support.Tuple2String(tuple)
 
-	// if we have a conntrack entry update it
+	/*
+	 * If we already have a conntrack entry update the existing, otherwise
+	 * create a new entry for the table.
+	 */
 	if entry, ok = support.FindConntrackEntry(finder); ok {
 		support.LogMessage("Found %s in table\n", finder)
 		entry.UpdateCount++
-
-		oldC2sBytes := entry.C2Sbytes
-		newC2sBytes := uint64(info.orig_bytes)
-		oldS2cBytes := entry.S2Cbytes
-		newS2cBytes := uint64(info.repl_bytes)
-		oldTotalBytes := entry.TotalBytes
-		newTotalBytes := (newC2sBytes + newS2cBytes)
-		diffC2sBytes := (newC2sBytes - oldC2sBytes)
-		diffS2cBytes := (newS2cBytes - oldS2cBytes)
-		diffTotalBytes := (newTotalBytes - oldTotalBytes)
-		c2sRate := float32(diffC2sBytes / 60)
-		s2cRate := float32(diffS2cBytes / 60)
-		totalRate := float32(diffTotalBytes / 60)
-
-		// In some cases, specifically UDP, a new session takes the place of an old session with the same tuple.
-		// In this case the counts go down because its actually a new session.
-		// If the total bytes is low, this is probably the case and just assume it went from zero to current total bytes
-		// If not, just discard the event with a warning
-		if ((diffC2sBytes < 0) || (diffS2cBytes < 0)) {
-			return
-		}
-
-		entry.C2Sbytes = newC2sBytes
-		entry.S2Cbytes = newS2cBytes
-		entry.TotalBytes = newTotalBytes
-		entry.C2Srate = c2sRate
-		entry.S2Crate = s2cRate
-		entry.TotalRate = totalRate
-	// not found so create new conntrack entry
 	} else {
+		support.LogMessage("Adding %s to table\n", finder)
 		entry.SessionId = support.NextSessionId()
 		entry.SessionCreation = time.Now()
 		entry.SessionTuple = tuple
-		entry.UpdateCount = 0
-		entry.C2Sbytes = uint64(info.orig_bytes)
-		entry.S2Cbytes = uint64(info.repl_bytes)
-		support.InsertConntrackEntry(finder, entry)
-		support.LogMessage("Adding %s to table\n", finder)
+		entry.UpdateCount = 1
 	}
+
+	oldC2sBytes := entry.C2Sbytes
+	oldS2cBytes := entry.S2Cbytes
+	oldTotalBytes := entry.TotalBytes
+	newC2sBytes := uint64(info.orig_bytes)
+	newS2cBytes := uint64(info.repl_bytes)
+	newTotalBytes := (newC2sBytes + newS2cBytes)
+	diffC2sBytes := (newC2sBytes - oldC2sBytes)
+	diffS2cBytes := (newS2cBytes - oldS2cBytes)
+	diffTotalBytes := (newTotalBytes - oldTotalBytes)
+
+	// In some cases, specifically UDP, a new session takes the place of an old session with the same tuple.
+	// In this case the counts go down because its actually a new session. If the total bytes is low, this
+	// is probably the case so treat it as a new entry.
+	if (diffC2sBytes < 0) || (diffS2cBytes < 0) {
+		newC2sBytes = uint64(info.orig_bytes)
+		diffC2sBytes = newC2sBytes
+		newS2cBytes = uint64(info.repl_bytes)
+		diffS2cBytes = newS2cBytes
+		newTotalBytes = (newC2sBytes + newS2cBytes)
+		diffTotalBytes = newTotalBytes
+		return
+	}
+
+	c2sRate := float32(diffC2sBytes / 60)
+	s2cRate := float32(diffS2cBytes / 60)
+	totalRate := float32(diffTotalBytes / 60)
+
+	entry.C2Sbytes = newC2sBytes
+	entry.S2Cbytes = newS2cBytes
+	entry.TotalBytes = newTotalBytes
+	entry.C2Srate = c2sRate
+	entry.S2Crate = s2cRate
+	entry.TotalRate = totalRate
+
+	entry.SessionActivity = time.Now()
+
+	if info.msg_type == 'D' {
+		entry.PurgeFlag = true
+	} else {
+		entry.PurgeFlag = false
+	}
+
+	support.InsertConntrackEntry(finder, entry)
 
 	// ********** Call all plugin conntrack handler functions here
 
-	go example.Plugin_conntrack_handler(&entry)
+	go example.Plugin_conntrack_handler(int(info.msg_type), &entry)
 
 	// ********** End of plugin netfilter callback functions
 

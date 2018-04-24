@@ -27,13 +27,17 @@ func Plugin_netfilter_handler(ch chan<- int32,buffer []byte, length int) {
 }
 
 /*---------------------------------------------------------------------------*/
-func Plugin_conntrack_handler(entry *support.ConntrackEntry) {
-	fmt.Printf("CONNTRACK PROTO:%d SADDR:%s SPORT:%d DADDR:%s DPORT:%d\n",
+func Plugin_conntrack_handler(message int, entry *support.ConntrackEntry) {
+	fmt.Printf("CONNTRACK MSG:%c PROTO:%d SADDR:%s SPORT:%d DADDR:%s DPORT:%d TX:%d RX:%d UC:%d\n",
+		message,
 		entry.SessionTuple.Protocol,
 		entry.SessionTuple.ClientAddr,
 		entry.SessionTuple.ClientPort,
 		entry.SessionTuple.ServerAddr,
-		entry.SessionTuple.ServerPort)
+		entry.SessionTuple.ServerPort,
+		entry.C2Sbytes,
+		entry.S2Cbytes,
+		entry.UpdateCount)
 }
 
 /*---------------------------------------------------------------------------*/

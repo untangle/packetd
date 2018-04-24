@@ -31,6 +31,7 @@ static u_int64_t			tracker_unknown;
 static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrack *ct,void *data)
 {
 struct conntrack_info	info;
+char					opcode;
 
 // if the shutdown flag is set return stop to interrupt nfct_catch
 if (g_shutdown != 0) return(NFCT_CB_STOP);
@@ -38,14 +39,17 @@ if (g_shutdown != 0) return(NFCT_CB_STOP);
 	switch(type)
 	{
 		case NFCT_T_NEW:
-		case NFCT_T_UPDATE:
-		case NFCT_T_DESTROY:
+			info.msg_type = 'N';
 			break;
-
+		case NFCT_T_UPDATE:
+			info.msg_type = 'U';
+			break;
+		case NFCT_T_DESTROY:
+			info.msg_type = 'D';
+			break;
 		case NFCT_T_ERROR:
 			tracker_error++;
 			return(NFCT_CB_CONTINUE);
-
 		default:
 			tracker_unknown++;
 			return(NFCT_CB_CONTINUE);
@@ -65,16 +69,13 @@ info.orig_daddr = nfct_get_attr_u32(ct,ATTR_ORIG_IPV4_DST);
 if ((info.orig_saddr & 0x000000FF) == 0x0000007F) return(NFCT_CB_CONTINUE);
 if ((info.orig_daddr & 0x000000FF) == 0x0000007F) return(NFCT_CB_CONTINUE);
 
-// save the conntrack message type
-info.msg_type = type;
-
 // get all of the source and destination ports
 info.orig_sport = be16toh(nfct_get_attr_u16(ct,ATTR_ORIG_PORT_SRC));
 info.orig_dport = be16toh(nfct_get_attr_u16(ct,ATTR_ORIG_PORT_DST));
 
 // get the byte counts
-info.orig_bytes = be64toh(nfct_get_attr_u64(ct,ATTR_ORIG_COUNTER_BYTES));
-info.repl_bytes = be64toh(nfct_get_attr_u64(ct,ATTR_REPL_COUNTER_BYTES));
+info.orig_bytes = nfct_get_attr_u64(ct,ATTR_ORIG_COUNTER_BYTES);
+info.repl_bytes = nfct_get_attr_u64(ct,ATTR_REPL_COUNTER_BYTES);
 
 go_conntrack_callback(&info);
 
