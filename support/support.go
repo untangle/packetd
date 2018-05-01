@@ -4,9 +4,12 @@ import "fmt"
 import "net"
 import "time"
 import "sync"
+import "crypto/x509"
 
 var runtime time.Time
+var sessionTable map[string]SessionEntry
 var conntrackTable map[string]ConntrackEntry
+var certificateTable map[string]CertificateHolder
 var conntrackMutex sync.Mutex
 var sessionMutex sync.Mutex
 var sessionIndex uint64
@@ -18,6 +21,18 @@ type Tuple  struct {
 	ClientPort			uint16
 	ServerAddr			net.IP
 	ServerPort			uint16
+}
+
+/*---------------------------------------------------------------------------*/
+type SessionEntry struct {
+	SessionId			uint64
+	SessionCreation		time.Time
+	SessionActivity		time.Time
+	SessionTuple		Tuple
+	UpdateCount			uint64
+	ServerCertificate	x509.Certificate
+	ClientLocation		string
+	ServerLocation		string
 }
 
 /*---------------------------------------------------------------------------*/
@@ -50,6 +65,11 @@ type Logger struct {
 	Prefix		string
 }
 
+/*---------------------------------------------------------------------------*/
+type CertificateHolder struct {
+	CreationTime		time.Time
+	Certificate			x509.Certificate
+}
 /*---------------------------------------------------------------------------*/
 func Startup() {
 	// capture startup time
@@ -111,6 +131,43 @@ func NextSessionId() uint64 {
 	return(value)
 }
 /*---------------------------------------------------------------------------*/
+func FindSessionEntry(finder string) (SessionEntry, bool) {
+	sessionMutex.Lock()
+	entry, status := sessionTable[finder]
+	sessionMutex.Unlock()
+	return entry, status
+}
+
+/*---------------------------------------------------------------------------*/
+func InsertSessionEntry(finder string, entry SessionEntry) {
+	sessionMutex.Lock()
+	sessionTable[finder] = entry
+	sessionMutex.Unlock()
+}
+
+/*---------------------------------------------------------------------------*/
+func RemoveSessionEntry(finder string) {
+	sessionMutex.Lock()
+	delete(sessionTable, finder)
+	sessionMutex.Unlock()
+}
+/*---------------------------------------------------------------------------*/
+func CleanSessionTable() {
+	var counter int = 0
+	nowtime := time.Now()
+
+	for key, val := range conntrackTable {
+		if (val.PurgeFlag == false) { continue }
+		if ((nowtime.Unix() - val.SessionActivity.Unix()) < 60) { continue }
+		RemoveSessionEntry(key)
+		counter++
+		LogMessage("Removing %s from table\n", key)
+	}
+
+	LogMessage("SESSION REMOVED:%d REMAINING:%d\n",counter, len(sessionTable))
+}
+
+/*---------------------------------------------------------------------------*/
 func FindConntrackEntry(finder string) (ConntrackEntry, bool) {
 	conntrackMutex.Lock()
 	entry, status := conntrackTable[finder]
@@ -144,7 +201,7 @@ func CleanConntrackTable() {
 		LogMessage("Removing %s from table\n", key)
 	}
 
-	LogMessage("REMOVED:%d REMAINING:%d\n",counter, len(conntrackTable))
+	LogMessage("CONNTRACK REMOVED:%d REMAINING:%d\n",counter, len(conntrackTable))
 }
 
 /*---------------------------------------------------------------------------*/

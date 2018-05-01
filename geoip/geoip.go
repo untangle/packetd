@@ -49,6 +49,9 @@ func Plugin_netfilter_handler(ch chan<- int32,buffer []byte, length int) {
 		support.LogMessage("SRC: %s = %s\n",addr.SrcIP,SrcCode)
 		support.LogMessage("DST: %s = %s\n",addr.DstIP,DstCode)
 	}
+
+	// TODO - store the country values in the session object
+
 	ch <- 4
 }
 

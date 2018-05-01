@@ -39,6 +39,8 @@ func Plugin_netfilter_handler(ch chan<- int32,buffer []byte, length int) {
 	ptr := (*C.uchar)(unsafe.Pointer(&buffer[0]))
 	C.vendor_classify(ptr, C.int(length))
 
+	// TODO - put the classification in the session object
+
 	// use the channel to return our mark bits
 	ch <- 2
 }

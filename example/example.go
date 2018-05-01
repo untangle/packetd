@@ -3,8 +3,9 @@ package example
 import "fmt"
 import "sync"
 import "encoding/hex"
-
 import "github.com/untangle/packetd/support"
+import "github.com/google/gopacket"
+import "github.com/google/gopacket/layers"
 
 /*---------------------------------------------------------------------------*/
 func Plugin_Startup(childsync *sync.WaitGroup) {
@@ -20,7 +21,12 @@ func Plugin_Goodbye(childsync *sync.WaitGroup) {
 
 /*---------------------------------------------------------------------------*/
 func Plugin_netfilter_handler(ch chan<- int32,buffer []byte, length int) {
-	fmt.Println(hex.Dump(buffer))
+	packet := gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
+	ipLayer := packet.Layer(layers.LayerTypeIPv4)
+	if (ipLayer != nil) {
+		addr := ipLayer.(*layers.IPv4)
+		fmt.Printf("NETFILTER %d BYTES FROM %s\n%s\n",length, addr.SrcIP, hex.Dump(buffer))
+	}
 
 	// use the channel to return our mark bits
 	ch <- 1

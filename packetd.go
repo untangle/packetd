@@ -8,16 +8,20 @@ package main
 import "C"
 
 import "os"
+import "fmt"
 import "net"
 import "time"
 import "sync"
 import "bufio"
 import "unsafe"
 import "encoding/binary"
+import "github.com/google/gopacket"
+import "github.com/google/gopacket/layers"
 import "github.com/untangle/packetd/support"
 import "github.com/untangle/packetd/example"
 import "github.com/untangle/packetd/classify"
 import "github.com/untangle/packetd/geoip"
+import "github.com/untangle/packetd/certcache"
 import "github.com/untangle/packetd/restd"
 
 /*---------------------------------------------------------------------------*/
@@ -50,6 +54,10 @@ func main() {
 	go example.Plugin_Startup(&childsync)
 	go classify.Plugin_Startup(&childsync)
 	go geoip.Plugin_Startup(&childsync)
+	go certcache.Plugin_Startup(&childsync)
+
+	// Start REST HTTP daemon
+	go restd.StartRestDaemon()
 
 	// ********** End of plugin startup functions
 
@@ -66,9 +74,6 @@ func main() {
 		}
 		close(ch)
 	}(ch)
-
-	// Start REST HTTP daemon
-	go restd.StartRestDaemon()
 
 	support.LogMessage("RUNNING ON CONSOLE - HIT ENTER TO EXIT\n")
 
@@ -104,6 +109,7 @@ stdinloop:
 	go example.Plugin_Goodbye(&childsync)
 	go classify.Plugin_Goodbye(&childsync)
 	go geoip.Plugin_Goodbye(&childsync)
+	go certcache.Plugin_Goodbye(&childsync)
 
 	// ********** End of plugin goodbye functions
 
@@ -117,12 +123,71 @@ stdinloop:
 //export go_netfilter_callback
 func go_netfilter_callback(mark C.int, data *C.uchar, size C.int) int32 {
 
-	// this version creates a Go copy of the buffer
+	// ***** this version creates a Go copy of the buffer = SLOWER
 	// buffer := C.GoBytes(unsafe.Pointer(data),size)
 
-	// this version creates a Go pointer to the buffer
+	// ***** this version creates a Go pointer to the buffer = FASTER
 	buffer := (*[0xFFFF]byte)(unsafe.Pointer(data))[:int(size):int(size)]
+
+	// convert the C integer to a Go integer
 	length := int(size)
+
+	// get the existing mark on the packet
+	var pmark int32 = int32(C.int(mark))
+
+	// make a gopacket from the raw packet data
+	packet := gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
+
+	// get the  IPv4 layer
+	ipLayer := packet.Layer(layers.LayerTypeIPv4)
+	if ipLayer == nil {
+		return (pmark)
+	}
+	ip := ipLayer.(*layers.IPv4)
+
+	var srcport, dstport uint16
+
+	// get the TCP layer
+	tcpLayer := packet.Layer(layers.LayerTypeTCP)
+	if tcpLayer != nil {
+		tcp := tcpLayer.(*layers.TCP)
+		srcport = uint16(tcp.SrcPort)
+		dstport = uint16(tcp.DstPort)
+	}
+
+	// get the UDP layer
+	udpLayer := packet.Layer(layers.LayerTypeUDP)
+	if udpLayer != nil {
+		udp := udpLayer.(*layers.UDP)
+		srcport = uint16(udp.SrcPort)
+		dstport = uint16(udp.DstPort)
+	}
+
+	// right now we only care about TCP and UDP
+	if (tcpLayer == nil) && (udpLayer == nil) {
+		return (pmark)
+	}
+
+	var entry support.SessionEntry
+	var ok bool
+
+	finder := fmt.Sprintf("%d|%s:%d-%s:%d", uint8(ip.Protocol), ip.SrcIP, srcport, ip.DstIP, dstport)
+
+	/*
+	 * If we already have a session entry update the existing, otherwise
+	 * create a new entry for the table.
+	 */
+	if entry, ok = support.FindSessionEntry(finder); ok {
+		support.LogMessage("SESSION Found %s in table\n", finder)
+		entry.UpdateCount++
+	} else {
+		support.LogMessage("SESSION Adding %s to table\n", finder)
+		entry.SessionId = support.NextSessionId()
+		entry.SessionCreation = time.Now()
+		entry.UpdateCount = 1
+	}
+
+	// TODO - pass the gopacket to the handlers instead of the raw buffer
 
 	// ********** Call all plugin netfilter handler functions here
 
@@ -134,9 +199,6 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int) int32 {
 	go geoip.Plugin_netfilter_handler(c3, buffer, length)
 
 	// ********** End of plugin netfilter callback functions
-
-	// get the existing mark on the packet
-	var pmark int32 = int32(C.int(mark))
 
 	// add the mark bits returned from each package handler
 	for i := 0; i < 2; i++ {
@@ -179,10 +241,10 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	 * create a new entry for the table.
 	 */
 	if entry, ok = support.FindConntrackEntry(finder); ok {
-		support.LogMessage("Found %s in table\n", finder)
+		support.LogMessage("CONNTRACK Found %s in table\n", finder)
 		entry.UpdateCount++
 	} else {
-		support.LogMessage("Adding %s to table\n", finder)
+		support.LogMessage("CONNTRACK Adding %s to table\n", finder)
 		entry.SessionId = support.NextSessionId()
 		entry.SessionCreation = time.Now()
 		entry.SessionTuple = tuple
@@ -236,6 +298,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	// ********** Call all plugin conntrack handler functions here
 
 	go example.Plugin_conntrack_handler(int(info.msg_type), &entry)
+	go certcache.Plugin_conntrack_handler(int(info.msg_type), &entry)
 
 	// ********** End of plugin netfilter callback functions
 
