@@ -8,7 +8,6 @@ package main
 import "C"
 
 import "os"
-import "fmt"
 import "net"
 import "time"
 import "sync"
@@ -100,6 +99,7 @@ stdinloop:
 				support.LogMessage("Calling perodic conntrack dump %d\n", counter)
 				C.conntrack_dump()
 				support.CleanConntrackTable()
+				support.CleanCertificateTable()
 			}
 		}
 	}
@@ -145,22 +145,25 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int) int32 {
 	}
 	ip := ipLayer.(*layers.IPv4)
 
-	var srcport, dstport uint16
+	var tuple support.Tuple
+	tuple.Protocol = uint8(ip.Protocol)
+	tuple.ClientAddr = ip.SrcIP
+	tuple.ServerAddr = ip.DstIP
 
 	// get the TCP layer
 	tcpLayer := packet.Layer(layers.LayerTypeTCP)
 	if tcpLayer != nil {
 		tcp := tcpLayer.(*layers.TCP)
-		srcport = uint16(tcp.SrcPort)
-		dstport = uint16(tcp.DstPort)
+		tuple.ClientPort = uint16(tcp.SrcPort)
+		tuple.ServerPort = uint16(tcp.DstPort)
 	}
 
 	// get the UDP layer
 	udpLayer := packet.Layer(layers.LayerTypeUDP)
 	if udpLayer != nil {
 		udp := udpLayer.(*layers.UDP)
-		srcport = uint16(udp.SrcPort)
-		dstport = uint16(udp.DstPort)
+		tuple.ClientPort = uint16(udp.SrcPort)
+		tuple.ServerPort = uint16(udp.DstPort)
 	}
 
 	// right now we only care about TCP and UDP
@@ -171,7 +174,7 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int) int32 {
 	var entry support.SessionEntry
 	var ok bool
 
-	finder := fmt.Sprintf("%d|%s:%d-%s:%d", uint8(ip.Protocol), ip.SrcIP, srcport, ip.DstIP, dstport)
+	finder := support.Tuple2String(tuple)
 
 	/*
 	 * If we already have a session entry update the existing, otherwise
@@ -197,6 +200,8 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int) int32 {
 	go classify.Plugin_netfilter_handler(c2, buffer, length)
 	c3 := make(chan int32)
 	go geoip.Plugin_netfilter_handler(c3, buffer, length)
+	c4 := make(chan int32)
+	go certcache.Plugin_netfilter_handler(c4, tuple)
 
 	// ********** End of plugin netfilter callback functions
 
@@ -298,7 +303,6 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	// ********** Call all plugin conntrack handler functions here
 
 	go example.Plugin_conntrack_handler(int(info.msg_type), &entry)
-	go certcache.Plugin_conntrack_handler(int(info.msg_type), &entry)
 
 	// ********** End of plugin netfilter callback functions
 

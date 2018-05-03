@@ -35,7 +35,7 @@ func Plugin_Goodbye(childsync *sync.WaitGroup) {
 }
 
 /*---------------------------------------------------------------------------*/
-func Plugin_netfilter_handler(ch chan<- int32,buffer []byte, length int) {
+func Plugin_netfilter_handler(ch chan<- int32, buffer []byte, length int) {
 	ptr := (*C.uchar)(unsafe.Pointer(&buffer[0]))
 	C.vendor_classify(ptr, C.int(length))
 

@@ -20,12 +20,12 @@ func Plugin_Goodbye(childsync *sync.WaitGroup) {
 }
 
 /*---------------------------------------------------------------------------*/
-func Plugin_netfilter_handler(ch chan<- int32,buffer []byte, length int) {
+func Plugin_netfilter_handler(ch chan<- int32, buffer []byte, length int) {
 	packet := gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
 	ipLayer := packet.Layer(layers.LayerTypeIPv4)
-	if (ipLayer != nil) {
+	if ipLayer != nil {
 		addr := ipLayer.(*layers.IPv4)
-		fmt.Printf("NETFILTER %d BYTES FROM %s\n%s\n",length, addr.SrcIP, hex.Dump(buffer))
+		fmt.Printf("NETFILTER %d BYTES FROM %s\n%s\n", length, addr.SrcIP, hex.Dump(buffer))
 	}
 
 	// use the channel to return our mark bits
