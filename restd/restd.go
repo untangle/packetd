@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/untangle/packetd/reports"
+	"github.com/untangle/packetd/settings"
 	"io/ioutil"
 	"strconv"
 	"strings"
@@ -66,133 +67,52 @@ func reportsCreateQuery(c *gin.Context) {
 }
 
 func getSettings(c *gin.Context) {
+	var segments []string
+
 	path := c.Param("path")
-	jsonObject, err := readSettingsFile()
-	if err != nil {
-		c.JSON(200, gin.H{"error": err})
-		return
-	}
-	if path != "" {
-		segments := removeEmptyStrings(strings.Split(path, "/"))
-		lastValue := ""
-		for _, value := range segments {
-			if value != "" {
-				j, ok := jsonObject.(map[string]interface{})
-				if ok {
-					jsonObject = j[value]
-					if jsonObject == nil {
-						c.JSON(200, gin.H{"error": "Attribute " + value + " not found in JSON object"})
-						return
-					}
-				} else {
-					c.JSON(200, gin.H{"error": "Map " + lastValue + " not found in JSON object"})
-					return
-				}
-			}
-			lastValue = value
-		}
+
+	if path == "" {
+		segments = nil
+	} else {
+		segments = removeEmptyStrings(strings.Split(path, "/"))
 	}
 
-	c.JSON(200, jsonObject)
+	jsonResult := settings.GetSettings(segments)
+	c.JSON(200, jsonResult)
 	return
 }
 
 func setSettings(c *gin.Context) {
+	var segments []string
+	var bodyJsonObject interface{}
 	path := c.Param("path")
-	var bodyString []byte
+
+	if path == "" {
+		segments = nil
+	} else {
+		segments = removeEmptyStrings(strings.Split(path, "/"))
+	}
 
 	bodyString, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
 		c.JSON(200, gin.H{"error": err})
 		return
 	}
-
-	var jsonObject interface{}
-	var bodyJsonObject interface{}
-	var iterJsonObject map[string]interface{}
-	var jsonObjectCast map[string]interface{}
-	var ok bool
-
 	err = json.Unmarshal(bodyString, &bodyJsonObject)
-	if err != nil {
-		bodyJsonObject = nil
-	}
-
-	if path != "" {
-		jsonObject, err = readSettingsFile()
-		if err != nil {
-			c.JSON(200, gin.H{"error": err})
-			return
-		}
-
-		segments := removeEmptyStrings(strings.Split(path, "/"))
-
-		jsonObjectCast, ok = jsonObject.(map[string]interface{})
-		if !ok {
-			c.JSON(200, gin.H{"error": "Invalid settings JSON object", "json": jsonObject})
-			return
-		}
-		iterJsonObject = jsonObjectCast
-
-		for i, value := range segments {
-			//if this is the last value, set and break
-			if i == len(segments)-1 {
-				if bodyJsonObject != nil {
-					iterJsonObject[value] = bodyJsonObject
-				} else {
-					iterJsonObject[value] = string(bodyString)
-				}
-				break
-			}
-
-			// otherwise recurse down object
-			// 3 cases:
-			// if json[foo] does not exist, create a map
-			// if json[foo] exists and is a map, recurse
-			// if json[foo] exists and is not a map (its some value)
-			//    in this case we overwrite with a map, and recurse
-
-			if iterJsonObject[value] == nil {
-				newMap := make(map[string]interface{})
-				iterJsonObject[value] = newMap
-				iterJsonObject = newMap
-			} else {
-				jsonObjectCast, ok = iterJsonObject[value].(map[string]interface{})
-				iterJsonObject[value] = make(map[string]interface{})
-				if ok {
-					iterJsonObject[value] = jsonObjectCast
-					iterJsonObject = jsonObjectCast
-				} else {
-					newMap := make(map[string]interface{})
-					iterJsonObject[value] = newMap
-					iterJsonObject = newMap
-				}
-			}
-		}
-	} else {
-		if bodyJsonObject == nil {
-			c.JSON(200, gin.H{"error": "Invalid JSON"})
-			return
-		}
-
-		// if the path is empty, just use the whole body
-		jsonObject = bodyJsonObject
-	}
-
-	// Marshal it back to a string (with ident)
-	var jsonString []byte
-	jsonString, err = json.MarshalIndent(jsonObject, "", "  ")
-	if err != nil {
-		c.JSON(200, gin.H{"error": err})
+	// if its of type JSON then pass the JSON object
+	// otherwise just pass the raw string
+	if err == nil {
+		jsonResult := settings.SetSettings(segments, bodyJsonObject)
+		c.JSON(200, jsonResult)
 		return
 	}
 
-	err = ioutil.WriteFile("/etc/config/settings.json", jsonString, 0644)
-	if err != nil {
-		c.JSON(200, gin.H{"error": err})
-		return
-	}
-	c.JSON(200, gin.H{"result": "OK"})
+	// FIXME - its just a regular byte slice
+	// We should either cast to a number, boolean, or string
+	// currently assumes a string
+	jsonResult := settings.SetSettings(segments, string(bodyString))
+	c.JSON(200, jsonResult)
+	return
 }
 
 func StartRestDaemon() {
@@ -213,19 +133,6 @@ func StartRestDaemon() {
 	engine.Run()
 
 	fmt.Println("Started RestD")
-}
-
-func readSettingsFile() (interface{}, error) {
-	raw, err := ioutil.ReadFile("/etc/config/settings.json")
-	if err != nil {
-		return nil, err
-	}
-	var jsonObject interface{}
-	err = json.Unmarshal(raw, &jsonObject)
-	if err != nil {
-		return nil, err
-	}
-	return jsonObject, nil
 }
 
 func removeEmptyStrings(strings []string) []string {
