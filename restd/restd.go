@@ -1,7 +1,6 @@
 package restd
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/untangle/packetd/reports"
@@ -84,7 +83,6 @@ func getSettings(c *gin.Context) {
 
 func setSettings(c *gin.Context) {
 	var segments []string
-	var bodyJsonObject interface{}
 	path := c.Param("path")
 
 	if path == "" {
@@ -93,24 +91,12 @@ func setSettings(c *gin.Context) {
 		segments = removeEmptyStrings(strings.Split(path, "/"))
 	}
 
-	bodyString, err := ioutil.ReadAll(c.Request.Body)
+	body, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
 		c.JSON(200, gin.H{"error": err})
 		return
 	}
-	err = json.Unmarshal(bodyString, &bodyJsonObject)
-	// if its of type JSON then pass the JSON object
-	// otherwise just pass the raw string
-	if err == nil {
-		jsonResult := settings.SetSettings(segments, bodyJsonObject)
-		c.JSON(200, jsonResult)
-		return
-	}
-
-	// FIXME - its just a regular byte slice
-	// We should either cast to a number, boolean, or string
-	// currently assumes a string
-	jsonResult := settings.SetSettings(segments, string(bodyString))
+	jsonResult := settings.SetSettingsParse(segments, body)
 	c.JSON(200, jsonResult)
 	return
 }

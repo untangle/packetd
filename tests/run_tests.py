@@ -1,0 +1,344 @@
+#!/usr/bin/python3 -u
+import sys
+import getopt
+import signal
+import os
+import time
+import traceback
+import time
+import datetime
+sys.path.insert(0, './usr/lib/python%d.%d/' % sys.version_info[:2])
+
+import unittest
+import tests
+
+orig_stdout = sys.stdout
+orig_stderr = sys.stderr
+exit_flag = False
+interrupt_count = 0
+
+class ArgumentParser(object):
+    def __init__(self):
+        self.clientIP = "192.0.2.2"
+        self.hostUsername = None
+        self.hostKeyFile = None
+        self.verbosity = 2 # changed to default 2 because jcoffin
+        self.logfile = '/tmp/unittest.log'
+        self.fastfail = False
+        self.repeat = False
+        self.repeat_count = None
+        self.externalIntfId = 1
+        self.internalIntfId = 2
+        self.suitesToRun = ['all']
+        self.suitesToExclude = []
+        self.testsToRun = ['all']
+        self.testsToExclude = []
+        self.timedTests = True
+        self.quickTestsOnly = False
+
+    def set_clientIP( self, arg ):
+        self.clientIP = arg
+
+    def set_username( self, arg ):
+        self.username = arg
+
+    def set_keyfile( self, arg ):
+        self.password = arg
+
+    def set_logfile( self, arg ):
+        self.logfile = arg
+
+    def set_fastfail( self, arg ):
+        self.fastfail = True
+
+    def set_repeat( self, arg ):
+        self.repeat = True
+
+    def set_repeat_count( self, arg ):
+        self.repeat = True
+        self.repeat_count = int(arg)
+
+    def set_suitesToRun( self, arg ):
+        self.suitesToRun = arg.split(",")
+
+    def set_suitesToExclude( self, arg ):
+        self.suitesToExclude = arg.split(",")
+
+    def set_testsToRun( self, arg ):
+        self.testsToRun = arg.split(",")
+
+    def set_testsToExclude( self, arg ):
+        self.testsToExclude = arg.split(",")
+
+    def increase_verbosity( self, arg ):
+        self.verbosity += 1
+
+    def set_externalIntfId( self, arg ):
+        self.externalIntfId = arg
+
+    def set_internalIntfId( self, arg ):
+        self.internalIntfId = arg
+
+    def set_timedTests( self, arg ):
+        self.timedTests = True
+
+    def set_quickTestsOnly( self, arg ):
+        self.quickTestsOnly = True
+
+    def parse_args( self ):
+        handlers = {
+            '-h' : self.set_clientIP,
+            '-u' : self.set_username,
+            '-i' : self.set_keyfile,
+            '-l' : self.set_logfile,
+            '-v' : self.increase_verbosity,
+            '-q' : self.set_fastfail,
+            '-r' : self.set_repeat,
+            '-c' : self.set_repeat_count,
+            '-t' : self.set_suitesToRun,
+            '-T' : self.set_testsToRun,
+            '-e' : self.set_suitesToExclude,
+            '-E' : self.set_testsToExclude,
+            '-d' : self.set_externalIntfId,
+            '-s' : self.set_internalIntfId,
+            '-x' : self.set_timedTests,
+            '-z' : self.set_quickTestsOnly,
+        }
+
+        try:
+            (optlist, args) = getopt.getopt(sys.argv[1:], 'h:u:i:l:d:s:t:T:e:E:vqrc:xz')
+            for opt in optlist:
+                handlers[opt[0]](opt[1])
+            return args
+        except getopt.GetoptError as exc:
+            print(exc)
+            printUsage()
+            exit(1)
+
+def printUsage():
+    sys.stderr.write( """\
+%s Usage:
+  optional args:
+    -h <host>  : client host IP (behind Untangle)
+    -u <user>  : client host SSH login
+    -i <file>  : client host SSH identity (key) file
+    -l <file>  : log file
+    -d <int>   : interface ID of the external interface (outside) default: 1
+    -s <int>   : interface ID of the internal interface (client) default: 2
+    -t <suite> : comma seperated list test suites to run (default: "all") (exm: "web-filter,ad-blocker")
+    -T <test>  : comma seperated list tests within suites to run (default: "all") (exm: "test_010_clientOnline")
+    -e <suite> : comma seperated list test suites to EXCLUDE (default: "all") (exm: "web-filter,ad-blocker")
+    -E <test>  : comma seperated list tests within suites to EXCLUDE (default: "all") (exm: "test_010_clientOnline")
+    -v         : verbose (can be specified more than one time)
+    -q         : quit on first failure
+    -r         : repeat test indefinitely or until repeat count if specified (or until failure if -q is specified)
+    -c <count> : repeat test count
+    -x         : time testsuite and display elapsed seconds
+    -z         : skip lengthly test suites
+""" % sys.argv[0] )
+
+def signal_handler(signal, frame):
+    global orig_stdout, exit_flag, interrupt_count
+    interrupt_count = interrupt_count + 1
+    orig_stdout.write("Interrupt...\n")
+    orig_stdout.flush()
+    if interrupt_count > 4:
+        sys.exit(1)
+    else:
+        exit_flag = True;
+
+def exit(code):
+    global parser
+    if (code != 0):
+        print("")
+        print("More details found in %s" % parser.logfile)
+    sys.exit(code)
+
+def runTestSuite(suite):
+    global parser
+    global logfile
+    global exit_flag
+    
+    if exit_flag:
+        return
+    
+    print("== testing %s ==" % suite.moduleName())
+    tests_list = unittest.TestLoader().loadTestsFromTestCase(suite)
+    failCount = 0
+    skipCount = 0  # number of skipped tests.
+    totalCount = 0
+    timeString = ""
+    if (parser.timedTests):
+        suiteStartTime = time.time()
+
+    sys.stdout = logfile
+    sys.stderr = logfile
+    if "initialSetUp" in dir(suite):
+        try:
+            suite.initialSetUp(suite)
+        except Exception as e:
+            print("initialSetUp exception: ")
+            traceback.print_exc()
+            unittest.skip("initialSetUp exception: ")(suite)
+    sys.stdout = orig_stdout
+    sys.stderr = orig_stderr
+
+    for test in tests_list:
+        test_name = test._testMethodName
+
+        if not ( test_name in parser.testsToRun or "all" in parser.testsToRun ):
+            continue
+        if test_name in parser.testsToExclude:
+            continue
+
+        sys.stdout = logfile
+        sys.stderr = logfile
+
+        if (parser.timedTests):
+            testStartTime = time.time()
+
+        print("\n\n")
+        print("="*70)
+        print(test_name + " start [" + time.strftime("%Y-%m-%dT%H:%M:%S") + "]")
+        tests.global_functions.set_test_start_time()
+        results = unittest.TextTestRunner( stream=logfile, verbosity=parser.verbosity ).run( test )
+        print(test_name + " end   [" + time.strftime("%Y-%m-%dT%H:%M:%S") + "]")
+        print("="*70)
+        sys.stdout.flush
+        tests.global_functions.set_previous_test_name( test_name )
+        
+        if (parser.timedTests):
+            testElapsedTime = time.time() - testStartTime
+            timeString = "[%.1fs]" % testElapsedTime
+
+        sys.stdout = orig_stdout
+        sys.stderr = orig_stderr
+
+        if exit_flag:
+            break
+        
+        totalCount += 1
+        if (len(results.failures) > 0 or len(results.errors) > 0):
+            print("Test FAILED  : %s %s" % (test_name, timeString))
+            failCount += 1
+            if (parser.fastfail):
+                exit_flag = True
+                # we return here, don't break because we dont
+                # want to run finalTearDown
+                return failCount, skipCount, totalCount
+        elif (len(results.skipped) > 0):
+            print("Test skipped : %s %s" % (test_name, timeString))
+            skipCount += 1
+        else:
+            print("Test success : %s %s " % (test_name, timeString))
+
+    if "finalTearDown" in dir(suite):
+        try:
+            suite.finalTearDown(suite)
+        except Exception as e:
+            print("finalTearDown exception: ")
+            traceback.print_exc( e )
+
+    if (parser.timedTests):
+        suiteElapsedTime = time.time() - suiteStartTime
+        print("== testing %s [%.1fs] ==" % (suite.moduleName(),suiteElapsedTime))
+    else:
+        print("== testing %s ==" % suite.moduleName())
+    return failCount, skipCount, totalCount
+
+# Verify the test enviroment is setup correctly
+def runTestEnvironmentTests():
+    global parser
+    global logfile
+    suite = unittest.TestLoader().loadTestsFromTestCase(tests.TestEnvironmentTests)
+    # results = unittest.TextTestRunner( stream=logfile, verbosity=parser.verbosity ).run( suite )
+    print("== testing environment ==")
+    for test in suite:
+        results = unittest.TextTestRunner( stream=logfile, verbosity=parser.verbosity ).run( test )
+        if exit_flag:
+            break
+        if (len(results.failures) > 0 or len(results.errors) > 0):
+            print("Test FAILED  : %s " % test._testMethodName)
+            print("The test enviroment is not configured correctly. Aborting...")
+            exit(1) # always fast fail on basic test environment tests
+        else:
+            print("Test success : %s " % test._testMethodName)
+    print("== testing environment ==")
+
+signal.signal(signal.SIGINT, signal_handler)
+
+parser = ArgumentParser()
+script_args = parser.parse_args()
+logfile = open(parser.logfile, 'w')
+
+if (parser.clientIP != None):
+    tests.remote_control.clientIP       = parser.clientIP
+if (parser.hostUsername != None):
+    tests.remote_control.hostUsername = parser.hostUsername
+if (parser.hostKeyFile != None):
+    tests.remote_control.hostKeyFile  = parser.hostKeyFile
+tests.remote_control.verbosity   = parser.verbosity
+tests.remote_control.logfile = logfile
+tests.remote_control.interface = int(parser.internalIntfId)
+tests.remote_control.interfaceExternal = int(parser.externalIntfId)
+tests.remote_control.quickTestsOnly = parser.quickTestsOnly
+
+if ("environment" in parser.suitesToRun or "all" in parser.suitesToRun) and "environment" not in parser.suitesToExclude:
+    runTestEnvironmentTests()
+
+if exit_flag:
+    sys.exit(0)
+
+if "all" in parser.suitesToRun:
+    parser.suitesToRun = tests.test_registry.allModules()
+
+# remove excluded tests
+for testName in parser.suitesToExclude:
+    if testName in parser.suitesToRun:
+        parser.suitesToRun.remove(testName)
+
+startTime = time.time()
+totalCount = 0
+failCount = 0
+skipCount = 0
+
+while True:
+    for module in parser.suitesToRun:
+        if exit_flag == True:
+            break
+        if module == "environment":
+            continue
+        testClz = tests.test_registry.getTest(module)
+        if testClz == None:
+           print("Unable to find tests for \"%s\"" % module)
+           exit(1)
+        subFailCount, subSkipCount, subTotalCount = runTestSuite(testClz)
+        failCount  += subFailCount
+        totalCount += subTotalCount
+        skipCount  += subSkipCount
+
+    if exit_flag == True:
+        break
+    if not parser.repeat:
+        break
+    if parser.repeat_count != None:
+        parser.repeat_count = parser.repeat_count-1
+        if parser.repeat_count < 1:
+            break
+
+elapsedTime = time.time() - startTime
+    
+print("")
+print("Tests complete. [%.1f seconds]" % elapsedTime)
+print("%s passed, %s skipped, %s failed" % (totalCount-failCount-skipCount, skipCount, failCount))
+print("")
+if totalCount > 0:
+    print("Total          : %4i" % totalCount)
+    print("Passed         : %4i" % (totalCount-failCount-skipCount))
+    print("Skipped        : %4i" % (skipCount))
+    print("Passed/Skipped : %4i [%6.2f%%]" % (totalCount-failCount, (100*(totalCount-failCount)/totalCount)))
+    print("Failed         : %4i [%6.2f%%]" % (failCount, 100*failCount/totalCount))
+    print("")
+print("More details found in %s" % parser.logfile)
+
+exit(failCount)

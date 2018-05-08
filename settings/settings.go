@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"strconv"
+	"strings"
 )
 
 func GetSettings(segments []string) interface{} {
@@ -35,6 +37,55 @@ func GetSettings(segments []string) interface{} {
 	return jsonObject
 }
 
+func SetSettingsParse(segments []string, byteSlice []byte) interface{} {
+	var err error
+	var bodyJsonObject interface{}
+
+	// str is a byte slice represetation of some sort of JSON object
+	// this could be a:
+	// string
+	// numeric
+	// boolean
+	// null
+	// array
+	// dict (json)
+
+	err = json.Unmarshal(byteSlice, &bodyJsonObject)
+	// if its of type JSON then pass the JSON object
+	// otherwise just pass the raw string
+	if err == nil {
+		return SetSettings(segments, bodyJsonObject)
+	}
+
+	str := strings.TrimSpace(string(byteSlice))
+
+	// try boolean
+	b, err := strconv.ParseBool(str)
+	if err == nil {
+		return SetSettings(segments, b)
+	}
+	// try numeric
+	i, err := strconv.ParseInt(str, 10, 64)
+	if err == nil {
+		return SetSettings(segments, i)
+	}
+	f, err := strconv.ParseFloat(str, 64)
+	if err == nil {
+		return SetSettings(segments, f)
+	}
+	// array - IMPLEMENT ME, arrays can be assorted types...
+	if str[0] == '[' {
+		return createErrorJsonString("Array not supported")
+	}
+	// null
+	if str == "null" {
+		return SetSettings(segments, nil)
+	}
+	// otherwise assume string
+	return SetSettings(segments, str)
+
+}
+
 func SetSettings(segments []string, jsonNewSettings interface{}) interface{} {
 	var ok bool
 	var err error
@@ -59,8 +110,12 @@ func SetSettings(segments []string, jsonNewSettings interface{}) interface{} {
 		for i, value := range segments {
 			//if this is the last value, set and break
 			if i == len(segments)-1 {
-				iterJsonObject[value] = jsonNewSettings
-				break
+				if jsonNewSettings != nil {
+					iterJsonObject[value] = jsonNewSettings
+					break
+				} else {
+					delete(iterJsonObject, value)
+				}
 			}
 
 			// otherwise recurse down object
@@ -69,7 +124,6 @@ func SetSettings(segments []string, jsonNewSettings interface{}) interface{} {
 			// if json[foo] exists and is a map, recurse
 			// if json[foo] exists and is not a map (its some value)
 			//    in this case we overwrite with a map, and recurse
-
 			if iterJsonObject[value] == nil {
 				newMap := make(map[string]interface{})
 				iterJsonObject[value] = newMap
