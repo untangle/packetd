@@ -15,13 +15,13 @@ func GetSettings(segments []string) interface{} {
 
 	jsonObject, err = readSettingsFile()
 	if err != nil {
-		return createErrorJsonError(err)
+		return createJsonErrorObject(err)
 	}
 	for i, value := range segments {
 		if value != "" {
 			j := jsonObject[value]
 			if j == nil {
-				return createErrorJsonString("Attribute " + value + " not found in JSON object")
+				return createJsonErrorString("Attribute " + value + " not found in JSON object")
 			}
 			// if final
 			if i == (len(segments) - 1) {
@@ -29,7 +29,7 @@ func GetSettings(segments []string) interface{} {
 			}
 			jsonObject, ok = j.(map[string]interface{})
 			if !ok {
-				return createErrorJsonString("Cast error")
+				return createJsonErrorString("Cast error")
 			}
 		}
 	}
@@ -75,7 +75,7 @@ func SetSettingsParse(segments []string, byteSlice []byte) interface{} {
 	}
 	// array - IMPLEMENT ME, arrays can be assorted types...
 	if str[0] == '[' {
-		return createErrorJsonString("Array not supported")
+		return createJsonErrorString("Array not supported")
 	}
 	// null
 	if str == "null" {
@@ -90,32 +90,29 @@ func SetSettings(segments []string, jsonNewSettings interface{}) interface{} {
 	var ok bool
 	var err error
 	var iterJsonObject map[string]interface{}
-	var jsonExistingSettings map[string]interface{}
+	var jsonSettings map[string]interface{}
 
-	jsonExistingSettings, err = readSettingsFile()
+	jsonSettings, err = readSettingsFile()
 	if err != nil {
-		return createErrorJsonError(err)
+		return createJsonErrorObject(err)
 	}
 
-	iterJsonObject = jsonExistingSettings
+	iterJsonObject = jsonSettings
 
 	if segments == nil {
 		j, ok := jsonNewSettings.(map[string]interface{})
 		if ok {
-			jsonExistingSettings = j
+			jsonSettings = j
 		} else {
-			return createErrorJsonString("Invalid global settings object")
+			str, _ := json.Marshal(jsonNewSettings)
+			return createJsonErrorString("Invalid global settings object: " + string(str))
 		}
 	} else {
 		for i, value := range segments {
 			//if this is the last value, set and break
 			if i == len(segments)-1 {
-				if jsonNewSettings != nil {
-					iterJsonObject[value] = jsonNewSettings
-					break
-				} else {
-					delete(iterJsonObject, value)
-				}
+				iterJsonObject[value] = jsonNewSettings
+				break
 			}
 
 			// otherwise recurse down object
@@ -144,18 +141,66 @@ func SetSettings(segments []string, jsonNewSettings interface{}) interface{} {
 		}
 	}
 
-	// Marshal it back to a string (with ident)
-	var jsonString []byte
-	jsonString, err = json.MarshalIndent(jsonExistingSettings, "", "  ")
+	ok, err = writeSettingsFile(jsonSettings)
 	if err != nil {
-		return createErrorJsonError(err)
+		return createJsonErrorObject(err)
+	} else {
+		return createJsonObject("result", "OK")
+	}
+}
+
+func TrimSettings(segments []string) interface{} {
+	var ok bool
+	var err error
+	var iterJsonObject map[string]interface{}
+	var jsonSettings map[string]interface{}
+
+	if segments == nil {
+		return createJsonErrorString("Invalid trim settings path")
 	}
 
-	err = ioutil.WriteFile("/etc/config/settings.json", jsonString, 0644)
+	jsonSettings, err = readSettingsFile()
 	if err != nil {
-		return createErrorJsonError(err)
+		return createJsonErrorObject(err)
 	}
-	return createErrorJsonObject("result", "OK")
+
+	iterJsonObject = jsonSettings
+
+	for i, value := range segments {
+		//if this is the last value, set and break
+		if i == len(segments)-1 {
+			delete(iterJsonObject, value)
+			break
+		}
+
+		// otherwise recurse down object
+		// 3 cases:
+		// if json[foo] does not exist, nothing to delete
+		// if json[foo] exists and is a map, recurse
+		// if json[foo] exists and is not a map (its some value)
+		//    in this case we throw an error
+		if iterJsonObject[value] == nil {
+			// path does not exists - nothing to delete, just quit
+			break
+		} else {
+			var j map[string]interface{}
+			j, ok = iterJsonObject[value].(map[string]interface{})
+			iterJsonObject[value] = make(map[string]interface{})
+			if ok {
+				iterJsonObject[value] = j
+				iterJsonObject = j // for next iteration
+			} else {
+				return createJsonErrorString("Non-dict found in path: " + string(value))
+			}
+		}
+	}
+
+	ok, err = writeSettingsFile(jsonSettings)
+	if err != nil {
+		return createJsonErrorObject(err)
+	} else {
+		return createJsonObject("result", "OK")
+	}
 }
 
 func readSettingsFile() (map[string]interface{}, error) {
@@ -176,14 +221,32 @@ func readSettingsFile() (map[string]interface{}, error) {
 	}
 }
 
-func createErrorJsonObject(key string, value string) map[string]interface{} {
+func writeSettingsFile(jsonObject map[string]interface{}) (bool, error) {
+	var err error
+
+	// Marshal it back to a string (with ident)
+	var jsonString []byte
+	jsonString, err = json.MarshalIndent(jsonObject, "", "  ")
+	if err != nil {
+		return false, err
+	}
+
+	err = ioutil.WriteFile("/etc/config/settings.json", jsonString, 0644)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func createJsonObject(key string, value string) map[string]interface{} {
 	return map[string]interface{}{key: value}
 }
 
-func createErrorJsonError(e error) map[string]interface{} {
-	return createErrorJsonObject("error", e.Error())
+func createJsonErrorObject(e error) map[string]interface{} {
+	return createJsonObject("error", e.Error())
 }
 
-func createErrorJsonString(str string) map[string]interface{} {
-	return createErrorJsonObject("error", str)
+func createJsonErrorString(str string) map[string]interface{} {
+	return createJsonObject("error", str)
 }

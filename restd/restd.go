@@ -101,6 +101,21 @@ func setSettings(c *gin.Context) {
 	return
 }
 
+func trimSettings(c *gin.Context) {
+	var segments []string
+	path := c.Param("path")
+
+	if path == "" {
+		segments = nil
+	} else {
+		segments = removeEmptyStrings(strings.Split(path, "/"))
+	}
+
+	jsonResult := settings.TrimSettings(segments)
+	c.JSON(200, jsonResult)
+	return
+}
+
 func StartRestDaemon() {
 	reports.ConnectDb()
 
@@ -114,6 +129,8 @@ func StartRestDaemon() {
 	engine.GET("/settings/get_settings/*path", getSettings)
 	engine.POST("/settings/set_settings", setSettings)
 	engine.POST("/settings/set_settings/*path", setSettings)
+	engine.DELETE("/settings/trim_settings", trimSettings)
+	engine.DELETE("/settings/trim_settings/*path", trimSettings)
 
 	// listen and serve on 0.0.0.0:8080
 	engine.Run()
