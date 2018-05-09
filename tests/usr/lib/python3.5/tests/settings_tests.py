@@ -58,15 +58,15 @@ class SettingsTests(unittest.TestCase):
     def setUp(self):
         pass
 
-    def test_00_basic_test(self):
+    def test_000_basic_test(self):
         assert(True)
 
-    def test_01_get_settings(self):
+    def test_001_get_settings(self):
         """Get the settings"""
         settings = get_settings()
         assert(settings != None)
 
-    def test_02_get_settings_subparts(self):
+    def test_002_get_settings_subparts(self):
         """"Gets all the attributes of the root settings object individually and verifies them"""
         settings = get_settings()
         for i in settings:
@@ -78,12 +78,12 @@ class SettingsTests(unittest.TestCase):
                     assert(attr2 == attr[j])
         assert(settings != None)
 
-    def test_03_get_settings_subpart_missing(self):
+    def test_003_get_settings_subpart_missing(self):
         """Get some non-existant settings and verify it produces an error"""
         settings = get_settings(['fakepart1','fakepart2','fakepart3'])
         assert('error' in settings)
         
-    def test_10_set_settings(self):
+    def test_010_set_settings_string(self):
         """Set the fakepart1 attribute of the root settings object to a string"""
         fname = sys._getframe().f_code.co_name
         result1 = set_settings(['fakepart1'],fname)
@@ -93,7 +93,45 @@ class SettingsTests(unittest.TestCase):
         assert(result2 != None)
         assert(result2.get('fakepart1') == fname)
 
-    def test_11_set_settings_doubleslash(self):
+    def test_011_set_settings_int(self):
+        """Set the fakepart1 attribute of the root settings object to a int"""
+        result1 = set_settings(['fakepart1'],123)
+        result2 = get_settings()
+        assert(result1 != None)
+        assert(result1.get('result') == 'OK')
+        assert(result2 != None)
+        assert(result2.get('fakepart1') == 123)
+
+    def test_012_set_settings_float(self):
+        """Set the fakepart1 attribute of the root settings object to a int"""
+        result1 = set_settings(['fakepart1'],123.123)
+        result2 = get_settings()
+        assert(result1 != None)
+        assert(result1.get('result') == 'OK')
+        assert(result2 != None)
+        assert(result2.get('fakepart1') == 123.123)
+
+    def test_013_set_settings_null(self):
+        """Set the fakepart1 attribute of the root settings object to a int"""
+        result1 = set_settings(['fakepart1'],None)
+        result2 = get_settings()
+        assert(result1 != None)
+        assert(result1.get('result') == 'OK')
+        assert(result2 != None)
+        assert('fakepart1' in result2)
+        assert(result2.get('fakepart1') == None)
+
+    def test_014_set_settings_array(self):
+        """Set the fakepart1 attribute of the root settings object to an array"""
+        result1 = set_settings(['fakepart1'],[1,"abc"])
+        result2 = get_settings()
+        print(result2)
+        assert(result1 != None)
+        assert(result1.get('result') == 'OK')
+        assert(result2 != None)
+        assert(result2.get('fakepart1') == [1,"abc"])
+
+    def test_015_set_settings_doubleslash(self):
         fname = sys._getframe().f_code.co_name
         """Set the fakepart1/fakepart2/fakepart3 attribute of the root settings object"""
         result1 = set_settings(['fakepart1','fakepart2','fakepart3'],fname, seperator="//")
@@ -103,7 +141,7 @@ class SettingsTests(unittest.TestCase):
         assert(result2 != None)
         assert(result2.get('fakepart1').get('fakepart2').get('fakepart3') == fname)
         
-    def test_12_set_settings_2layer(self):
+    def test_016_set_settings_2layer(self):
         """Set the fakepart1 attribute of the root settings object to a JSON object"""
         fname = sys._getframe().f_code.co_name
         result1 = set_settings(['fakepart1'],{'fakepart2':fname})
@@ -113,7 +151,7 @@ class SettingsTests(unittest.TestCase):
         assert(result2 != None)
         assert(result2.get('fakepart1').get('fakepart2') == fname)
 
-    def test_13_set_settings_3layer(self):
+    def test_017_set_settings_3layer(self):
         """Set the fakepart1 attribute of the root settings object to a multi-layer JSON object"""
         fname = sys._getframe().f_code.co_name
         result1 = set_settings(['fakepart1'],{'fakepart2':{'fakepart3':fname}})
@@ -123,7 +161,7 @@ class SettingsTests(unittest.TestCase):
         assert(result2 != None)
         assert(result2.get('fakepart1').get('fakepart2').get('fakepart3') == fname)
 
-    def test_14_set_settings_subpart_deeper(self):
+    def test_018_set_settings_subpart_deeper(self):
         """Set the fakepart1/fakepart2 attribute of the root settings object to a JSON object"""
         fname = sys._getframe().f_code.co_name
         result1 = set_settings(['fakepart1','fakepart2'],{'fakepart3':fname})
@@ -133,7 +171,7 @@ class SettingsTests(unittest.TestCase):
         assert(result2 != None)
         assert(result2.get('fakepart1').get('fakepart2').get('fakepart3') == fname)
 
-    def test_20_trim_settings(self):
+    def test_030_trim_settings(self):
         """Set the fakepart1/fakepart2 attribute of the root settings object and then trim it"""
         fname = sys._getframe().f_code.co_name
         result1 = set_settings(['fakepart1'],{'fakepart2':fname})
@@ -149,14 +187,14 @@ class SettingsTests(unittest.TestCase):
         assert(result4 != None)
         assert(result4.get('fakepart1') == None)
 
-    def test_21_trim_settings_nonexistant(self):
+    def test_031_trim_settings_nonexistant(self):
         """Trim a non-existant settings from the root settings object"""
         fname = sys._getframe().f_code.co_name
         result1 = trim_settings([fname])
         assert(result1 != None)
         assert(result1.get('result') == 'OK')
 
-    def test_22_trim_settings_nondict(self):
+    def test_032_trim_settings_nondict(self):
         fname = sys._getframe().f_code.co_name
         """Trim a path that doesnt make sense"""
         result1 = set_settings(['fakepart1','fakepart2'],fname, seperator="//")

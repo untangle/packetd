@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
-	"strconv"
-	"strings"
 )
 
 func GetSettings(segments []string) interface{} {
@@ -41,49 +39,12 @@ func SetSettingsParse(segments []string, byteSlice []byte) interface{} {
 	var err error
 	var bodyJsonObject interface{}
 
-	// str is a byte slice represetation of some sort of JSON object
-	// this could be a:
-	// string
-	// numeric
-	// boolean
-	// null
-	// array
-	// dict (json)
-
 	err = json.Unmarshal(byteSlice, &bodyJsonObject)
-	// if its of type JSON then pass the JSON object
-	// otherwise just pass the raw string
-	if err == nil {
-		return SetSettings(segments, bodyJsonObject)
+	if err != nil {
+		return createJsonErrorObject(err)
 	}
 
-	str := strings.TrimSpace(string(byteSlice))
-
-	// try boolean
-	b, err := strconv.ParseBool(str)
-	if err == nil {
-		return SetSettings(segments, b)
-	}
-	// try numeric
-	i, err := strconv.ParseInt(str, 10, 64)
-	if err == nil {
-		return SetSettings(segments, i)
-	}
-	f, err := strconv.ParseFloat(str, 64)
-	if err == nil {
-		return SetSettings(segments, f)
-	}
-	// array - IMPLEMENT ME, arrays can be assorted types...
-	if str[0] == '[' {
-		return createJsonErrorString("Array not supported")
-	}
-	// null
-	if str == "null" {
-		return SetSettings(segments, nil)
-	}
-	// otherwise assume string
-	return SetSettings(segments, str)
-
+	return SetSettings(segments, bodyJsonObject)
 }
 
 func SetSettings(segments []string, jsonNewSettings interface{}) interface{} {
