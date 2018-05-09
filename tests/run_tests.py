@@ -19,25 +19,24 @@ interrupt_count = 0
 
 class ArgumentParser(object):
     def __init__(self):
-        self.clientIP = "192.0.2.2"
-        self.hostUsername = None
-        self.hostKeyFile = None
+        self.client_ip = "192.0.2.2"
+        self.host_username = None
+        self.host_key_file = None
         self.verbosity = 2 # changed to default 2 because jcoffin
         self.logfile = '/tmp/unittest.log'
         self.fastfail = False
         self.repeat = False
         self.repeat_count = None
-        self.externalIntfId = 1
-        self.internalIntfId = 2
-        self.suitesToRun = ['all']
-        self.suitesToExclude = []
-        self.testsToRun = ['all']
-        self.testsToExclude = []
-        self.timedTests = True
-        self.quickTestsOnly = False
+        self.external_intf_id = 1
+        self.internal_intf_id = 2
+        self.suites_to_run = ['all']
+        self.suites_to_exclude = []
+        self.tests_to_run = ['all']
+        self.tests_to_exclude = []
+        self.quick_tests_only = False
 
-    def set_clientIP( self, arg ):
-        self.clientIP = arg
+    def set_client_ip( self, arg ):
+        self.client_ip = arg
 
     def set_username( self, arg ):
         self.username = arg
@@ -58,36 +57,33 @@ class ArgumentParser(object):
         self.repeat = True
         self.repeat_count = int(arg)
 
-    def set_suitesToRun( self, arg ):
-        self.suitesToRun = arg.split(",")
+    def set_suites_to_run( self, arg ):
+        self.suites_to_run = arg.split(",")
 
-    def set_suitesToExclude( self, arg ):
-        self.suitesToExclude = arg.split(",")
+    def set_suites_to_exclude( self, arg ):
+        self.suites_to_exclude = arg.split(",")
 
-    def set_testsToRun( self, arg ):
-        self.testsToRun = arg.split(",")
+    def set_tests_to_run( self, arg ):
+        self.tests_to_run = arg.split(",")
 
-    def set_testsToExclude( self, arg ):
-        self.testsToExclude = arg.split(",")
+    def set_tests_to_exclude( self, arg ):
+        self.tests_to_exclude = arg.split(",")
 
     def increase_verbosity( self, arg ):
         self.verbosity += 1
 
-    def set_externalIntfId( self, arg ):
-        self.externalIntfId = arg
+    def set_external_intf_id( self, arg ):
+        self.external_intf_id = arg
 
-    def set_internalIntfId( self, arg ):
-        self.internalIntfId = arg
+    def set_internal_intf_id( self, arg ):
+        self.internal_intf_id = arg
 
-    def set_timedTests( self, arg ):
-        self.timedTests = True
-
-    def set_quickTestsOnly( self, arg ):
-        self.quickTestsOnly = True
+    def set_quick_tests_only( self, arg ):
+        self.quick_tests_only = True
 
     def parse_args( self ):
         handlers = {
-            '-h' : self.set_clientIP,
+            '-h' : self.set_client_ip,
             '-u' : self.set_username,
             '-i' : self.set_keyfile,
             '-l' : self.set_logfile,
@@ -95,14 +91,13 @@ class ArgumentParser(object):
             '-q' : self.set_fastfail,
             '-r' : self.set_repeat,
             '-c' : self.set_repeat_count,
-            '-t' : self.set_suitesToRun,
-            '-T' : self.set_testsToRun,
-            '-e' : self.set_suitesToExclude,
-            '-E' : self.set_testsToExclude,
-            '-d' : self.set_externalIntfId,
-            '-s' : self.set_internalIntfId,
-            '-x' : self.set_timedTests,
-            '-z' : self.set_quickTestsOnly,
+            '-t' : self.set_suites_to_run,
+            '-T' : self.set_tests_to_run,
+            '-e' : self.set_suites_to_exclude,
+            '-E' : self.set_tests_to_exclude,
+            '-d' : self.set_external_intf_id,
+            '-s' : self.set_internal_intf_id,
+            '-z' : self.set_quick_tests_only,
         }
 
         try:
@@ -133,7 +128,6 @@ def printUsage():
     -q         : quit on first failure
     -r         : repeat test indefinitely or until repeat count if specified (or until failure if -q is specified)
     -c <count> : repeat test count
-    -x         : time testsuite and display elapsed seconds
     -z         : skip lengthly test suites
 """ % sys.argv[0] )
 
@@ -154,7 +148,7 @@ def exit(code):
         print("More details found in %s" % parser.logfile)
     sys.exit(code)
 
-def runTestSuite(suite):
+def run_test_suite(suite):
     global parser
     global logfile
     global exit_flag
@@ -168,8 +162,7 @@ def runTestSuite(suite):
     skipCount = 0  # number of skipped tests.
     totalCount = 0
     timeString = ""
-    if (parser.timedTests):
-        suiteStartTime = time.time()
+    suiteStartTime = time.time()
 
     sys.stdout = logfile
     sys.stderr = logfile
@@ -186,16 +179,15 @@ def runTestSuite(suite):
     for test in tests_list:
         test_name = test._testMethodName
 
-        if not ( test_name in parser.testsToRun or "all" in parser.testsToRun ):
+        if not ( test_name in parser.tests_to_run or "all" in parser.tests_to_run ):
             continue
-        if test_name in parser.testsToExclude:
+        if test_name in parser.tests_to_exclude:
             continue
 
         sys.stdout = logfile
         sys.stderr = logfile
 
-        if (parser.timedTests):
-            testStartTime = time.time()
+        testStartTime = time.time()
 
         print("\n\n")
         print("="*70)
@@ -207,9 +199,8 @@ def runTestSuite(suite):
         sys.stdout.flush
         tests.global_functions.set_previous_test_name( test_name )
         
-        if (parser.timedTests):
-            testElapsedTime = time.time() - testStartTime
-            timeString = "[%.1fs]" % testElapsedTime
+        testElapsedTime = time.time() - testStartTime
+        timeString = "[%.1fs]" % testElapsedTime
 
         sys.stdout = orig_stdout
         sys.stderr = orig_stderr
@@ -239,15 +230,12 @@ def runTestSuite(suite):
             print("finalTearDown exception: ")
             traceback.print_exc( e )
 
-    if (parser.timedTests):
-        suiteElapsedTime = time.time() - suiteStartTime
-        print("== testing %s [%.1fs] ==" % (suite.moduleName(),suiteElapsedTime))
-    else:
-        print("== testing %s ==" % suite.moduleName())
+    suiteElapsedTime = time.time() - suiteStartTime
+    print("== testing %s [%.1fs] ==" % (suite.moduleName(),suiteElapsedTime))
     return failCount, skipCount, totalCount
 
 # Verify the test enviroment is setup correctly
-def runTestEnvironmentTests():
+def run_environment_tests():
     global parser
     global logfile
     suite = unittest.TestLoader().loadTestsFromTestCase(tests.TestEnvironmentTests)
@@ -271,51 +259,51 @@ parser = ArgumentParser()
 script_args = parser.parse_args()
 logfile = open(parser.logfile, 'w')
 
-if (parser.clientIP != None):
-    tests.remote_control.clientIP       = parser.clientIP
-if (parser.hostUsername != None):
-    tests.remote_control.hostUsername = parser.hostUsername
-if (parser.hostKeyFile != None):
-    tests.remote_control.hostKeyFile  = parser.hostKeyFile
+if (parser.client_ip != None):
+    tests.remote_control.client_ip    = parser.client_ip
+if (parser.host_username != None):
+    tests.remote_control.host_username = parser.host_username
+if (parser.host_key_file != None):
+    tests.remote_control.host_key_file  = parser.host_key_file
 tests.remote_control.verbosity   = parser.verbosity
 tests.remote_control.logfile = logfile
-tests.remote_control.interface = int(parser.internalIntfId)
-tests.remote_control.interfaceExternal = int(parser.externalIntfId)
-tests.remote_control.quickTestsOnly = parser.quickTestsOnly
+tests.remote_control.interface = int(parser.internal_intf_id)
+tests.remote_control.interface_external = int(parser.external_intf_id)
+tests.remote_control.quick_tests_only = parser.quick_tests_only
 
-if ("environment" in parser.suitesToRun or "all" in parser.suitesToRun) and "environment" not in parser.suitesToExclude:
-    runTestEnvironmentTests()
+if ("environment" in parser.suites_to_run or "all" in parser.suites_to_run) and "environment" not in parser.suites_to_exclude:
+    run_environment_tests()
 
 if exit_flag:
     sys.exit(0)
 
-if "all" in parser.suitesToRun:
-    parser.suitesToRun = tests.test_registry.allModules()
+if "all" in parser.suites_to_run:
+    parser.suites_to_run = tests.test_registry.all_modules()
 
 # remove excluded tests
-for testName in parser.suitesToExclude:
-    if testName in parser.suitesToRun:
-        parser.suitesToRun.remove(testName)
+for test_name in parser.suites_to_exclude:
+    if test_name in parser.suites_to_run:
+        parser.suites_to_run.remove(test_name)
 
-startTime = time.time()
-totalCount = 0
-failCount = 0
-skipCount = 0
+start_time = time.time()
+total_count = 0
+fail_count = 0
+skip_count = 0
 
 while True:
-    for module in parser.suitesToRun:
+    for module in parser.suites_to_run:
         if exit_flag == True:
             break
         if module == "environment":
             continue
-        testClz = tests.test_registry.getTest(module)
-        if testClz == None:
+        test_clz = tests.test_registry.get_test(module)
+        if test_clz == None:
            print("Unable to find tests for \"%s\"" % module)
            exit(1)
-        subFailCount, subSkipCount, subTotalCount = runTestSuite(testClz)
-        failCount  += subFailCount
-        totalCount += subTotalCount
-        skipCount  += subSkipCount
+        sub_fail_count, sub_skip_count, sub_total_count = run_test_suite(test_clz)
+        fail_count  += sub_fail_count
+        total_count += sub_total_count
+        skip_count  += sub_skip_count
 
     if exit_flag == True:
         break
@@ -326,19 +314,19 @@ while True:
         if parser.repeat_count < 1:
             break
 
-elapsedTime = time.time() - startTime
+elapsedTime = time.time() - start_time
     
 print("")
 print("Tests complete. [%.1f seconds]" % elapsedTime)
-print("%s passed, %s skipped, %s failed" % (totalCount-failCount-skipCount, skipCount, failCount))
+print("%s passed, %s skipped, %s failed" % (total_count-fail_count-skip_count, skip_count, fail_count))
 print("")
-if totalCount > 0:
-    print("Total          : %4i" % totalCount)
-    print("Passed         : %4i" % (totalCount-failCount-skipCount))
-    print("Skipped        : %4i" % (skipCount))
-    print("Passed/Skipped : %4i [%6.2f%%]" % (totalCount-failCount, (100*(totalCount-failCount)/totalCount)))
-    print("Failed         : %4i [%6.2f%%]" % (failCount, 100*failCount/totalCount))
+if total_count > 0:
+    print("Total          : %4i" % total_count)
+    print("Passed         : %4i" % (total_count-fail_count-skip_count))
+    print("Skipped        : %4i" % (skip_count))
+    print("Passed/Skipped : %4i [%6.2f%%]" % (total_count-fail_count, (100*(total_count-fail_count)/total_count)))
+    print("Failed         : %4i [%6.2f%%]" % (fail_count, 100*fail_count/total_count))
     print("")
 print("More details found in %s" % parser.logfile)
 
-exit(failCount)
+exit(fail_count)

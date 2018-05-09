@@ -2,24 +2,24 @@ import os
 import sys
 import subprocess
 
-__moduleDict = {}
+__module_dict = {}
 
-def registerModule(moduleName, clz):
-    global __moduleDict
-    __moduleDict[moduleName] = clz
+def register_module(module_name, clz):
+    global __module_dict
+    __module_dict[module_name] = clz
 
-def allModules():
-    global __moduleDict
-    moduleList = sorted(__moduleDict.keys())
-    return moduleList
+def all_modules():
+    global __module_dict
+    module_list = sorted(__module_dict.keys())
+    return module_list
 
-def allTests():
-    global __moduleDict
-    return __moduleDict.values()
+def all_tests():
+    global __module_dict
+    return __module_dict.values()
 
-def getTest(moduleName):
-    global __moduleDict
+def get_test(module_name):
+    global __module_dict
     try:
-        return __moduleDict[moduleName]
+        return __module_dict[module_name]
     except Exception as e:
         return None
