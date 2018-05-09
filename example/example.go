@@ -20,7 +20,7 @@ func Plugin_Goodbye(childsync *sync.WaitGroup) {
 }
 
 /*---------------------------------------------------------------------------*/
-func Plugin_netfilter_handler(ch chan<- int32, buffer []byte, length int) {
+func Plugin_netfilter_handler(ch chan<- int32, buffer []byte, length int, ctid uint) {
 	packet := gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
 	ipLayer := packet.Layer(layers.LayerTypeIPv4)
 	if ipLayer != nil {
@@ -34,8 +34,9 @@ func Plugin_netfilter_handler(ch chan<- int32, buffer []byte, length int) {
 
 /*---------------------------------------------------------------------------*/
 func Plugin_conntrack_handler(message int, entry *support.ConntrackEntry) {
-	fmt.Printf("CONNTRACK MSG:%c PROTO:%d SADDR:%s SPORT:%d DADDR:%s DPORT:%d TX:%d RX:%d UC:%d\n",
+	fmt.Printf("CONNTRACK MSG:%c ID:%d PROTO:%d SADDR:%s SPORT:%d DADDR:%s DPORT:%d TX:%d RX:%d UC:%d\n",
 		message,
+		entry.ConntrackId,
 		entry.SessionTuple.Protocol,
 		entry.SessionTuple.ClientAddr,
 		entry.SessionTuple.ClientPort,

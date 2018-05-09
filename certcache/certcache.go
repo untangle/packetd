@@ -21,7 +21,7 @@ func Plugin_Goodbye(childsync *sync.WaitGroup) {
 }
 
 /*---------------------------------------------------------------------------*/
-func Plugin_netfilter_handler(ch chan<- int32, tuple support.Tuple) {
+func Plugin_netfilter_handler(ch chan<- int32, tuple support.Tuple, ctid uint) {
 
 	if tuple.ServerPort != 443 {
 		return

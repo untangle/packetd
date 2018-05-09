@@ -1,40 +1,41 @@
 package main
 
-//#include "common.h"
-//#include "netfilter.h"
-//#include "conntrack.h"
-//#include "netlogger.h"
-//#cgo LDFLAGS: -lnetfilter_queue -lnfnetlink -lnetfilter_conntrack -lnetfilter_log
+/*
+#include "common.h"
+#include "netfilter.h"
+#include "conntrack.h"
+#include "netlogger.h"
+#cgo LDFLAGS: -lnetfilter_queue -lnfnetlink -lnetfilter_conntrack -lnetfilter_log
+*/
 import "C"
 
-import "os"
-import "net"
-import "time"
-import "sync"
-import "bufio"
-import "unsafe"
-import "encoding/binary"
-import "github.com/google/gopacket"
-import "github.com/google/gopacket/layers"
-import "github.com/untangle/packetd/support"
-import "github.com/untangle/packetd/example"
-import "github.com/untangle/packetd/classify"
-import "github.com/untangle/packetd/geoip"
-import "github.com/untangle/packetd/certcache"
-import "github.com/untangle/packetd/restd"
+import (
+	"bufio"
+	"encoding/binary"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/untangle/packetd/certcache"
+	"github.com/untangle/packetd/classify"
+	"github.com/untangle/packetd/example"
+	"github.com/untangle/packetd/geoip"
+	"github.com/untangle/packetd/restd"
+	"github.com/untangle/packetd/support"
+	"net"
+	"os"
+	"sync"
+	"time"
+	"unsafe"
+)
 
-/*---------------------------------------------------------------------------*/
-
-/*
- * The childsync is used to give the main process something to watch while
- * waiting for all of the goroutine children to finish execution and cleanup.
- * To give C child functions access we export go_child_startup and goodbye
- * functions. For children in normal go packages, we pass the WaitGroup
- * directly to the goroutine.
- */
+// The childsync is used to give the main process something to watch while
+// waiting for all of the goroutine children to finish execution and cleanup.
+// To give C child functions access we export go_child_startup and goodbye
+// functions. For children in normal go packages, we pass the WaitGroup
+// directly to the goroutine.
 var childsync sync.WaitGroup
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
 func main() {
 	var lastmin int
 	var counter int
@@ -119,9 +120,10 @@ stdinloop:
 	childsync.Wait()
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
 //export go_netfilter_callback
-func go_netfilter_callback(mark C.int, data *C.uchar, size C.int) int32 {
+func go_netfilter_callback(mark C.int, data *C.uchar, size C.int, ctid C.uint) int32 {
 
 	// ***** this version creates a Go copy of the buffer = SLOWER
 	// buffer := C.GoBytes(unsafe.Pointer(data),size)
@@ -129,7 +131,8 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int) int32 {
 	// ***** this version creates a Go pointer to the buffer = FASTER
 	buffer := (*[0xFFFF]byte)(unsafe.Pointer(data))[:int(size):int(size)]
 
-	// convert the C integer to a Go integer
+	// convert the C length and ctid to Go values
+	connid := uint(ctid)
 	length := int(size)
 
 	// get the existing mark on the packet
@@ -176,10 +179,7 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int) int32 {
 
 	finder := support.Tuple2String(tuple)
 
-	/*
-	 * If we already have a session entry update the existing, otherwise
-	 * create a new entry for the table.
-	 */
+	// If we already have a session entry update the existing, otherwise create a new entry for the table.
 	if entry, ok = support.FindSessionEntry(finder); ok {
 		support.LogMessage("SESSION Found %s in table\n", finder)
 		entry.UpdateCount++
@@ -195,13 +195,13 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int) int32 {
 	// ********** Call all plugin netfilter handler functions here
 
 	c1 := make(chan int32)
-	go example.Plugin_netfilter_handler(c1, buffer, length)
+	go example.Plugin_netfilter_handler(c1, buffer, length, connid)
 	c2 := make(chan int32)
-	go classify.Plugin_netfilter_handler(c2, buffer, length)
+	go classify.Plugin_netfilter_handler(c2, buffer, length, connid)
 	c3 := make(chan int32)
-	go geoip.Plugin_netfilter_handler(c3, buffer, length)
+	go geoip.Plugin_netfilter_handler(c3, buffer, length, connid)
 	c4 := make(chan int32)
-	go certcache.Plugin_netfilter_handler(c4, tuple)
+	go certcache.Plugin_netfilter_handler(c4, tuple, connid)
 
 	// ********** End of plugin netfilter callback functions
 
@@ -214,6 +214,8 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int) int32 {
 			pmark |= mark2
 		case mark3 := <-c3:
 			pmark |= mark3
+		case mark4 := <-c4:
+			pmark |= mark4
 		}
 	}
 
@@ -221,7 +223,8 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int) int32 {
 	return (pmark)
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
 //export go_conntrack_callback
 func go_conntrack_callback(info *C.struct_conntrack_info) {
 	var tuple support.Tuple
@@ -241,15 +244,13 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 
 	finder := support.Tuple2String(tuple)
 
-	/*
-	 * If we already have a conntrack entry update the existing, otherwise
-	 * create a new entry for the table.
-	 */
+	// If we already have a conntrack entry update the existing, otherwise create a new entry for the table.
 	if entry, ok = support.FindConntrackEntry(finder); ok {
 		support.LogMessage("CONNTRACK Found %s in table\n", finder)
 		entry.UpdateCount++
 	} else {
 		support.LogMessage("CONNTRACK Adding %s to table\n", finder)
+		entry.ConntrackId = uint(info.conn_id)
 		entry.SessionId = support.NextSessionId()
 		entry.SessionCreation = time.Now()
 		entry.SessionTuple = tuple
@@ -308,7 +309,8 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
 //export go_netlogger_callback
 func go_netlogger_callback(info *C.struct_netlogger_info) {
 	var logger support.Logger
@@ -331,16 +333,18 @@ func go_netlogger_callback(info *C.struct_netlogger_info) {
 	// ********** End of plugin netlogger callback functions
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
 //export go_child_startup
 func go_child_startup() {
 	childsync.Add(1)
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
 //export go_child_goodbye
 func go_child_goodbye() {
 	childsync.Done()
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------

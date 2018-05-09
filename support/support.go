@@ -38,6 +38,7 @@ type SessionEntry struct {
 
 /*---------------------------------------------------------------------------*/
 type ConntrackEntry struct {
+	ConntrackId		uint
 	SessionId       uint64
 	SessionCreation time.Time
 	SessionActivity time.Time

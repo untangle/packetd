@@ -11,6 +11,7 @@
 struct conntrack_info
 {
 	u_int8_t	msg_type;
+	u_int32_t	conn_id;
 	u_int8_t	orig_proto;
 	u_int32_t	orig_saddr;
 	u_int32_t	orig_daddr;
@@ -59,6 +60,9 @@ info.orig_proto = nfct_get_attr_u8(ct,ATTR_ORIG_L4PROTO);
 
 // ignore everything except TCP and UDP
 if ((info.orig_proto != IPPROTO_TCP) && (info.orig_proto != IPPROTO_UDP)) return(NFCT_CB_CONTINUE);
+
+// get the conntrack ID
+info.conn_id = nfct_get_attr_u32(ct, ATTR_ID);
 
 // get the source and destination addresses
 info.orig_saddr = nfct_get_attr_u32(ct,ATTR_ORIG_IPV4_SRC);

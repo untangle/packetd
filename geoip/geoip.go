@@ -5,6 +5,7 @@ import "github.com/untangle/packetd/support"
 import "github.com/oschwald/geoip2-golang"
 import "github.com/google/gopacket"
 import "github.com/google/gopacket/layers"
+import "github.com/untangle/packetd/conndict"
 
 var geodb *geoip2.Reader
 
@@ -30,27 +31,36 @@ func Plugin_Goodbye(childsync *sync.WaitGroup) {
 }
 
 /*---------------------------------------------------------------------------*/
-func Plugin_netfilter_handler(ch chan<- int32, buffer []byte, length int) {
+func Plugin_netfilter_handler(ch chan<- int32, buffer []byte, length int, ctid uint) {
+	var SrcCode string = "XX"
+	var DstCode string = "XX"
 	support.LogMessage("GEOIP RECEIVED %d BYTES\n", length)
 	packet := gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
 	ipLayer := packet.Layer(layers.LayerTypeIPv4)
 	if ipLayer != nil {
 		addr := ipLayer.(*layers.IPv4)
-		var SrcCode string = "XX"
-		var DstCode string = "XX"
 		SrcRecord, err := geodb.City(addr.SrcIP)
 		if err == nil {
 			SrcCode = SrcRecord.Country.IsoCode
+			support.LogMessage("SRC: %s = %s\n", addr.SrcIP, SrcCode)
 		}
 		DstRecord, err := geodb.City(addr.DstIP)
 		if err == nil {
 			DstCode = DstRecord.Country.IsoCode
+			support.LogMessage("DST: %s = %s\n", addr.DstIP, DstCode)
 		}
-		support.LogMessage("SRC: %s = %s\n", addr.SrcIP, SrcCode)
-		support.LogMessage("DST: %s = %s\n", addr.DstIP, DstCode)
 	}
 
-	// TODO - store the country values in the session object
+	errc := conndict.Set_pair("Client Country", SrcCode, ctid)
+	if (errc != nil) {
+		support.LogMessage("Set_pair(client) ERROR: %s\n", errc)
+	}
+
+	errs := conndict.Set_pair("Server Country", DstCode, ctid)
+	if (errs != nil) {
+		support.LogMessage("Set_pair(server) ERROR: %s\n", errs)
+	}
+
 
 	ch <- 4
 }
