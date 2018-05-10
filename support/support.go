@@ -1,10 +1,12 @@
 package support
 
-import "fmt"
-import "net"
-import "time"
-import "sync"
-import "crypto/x509"
+import (
+	"crypto/x509"
+	"fmt"
+	"net"
+	"sync"
+	"time"
+)
 
 var runtime time.Time
 var sessionTable map[string]SessionEntry
@@ -15,7 +17,9 @@ var conntrackMutex sync.Mutex
 var sessionMutex sync.Mutex
 var sessionIndex uint64
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Represent a session based on protocol and source and destination values
 type Tuple struct {
 	Protocol   uint8
 	ClientAddr net.IP
@@ -24,7 +28,9 @@ type Tuple struct {
 	ServerPort uint16
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Store details related to a session
 type SessionEntry struct {
 	SessionId         uint64
 	SessionCreation   time.Time
@@ -36,9 +42,11 @@ type SessionEntry struct {
 	ServerLocation    string
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Store the details of a conntrack entry
 type ConntrackEntry struct {
-	ConntrackId		uint
+	ConntrackId     uint
 	SessionId       uint64
 	SessionCreation time.Time
 	SessionActivity time.Time
@@ -53,7 +61,9 @@ type ConntrackEntry struct {
 	PurgeFlag       bool
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Used to pass the details of NFLOG events to interested plugins
 type Logger struct {
 	Protocol uint8
 	IcmpType uint16
@@ -67,13 +77,17 @@ type Logger struct {
 	Prefix   string
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Used to cache SSL/TLS certificates
 type CertificateHolder struct {
 	CreationTime time.Time
 	Certificate  x509.Certificate
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Called during daemon startup to handle initialization
 func Startup() {
 	// capture startup time
 	runtime = time.Now()
@@ -92,7 +106,9 @@ func Startup() {
 	sessionIndex = ((uint64(runtime.Unix()) & 0xFFFFFFFF) << 16)
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Message logger - TODO consolidate multiple logmessages functions somewhere (C? Go?)
 func LogMessage(format string, args ...interface{}) {
 	nowtime := time.Now()
 	var elapsed = nowtime.Sub(runtime)
@@ -105,7 +121,9 @@ func LogMessage(format string, args ...interface{}) {
 	}
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Converts an IPv4 address from uint32 to net.IP
 func Int2Ip(value uint32) net.IP {
 	ip := make(net.IP, 4)
 	ip[0] = byte(value)
@@ -115,13 +133,17 @@ func Int2Ip(value uint32) net.IP {
 	return (ip)
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Generates a string from a Tuple for use as a map index
 func Tuple2String(tuple Tuple) string {
 	retval := fmt.Sprintf("%d|%s:%d-%s:%d", tuple.Protocol, tuple.ClientAddr, tuple.ClientPort, tuple.ServerAddr, tuple.ServerPort)
 	return (retval)
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Gets the next sequential session ID value
 func NextSessionId() uint64 {
 	var value uint64
 	sessionMutex.Lock()
@@ -136,7 +158,9 @@ func NextSessionId() uint64 {
 	return (value)
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Find an entry in the session table
 func FindSessionEntry(finder string) (SessionEntry, bool) {
 	sessionMutex.Lock()
 	entry, status := sessionTable[finder]
@@ -144,21 +168,27 @@ func FindSessionEntry(finder string) (SessionEntry, bool) {
 	return entry, status
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Add an entry to the session table
 func InsertSessionEntry(finder string, entry SessionEntry) {
 	sessionMutex.Lock()
 	sessionTable[finder] = entry
 	sessionMutex.Unlock()
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Remove an entry from the session table
 func RemoveSessionEntry(finder string) {
 	sessionMutex.Lock()
 	delete(sessionTable, finder)
 	sessionMutex.Unlock()
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Cleanup the session table by removing stale entries
 func CleanSessionTable() {
 	var counter int = 0
 	nowtime := time.Now()
@@ -178,7 +208,9 @@ func CleanSessionTable() {
 	LogMessage("SESSION REMOVED:%d REMAINING:%d\n", counter, len(sessionTable))
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Find an entry in the conntrack table
 func FindConntrackEntry(finder string) (ConntrackEntry, bool) {
 	conntrackMutex.Lock()
 	entry, status := conntrackTable[finder]
@@ -186,21 +218,27 @@ func FindConntrackEntry(finder string) (ConntrackEntry, bool) {
 	return entry, status
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Add an entry to the conntrack table
 func InsertConntrackEntry(finder string, entry ConntrackEntry) {
 	conntrackMutex.Lock()
 	conntrackTable[finder] = entry
 	conntrackMutex.Unlock()
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Remove an entry from the conntrack table
 func RemoveConntrackEntry(finder string) {
 	conntrackMutex.Lock()
 	delete(conntrackTable, finder)
 	conntrackMutex.Unlock()
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Cleanup the conntrack table by removing stale entries
 func CleanConntrackTable() {
 	var counter int = 0
 	nowtime := time.Now()
@@ -220,7 +258,9 @@ func CleanConntrackTable() {
 	LogMessage("CONNTRACK REMOVED:%d REMAINING:%d\n", counter, len(conntrackTable))
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Find the cached certificate for the argumented address
 func FindCertificate(finder string) (x509.Certificate, bool) {
 	certificateMutex.Lock()
 	entry, status := certificateTable[finder]
@@ -228,7 +268,9 @@ func FindCertificate(finder string) (x509.Certificate, bool) {
 	return entry.Certificate, status
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Add a certificate to the cache
 func InsertCertificate(finder string, cert x509.Certificate) {
 	var holder CertificateHolder
 	holder.CreationTime = time.Now()
@@ -238,14 +280,18 @@ func InsertCertificate(finder string, cert x509.Certificate) {
 	certificateMutex.Unlock()
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Remove a certificate from the cache
 func RemoveCertificate(finder string) {
 	certificateMutex.Lock()
 	delete(certificateTable, finder)
 	certificateMutex.Unlock()
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
+
+// Cleanup the session table by removing stale entries
 func CleanCertificateTable() {
 	var counter int = 0
 	nowtime := time.Now()
@@ -262,4 +308,4 @@ func CleanCertificateTable() {
 	LogMessage("CERTIFICATE REMOVED:%d REMAINING:%d\n", counter, len(certificateTable))
 }
 
-/*---------------------------------------------------------------------------*/
+//-----------------------------------------------------------------------------
