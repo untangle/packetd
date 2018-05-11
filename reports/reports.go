@@ -5,21 +5,27 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	_ "github.com/mattn/go-sqlite3"
+	//	"github.com/mattn/go-sqlite3"
 	"log"
 	"sync/atomic"
 	"time"
 )
 
 var db *sql.DB
-var queries map[uint64]*Query = make(map[uint64]*Query)
-var queryId uint64 = 0
+var queries = make(map[uint64]*Query)
+var queryID uint64
 
+//-----------------------------------------------------------------------------
+
+// Query holds the results of a database query operation
 type Query struct {
-	Id   uint64
+	ID   uint64
 	Rows *sql.Rows
 }
 
+//-----------------------------------------------------------------------------
+
+// ConnectDb creates a connection to the database
 func ConnectDb() {
 	var err error
 	db, err = sql.Open("sqlite3", "/tmp/reports.db")
@@ -29,6 +35,9 @@ func ConnectDb() {
 	}
 }
 
+//-----------------------------------------------------------------------------
+
+// CreateQuery submits a database query and returns the results
 func CreateQuery(reportEntry string) (*Query, error) {
 	rows, err := db.Query("SELECT * FROM sessions LIMIT 5")
 	if err != nil {
@@ -36,18 +45,21 @@ func CreateQuery(reportEntry string) (*Query, error) {
 		return nil, err
 	}
 	q := new(Query)
-	q.Id = atomic.AddUint64(&queryId, 1)
+	q.ID = atomic.AddUint64(&queryID, 1)
 	q.Rows = rows
 
-	queries[q.Id] = q
+	queries[q.ID] = q
 	go cleanupQuery(q)
 	return q, nil
 }
 
-func GetData(queryId uint64) (string, error) {
-	q := queries[queryId]
+//-----------------------------------------------------------------------------
+
+// GetData returns the data for the provided QueryID
+func GetData(queryID uint64) (string, error) {
+	q := queries[queryID]
 	if q == nil {
-		fmt.Println("Query not found: ", queryId)
+		fmt.Println("Query not found: ", queryID)
 		return "", errors.New("Query ID not found")
 	}
 	result, err := getRows(q.Rows, 1000)
@@ -61,6 +73,8 @@ func GetData(queryId uint64) (string, error) {
 
 	return string(jsonData), nil
 }
+
+//-----------------------------------------------------------------------------
 
 func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
 	if rows == nil {
@@ -103,13 +117,16 @@ func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
 	return tableData, nil
 }
 
+//-----------------------------------------------------------------------------
+
 func cleanupQuery(query *Query) {
-	fmt.Println("cleanupQuery() launched ", query.Id)
+	fmt.Println("cleanupQuery() launched ", query.ID)
 	time.Sleep(30 * time.Second)
-	delete(queries, query.Id)
+	delete(queries, query.ID)
 	if query.Rows != nil {
 		query.Rows.Close()
 	}
-	fmt.Println("cleanupQuery() finished ", query.Id)
-
+	fmt.Println("cleanupQuery() finished ", query.ID)
 }
+
+//-----------------------------------------------------------------------------

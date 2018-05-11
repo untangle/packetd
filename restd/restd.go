@@ -12,11 +12,15 @@ import (
 
 var engine *gin.Engine
 
+//-----------------------------------------------------------------------------
+
 func pingHandler(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"message": "pong",
 	})
 }
+
+//-----------------------------------------------------------------------------
 
 func reportsGetData(c *gin.Context) {
 	// body, err := ioutil.ReadAll(c.Request.Body)
@@ -25,26 +29,28 @@ func reportsGetData(c *gin.Context) {
 	// 	return
 	// }
 	queryStr := c.Param("query_id")
-	// queryId, err := strconv.ParseUint(string(body), 10, 64)
+	// queryID, err := strconv.ParseUint(string(body), 10, 64)
 	if queryStr == "" {
 		c.JSON(200, gin.H{"error": "query_id not found"})
 		return
 	}
-	queryId, err := strconv.ParseUint(queryStr, 10, 64)
+	queryID, err := strconv.ParseUint(queryStr, 10, 64)
 	if err != nil {
 		c.JSON(200, gin.H{"error": err})
 		return
 	}
 
-	str, err := reports.GetData(queryId)
+	str, err := reports.GetData(queryID)
 	if err != nil {
 		c.JSON(200, gin.H{"error": err})
 		return
-	} else {
-		c.String(200, str)
-		return
 	}
+
+	c.String(200, str)
+	return
 }
+
+//-----------------------------------------------------------------------------
 
 func reportsCreateQuery(c *gin.Context) {
 	body, err := ioutil.ReadAll(c.Request.Body)
@@ -57,13 +63,15 @@ func reportsCreateQuery(c *gin.Context) {
 		c.JSON(200, gin.H{"error": err})
 		return
 	}
-	str := fmt.Sprintf("%v", q.Id)
+	str := fmt.Sprintf("%v", q.ID)
 	fmt.Println("ID: ", str)
 	c.String(200, str)
 	// c.JSON(200, gin.H{
-	// 	"queryId": q.Id,
+	// 	"queryID": q.ID,
 	// })
 }
+
+//-----------------------------------------------------------------------------
 
 func getSettings(c *gin.Context) {
 	var segments []string
@@ -80,6 +88,8 @@ func getSettings(c *gin.Context) {
 	c.JSON(200, jsonResult)
 	return
 }
+
+//-----------------------------------------------------------------------------
 
 func setSettings(c *gin.Context) {
 	var segments []string
@@ -101,6 +111,8 @@ func setSettings(c *gin.Context) {
 	return
 }
 
+//-----------------------------------------------------------------------------
+
 func trimSettings(c *gin.Context) {
 	var segments []string
 	path := c.Param("path")
@@ -116,6 +128,9 @@ func trimSettings(c *gin.Context) {
 	return
 }
 
+//-----------------------------------------------------------------------------
+
+// StartRestDaemon is called to start the rest daemon
 func StartRestDaemon() {
 	reports.ConnectDb()
 
@@ -138,6 +153,8 @@ func StartRestDaemon() {
 	fmt.Println("Started RestD")
 }
 
+//-----------------------------------------------------------------------------
+
 func removeEmptyStrings(strings []string) []string {
 
 	b := strings[:0]
@@ -148,3 +165,5 @@ func removeEmptyStrings(strings []string) []string {
 	}
 	return b
 }
+
+//-----------------------------------------------------------------------------
