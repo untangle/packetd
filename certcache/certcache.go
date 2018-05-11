@@ -29,20 +29,22 @@ func Plugin_Goodbye(childsync *sync.WaitGroup) {
 func Plugin_netfilter_handler(ch chan<- int32, tuple support.Tuple, ctid uint) {
 
 	if tuple.ServerPort != 443 {
+		ch <- 8
 		return
 	}
-
-	localMutex.Lock()
-
-	var cert x509.Certificate
-	var ok bool
 
 	client := fmt.Sprintf("%s", tuple.ClientAddr)
 
 	// TODO - remove this hack once we can ignore locally generated traffic
 	if client == "192.168.222.20" {
+		ch <- 8
 		return
 	}
+
+	var cert x509.Certificate
+	var ok bool
+
+	localMutex.Lock()
 
 	if cert, ok = support.FindCertificate(client); ok {
 		support.LogMessage("Loading certificate for %s\n", tuple.ServerAddr)
@@ -66,6 +68,7 @@ func Plugin_netfilter_handler(ch chan<- int32, tuple support.Tuple, ctid uint) {
 
 	localMutex.Unlock()
 	support.LogMessage("CERTIFICATE: %s\n", cert.Subject)
+	ch <- 8
 }
 
 //-----------------------------------------------------------------------------

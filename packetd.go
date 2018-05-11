@@ -194,28 +194,20 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int, ctid C.uint) i
 
 	// ********** Call all plugin netfilter handler functions here
 
-	c1 := make(chan int32)
-	go example.Plugin_netfilter_handler(c1, buffer, length, connid)
-	c2 := make(chan int32)
-	go classify.Plugin_netfilter_handler(c2, buffer, length, connid)
-	c3 := make(chan int32)
-	go geoip.Plugin_netfilter_handler(c3, buffer, length, connid)
-	c4 := make(chan int32)
-	go certcache.Plugin_netfilter_handler(c4, tuple, connid)
+	result := make(chan int32)
+
+	go example.Plugin_netfilter_handler(result, buffer, length, connid)
+	go classify.Plugin_netfilter_handler(result, buffer, length, connid)
+	go geoip.Plugin_netfilter_handler(result, buffer, length, connid)
+	go certcache.Plugin_netfilter_handler(result, tuple, connid)
 
 	// ********** End of plugin netfilter callback functions
 
 	// add the mark bits returned from each package handler
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 4; i++ {
 		select {
-		case mark1 := <-c1:
-			pmark |= mark1
-		case mark2 := <-c2:
-			pmark |= mark2
-		case mark3 := <-c3:
-			pmark |= mark3
-		case mark4 := <-c4:
-			pmark |= mark4
+		case mark := <-result:
+			pmark |= mark
 		}
 	}
 
