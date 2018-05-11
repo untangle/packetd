@@ -242,7 +242,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 		entry.UpdateCount++
 	} else {
 		support.LogMessage("CONNTRACK Adding %s to table\n", finder)
-		entry.ConntrackId = uint(info.conn_id)
+		entry.ConntrackID = uint(info.conn_id)
 		entry.SessionID = support.NextSessionID()
 		entry.SessionCreation = time.Now()
 		entry.SessionTuple = tuple

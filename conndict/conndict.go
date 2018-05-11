@@ -1,46 +1,57 @@
 package conndict
 
-import "bufio"
-import "fmt"
-import "os"
-import "strings"
-import "sync"
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+	"sync"
+)
 
-const path_base string = "/proc/net/dict"
+const pathBase string = "/proc/net/dict"
 
-var read_mutex = &sync.Mutex{}
+var readMutex = &sync.Mutex{}
 
-type Pair struct {
+//-----------------------------------------------------------------------------
+
+// DictPair holds a field value pair of data
+type DictPair struct {
 	Field string
 	Value string
 }
 
+//-----------------------------------------------------------------------------
+
 // Create a field/value pair from a line of output from /proc/net/dict/*
-func parse_pair(line string) Pair {
+func parsePair(line string) DictPair {
 	slices := strings.SplitN(line, ": ", 2)
-	new_pair := Pair{Field: slices[0], Value: slices[1]}
-	return new_pair
+	pair := DictPair{Field: slices[0], Value: slices[1]}
+	return pair
 }
 
+//-----------------------------------------------------------------------------
+
 // Print a pair's field and value
-func (p Pair) Print() {
+func (p DictPair) Print() {
 	fmt.Printf("Field: %s Value: %s\n", p.Field, p.Value)
 }
 
-// Set a field/value pair based on the supplied conntrack id
-func Set_pair(field string, value string, id uint) error {
-	file, err := os.OpenFile(path_base+"/write", os.O_WRONLY, 0660)
-	set_string := fmt.Sprintf("id=%d,field=%s,value=%s", id, field, value)
+//-----------------------------------------------------------------------------
+
+// SetPair sets a field/value pair for the supplied conntrack id
+func SetPair(field string, value string, id uint) error {
+	file, err := os.OpenFile(pathBase+"/write", os.O_WRONLY, 0660)
+	setstr := fmt.Sprintf("id=%d,field=%s,value=%s", id, field, value)
 
 	if err != nil {
-		return fmt.Errorf("conndict: Set_pair: Failed to open %s", path_base+"/write")
+		return fmt.Errorf("conndict: SetPair: Failed to open %s", pathBase+"/write")
 	}
 
 	defer file.Close()
 
-	_, err = file.WriteString(set_string)
+	_, err = file.WriteString(setstr)
 	if err != nil {
-		return fmt.Errorf("conndict: Set_pair: Failed to write %s", set_string)
+		return fmt.Errorf("conndict: SetPair: Failed to write %s", setstr)
 	}
 
 	file.Sync()
@@ -48,65 +59,73 @@ func Set_pair(field string, value string, id uint) error {
 	return err
 }
 
-// Set a slice of field/value pairs based on the supplied conntrack id
-func Set_pairs(pairs []Pair, id uint) error {
+//-----------------------------------------------------------------------------
+
+// SetPairs sets a slice of field/value pairs for the supplied conntrack id
+func SetPairs(pairs []DictPair, id uint) error {
 	for _, p := range pairs {
-		err := Set_pair(p.Field, p.Value, id)
+		err := SetPair(p.Field, p.Value, id)
 
 		if err != nil {
 			fmt.Println(err)
-			return fmt.Errorf("conndict: Set_pairs: Failed on setting %s:%s for %d", p.Field, p.Value, id)
+			return fmt.Errorf("conndict: SetPairs: Failed on setting %s:%s for %d", p.Field, p.Value, id)
 		}
 	}
 
 	return nil
 }
 
-// Get all of the field/value pairs associated with the supplied conntrack id
-func Get_pairs(id uint) ([]Pair, error) {
-	file, err := os.OpenFile(path_base+"/read", os.O_RDWR, 0660)
-	set_string := fmt.Sprintf("%d", id)
+//-----------------------------------------------------------------------------
+
+// GetPairs gets all of the field/value pairs for the supplied conntrack id
+func GetPairs(id uint) ([]DictPair, error) {
+	file, err := os.OpenFile(pathBase+"/read", os.O_RDWR, 0660)
+	setstr := fmt.Sprintf("%d", id)
 
 	if err != nil {
-		return nil, fmt.Errorf("conndict: Get_pairs: Failed to open %s", path_base+"/read")
+		return nil, fmt.Errorf("conndict: Get_pairs: Failed to open %s", pathBase+"/read")
 	}
 
 	defer file.Close()
 
-	read_mutex.Lock()
-	_, err = file.WriteString(set_string)
+	readMutex.Lock()
+	_, err = file.WriteString(setstr)
 
 	if err != nil {
-		return nil, fmt.Errorf("conndict: Set_pair: Failed to write %s", set_string)
+		return nil, fmt.Errorf("conndict: GetPair: Failed to write %s", setstr)
 	}
 
 	file.Sync()
 
-	var pairs []Pair
+	var pairs []DictPair
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		pairs = append(pairs, parse_pair(scanner.Text()))
+		pairs = append(pairs, parsePair(scanner.Text()))
 	}
-	read_mutex.Unlock()
+	readMutex.Unlock()
 	return pairs, err
 }
 
-// Get all of the field/value pairs for all known conntrack entries
-func Get_all() ([]Pair, error) {
-	file, err := os.OpenFile(path_base+"/all", os.O_RDWR, 0660)
+//-----------------------------------------------------------------------------
+
+// GetAll gets all of the field/value pairs for all known conntrack entries
+func GetAll() ([]DictPair, error) {
+	file, err := os.OpenFile(pathBase+"/all", os.O_RDWR, 0660)
 
 	if err != nil {
-		return nil, fmt.Errorf("conndict: Get_pairs: Failed to open %s", path_base+"/all")
+		return nil, fmt.Errorf("conndict: Get_pairs: Failed to open %s", pathBase+"/all")
 	}
 
 	defer file.Close()
 
-	var pairs []Pair
+	var pairs []DictPair
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		pairs = append(pairs, parse_pair(scanner.Text()))
+		pairs = append(pairs, parsePair(scanner.Text()))
 	}
 	return pairs, err
 }
+
+//-----------------------------------------------------------------------------

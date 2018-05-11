@@ -90,18 +90,18 @@ func PluginNetfilterHandler(ch chan<- int32, buffer []byte, length int, ctid uin
 		}
 	}
 
-	errc := conndict.Set_pair("Client Country", SrcCode, ctid)
+	errc := conndict.SetPair("Client Country", SrcCode, ctid)
 	if errc != nil {
-		support.LogMessage("Set_pair(client) ERROR: %s\n", errc)
+		support.LogMessage("SetPair(client) ERROR: %s\n", errc)
 	} else {
-		support.LogMessage("Set_pair(client) %d = %s\n", ctid, SrcCode)
+		support.LogMessage("SetPair(client) %d = %s\n", ctid, SrcCode)
 	}
 
-	errs := conndict.Set_pair("Server Country", DstCode, ctid)
+	errs := conndict.SetPair("Server Country", DstCode, ctid)
 	if errs != nil {
-		support.LogMessage("Set_pair(server) ERROR: %s\n", errs)
+		support.LogMessage("SetPair(server) ERROR: %s\n", errs)
 	} else {
-		support.LogMessage("Set_pair(server) %d = %s\n", ctid, DstCode)
+		support.LogMessage("SetPair(server) %d = %s\n", ctid, DstCode)
 	}
 
 	ch <- 4
