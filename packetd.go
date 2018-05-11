@@ -51,10 +51,10 @@ func main() {
 
 	// ********** Call all plugin startup functions here
 
-	go example.Plugin_Startup(&childsync)
-	go classify.Plugin_Startup(&childsync)
-	go geoip.Plugin_Startup(&childsync)
-	go certcache.Plugin_Startup(&childsync)
+	go example.PluginStartup(&childsync)
+	go classify.PluginStartup(&childsync)
+	go geoip.PluginStartup(&childsync)
+	go certcache.PluginStartup(&childsync)
 
 	// Start REST HTTP daemon
 	go restd.StartRestDaemon()
@@ -107,10 +107,10 @@ stdinloop:
 
 	// ********** Call all plugin goodbye functions here
 
-	go example.Plugin_Goodbye(&childsync)
-	go classify.Plugin_Goodbye(&childsync)
-	go geoip.Plugin_Goodbye(&childsync)
-	go certcache.Plugin_Goodbye(&childsync)
+	go example.PluginGoodbye(&childsync)
+	go classify.PluginGoodbye(&childsync)
+	go geoip.PluginGoodbye(&childsync)
+	go certcache.PluginGoodbye(&childsync)
 
 	// ********** End of plugin goodbye functions
 
@@ -185,7 +185,7 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int, ctid C.uint) i
 		entry.UpdateCount++
 	} else {
 		support.LogMessage("SESSION Adding %s to table\n", finder)
-		entry.SessionId = support.NextSessionId()
+		entry.SessionID = support.NextSessionID()
 		entry.SessionCreation = time.Now()
 		entry.UpdateCount = 1
 	}
@@ -196,10 +196,10 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int, ctid C.uint) i
 
 	result := make(chan int32)
 
-	go example.Plugin_netfilter_handler(result, buffer, length, connid)
-	go classify.Plugin_netfilter_handler(result, buffer, length, connid)
-	go geoip.Plugin_netfilter_handler(result, buffer, length, connid)
-	go certcache.Plugin_netfilter_handler(result, tuple, connid)
+	go example.PluginNetfilterHandler(result, buffer, length, connid)
+	go classify.PluginNetfilterHandler(result, buffer, length, connid)
+	go geoip.PluginNetfilterHandler(result, buffer, length, connid)
+	go certcache.PluginNetfilterHandler(result, tuple, connid)
 
 	// ********** End of plugin netfilter callback functions
 
@@ -243,7 +243,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	} else {
 		support.LogMessage("CONNTRACK Adding %s to table\n", finder)
 		entry.ConntrackId = uint(info.conn_id)
-		entry.SessionId = support.NextSessionId()
+		entry.SessionID = support.NextSessionID()
 		entry.SessionCreation = time.Now()
 		entry.SessionTuple = tuple
 		entry.UpdateCount = 1
@@ -295,7 +295,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 
 	// ********** Call all plugin conntrack handler functions here
 
-	go example.Plugin_conntrack_handler(int(info.msg_type), &entry)
+	go example.PluginConntrackHandler(int(info.msg_type), &entry)
 
 	// ********** End of plugin netfilter callback functions
 
@@ -320,7 +320,7 @@ func go_netlogger_callback(info *C.struct_netlogger_info) {
 
 	// ********** Call all plugin netlogger handler functions here
 
-	go example.Plugin_netlogger_handler(&logger)
+	go example.PluginNetloggerHandler(&logger)
 
 	// ********** End of plugin netlogger callback functions
 }

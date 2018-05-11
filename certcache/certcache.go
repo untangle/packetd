@@ -12,21 +12,29 @@ var localMutex sync.Mutex
 
 //-----------------------------------------------------------------------------
 
-func Plugin_Startup(childsync *sync.WaitGroup) {
-	support.LogMessage("Plugin_Startup(%s) has been called\n", "certcache")
+// PluginStartup function is called to allow plugin specific initialization. We
+// increment the argumented WaitGroup so the main process can wait for
+// our goodbye function to return during shutdown.
+func PluginStartup(childsync *sync.WaitGroup) {
+	support.LogMessage("PluginStartup(%s) has been called\n", "certcache")
 	childsync.Add(1)
 }
 
 //-----------------------------------------------------------------------------
 
-func Plugin_Goodbye(childsync *sync.WaitGroup) {
-	support.LogMessage("Plugin_Goodbye(%s) has been called\n", "certcache")
+// PluginGoodbye function called when the daemon is shutting down. We call Done
+// for the argumented WaitGroup to let the main process know we're finished.
+func PluginGoodbye(childsync *sync.WaitGroup) {
+	support.LogMessage("PluginGoodbye(%s) has been called\n", "certcache")
 	childsync.Done()
 }
 
 //-----------------------------------------------------------------------------
 
-func Plugin_netfilter_handler(ch chan<- int32, tuple support.Tuple, ctid uint) {
+// PluginNetfilterHandler is called to handle netfilter packet data. We extract
+// the source and destination IP address from the packet, lookup the GeoIP
+// country code for each, and store them in the conntrack dictionary.
+func PluginNetfilterHandler(ch chan<- int32, tuple support.Tuple, ctid uint) {
 
 	if tuple.ServerPort != 443 {
 		ch <- 8

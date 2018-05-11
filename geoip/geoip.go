@@ -17,8 +17,13 @@ var geodb *geoip2.Reader
 
 //-----------------------------------------------------------------------------
 
-func Plugin_Startup(childsync *sync.WaitGroup) {
-	support.LogMessage("Plugin_Startup(%s) has been called\n", "geoip")
+// PluginStartup is called to allow plugin specific initialization.
+// We initialize an instance of the GeoIP engine using any existing
+// database we can find, or we download if needed. We increment the
+// argumented WaitGroup so the main process can wait for our goodbye function
+// to return during shutdown.
+func PluginStartup(childsync *sync.WaitGroup) {
+	support.LogMessage("PluginStartup(%s) has been called\n", "geoip")
 
 	var filename string
 
@@ -50,10 +55,56 @@ func Plugin_Startup(childsync *sync.WaitGroup) {
 
 //-----------------------------------------------------------------------------
 
-func Plugin_Goodbye(childsync *sync.WaitGroup) {
-	support.LogMessage("Plugin_Goodbye(%s) has been called\n", "geoip")
+// PluginGoodbye is called when the daemon is shutting down. We close our
+// GeoIP engine and call done for the argumented WaitGroup to let the main
+// process know we're finished.
+func PluginGoodbye(childsync *sync.WaitGroup) {
+	support.LogMessage("PluginGoodbye(%s) has been called\n", "geoip")
 	geodb.Close()
 	childsync.Done()
+}
+
+//-----------------------------------------------------------------------------
+
+// PluginNetfilterHandler is called to handle netfilter packet data. We extract
+// the source and destination IP address from the packet, lookup the GeoIP
+// country code for each, and store them in the conntrack dictionary.
+func PluginNetfilterHandler(ch chan<- int32, buffer []byte, length int, ctid uint) {
+	var SrcCode = "XX"
+	var DstCode = "XX"
+
+	support.LogMessage("GEOIP RECEIVED %d BYTES\n", length)
+	packet := gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
+	ipLayer := packet.Layer(layers.LayerTypeIPv4)
+	if ipLayer != nil {
+		addr := ipLayer.(*layers.IPv4)
+		SrcRecord, err := geodb.City(addr.SrcIP)
+		if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
+			SrcCode = SrcRecord.Country.IsoCode
+			support.LogMessage("SRC: %s = %s\n", addr.SrcIP, SrcCode)
+		}
+		DstRecord, err := geodb.City(addr.DstIP)
+		if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
+			DstCode = DstRecord.Country.IsoCode
+			support.LogMessage("DST: %s = %s\n", addr.DstIP, DstCode)
+		}
+	}
+
+	errc := conndict.Set_pair("Client Country", SrcCode, ctid)
+	if errc != nil {
+		support.LogMessage("Set_pair(client) ERROR: %s\n", errc)
+	} else {
+		support.LogMessage("Set_pair(client) %d = %s\n", ctid, SrcCode)
+	}
+
+	errs := conndict.Set_pair("Server Country", DstCode, ctid)
+	if errs != nil {
+		support.LogMessage("Set_pair(server) ERROR: %s\n", errs)
+	} else {
+		support.LogMessage("Set_pair(server) %d = %s\n", ctid, DstCode)
+	}
+
+	ch <- 4
 }
 
 //-----------------------------------------------------------------------------
@@ -90,46 +141,6 @@ func databaseDownload(filename string) {
 
 	// Write the uncompressed database to the file
 	io.Copy(writer, reader)
-}
-
-//-----------------------------------------------------------------------------
-
-func Plugin_netfilter_handler(ch chan<- int32, buffer []byte, length int, ctid uint) {
-	var SrcCode string = "XX"
-	var DstCode string = "XX"
-
-	support.LogMessage("GEOIP RECEIVED %d BYTES\n", length)
-	packet := gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
-	ipLayer := packet.Layer(layers.LayerTypeIPv4)
-	if ipLayer != nil {
-		addr := ipLayer.(*layers.IPv4)
-		SrcRecord, err := geodb.City(addr.SrcIP)
-		if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
-			SrcCode = SrcRecord.Country.IsoCode
-			support.LogMessage("SRC: %s = %s\n", addr.SrcIP, SrcCode)
-		}
-		DstRecord, err := geodb.City(addr.DstIP)
-		if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
-			DstCode = DstRecord.Country.IsoCode
-			support.LogMessage("DST: %s = %s\n", addr.DstIP, DstCode)
-		}
-	}
-
-	errc := conndict.Set_pair("Client Country", SrcCode, ctid)
-	if errc != nil {
-		support.LogMessage("Set_pair(client) ERROR: %s\n", errc)
-	} else {
-		support.LogMessage("Set_pair(client) %d = %s\n", ctid, SrcCode)
-	}
-
-	errs := conndict.Set_pair("Server Country", DstCode, ctid)
-	if errs != nil {
-		support.LogMessage("Set_pair(server) ERROR: %s\n", errs)
-	} else {
-		support.LogMessage("Set_pair(server) %d = %s\n", ctid, DstCode)
-	}
-
-	ch <- 4
 }
 
 //-----------------------------------------------------------------------------
