@@ -7,10 +7,15 @@
  * All Rights Reserved
  */
 
+#include "../common.h"
+
 #define CLIENT_to_SERVER	0
 #define SERVER_to_CLIENT	1
 #define INVALID_VALUE		1234567890
 /*--------------------------------------------------------------------------*/
+extern void plugin_navl_callback(char *appname,char *protochain,unsigned int ctid);
+extern void plugin_attr_callback(char *detail,unsigned int ctid);
+
 static navl_handle_t l_navl_handle = (navl_handle_t)0;
 
 // vars for library configuration
@@ -29,12 +34,13 @@ static const char *l_name_facebook_app = "facebook.app";
 static const char *l_name_tls_hostname = "tls.hostname";
 
 // vars to hold the detail attributes we track
-int l_attr_facebook_app = INVALID_VALUE;
-int l_attr_tls_hostname = INVALID_VALUE;
+static int l_attr_facebook_app = INVALID_VALUE;
+static int l_attr_tls_hostname = INVALID_VALUE;
 /*--------------------------------------------------------------------------*/
-int navl_callback(navl_handle_t handle,navl_result_t result,navl_state_t state,navl_conn_t conn,void *arg,int error)
+static int navl_callback(navl_handle_t handle,navl_result_t result,navl_state_t state,navl_conn_t conn,void *arg,int error)
 {
     navl_iterator_t     it;
+	unsigned int		ctid;
     char                protochain[256];
     char                appname[16];
     char                work[16];
@@ -63,14 +69,14 @@ int navl_callback(navl_handle_t handle,navl_result_t result,navl_state_t state,n
         strncat(protochain,work,sizeof(protochain)-1);
     }
 
-    // TODO - do something with the appname and protochain
-    printf("APPNAME:%s PROTOCHAIN:%s\n",appname,protochain);
-
+	ctid = *(unsigned int *)arg;
+	plugin_navl_callback(appname,protochain,ctid);
     return(0);
 }
 /*--------------------------------------------------------------------------*/
-void attr_callback(navl_handle_t handle,navl_conn_t conn,int attr_type,int attr_length,const void *attr_value,int attr_flag,void *arg)
+static void attr_callback(navl_handle_t handle,navl_conn_t conn,int attr_type,int attr_length,const void *attr_value,int attr_flag,void *arg)
 {
+	unsigned int		ctid;
     char                detail[256];
 
     // we can't initialize our l_attr_xxx values during startup because the values
@@ -93,16 +99,16 @@ void attr_callback(navl_handle_t handle,navl_conn_t conn,int attr_type,int attr_
         detail[attr_length] = 0;
     }
 
-    // TODO - do something with the detail
-    printf("DETAIL:%s\n",detail);
+	ctid = *(unsigned int *)arg;
+	plugin_attr_callback(detail,ctid);
 }
 /*--------------------------------------------------------------------------*/
-int vendor_classify(const unsigned char *data,int length)
+static int vendor_classify(const unsigned char *data,int length, unsigned int ctid)
 {
-    navl_classify(l_navl_handle,NAVL_ENCAP_IP,data,length,NULL,0,navl_callback,NULL);
+    navl_classify(l_navl_handle,NAVL_ENCAP_IP,data,length,NULL,0,navl_callback,&ctid);
 }
 /*--------------------------------------------------------------------------*/
-int vendor_log_message(const char *level, const char *func, const char *format, ... )
+static int vendor_log_message(const char *level, const char *func, const char *format, ... )
 {
     va_list     va;
     char        buf[4096];
@@ -116,7 +122,7 @@ int vendor_log_message(const char *level, const char *func, const char *format, 
     return(res);
 }
 /*--------------------------------------------------------------------------*/
-void vendor_externals(void)
+static void vendor_externals(void)
 {
     /* memory allocation */
     navl_malloc_local = malloc;
@@ -182,7 +188,7 @@ static int vendor_config(const char *key,int value)
 
     sprintf(work,"%d",value);
     ret = navl_config_set(l_navl_handle,key,work);
-    if (ret != 0) printf("Error calling navl_config_set(%s)\n",key); // TODO - no printf
+    if (ret != 0) logmessage(LOG_ERR,"Error calling navl_config_set(%s)\n",key);
     return(ret);
 }
 /*--------------------------------------------------------------------------*/
@@ -202,7 +208,7 @@ static int vendor_startup(void)
 
     if (l_navl_handle == -1) {
         ret = navl_error_get(0);
-        printf("Error %d returned from navl_open()\n",ret); // TODO - no printf
+        logmessage(LOG_ERR,"Error %d returned from navl_open()\n",ret);
         return(1);
     }
 
@@ -231,7 +237,7 @@ static int vendor_startup(void)
     ret = navl_init(l_navl_handle);
 
     if (ret != 0) {
-        printf("Error %d returned from navl_init()\n",ret); // TODO - no printf
+        logmessage(LOG_ERR,"Error %d returned from navl_init()\n",ret);
         return(13);
     }
 
@@ -239,7 +245,7 @@ static int vendor_startup(void)
     if ((navl_attr_callback_set(l_navl_handle,l_name_tls_hostname,attr_callback) != 0)) problem|=0x02;
 
     if (problem != 0) {
-        printf("Error 0x%02X enabling metadata callbacks\n",problem); // TODO - no printf
+        logmessage(LOG_ERR,"Error 0x%02X enabling metadata callbacks\n",problem);
         return(14);
     }
 
@@ -247,7 +253,7 @@ static int vendor_startup(void)
     ret = navl_proto_max_index(l_navl_handle);
 
     if (ret == -1) {
-        printf("Error calling navl_proto_max_index()\n"); // TODO - no printf
+        logmessage(LOG_ERR,"Error calling navl_proto_max_index()\n");
         return(15);
     }
 
@@ -265,4 +271,3 @@ static void vendor_shutdown(void)
     navl_close(l_navl_handle);
 }
 /*--------------------------------------------------------------------------*/
-

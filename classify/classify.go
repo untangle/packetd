@@ -1,5 +1,7 @@
 package classify
 
+// TODO - need indirect way to call the NAVL library for GPL compliance
+
 /*
 #include "string.h"
 #include "stdlib.h"
@@ -18,6 +20,7 @@ package classify
 import "C"
 
 import (
+	"github.com/untangle/packetd/conndict"
 	"github.com/untangle/packetd/support"
 	"sync"
 	"unsafe"
@@ -49,15 +52,51 @@ func PluginGoodbye(childsync *sync.WaitGroup) {
 // PluginNetfilterHandler is called for raw netfilter packets. We pass the
 // packet directly to the Sandvine NAVL library for classification, and
 // push the results to the conntrack dictionary.
-// TODO - need indirect way to call the NAVL library for GPL compliance
 func PluginNetfilterHandler(ch chan<- int32, buffer []byte, length int, ctid uint) {
 	ptr := (*C.uchar)(unsafe.Pointer(&buffer[0]))
-	C.vendor_classify(ptr, C.int(length))
-
-	// TODO - put the classification in the session object
+	C.vendor_classify(ptr, C.int(length), C.uint(ctid))
 
 	// use the channel to return our mark bits
 	ch <- 2
+}
+
+//-----------------------------------------------------------------------------
+
+//export plugin_navl_callback
+func plugin_navl_callback(appname *C.char, protochain *C.char, ctid C.uint) {
+	app := C.GoString(appname)
+	chain := C.GoString(protochain)
+	id := uint(ctid)
+
+	erra := conndict.SetPair("AppName", app, id)
+	if erra != nil {
+		support.LogMessage("SetPair(navl_appname) ERROR: %s\n", erra)
+	} else {
+		support.LogMessage("SetPair(navl_appname) %d = %s\n", id, app)
+	}
+
+	errc := conndict.SetPair("ProtoChain", chain, id)
+	if errc != nil {
+		support.LogMessage("SetPair(navl_protochain) ERROR: %s\n", errc)
+	} else {
+		support.LogMessage("SetPair(navl_protochain) %d = %s\n", id, chain)
+	}
+
+}
+
+//-----------------------------------------------------------------------------
+
+//export plugin_attr_callback
+func plugin_attr_callback(detail *C.char, ctid C.uint) {
+	info := C.GoString(detail)
+	id := uint(ctid)
+
+	errd := conndict.SetPair("Detail", info, id)
+	if errd != nil {
+		support.LogMessage("SetPair(attr_detail) ERROR: %s\n", errd)
+	} else {
+		support.LogMessage("SetPair(attr_detail) %d = %s\n", id, info)
+	}
 }
 
 //-----------------------------------------------------------------------------

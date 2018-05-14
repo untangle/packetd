@@ -74,6 +74,8 @@ func PluginNetfilterHandler(ch chan<- int32, tuple support.Tuple, ctid uint) {
 		conn.Close()
 	}
 
+	// TODO - should the cert also be attached to the session?
+
 	localMutex.Unlock()
 	support.LogMessage("CERTIFICATE: %s\n", cert.Subject)
 	ch <- 8
