@@ -16,7 +16,6 @@ static u_int64_t			tracker_unknown;
 static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrack *ct,void *data)
 {
 	struct conntrack_info	info;
-	char					opcode;
 
 	// if the shutdown flag is set return stop to interrupt nfct_catch
 	if (get_shutdown_flag() != 0) return(NFCT_CB_STOP);

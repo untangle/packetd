@@ -178,8 +178,7 @@ void netfilter_shutdown(void)
 /*--------------------------------------------------------------------------*/
 int netfilter_thread(void)
 {
-	struct pollfd	network,console;
-	struct timeval	tv;
+	struct pollfd	network;
 	char			*buffer;
 	int				netsock;
 	int				val,ret;
