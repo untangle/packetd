@@ -7,6 +7,7 @@
  * All Rights Reserved
  */
 
+#include <pthread.h>
 #include <unistd.h>
 #include <syslog.h>
 #include <stdlib.h>
@@ -14,7 +15,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <ctype.h>
 #include <poll.h>
+#include <time.h>
+#include <math.h>
 #include <sys/time.h>
 #include <arpa/inet.h>
 #include <netinet/ip.h>
@@ -27,100 +31,67 @@
 #include <libnetfilter_log/libnetfilter_log.h>
 #include <libnfnetlink/libnfnetlink.h>
 /*--------------------------------------------------------------------------*/
+struct conntrack_info {
+    u_int8_t    msg_type;
+    u_int32_t   conn_id;
+    u_int8_t    orig_proto;
+    u_int32_t   orig_saddr;
+    u_int32_t   orig_daddr;
+    u_int16_t   orig_sport;
+    u_int16_t   orig_dport;
+    u_int64_t   orig_bytes;
+    u_int64_t   repl_bytes;
+};
+/*--------------------------------------------------------------------------*/
+struct netlogger_info {
+    u_int8_t    protocol;
+    u_int16_t   icmp_type;
+    u_int8_t    src_intf, dst_intf;
+    u_int32_t   src_addr, dst_addr;
+    u_int16_t   src_port, dst_port;
+    u_int32_t   mark;
+    const char  *prefix;
+};
+/*--------------------------------------------------------------------------*/
+struct nfq_data {
+    struct nfattr   **data;
+};
+/*--------------------------------------------------------------------------*/
+extern int go_netfilter_callback(int mark,unsigned char* data,int len,unsigned int ctid);
+extern void go_netlogger_callback(struct netlogger_info* info);
+extern void go_conntrack_callback(struct conntrack_info* info);
+extern void go_child_startup(void);
+extern void go_child_goodbye(void);
+/*--------------------------------------------------------------------------*/
+void common_startup(void);
+void common_goodbye(void);
+char* itolevel(int value,char *dest);
+void rawmessage(int priority,const char *message);
+void logmessage(int priority,const char *format,...);
+void hexmessage(int priority,const void *buffer,int size);
+int get_shutdown_flag(void);
+/*--------------------------------------------------------------------------*/
+int conntrack_startup(void);
+void conntrack_shutdown(void);
+int conntrack_thread(void);
+void conntrack_goodbye(void);
+void conntrack_dump(void);
+/*--------------------------------------------------------------------------*/
+int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data);
+unsigned int nfq_get_conntrack_id(struct nfq_data *nfad, int l3num);
+int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data *nfad,void *data);
+int netfilter_startup(void);
+void netfilter_shutdown(void);
+int netfilter_thread(void);
+void netfilter_goodbye(void);
+/*--------------------------------------------------------------------------*/
+int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct nflog_data *nfa,void *data);
+int netlogger_startup(void);
+void netlogger_shutdown(void);
+int netlogger_thread(void);
+void netlogger_goodbye(void);
+/*--------------------------------------------------------------------------*/
 static struct timeval   g_runtime;
 static int              g_shutdown;
 static int              g_debug;
 /*--------------------------------------------------------------------------*/
-static void common_startup(void)
-{
-    gettimeofday(&g_runtime,NULL);
-    g_shutdown = 0;
-    g_debug = 1;
-}
-/*--------------------------------------------------------------------------*/
-static char* itolevel(int value,char *dest)
-{
-    if (value == LOG_EMERG)     return(strcpy(dest,"EMERGENCY"));
-    if (value == LOG_ALERT)     return(strcpy(dest,"ALERT"));
-    if (value == LOG_CRIT)      return(strcpy(dest,"CRITICAL"));
-    if (value == LOG_ERR)       return(strcpy(dest,"ERROR"));
-    if (value == LOG_WARNING)   return(strcpy(dest,"WARNING"));
-    if (value == LOG_NOTICE)    return(strcpy(dest,"NOTICE"));
-    if (value == LOG_INFO)      return(strcpy(dest,"INFO"));
-    if (value == LOG_DEBUG)     return(strcpy(dest,"DEBUG"));
-
-    sprintf(dest,"LOG_%d",value);
-    return(dest);
-}
-/*--------------------------------------------------------------------------*/
-static void rawmessage(int priority,const char *message)
-{
-    struct timeval  nowtime;
-    struct tm       *today;
-    time_t          value;
-    double          rr,nn,ee;
-    char            string[32];
-
-    if ((priority == LOG_DEBUG) && (g_debug == 0)) return;
-
-    gettimeofday(&nowtime,NULL);
-
-    rr = ((double)g_runtime.tv_sec * (double)1000000.00);
-    rr+=(double)g_runtime.tv_usec;
-
-    nn = ((double)nowtime.tv_sec * (double)1000000.00);
-    nn+=(double)nowtime.tv_usec;
-
-    ee = ((nn - rr) / (double)1000000.00);
-
-    itolevel(priority,string);
-    printf("[%.6f] %s %s",ee,string,message);
-
-    fflush(stdout);
-    return;
-}
-/*--------------------------------------------------------------------------*/
-static void logmessage(int priority,const char *format,...)
-{
-    va_list         args;
-    char            message[1024];
-
-    if ((priority == LOG_DEBUG) && (g_debug == 0)) return;
-
-    va_start(args,format);
-    vsnprintf(message,sizeof(message),format,args);
-    va_end(args);
-
-    rawmessage(priority,message);
-}
-/*--------------------------------------------------------------------------*/
-static void hexmessage(int priority,const void *buffer,int size)
-{
-    const unsigned char     *data;
-    char                    *message;
-    int                     loc;
-    int                     x;
-
-    if ((priority == LOG_DEBUG) && (g_debug == 0)) return;
-
-    message = (char *)malloc((size * 3) + 4);
-    data = (const unsigned char *)buffer;
-
-    for (x = 0;x < size;x++) {
-        loc = (x * 3);
-        if (x == 0) sprintf(&message[loc],"%02X ",data[x]);
-        else sprintf(&message[loc],"%02X ",data[x]);
-    }
-
-    loc = (size * 3);
-    strcpy(&message[loc],"\n");
-    rawmessage(priority,message);
-    free(message);
-}
-/*--------------------------------------------------------------------------*/
-static int get_shutdown_flag(void)
-{
-    return(g_shutdown);
-}
-/*--------------------------------------------------------------------------*/
-

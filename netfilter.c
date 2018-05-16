@@ -1,5 +1,5 @@
 /**
- * netfilter.h
+ * netfilter.c
  *
  * Handles receiving raw netfilter packets for the Untnagle Packet Daemon
  *
@@ -7,14 +7,7 @@
  * All Rights Reserved
  */
 
-/*--------------------------------------------------------------------------*/
-extern int go_netfilter_callback(int mark,unsigned char* data,int len,unsigned int ctid);
-extern void go_child_startup(void);
-extern void go_child_goodbye(void);
-/*--------------------------------------------------------------------------*/
-struct nfq_data {
-    struct nfattr   **data;
-};
+#include "common.h"
 /*--------------------------------------------------------------------------*/
 static struct nfq_q_handle      *nfqqh;
 static struct nfq_handle        *nfqh;
@@ -23,7 +16,7 @@ static int                      cfg_net_maxlen = 10240;
 static int                      cfg_net_buffer = 32768;
 static int                      cfg_net_queue = 1818;
 /*--------------------------------------------------------------------------*/
-static int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data)
+int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data)
 {
     *data = (unsigned char *)nfnl_get_pointer_to_data(nfad->data,NFQA_CT,struct nf_conntrack);
     if (*data) return NFA_PAYLOAD(nfad->data[NFQA_CT-1]);
@@ -32,7 +25,7 @@ static int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data)
     return(-1);
 }
 /*--------------------------------------------------------------------------*/
-static unsigned int nfq_get_conntrack_id(struct nfq_data *nfad, int l3num)
+unsigned int nfq_get_conntrack_id(struct nfq_data *nfad, int l3num)
 {
     struct nf_conntrack *ct;
     unsigned char       *ct_data;
@@ -60,7 +53,7 @@ static unsigned int nfq_get_conntrack_id(struct nfq_data *nfad, int l3num)
     return(id);
 }
 /*--------------------------------------------------------------------------*/
-static int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data *nfad,void *data)
+int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data *nfad,void *data)
 {
     struct nfqnl_msg_packet_hdr     *hdr;
     unsigned char                   *rawpkt;
@@ -104,7 +97,7 @@ static int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct n
     return(0);
 }
 /*--------------------------------------------------------------------------*/
-static int netfilter_startup(void)
+int netfilter_startup(void)
 {
     int     ret;
 
@@ -174,7 +167,7 @@ static int netfilter_startup(void)
     return(0);
 }
 /*--------------------------------------------------------------------------*/
-static void netfilter_shutdown(void)
+void netfilter_shutdown(void)
 {
     // destroy the netfilter queue
     nfq_destroy_queue(nfqqh);
@@ -183,7 +176,7 @@ static void netfilter_shutdown(void)
     nfq_close(nfqh);
 }
 /*--------------------------------------------------------------------------*/
-static int netfilter_thread(void)
+int netfilter_thread(void)
 {
     struct pollfd   network,console;
     struct timeval  tv;
@@ -276,9 +269,8 @@ static int netfilter_thread(void)
     return(0);
 }
 /*--------------------------------------------------------------------------*/
-static void netfilter_goodbye(void)
+void netfilter_goodbye(void)
 {
     g_shutdown = 1;
 }
 /*--------------------------------------------------------------------------*/
-

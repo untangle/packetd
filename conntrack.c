@@ -1,5 +1,5 @@
 /**
- * conntrack.h
+ * conntrack.c
  *
  * Handles receiving conntrack updates for the Untnagle Packet Daemon
  *
@@ -7,22 +7,7 @@
  * All Rights Reserved
  */
 
-/*--------------------------------------------------------------------------*/
-struct conntrack_info {
-    u_int8_t    msg_type;
-    u_int32_t   conn_id;
-    u_int8_t    orig_proto;
-    u_int32_t   orig_saddr;
-    u_int32_t   orig_daddr;
-    u_int16_t   orig_sport;
-    u_int16_t   orig_dport;
-    u_int64_t   orig_bytes;
-    u_int64_t   repl_bytes;
-};
-/*--------------------------------------------------------------------------*/
-extern void go_conntrack_callback(struct conntrack_info* info);
-extern void go_child_startup(void);
-extern void go_child_goodbye(void);
+#include "common.h"
 /*--------------------------------------------------------------------------*/
 static struct nfct_handle   *nfcth;
 static u_int64_t            tracker_error;
@@ -84,7 +69,7 @@ static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrac
     return(NFCT_CB_CONTINUE);
 }
 /*--------------------------------------------------------------------------*/
-static int conntrack_startup(void)
+int conntrack_startup(void)
 {
     int     ret;
 
@@ -111,7 +96,7 @@ static int conntrack_startup(void)
     return(0);
 }
 /*--------------------------------------------------------------------------*/
-static void conntrack_shutdown(void)
+void conntrack_shutdown(void)
 {
     if (nfcth == NULL) return;
 
@@ -125,7 +110,7 @@ static void conntrack_shutdown(void)
     nfcth = NULL;
 }
 /*--------------------------------------------------------------------------*/
-static int conntrack_thread(void)
+int conntrack_thread(void)
 {
     int     ret;
 
@@ -156,7 +141,7 @@ static int conntrack_thread(void)
     return(0);
 }
 /*--------------------------------------------------------------------------*/
-static void conntrack_goodbye(void)
+void conntrack_goodbye(void)
 {
     u_int32_t   family;
 
@@ -168,7 +153,7 @@ static void conntrack_goodbye(void)
     nfct_send(nfcth,NFCT_Q_DUMP,&family);
 }
 /*--------------------------------------------------------------------------*/
-static void conntrack_dump(void)
+void conntrack_dump(void)
 {
     u_int32_t   family;
     int         ret;
@@ -180,4 +165,3 @@ static void conntrack_dump(void)
     logmessage(LOG_INFO,"nfct_send() result = %d\n",ret);
 }
 /*--------------------------------------------------------------------------*/
-

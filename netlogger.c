@@ -1,5 +1,5 @@
 /**
- * netlogger.h
+ * netlogger.c
  *
  * Handles receiving netfilter log events for the Untnagle Packet Daemon
  *
@@ -7,26 +7,13 @@
  * All Rights Reserved
  */
 
-/*--------------------------------------------------------------------------*/
-struct netlogger_info {
-    u_int8_t    protocol;
-    u_int16_t   icmp_type;
-    u_int8_t    src_intf, dst_intf;
-    u_int32_t   src_addr, dst_addr;
-    u_int16_t   src_port, dst_port;
-    u_int32_t   mark;
-    const char  *prefix;
-};
-/*--------------------------------------------------------------------------*/
-extern void go_netlogger_callback(struct netlogger_info* info);
-extern void go_child_startup(void);
-extern void go_child_goodbye(void);
+#include "common.h"
 /*--------------------------------------------------------------------------*/
 static struct nflog_handle      *l_log_handle;
 static struct nflog_g_handle    *l_grp_handle;
 static int                      l_logsock;
 /*--------------------------------------------------------------------------*/
-static int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct nflog_data *nfa,void *data)
+int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct nflog_data *nfa,void *data)
 {
     struct netlogger_info   info;
     struct icmphdr          *icmphead;
@@ -85,7 +72,7 @@ static int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,s
     return(0);
 }
 /*--------------------------------------------------------------------------*/
-static int netlogger_startup(void)
+int netlogger_startup(void)
 {
     int     ret;
 
@@ -145,7 +132,7 @@ static int netlogger_startup(void)
     return(0);
 }
 /*--------------------------------------------------------------------------*/
-static void netlogger_shutdown(void)
+void netlogger_shutdown(void)
 {
     int     ret;
 
@@ -162,7 +149,7 @@ static void netlogger_shutdown(void)
     }
 }
 /*--------------------------------------------------------------------------*/
-static int netlogger_thread(void)
+int netlogger_thread(void)
 {
     struct timeval  tv;
     sigset_t        sigset;
@@ -227,9 +214,8 @@ static int netlogger_thread(void)
     return(0);
 }
 /*--------------------------------------------------------------------------*/
-static void netlogger_goodbye(void)
+void netlogger_goodbye(void)
 {
     g_shutdown = 1;
 }
 /*--------------------------------------------------------------------------*/
-

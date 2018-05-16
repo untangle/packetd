@@ -1,21 +1,8 @@
 package classify
 
-// TODO - need indirect way to call the NAVL library for GPL compliance
-
 /*
-#include "string.h"
-#include "stdlib.h"
-#include "stdarg.h"
-#include "syslog.h"
-#include "stdio.h"
-#include "ctype.h"
-#include "math.h"
-#include "time.h"
-#include "sys/time.h"
-#include "pthread.h"
-#include "navl.h"
 #include "classify.h"
-#cgo LDFLAGS: -lnavl -lm -ldl
+#cgo LDFLAGS: -ldl -lm -lnavl
 */
 import "C"
 
@@ -64,6 +51,7 @@ func PluginNetfilterHandler(ch chan<- int32, buffer []byte, length int, ctid uin
 
 //export plugin_navl_callback
 func plugin_navl_callback(appname *C.char, protochain *C.char, ctid C.uint) {
+
 	app := C.GoString(appname)
 	chain := C.GoString(protochain)
 	id := uint(ctid)

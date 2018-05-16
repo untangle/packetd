@@ -2,9 +2,6 @@ package main
 
 /*
 #include "common.h"
-#include "netfilter.h"
-#include "conntrack.h"
-#include "netlogger.h"
 #cgo LDFLAGS: -lnetfilter_queue -lnfnetlink -lnetfilter_conntrack -lnetfilter_log
 */
 import "C"
@@ -40,9 +37,9 @@ func main() {
 	var lastmin int
 	var counter int
 
-	support.Startup()
 	C.common_startup()
 
+	support.Startup()
 	support.LogMessage("Untangle Packet Daemon Version %s\n", "1.00")
 
 	go C.netfilter_thread()
@@ -117,6 +114,9 @@ stdinloop:
 	C.netfilter_goodbye()
 	C.conntrack_goodbye()
 	C.netlogger_goodbye()
+
+	C.common_goodbye()
+
 	childsync.Wait()
 }
 
