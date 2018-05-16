@@ -165,13 +165,13 @@ int netlogger_thread(void)
     // if there were any startup errors set the shutdown flag
     if (ret != 0) {
         logmessage(LOG_ERR,"Error %d returned from netlogger_startup(init)\n",ret);
-        g_shutdown = 1;
+        set_shutdown_flag(1);
     }
 
     go_child_startup();
 
     // sit in this loop processing messages from the queue
-    while (g_shutdown == 0) {
+    while (get_shutdown_flag() == 0) {
         // clear the select set and add the log socket
         FD_ZERO(&tester);
         FD_SET(l_logsock,&tester);
@@ -195,7 +195,7 @@ int netlogger_thread(void)
             // if startup failed log the error and set the shutdown flag
             if (ret != 0) {
                 logmessage(LOG_ERR,"Error %d returned from netlogger_startup(loop)\n",ret);
-                g_shutdown = 1;
+                set_shutdown_flag(1);
                 break;
             }
         }
@@ -216,6 +216,6 @@ int netlogger_thread(void)
 /*--------------------------------------------------------------------------*/
 void netlogger_goodbye(void)
 {
-    g_shutdown = 1;
+    set_shutdown_flag(1);
 }
 /*--------------------------------------------------------------------------*/

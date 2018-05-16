@@ -7,7 +7,12 @@
  * All Rights Reserved
  */
 
+#define DATAFLAG
 #include "common.h"
+/*--------------------------------------------------------------------------*/
+static struct timeval   g_runtime;
+static int              g_shutdown;
+static int              g_debug;
 /*--------------------------------------------------------------------------*/
 void common_startup(void)
 {
@@ -37,29 +42,8 @@ char* itolevel(int value,char *dest)
 /*--------------------------------------------------------------------------*/
 void rawmessage(int priority,const char *message)
 {
-    struct timeval  nowtime;
-    struct tm       *today;
-    time_t          value;
-    double          rr,nn,ee;
-    char            string[32];
-
     if ((priority == LOG_DEBUG) && (g_debug == 0)) return;
-
-    gettimeofday(&nowtime,NULL);
-
-    rr = ((double)g_runtime.tv_sec * (double)1000000.00);
-    rr+=(double)g_runtime.tv_usec;
-
-    nn = ((double)nowtime.tv_sec * (double)1000000.00);
-    nn+=(double)nowtime.tv_usec;
-
-    ee = ((nn - rr) / (double)1000000.00);
-
-    itolevel(priority,string);
-    printf("[%.6f] %s %s",ee,string,message);
-
-    fflush(stdout);
-    return;
+    go_child_message((char *)message);
 }
 /*--------------------------------------------------------------------------*/
 void logmessage(int priority,const char *format,...)
@@ -103,5 +87,10 @@ void hexmessage(int priority,const void *buffer,int size)
 int get_shutdown_flag(void)
 {
     return(g_shutdown);
+}
+/*--------------------------------------------------------------------------*/
+void set_shutdown_flag(int value)
+{
+    g_shutdown = value;
 }
 /*--------------------------------------------------------------------------*/

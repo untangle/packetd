@@ -110,7 +110,6 @@ func Startup() {
 //-----------------------------------------------------------------------------
 
 // LogMessage is called to write messages to the system log
-// TODO consolidate multiple logmessages functions somewhere (C? Go?)
 func LogMessage(format string, args ...interface{}) {
 	nowtime := time.Now()
 	var elapsed = nowtime.Sub(runtime)

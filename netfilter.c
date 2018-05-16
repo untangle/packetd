@@ -106,7 +106,7 @@ int netfilter_startup(void)
 
     if (nfqh == NULL) {
         logmessage(LOG_ERR,"Error returned from nfq_open()\n");
-        g_shutdown = 1;
+        set_shutdown_flag(1);
         return(1);
     }
 
@@ -115,7 +115,7 @@ int netfilter_startup(void)
 
     if (ret < 0) {
         logmessage(LOG_ERR,"Error returned from nfq_unbind_pf()\n");
-        g_shutdown = 1;
+        set_shutdown_flag(1);
         return(2);
     }
 
@@ -124,7 +124,7 @@ int netfilter_startup(void)
 
     if (ret < 0) {
         logmessage(LOG_ERR,"Error returned from nfq_bind_pf(lan)\n");
-        g_shutdown = 1;
+        set_shutdown_flag(1);
         return(3);
     }
 
@@ -133,7 +133,7 @@ int netfilter_startup(void)
 
     if (nfqqh == 0) {
         logmessage(LOG_ERR,"Error returned from nfq_create_queue(%u)\n",cfg_net_queue);
-        g_shutdown = 1;
+        set_shutdown_flag(1);
         return(4);
     }
 
@@ -142,7 +142,7 @@ int netfilter_startup(void)
 
     if (ret < 0) {
         logmessage(LOG_ERR,"Error returned from nfq_set_queue_maxlen(%d)\n",cfg_net_maxlen);
-        g_shutdown = 1;
+        set_shutdown_flag(1);
         return(5);
     }
 
@@ -151,7 +151,7 @@ int netfilter_startup(void)
 
     if (ret < 0) {
         logmessage(LOG_ERR,"Error returned from nfq_set_mode(NFQNL_COPY_PACKET)\n");
-        g_shutdown = 1;
+        set_shutdown_flag(1);
         return(6);
     }
 
@@ -160,7 +160,7 @@ int netfilter_startup(void)
 
     if (ret < 0) {
         logmessage(LOG_ERR,"Error returned from nfq_set_queue_flags(NFQA_CFG_F_CONNTRACK)\n");
-        g_shutdown = 1;
+        set_shutdown_flag(1);
         return(7);
     }
 
@@ -184,8 +184,6 @@ int netfilter_thread(void)
     int             netsock;
     int             val,ret;
 
-    gettimeofday(&g_runtime,NULL);
-
     logmessage(LOG_INFO,"The netfilter thread is starting\n");
 
     // allocate our packet buffer
@@ -196,7 +194,7 @@ int netfilter_thread(void)
 
     if (ret != 0) {
         logmessage(LOG_ERR,"Error %d returned from netfilter_startup()\n",ret);
-        g_shutdown = 1;
+        set_shutdown_flag(1);
         return(1);
     }
 
@@ -210,7 +208,7 @@ int netfilter_thread(void)
 
         if (ret != 0) {
             logmessage(LOG_ERR,"Error %d returned from setsockopt(SO_RCVBUF)\n",errno);
-            g_shutdown = 1;
+            set_shutdown_flag(1);
             return(1);
         }
     }
@@ -222,7 +220,7 @@ int netfilter_thread(void)
 
     go_child_startup();
 
-    while (g_shutdown == 0) {
+    while (get_shutdown_flag() == 0) {
         // wait for data on the socket
         ret = poll(&network,1,1000);
 
@@ -242,14 +240,14 @@ int netfilter_thread(void)
 
             if (ret == 0) {
                 logmessage(LOG_ERR,"The netfilter socket was unexpectedly closed\n");
-                g_shutdown = 1;
+                set_shutdown_flag(1);
                 break;
             }
 
             if (ret < 0) {
                 if ((errno == EAGAIN) || (errno == EINTR) || (errno == ENOBUFS)) break;
                 logmessage(LOG_ERR,"Error %d (%s) returned from recv()\n",errno,strerror(errno));
-                g_shutdown = 1;
+                set_shutdown_flag(1);
                 break;
             }
 
@@ -271,6 +269,6 @@ int netfilter_thread(void)
 /*--------------------------------------------------------------------------*/
 void netfilter_goodbye(void)
 {
-    g_shutdown = 1;
+    set_shutdown_flag(1);
 }
 /*--------------------------------------------------------------------------*/

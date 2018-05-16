@@ -62,6 +62,7 @@ extern void go_netlogger_callback(struct netlogger_info* info);
 extern void go_conntrack_callback(struct conntrack_info* info);
 extern void go_child_startup(void);
 extern void go_child_goodbye(void);
+extern void go_child_message(char *message);
 /*--------------------------------------------------------------------------*/
 void common_startup(void);
 void common_goodbye(void);
@@ -70,6 +71,7 @@ void rawmessage(int priority,const char *message);
 void logmessage(int priority,const char *format,...);
 void hexmessage(int priority,const void *buffer,int size);
 int get_shutdown_flag(void);
+void set_shutdown_flag(int value);
 /*--------------------------------------------------------------------------*/
 int conntrack_startup(void);
 void conntrack_shutdown(void);
@@ -90,8 +92,4 @@ int netlogger_startup(void);
 void netlogger_shutdown(void);
 int netlogger_thread(void);
 void netlogger_goodbye(void);
-/*--------------------------------------------------------------------------*/
-static struct timeval   g_runtime;
-static int              g_shutdown;
-static int              g_debug;
 /*--------------------------------------------------------------------------*/

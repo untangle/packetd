@@ -340,3 +340,11 @@ func go_child_goodbye() {
 }
 
 //-----------------------------------------------------------------------------
+
+//export go_child_message
+func go_child_message(message *C.char) {
+	local := C.GoString(message)
+	support.LogMessage(local)
+}
+
+//-----------------------------------------------------------------------------

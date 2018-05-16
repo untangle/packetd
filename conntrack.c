@@ -19,7 +19,7 @@ static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrac
     char                    opcode;
 
     // if the shutdown flag is set return stop to interrupt nfct_catch
-    if (g_shutdown != 0) return(NFCT_CB_STOP);
+    if (get_shutdown_flag() != 0) return(NFCT_CB_STOP);
 
     switch (type) {
     case NFCT_T_NEW:
@@ -80,7 +80,7 @@ int conntrack_startup(void)
 
     if (nfcth == NULL) {
         logmessage(LOG_ERR,"Error %d returned from nfct_open()\n",errno);
-        g_shutdown = 1;
+        set_shutdown_flag(1);
         return(1);
     }
 
@@ -89,7 +89,7 @@ int conntrack_startup(void)
 
     if (ret != 0) {
         logmessage(LOG_ERR,"Error %d returned from nfct_callback_register()\n",errno);
-        g_shutdown = 1;
+        set_shutdown_flag(1);
         return(2);
     }
 
@@ -121,7 +121,7 @@ int conntrack_thread(void)
 
     if (ret != 0) {
         logmessage(LOG_ERR,"Error %d returned from conntrack_startup()\n",ret);
-        g_shutdown = 1;
+        set_shutdown_flag(1);
         return(1);
     }
 
@@ -129,7 +129,7 @@ int conntrack_thread(void)
 
     // the nfct_catch function should only return if it receives a signal
     // other than EINTR or if NFCT_CB_STOP is returned from the callback
-    while (g_shutdown == 0) {
+    while (get_shutdown_flag() == 0) {
         nfct_catch(nfcth);
     }
 
@@ -145,7 +145,7 @@ void conntrack_goodbye(void)
 {
     u_int32_t   family;
 
-    g_shutdown = 1;
+    set_shutdown_flag(1);
     if (nfcth == NULL) return;
 
     // dump the conntrack table to interrupt the nfct_catch function
