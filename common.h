@@ -7,7 +7,6 @@
  * All Rights Reserved
  */
 
-#include <pthread.h>
 #include <unistd.h>
 #include <syslog.h>
 #include <stdlib.h>
@@ -15,13 +14,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
-#include <ctype.h>
 #include <poll.h>
-#include <time.h>
-#include <math.h>
-#include <sys/time.h>
-#include <arpa/inet.h>
-#include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
@@ -32,29 +25,29 @@
 #include <libnfnetlink/libnfnetlink.h>
 /*--------------------------------------------------------------------------*/
 struct conntrack_info {
-    u_int8_t    msg_type;
-    u_int32_t   conn_id;
-    u_int8_t    orig_proto;
-    u_int32_t   orig_saddr;
-    u_int32_t   orig_daddr;
-    u_int16_t   orig_sport;
-    u_int16_t   orig_dport;
-    u_int64_t   orig_bytes;
-    u_int64_t   repl_bytes;
+	u_int8_t		msg_type;
+	u_int32_t		conn_id;
+	u_int8_t		orig_proto;
+	u_int32_t		orig_saddr;
+	u_int32_t		orig_daddr;
+	u_int16_t		orig_sport;
+	u_int16_t		orig_dport;
+	u_int64_t		orig_bytes;
+	u_int64_t		repl_bytes;
 };
 /*--------------------------------------------------------------------------*/
 struct netlogger_info {
-    u_int8_t    protocol;
-    u_int16_t   icmp_type;
-    u_int8_t    src_intf, dst_intf;
-    u_int32_t   src_addr, dst_addr;
-    u_int16_t   src_port, dst_port;
-    u_int32_t   mark;
-    const char  *prefix;
+	u_int8_t		protocol;
+	u_int16_t		icmp_type;
+	u_int8_t		src_intf, dst_intf;
+	u_int32_t		src_addr, dst_addr;
+	u_int16_t		src_port, dst_port;
+	u_int32_t		mark;
+	const char		*prefix;
 };
 /*--------------------------------------------------------------------------*/
 struct nfq_data {
-    struct nfattr   **data;
+	struct nfattr	**data;
 };
 /*--------------------------------------------------------------------------*/
 extern int go_netfilter_callback(int mark,unsigned char* data,int len,unsigned int ctid);

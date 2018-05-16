@@ -141,7 +141,7 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int, ctid C.uint) i
 	// make a gopacket from the raw packet data
 	packet := gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
 
-	// get the  IPv4 layer
+	// get the IPv4 layer
 	ipLayer := packet.Layer(layers.LayerTypeIPv4)
 	if ipLayer == nil {
 		return (pmark)

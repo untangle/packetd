@@ -22,68 +22,68 @@ var sessionIndex uint64
 // Tuple represent a session using the protocol and source and destination
 // address and port values.
 type Tuple struct {
-	Protocol   uint8
-	ClientAddr net.IP
-	ClientPort uint16
-	ServerAddr net.IP
-	ServerPort uint16
+	Protocol			uint8
+	ClientAddr			net.IP
+	ClientPort			uint16
+	ServerAddr			net.IP
+	ServerPort			uint16
 }
 
 //-----------------------------------------------------------------------------
 
 // SessionEntry stores details related to a session
 type SessionEntry struct {
-	SessionID         uint64
-	SessionCreation   time.Time
-	SessionActivity   time.Time
-	SessionTuple      Tuple
-	UpdateCount       uint64
-	ServerCertificate x509.Certificate
-	ClientLocation    string
-	ServerLocation    string
+	SessionID			uint64
+	SessionCreation		time.Time
+	SessionActivity		time.Time
+	SessionTuple		Tuple
+	UpdateCount			uint64
+	ServerCertificate	x509.Certificate
+	ClientLocation		string
+	ServerLocation		string
 }
 
 //-----------------------------------------------------------------------------
 
 // ConntrackEntry stores the details of a conntrack entry
 type ConntrackEntry struct {
-	ConntrackID     uint
-	SessionID       uint64
-	SessionCreation time.Time
-	SessionActivity time.Time
-	SessionTuple    Tuple
-	UpdateCount     uint64
-	C2Sbytes        uint64
-	S2Cbytes        uint64
-	TotalBytes      uint64
-	C2Srate         float32
-	S2Crate         float32
-	TotalRate       float32
-	PurgeFlag       bool
+	ConntrackID			uint
+	SessionID			uint64
+	SessionCreation		time.Time
+	SessionActivity		time.Time
+	SessionTuple		Tuple
+	UpdateCount			uint64
+	C2Sbytes			uint64
+	S2Cbytes			uint64
+	TotalBytes			uint64
+	C2Srate				float32
+	S2Crate				float32
+	TotalRate			float32
+	PurgeFlag			bool
 }
 
 //-----------------------------------------------------------------------------
 
 // Logger is used to pass the details of NFLOG events to interested plugins
 type Logger struct {
-	Protocol uint8
-	IcmpType uint16
-	SrcIntf  uint8
-	DstIntf  uint8
-	SrcAddr  uint32
-	DstAddr  uint32
-	SrcPort  uint16
-	DstPort  uint16
-	Mark     uint32
-	Prefix   string
+	Protocol			uint8
+	IcmpType			uint16
+	SrcIntf				uint8
+	DstIntf				uint8
+	SrcAddr				uint32
+	DstAddr				uint32
+	SrcPort				uint16
+	DstPort				uint16
+	Mark				uint32
+	Prefix				string
 }
 
 //-----------------------------------------------------------------------------
 
 // CertificateHolder is used to cache SSL/TLS certificates
 type CertificateHolder struct {
-	CreationTime time.Time
-	Certificate  x509.Certificate
+	CreationTime		time.Time
+	Certificate			x509.Certificate
 }
 
 //-----------------------------------------------------------------------------
