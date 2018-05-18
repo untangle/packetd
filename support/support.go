@@ -3,6 +3,8 @@ package support
 import (
 	"crypto/x509"
 	"fmt"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"net"
 	"sync"
 	"time"
@@ -64,8 +66,20 @@ type ConntrackEntry struct {
 
 //-----------------------------------------------------------------------------
 
-// Logger is used to pass the details of NFLOG events to interested plugins
-type Logger struct {
+// TrafficMessage is used to pass netfilter traffic to interested plugins
+type TrafficMessage struct {
+	MsgTuple  Tuple
+	MsgPacket gopacket.Packet
+	MsgLength int
+	MsgIP     *layers.IPv4
+	MsgTCP    *layers.TCP
+	MsgUDP    *layers.UDP
+}
+
+//-----------------------------------------------------------------------------
+
+// LoggerMessage is used to pass the details of NFLOG events to interested plugins
+type LoggerMessage struct {
 	Protocol uint8
 	IcmpType uint16
 	SrcIntf  uint8

@@ -3,8 +3,6 @@ package example
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"github.com/untangle/packetd/support"
 	"sync"
 )
@@ -30,16 +28,14 @@ func PluginGoodbye(childsync *sync.WaitGroup) {
 
 //-----------------------------------------------------------------------------
 
-// PluginNetfilterHandler receives raw netfilter packet data. We can do whatever
-// we like with the data, and when finished, we return an integer via the
-// argumented channel with any bits set that we want added to the packet mark.
-func PluginNetfilterHandler(ch chan<- int32, buffer []byte, length int, ctid uint) {
-	packet := gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
-	ipLayer := packet.Layer(layers.LayerTypeIPv4)
-	if ipLayer != nil {
-		addr := ipLayer.(*layers.IPv4)
-		fmt.Printf("NETFILTER %d BYTES FROM %s\n%s\n", length, addr.SrcIP, hex.Dump(buffer))
-	}
+// PluginNetfilterHandler receives a TrafficMessage which includes a Tuple and
+// a gopacket.Packet, along with the IP and TCP or UDP layer already extracted.
+// We do whatever we like with the data, and when finished, we return an
+// integer via the argumented channel with any bits set that we want added to
+// the packet mark.
+func PluginNetfilterHandler(ch chan<- int32, mess support.TrafficMessage, ctid uint) {
+	// our example simply dumps the raw message to the console
+	fmt.Printf("NETFILTER %d BYTES FROM %s to %s\n%s\n", mess.MsgLength, mess.MsgIP.SrcIP, mess.MsgIP.DstIP, hex.Dump(mess.MsgPacket.Data()))
 
 	// use the channel to return our mark bits
 	ch <- 1
@@ -67,7 +63,7 @@ func PluginConntrackHandler(message int, entry *support.ConntrackEntry) {
 //-----------------------------------------------------------------------------
 
 // PluginNetloggerHandler receives NFLOG events.
-func PluginNetloggerHandler(logger *support.Logger) {
+func PluginNetloggerHandler(logger *support.LoggerMessage) {
 	fmt.Printf("NETLOGGER PROTO:%d ICMP:%d SIF:%d DIF:%d SADR:%s DADR:%s SPORT:%d DPORT:%d MARK:%X PREFIX:%s\n",
 		logger.Protocol,
 		logger.IcmpType,

@@ -34,14 +34,14 @@ func PluginGoodbye(childsync *sync.WaitGroup) {
 // PluginNetfilterHandler is called to handle netfilter packet data. We extract
 // the source and destination IP address from the packet, lookup the GeoIP
 // country code for each, and store them in the conntrack dictionary.
-func PluginNetfilterHandler(ch chan<- int32, tuple support.Tuple, ctid uint) {
+func PluginNetfilterHandler(ch chan<- int32, mess support.TrafficMessage, ctid uint) {
 
-	if tuple.ServerPort != 443 {
+	if mess.MsgTuple.ServerPort != 443 {
 		ch <- 8
 		return
 	}
 
-	client := fmt.Sprintf("%s", tuple.ClientAddr)
+	client := fmt.Sprintf("%s", mess.MsgTuple.ClientAddr)
 
 	// TODO - remove this hack once we can ignore locally generated traffic
 	if client == "192.168.222.20" {
@@ -55,15 +55,15 @@ func PluginNetfilterHandler(ch chan<- int32, tuple support.Tuple, ctid uint) {
 	localMutex.Lock()
 
 	if cert, ok = support.FindCertificate(client); ok {
-		support.LogMessage("Loading certificate for %s\n", tuple.ServerAddr)
+		support.LogMessage("Loading certificate for %s\n", mess.MsgTuple.ServerAddr)
 	} else {
-		support.LogMessage("Fetching certificate for %s\n", tuple.ServerAddr)
+		support.LogMessage("Fetching certificate for %s\n", mess.MsgTuple.ServerAddr)
 
 		conf := &tls.Config{
 			InsecureSkipVerify: true,
 		}
 
-		target := fmt.Sprintf("%s:443", tuple.ServerAddr)
+		target := fmt.Sprintf("%s:443", mess.MsgTuple.ServerAddr)
 		conn, err := tls.Dial("tcp", target, conf)
 		if err != nil {
 			support.LogMessage("TLS ERROR: %s\n", err)

@@ -2,8 +2,6 @@ package geoip
 
 import (
 	"compress/gzip"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"github.com/oschwald/geoip2-golang"
 	"github.com/untangle/packetd/conndict"
 	"github.com/untangle/packetd/support"
@@ -69,25 +67,20 @@ func PluginGoodbye(childsync *sync.WaitGroup) {
 // PluginNetfilterHandler is called to handle netfilter packet data. We extract
 // the source and destination IP address from the packet, lookup the GeoIP
 // country code for each, and store them in the conntrack dictionary.
-func PluginNetfilterHandler(ch chan<- int32, buffer []byte, length int, ctid uint) {
+func PluginNetfilterHandler(ch chan<- int32, mess support.TrafficMessage, ctid uint) {
 	var SrcCode = "XX"
 	var DstCode = "XX"
 
-	support.LogMessage("GEOIP RECEIVED %d BYTES\n", length)
-	packet := gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
-	ipLayer := packet.Layer(layers.LayerTypeIPv4)
-	if ipLayer != nil {
-		addr := ipLayer.(*layers.IPv4)
-		SrcRecord, err := geodb.City(addr.SrcIP)
-		if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
-			SrcCode = SrcRecord.Country.IsoCode
-			support.LogMessage("SRC: %s = %s\n", addr.SrcIP, SrcCode)
-		}
-		DstRecord, err := geodb.City(addr.DstIP)
-		if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
-			DstCode = DstRecord.Country.IsoCode
-			support.LogMessage("DST: %s = %s\n", addr.DstIP, DstCode)
-		}
+	SrcRecord, err := geodb.City(mess.MsgIP.SrcIP)
+	if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
+		SrcCode = SrcRecord.Country.IsoCode
+		support.LogMessage("SRC: %s = %s\n", mess.MsgIP.SrcIP, SrcCode)
+	}
+
+	DstRecord, err := geodb.City(mess.MsgIP.DstIP)
+	if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
+		DstCode = DstRecord.Country.IsoCode
+		support.LogMessage("DST: %s = %s\n", mess.MsgIP.DstIP, DstCode)
 	}
 
 	errc := conndict.SetPair("SrcCountry", SrcCode, ctid)

@@ -127,6 +127,7 @@ stdinloop:
 
 //export go_netfilter_callback
 func go_netfilter_callback(mark C.int, data *C.uchar, size C.int, ctid C.uint) int32 {
+	var mess support.TrafficMessage
 
 	// ***** this version creates a Go copy of the buffer = SLOWER
 	// buffer := C.GoBytes(unsafe.Pointer(data),size)
@@ -136,40 +137,39 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int, ctid C.uint) i
 
 	// convert the C length and ctid to Go values
 	connid := uint(ctid)
-	length := int(size)
 
 	// get the existing mark on the packet
 	var pmark int32 = int32(C.int(mark))
 
 	// make a gopacket from the raw packet data
-	packet := gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
+	mess.MsgPacket = gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
+	mess.MsgLength = int(size)
 
 	// get the IPv4 layer
-	ipLayer := packet.Layer(layers.LayerTypeIPv4)
+	ipLayer := mess.MsgPacket.Layer(layers.LayerTypeIPv4)
 	if ipLayer == nil {
 		return (pmark)
 	}
-	ip := ipLayer.(*layers.IPv4)
+	mess.MsgIP = ipLayer.(*layers.IPv4)
 
-	var tuple support.Tuple
-	tuple.Protocol = uint8(ip.Protocol)
-	tuple.ClientAddr = ip.SrcIP
-	tuple.ServerAddr = ip.DstIP
+	mess.MsgTuple.Protocol = uint8(mess.MsgIP.Protocol)
+	mess.MsgTuple.ClientAddr = mess.MsgIP.SrcIP
+	mess.MsgTuple.ServerAddr = mess.MsgIP.DstIP
 
 	// get the TCP layer
-	tcpLayer := packet.Layer(layers.LayerTypeTCP)
+	tcpLayer := mess.MsgPacket.Layer(layers.LayerTypeTCP)
 	if tcpLayer != nil {
-		tcp := tcpLayer.(*layers.TCP)
-		tuple.ClientPort = uint16(tcp.SrcPort)
-		tuple.ServerPort = uint16(tcp.DstPort)
+		mess.MsgTCP = tcpLayer.(*layers.TCP)
+		mess.MsgTuple.ClientPort = uint16(mess.MsgTCP.SrcPort)
+		mess.MsgTuple.ServerPort = uint16(mess.MsgTCP.DstPort)
 	}
 
 	// get the UDP layer
-	udpLayer := packet.Layer(layers.LayerTypeUDP)
+	udpLayer := mess.MsgPacket.Layer(layers.LayerTypeUDP)
 	if udpLayer != nil {
-		udp := udpLayer.(*layers.UDP)
-		tuple.ClientPort = uint16(udp.SrcPort)
-		tuple.ServerPort = uint16(udp.DstPort)
+		mess.MsgUDP = udpLayer.(*layers.UDP)
+		mess.MsgTuple.ClientPort = uint16(mess.MsgUDP.SrcPort)
+		mess.MsgTuple.ServerPort = uint16(mess.MsgUDP.DstPort)
 	}
 
 	// right now we only care about TCP and UDP
@@ -180,7 +180,7 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int, ctid C.uint) i
 	var entry support.SessionEntry
 	var ok bool
 
-	finder := support.Tuple2String(tuple)
+	finder := support.Tuple2String(mess.MsgTuple)
 
 	// If we already have a session entry update the existing, otherwise create a new entry for the table.
 	if entry, ok = support.FindSessionEntry(finder); ok {
@@ -193,16 +193,14 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int, ctid C.uint) i
 		entry.UpdateCount = 1
 	}
 
-	// TODO - pass the gopacket to the handlers instead of the raw buffer
-
 	// ********** Call all plugin netfilter handler functions here
 
 	result := make(chan int32)
 
-	go example.PluginNetfilterHandler(result, buffer, length, connid)
-	go classify.PluginNetfilterHandler(result, buffer, length, connid)
-	go geoip.PluginNetfilterHandler(result, buffer, length, connid)
-	go certcache.PluginNetfilterHandler(result, tuple, connid)
+	go example.PluginNetfilterHandler(result, mess, connid)
+	go classify.PluginNetfilterHandler(result, mess, connid)
+	go geoip.PluginNetfilterHandler(result, mess, connid)
+	go certcache.PluginNetfilterHandler(result, mess, connid)
 
 	// ********** End of plugin netfilter callback functions
 
@@ -308,7 +306,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 
 //export go_netlogger_callback
 func go_netlogger_callback(info *C.struct_netlogger_info) {
-	var logger support.Logger
+	var logger support.LoggerMessage
 
 	logger.Protocol = uint8(info.protocol)
 	logger.IcmpType = uint16(info.icmp_type)
