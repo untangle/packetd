@@ -16,6 +16,7 @@ import (
 	"github.com/untangle/packetd/example"
 	"github.com/untangle/packetd/geoip"
 	"github.com/untangle/packetd/restd"
+	"github.com/untangle/packetd/settings"
 	"github.com/untangle/packetd/support"
 	"net"
 	"os"
@@ -41,6 +42,8 @@ func main() {
 
 	support.Startup()
 	support.LogMessage("Untangle Packet Daemon Version %s\n", "1.00")
+
+	settings.Startup()
 
 	go C.netfilter_thread()
 	go C.conntrack_thread()

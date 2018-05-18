@@ -3,10 +3,63 @@ package settings
 import (
 	"encoding/json"
 	"errors"
+	"github.com/untangle/packetd/support"
 	"io/ioutil"
 )
 
-//-----------------------------------------------------------------------------
+// Settings is the top-level settings object
+type Settings struct {
+	Version int             `json:"version"`
+	Network NetworkSettings `json:"network"`
+}
+
+// NetworkSettings is the network settings container object
+type NetworkSettings struct {
+	Interfaces []InterfaceSettings `json:"interfaces"`
+	Options    NetworkOptions      `json:"options"`
+}
+
+// NetworkOptions stores global network options
+type NetworkOptions struct {
+	SendIcmpRedirects bool `json:"sendIcmpRedirects"`
+	StrictArpMode     bool `json:"strictArpMode"`
+	StpEnabled        bool `json:"stpEnabled"`
+	DhcpAuthoritative bool `json:"dhcpAuthoritative"`
+}
+
+// InterfaceSettings is the interface settings container object
+type InterfaceSettings struct {
+	name string
+}
+
+// settings stores the current system settings
+var settings *Settings
+
+// Startup initializes all settings objects
+func Startup() {
+	var err error
+	settings, err = readSettingsFile()
+	if err != nil {
+		support.LogMessage("Error reading settings file: %s\n", err.Error())
+	}
+
+	if settings == nil {
+		support.LogMessage("Initializing new settings...\n")
+		settings = new(Settings)
+
+		settings.Version = 1 // version 1 currently
+
+		settings.Network.Options.SendIcmpRedirects = true
+		settings.Network.Options.StrictArpMode = true
+		settings.Network.Options.StpEnabled = false
+		settings.Network.Options.DhcpAuthoritative = true
+
+		_, err := writeSettingsFile(settings)
+		if err != nil {
+			support.LogMessage("ERROR Initializing new settings: %s\n", err.Error())
+		}
+	}
+}
 
 // GetSettings returns the daemon settings
 func GetSettings(segments []string) interface{} {
@@ -14,7 +67,7 @@ func GetSettings(segments []string) interface{} {
 	var err error
 	var jsonObject map[string]interface{}
 
-	jsonObject, err = readSettingsFile()
+	jsonObject, err = readSettingsFileJSON()
 	if err != nil {
 		return createJSONErrorObject(err)
 	}
@@ -38,8 +91,6 @@ func GetSettings(segments []string) interface{} {
 	return jsonObject
 }
 
-//-----------------------------------------------------------------------------
-
 // SetSettingsParse updates the daemon settings from a parsed JSON object
 func SetSettingsParse(segments []string, byteSlice []byte) interface{} {
 	var err error
@@ -53,8 +104,6 @@ func SetSettingsParse(segments []string, byteSlice []byte) interface{} {
 	return SetSettings(segments, bodyJSONObject)
 }
 
-//-----------------------------------------------------------------------------
-
 // SetSettings updates the daemon settings
 func SetSettings(segments []string, jsonNewSettings interface{}) interface{} {
 	var ok bool
@@ -62,7 +111,7 @@ func SetSettings(segments []string, jsonNewSettings interface{}) interface{} {
 	var iterJSONObject map[string]interface{}
 	var jsonSettings map[string]interface{}
 
-	jsonSettings, err = readSettingsFile()
+	jsonSettings, err = readSettingsFileJSON()
 	if err != nil {
 		return createJSONErrorObject(err)
 	}
@@ -111,15 +160,13 @@ func SetSettings(segments []string, jsonNewSettings interface{}) interface{} {
 		}
 	}
 
-	ok, err = writeSettingsFile(jsonSettings)
+	ok, err = writeSettingsFileJSON(jsonSettings)
 	if err != nil {
 		return createJSONErrorObject(err)
 	}
 
 	return createJSONObject("result", "OK")
 }
-
-//-----------------------------------------------------------------------------
 
 // TrimSettings trims the settings
 func TrimSettings(segments []string) interface{} {
@@ -132,7 +179,7 @@ func TrimSettings(segments []string) interface{} {
 		return createJSONErrorString("Invalid trim settings path")
 	}
 
-	jsonSettings, err = readSettingsFile()
+	jsonSettings, err = readSettingsFileJSON()
 	if err != nil {
 		return createJSONErrorObject(err)
 	}
@@ -168,7 +215,7 @@ func TrimSettings(segments []string) interface{} {
 		}
 	}
 
-	ok, err = writeSettingsFile(jsonSettings)
+	ok, err = writeSettingsFileJSON(jsonSettings)
 	if err != nil {
 		return createJSONErrorObject(err)
 	}
@@ -176,9 +223,22 @@ func TrimSettings(segments []string) interface{} {
 	return createJSONObject("result", "OK")
 }
 
-//-----------------------------------------------------------------------------
+// Read the settings file and return the corresponding settings object
+func readSettingsFile() (*Settings, error) {
+	raw, err := ioutil.ReadFile("/etc/config/settings.json")
+	if err != nil {
+		return nil, err
+	}
+	var newSettings = new(Settings)
+	err = json.Unmarshal(raw, newSettings)
+	if err != nil {
+		return nil, err
+	}
+	return newSettings, nil
+}
 
-func readSettingsFile() (map[string]interface{}, error) {
+// readSettingsFileJSON reads the settings file and return the corresponding JSON object
+func readSettingsFileJSON() (map[string]interface{}, error) {
 	raw, err := ioutil.ReadFile("/etc/config/settings.json")
 	if err != nil {
 		return nil, err
@@ -196,9 +256,8 @@ func readSettingsFile() (map[string]interface{}, error) {
 	return nil, errors.New("Invalid settings file format")
 }
 
-//-----------------------------------------------------------------------------
-
-func writeSettingsFile(jsonObject map[string]interface{}) (bool, error) {
+// writeSettingsFileJSON writes the specified JSON object to the settings file
+func writeSettingsFileJSON(jsonObject map[string]interface{}) (bool, error) {
 	var err error
 
 	// Marshal it back to a string (with ident)
@@ -216,22 +275,40 @@ func writeSettingsFile(jsonObject map[string]interface{}) (bool, error) {
 	return true, nil
 }
 
-//-----------------------------------------------------------------------------
+// Write the specified Settings object to the settings file
+func writeSettingsFile(newSettings *Settings) (bool, error) {
+	var err error
 
+	if newSettings == nil {
+		return false, errors.New("Invalid settings")
+	}
+
+	// Marshal it back to a string (with ident)
+	var jsonString []byte
+	jsonString, err = json.MarshalIndent(newSettings, "", "  ")
+	if err != nil {
+		return false, err
+	}
+
+	err = ioutil.WriteFile("/etc/config/settings.json", jsonString, 0644)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+// Create a JSON object with the single key value pair
 func createJSONObject(key string, value string) map[string]interface{} {
 	return map[string]interface{}{key: value}
 }
 
-//-----------------------------------------------------------------------------
-
+// Create a JSON object with an error based on the object
 func createJSONErrorObject(e error) map[string]interface{} {
 	return createJSONObject("error", e.Error())
 }
 
-//-----------------------------------------------------------------------------
-
+// Create a JSON object with an error based on the string
 func createJSONErrorString(str string) map[string]interface{} {
 	return createJSONObject("error", str)
 }
-
-//-----------------------------------------------------------------------------
