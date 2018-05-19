@@ -5,60 +5,33 @@ import (
 	"errors"
 	"github.com/untangle/packetd/support"
 	"io/ioutil"
+	"os/exec"
 )
 
-// Settings is the top-level settings object
-type Settings struct {
-	Version int             `json:"version"`
-	Network NetworkSettings `json:"network"`
-}
-
-// NetworkSettings is the network settings container object
-type NetworkSettings struct {
-	Interfaces []InterfaceSettings `json:"interfaces"`
-	Options    NetworkOptions      `json:"options"`
-}
-
-// NetworkOptions stores global network options
-type NetworkOptions struct {
-	SendIcmpRedirects bool `json:"sendIcmpRedirects"`
-	StrictArpMode     bool `json:"strictArpMode"`
-	StpEnabled        bool `json:"stpEnabled"`
-	DhcpAuthoritative bool `json:"dhcpAuthoritative"`
-}
-
-// InterfaceSettings is the interface settings container object
-type InterfaceSettings struct {
-	name string
-}
-
 // settings stores the current system settings
-var settings *Settings
+var settings map[string]interface{}
 
 // Startup initializes all settings objects
 func Startup() {
 	var err error
-	settings, err = readSettingsFile()
+	settings, err = readSettingsFileJSON()
 	if err != nil {
 		support.LogMessage("Error reading settings file: %s\n", err.Error())
 	}
 
 	if settings == nil {
-		support.LogMessage("Initializing new settings...\n")
-		settings = new(Settings)
-
-		settings.Version = 1 // version 1 currently
-
-		settings.Network.Options.SendIcmpRedirects = true
-		settings.Network.Options.StrictArpMode = true
-		settings.Network.Options.StpEnabled = false
-		settings.Network.Options.DhcpAuthoritative = true
-
-		_, err := writeSettingsFile(settings)
-		if err != nil {
-			support.LogMessage("ERROR Initializing new settings: %s\n", err.Error())
-		}
+		settings, err = createNewSettings()
 	}
+	if err != nil || settings == nil {
+		support.LogMessage("Error reading settings file: %s\n", err.Error())
+		//FIXME abort / exit
+	}
+	// jsonString, err := json.MarshalIndent(settings, "", "  ")
+	// if err != nil {
+	// 	support.LogMessage("Error reading settings file: %s\n", err.Error())
+	// } else {
+	// 	support.LogMessage("settings: %s\n", jsonString)
+	// }
 }
 
 // GetSettings returns the daemon settings
@@ -223,20 +196,6 @@ func TrimSettings(segments []string) interface{} {
 	return createJSONObject("result", "OK")
 }
 
-// Read the settings file and return the corresponding settings object
-func readSettingsFile() (*Settings, error) {
-	raw, err := ioutil.ReadFile("/etc/config/settings.json")
-	if err != nil {
-		return nil, err
-	}
-	var newSettings = new(Settings)
-	err = json.Unmarshal(raw, newSettings)
-	if err != nil {
-		return nil, err
-	}
-	return newSettings, nil
-}
-
 // readSettingsFileJSON reads the settings file and return the corresponding JSON object
 func readSettingsFileJSON() (map[string]interface{}, error) {
 	raw, err := ioutil.ReadFile("/etc/config/settings.json")
@@ -275,29 +234,6 @@ func writeSettingsFileJSON(jsonObject map[string]interface{}) (bool, error) {
 	return true, nil
 }
 
-// Write the specified Settings object to the settings file
-func writeSettingsFile(newSettings *Settings) (bool, error) {
-	var err error
-
-	if newSettings == nil {
-		return false, errors.New("Invalid settings")
-	}
-
-	// Marshal it back to a string (with ident)
-	var jsonString []byte
-	jsonString, err = json.MarshalIndent(newSettings, "", "  ")
-	if err != nil {
-		return false, err
-	}
-
-	err = ioutil.WriteFile("/etc/config/settings.json", jsonString, 0644)
-	if err != nil {
-		return false, err
-	}
-
-	return true, nil
-}
-
 // Create a JSON object with the single key value pair
 func createJSONObject(key string, value string) map[string]interface{} {
 	return map[string]interface{}{key: value}
@@ -311,4 +247,21 @@ func createJSONErrorObject(e error) map[string]interface{} {
 // Create a JSON object with an error based on the string
 func createJSONErrorString(str string) map[string]interface{} {
 	return createJSONObject("error", str)
+}
+
+// createNewSettings creates a new settings file
+func createNewSettings() (map[string]interface{}, error) {
+	cmd := exec.Command("sh", "-c", "/usr/bin/sync-settings -o openwrt -c -f /etc/config/settings.json")
+	stdoutStderr, err := cmd.CombinedOutput()
+	if err != nil {
+		support.LogMessage("Error creating new settings file: %s\n", err.Error())
+	}
+	support.LogMessage("Initializing new settings...\n")
+	support.LogMessage("%s\n", stdoutStderr)
+
+	settings, err = readSettingsFileJSON()
+	if err != nil {
+		support.LogMessage("Error reading settings file: %s\n", err.Error())
+	}
+	return settings, err
 }
