@@ -11,6 +11,7 @@ import (
 	"sync"
 )
 
+var logsrc = "geoip"
 var geodb *geoip2.Reader
 
 //-----------------------------------------------------------------------------
@@ -21,7 +22,7 @@ var geodb *geoip2.Reader
 // argumented WaitGroup so the main process can wait for our goodbye function
 // to return during shutdown.
 func PluginStartup(childsync *sync.WaitGroup) {
-	support.LogMessage("PluginStartup(%s) has been called\n", "geoip")
+	support.LogMessage(support.LogInfo, logsrc, "PluginStartup(%s) has been called\n", "geoip")
 
 	var filename string
 
@@ -42,9 +43,9 @@ func PluginStartup(childsync *sync.WaitGroup) {
 
 	db, err := geoip2.Open(filename)
 	if err != nil {
-		support.LogMessage("Unable to load GeoIP Database: %s\n", err)
+		support.LogMessage(support.LogWarning, logsrc, "Unable to load GeoIP Database: %s\n", err)
 	} else {
-		support.LogMessage("Loading GeoIP Database: %s\n", filename)
+		support.LogMessage(support.LogInfo, logsrc, "Loading GeoIP Database: %s\n", filename)
 		geodb = db
 	}
 
@@ -57,7 +58,7 @@ func PluginStartup(childsync *sync.WaitGroup) {
 // GeoIP engine and call done for the argumented WaitGroup to let the main
 // process know we're finished.
 func PluginGoodbye(childsync *sync.WaitGroup) {
-	support.LogMessage("PluginGoodbye(%s) has been called\n", "geoip")
+	support.LogMessage(support.LogInfo, logsrc, "PluginGoodbye(%s) has been called\n", "geoip")
 	geodb.Close()
 	childsync.Done()
 }
@@ -74,27 +75,27 @@ func PluginNetfilterHandler(ch chan<- int32, mess support.TrafficMessage, ctid u
 	SrcRecord, err := geodb.City(mess.MsgIP.SrcIP)
 	if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
 		SrcCode = SrcRecord.Country.IsoCode
-		support.LogMessage("SRC: %s = %s\n", mess.MsgIP.SrcIP, SrcCode)
+		support.LogMessage(support.LogDebug, logsrc, "SRC: %s = %s\n", mess.MsgIP.SrcIP, SrcCode)
 	}
 
 	DstRecord, err := geodb.City(mess.MsgIP.DstIP)
 	if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
 		DstCode = DstRecord.Country.IsoCode
-		support.LogMessage("DST: %s = %s\n", mess.MsgIP.DstIP, DstCode)
+		support.LogMessage(support.LogDebug, logsrc, "DST: %s = %s\n", mess.MsgIP.DstIP, DstCode)
 	}
 
 	errc := conndict.SetPair("SrcCountry", SrcCode, ctid)
 	if errc != nil {
-		support.LogMessage("SetPair(client) ERROR: %s\n", errc)
+		support.LogMessage(support.LogWarning, logsrc, "SetPair(client) ERROR: %s\n", errc)
 	} else {
-		support.LogMessage("SetPair(client) %d = %s\n", ctid, SrcCode)
+		support.LogMessage(support.LogDebug, logsrc, "SetPair(client) %d = %s\n", ctid, SrcCode)
 	}
 
 	errs := conndict.SetPair("DstCountry", DstCode, ctid)
 	if errs != nil {
-		support.LogMessage("SetPair(server) ERROR: %s\n", errs)
+		support.LogMessage(support.LogWarning, logsrc, "SetPair(server) ERROR: %s\n", errs)
 	} else {
-		support.LogMessage("SetPair(server) %d = %s\n", ctid, DstCode)
+		support.LogMessage(support.LogDebug, logsrc, "SetPair(server) %d = %s\n", ctid, DstCode)
 	}
 
 	ch <- 4
@@ -103,7 +104,7 @@ func PluginNetfilterHandler(ch chan<- int32, mess support.TrafficMessage, ctid u
 //-----------------------------------------------------------------------------
 
 func databaseDownload(filename string) {
-	support.LogMessage("Downloading GeoIP Database\n")
+	support.LogMessage(support.LogInfo, logsrc, "Downloading GeoIP Database\n")
 
 	// Get the GeoIP database from MaxMind
 	resp, err := http.Get("http://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.mmdb.gz")
@@ -114,7 +115,7 @@ func databaseDownload(filename string) {
 
 	// Check server response
 	if resp.StatusCode != http.StatusOK {
-		support.LogMessage("Download failure: %s\n", resp.Status)
+		support.LogMessage(support.LogWarning, logsrc, "Download failure: %s\n", resp.Status)
 		return
 	}
 

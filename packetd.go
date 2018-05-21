@@ -31,6 +31,7 @@ import (
 // functions. For children in normal go packages, we pass the WaitGroup
 // directly to the goroutine.
 var childsync sync.WaitGroup
+var logsrc = "packetd"
 
 //-----------------------------------------------------------------------------
 
@@ -41,7 +42,7 @@ func main() {
 	C.common_startup()
 
 	support.Startup()
-	support.LogMessage("Untangle Packet Daemon Version %s\n", "1.00")
+	support.LogMessage(support.LogInfo, logsrc, "Untangle Packet Daemon Version %s\n", "1.00")
 
 	settings.Startup()
 
@@ -75,7 +76,7 @@ func main() {
 		close(ch)
 	}(ch)
 
-	support.LogMessage("RUNNING ON CONSOLE - HIT ENTER TO EXIT\n")
+	support.LogMessage(support.LogInfo, logsrc, "RUNNING ON CONSOLE - HIT ENTER TO EXIT\n")
 
 stdinloop:
 	for {
@@ -88,7 +89,7 @@ stdinloop:
 			if !ok {
 				break stdinloop
 			} else {
-				support.LogMessage("Console input detected - Application shutting down\n")
+				support.LogMessage(support.LogInfo, logsrc, "Console input detected - Application shutting down\n")
 				_ = stdin
 				break stdinloop
 			}
@@ -97,7 +98,7 @@ stdinloop:
 			if current.Minute() != lastmin {
 				lastmin = current.Minute()
 				counter++
-				support.LogMessage("Calling perodic conntrack dump %d\n", counter)
+				support.LogMessage(support.LogDebug, logsrc, "Calling perodic conntrack dump %d\n", counter)
 				C.conntrack_dump()
 				support.CleanConntrackTable()
 				support.CleanCertificateTable()
@@ -184,10 +185,10 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int, ctid C.uint) i
 
 	// If we already have a session entry update the existing, otherwise create a new entry for the table.
 	if entry, ok = support.FindSessionEntry(finder); ok {
-		support.LogMessage("SESSION Found %s in table\n", finder)
+		support.LogMessage(support.LogDebug, logsrc, "SESSION Found %s in table\n", finder)
 		entry.UpdateCount++
 	} else {
-		support.LogMessage("SESSION Adding %s to table\n", finder)
+		support.LogMessage(support.LogDebug, logsrc, "SESSION Adding %s to table\n", finder)
 		entry.SessionID = support.NextSessionID()
 		entry.SessionCreation = time.Now()
 		entry.UpdateCount = 1
@@ -239,10 +240,10 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 
 	// If we already have a conntrack entry update the existing, otherwise create a new entry for the table.
 	if entry, ok = support.FindConntrackEntry(finder); ok {
-		support.LogMessage("CONNTRACK Found %s in table\n", finder)
+		support.LogMessage(support.LogDebug, logsrc, "CONNTRACK Found %s in table\n", finder)
 		entry.UpdateCount++
 	} else {
-		support.LogMessage("CONNTRACK Adding %s to table\n", finder)
+		support.LogMessage(support.LogDebug, logsrc, "CONNTRACK Adding %s to table\n", finder)
 		entry.ConntrackID = uint(info.conn_id)
 		entry.SessionID = support.NextSessionID()
 		entry.SessionCreation = time.Now()
@@ -306,7 +307,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 
 //export go_netlogger_callback
 func go_netlogger_callback(info *C.struct_netlogger_info) {
-	var logger support.LoggerMessage
+	var logger support.NetloggerMessage
 
 	logger.Protocol = uint8(info.protocol)
 	logger.IcmpType = uint16(info.icmp_type)
@@ -343,9 +344,10 @@ func go_child_goodbye() {
 //-----------------------------------------------------------------------------
 
 //export go_child_message
-func go_child_message(message *C.char) {
-	local := C.GoString(message)
-	support.LogMessage(local)
+func go_child_message(level C.int, source *C.char, message *C.char) {
+	lsrc := C.GoString(source)
+	lmsg := C.GoString(message)
+	support.LogMessage(int(level), lsrc, lmsg)
 }
 
 //-----------------------------------------------------------------------------

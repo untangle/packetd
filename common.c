@@ -37,13 +37,13 @@ char* itolevel(int value,char *dest)
 	return(dest);
 }
 /*--------------------------------------------------------------------------*/
-void rawmessage(int priority,const char *message)
+void rawmessage(int priority,const char *source,const char *message)
 {
 	if ((priority == LOG_DEBUG) && (g_debug == 0)) return;
-	go_child_message((char *)message);
+	go_child_message(priority,(char *)source,(char *)message);
 }
 /*--------------------------------------------------------------------------*/
-void logmessage(int priority,const char *format,...)
+void logmessage(int priority,const char *source,const char *format,...)
 {
 	va_list		args;
 	char		message[1024];
@@ -54,10 +54,10 @@ void logmessage(int priority,const char *format,...)
 	vsnprintf(message,sizeof(message),format,args);
 	va_end(args);
 
-	rawmessage(priority,message);
+	rawmessage(priority,source,message);
 }
 /*--------------------------------------------------------------------------*/
-void hexmessage(int priority,const void *buffer,int size)
+void hexmessage(int priority,const char *source,const void *buffer,int size)
 {
 	const unsigned char		*data;
 	char					*message;
@@ -77,7 +77,7 @@ void hexmessage(int priority,const void *buffer,int size)
 
 	loc = (size * 3);
 	strcpy(&message[loc],"\n");
-	rawmessage(priority,message);
+	rawmessage(priority,source,message);
 	free(message);
 }
 /*--------------------------------------------------------------------------*/

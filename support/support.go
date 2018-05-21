@@ -10,6 +10,31 @@ import (
 	"time"
 )
 
+//LogEmerg = stdlog.h/LOG_EMERG
+const LogEmerg = 0
+
+//LogAlert = stdlog.h/LOG_ALERT
+const LogAlert = 1
+
+//LogCrit = stdlog.h/LOG_CRIT
+const LogCrit = 2
+
+//LogErr = stdlog.h/LOG_ERR
+const LogErr = 3
+
+//LogWarning = stdlog.h/LOG_WARNING
+const LogWarning = 4
+
+//LogNotice = stdlog.h/LOG_NOTICE
+const LogNotice = 5
+
+//LogInfo = stdlog.h/LOG_INFO
+const LogInfo = 6
+
+//LogDebug = stdlog.h/LOG_DEBUG
+const LogDebug = 7
+
+var logsrc = "support"
 var runtime time.Time
 var sessionTable map[string]SessionEntry
 var conntrackTable map[string]ConntrackEntry
@@ -78,8 +103,8 @@ type TrafficMessage struct {
 
 //-----------------------------------------------------------------------------
 
-// LoggerMessage is used to pass the details of NFLOG events to interested plugins
-type LoggerMessage struct {
+// NetloggerMessage is used to pass the details of NFLOG events to interested plugins
+type NetloggerMessage struct {
 	Protocol uint8
 	IcmpType uint16
 	SrcIntf  uint8
@@ -124,15 +149,15 @@ func Startup() {
 //-----------------------------------------------------------------------------
 
 // LogMessage is called to write messages to the system log
-func LogMessage(format string, args ...interface{}) {
+func LogMessage(level int, source string, format string, args ...interface{}) {
 	nowtime := time.Now()
 	var elapsed = nowtime.Sub(runtime)
 
 	if len(args) == 0 {
-		fmt.Printf("[%.6f] %s", elapsed.Seconds(), format)
+		fmt.Printf("[%.6f]{%s} %s", elapsed.Seconds(), source, format)
 	} else {
 		buffer := fmt.Sprintf(format, args...)
-		fmt.Printf("[%.6f] %s", elapsed.Seconds(), buffer)
+		fmt.Printf("[%.6f]{%s} %s", elapsed.Seconds(), source, buffer)
 	}
 }
 
@@ -217,10 +242,10 @@ func CleanSessionTable() {
 		}
 		RemoveSessionEntry(key)
 		counter++
-		LogMessage("SESSION Removing %s from table\n", key)
+		LogMessage(LogDebug, logsrc, "SESSION Removing %s from table\n", key)
 	}
 
-	LogMessage("SESSION REMOVED:%d REMAINING:%d\n", counter, len(sessionTable))
+	LogMessage(LogDebug, logsrc, "SESSION REMOVED:%d REMAINING:%d\n", counter, len(sessionTable))
 }
 
 //-----------------------------------------------------------------------------
@@ -267,10 +292,10 @@ func CleanConntrackTable() {
 		}
 		RemoveConntrackEntry(key)
 		counter++
-		LogMessage("CONNTRACK Removing %s from table\n", key)
+		LogMessage(LogDebug, logsrc, "CONNTRACK Removing %s from table\n", key)
 	}
 
-	LogMessage("CONNTRACK REMOVED:%d REMAINING:%d\n", counter, len(conntrackTable))
+	LogMessage(LogDebug, logsrc, "CONNTRACK REMOVED:%d REMAINING:%d\n", counter, len(conntrackTable))
 }
 
 //-----------------------------------------------------------------------------
@@ -317,10 +342,10 @@ func CleanCertificateTable() {
 		}
 		RemoveCertificate(key)
 		counter++
-		LogMessage("CERTIFICATE Removing %s from table\n", key)
+		LogMessage(LogDebug, logsrc, "CERTIFICATE Removing %s from table\n", key)
 	}
 
-	LogMessage("CERTIFICATE REMOVED:%d REMAINING:%d\n", counter, len(certificateTable))
+	LogMessage(LogDebug, logsrc, "CERTIFICATE REMOVED:%d REMAINING:%d\n", counter, len(certificateTable))
 }
 
 //-----------------------------------------------------------------------------

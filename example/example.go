@@ -7,13 +7,15 @@ import (
 	"sync"
 )
 
+var logsrc = "example"
+
 //-----------------------------------------------------------------------------
 
 // PluginStartup function is called to allow plugin specific initialization. We
 // increment the argumented WaitGroup so the main process can wait for
 // our goodbye function to return during shutdown.
 func PluginStartup(childsync *sync.WaitGroup) {
-	support.LogMessage("PluginStartup(%s) has been called\n", "example")
+	support.LogMessage(support.LogInfo, logsrc, "PluginStartup(%s) has been called\n", "example")
 	childsync.Add(1)
 }
 
@@ -22,7 +24,7 @@ func PluginStartup(childsync *sync.WaitGroup) {
 // PluginGoodbye function called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
 func PluginGoodbye(childsync *sync.WaitGroup) {
-	support.LogMessage("PluginGoodbye(%s) has been called\n", "example")
+	support.LogMessage(support.LogInfo, logsrc, "PluginGoodbye(%s) has been called\n", "example")
 	childsync.Done()
 }
 
@@ -63,7 +65,7 @@ func PluginConntrackHandler(message int, entry *support.ConntrackEntry) {
 //-----------------------------------------------------------------------------
 
 // PluginNetloggerHandler receives NFLOG events.
-func PluginNetloggerHandler(logger *support.LoggerMessage) {
+func PluginNetloggerHandler(logger *support.NetloggerMessage) {
 	fmt.Printf("NETLOGGER PROTO:%d ICMP:%d SIF:%d DIF:%d SADR:%s DADR:%s SPORT:%d DPORT:%d MARK:%X PREFIX:%s\n",
 		logger.Protocol,
 		logger.IcmpType,

@@ -8,6 +8,8 @@ import (
 	"os/exec"
 )
 
+var logsrc = "settings"
+
 // settings stores the current system settings
 var settings map[string]interface{}
 
@@ -16,21 +18,21 @@ func Startup() {
 	var err error
 	settings, err = readSettingsFileJSON()
 	if err != nil {
-		support.LogMessage("Error reading settings file: %s\n", err.Error())
+		support.LogMessage(support.LogWarning, logsrc, "Error reading settings file: %s\n", err.Error())
 	}
 
 	if settings == nil {
 		settings, err = createNewSettings()
 	}
 	if err != nil || settings == nil {
-		support.LogMessage("Error reading settings file: %s\n", err.Error())
+		support.LogMessage(support.LogErr, logsrc, "Error reading settings file: %s\n", err.Error())
 		//FIXME abort / exit
 	}
 	// jsonString, err := json.MarshalIndent(settings, "", "  ")
 	// if err != nil {
-	// 	support.LogMessage("Error reading settings file: %s\n", err.Error())
+	// support.LogMessage(support.LogWarning, logsrc, "Error reading settings file: %s\n", err.Error())
 	// } else {
-	// 	support.LogMessage("settings: %s\n", jsonString)
+	// support.LogMessage(support.LogDebug, logsrc, "settings: %s\n", jsonString)
 	// }
 }
 
@@ -254,14 +256,14 @@ func createNewSettings() (map[string]interface{}, error) {
 	cmd := exec.Command("sh", "-c", "/usr/bin/sync-settings -o openwrt -c -f /etc/config/settings.json")
 	stdoutStderr, err := cmd.CombinedOutput()
 	if err != nil {
-		support.LogMessage("Error creating new settings file: %s\n", err.Error())
+		support.LogMessage(support.LogWarning, logsrc, "Error creating new settings file: %s\n", err.Error())
 	}
-	support.LogMessage("Initializing new settings...\n")
-	support.LogMessage("%s\n", stdoutStderr)
+	support.LogMessage(support.LogInfo, logsrc, "Initializing new settings...\n")
+	support.LogMessage(support.LogInfo, logsrc, "%s\n", stdoutStderr)
 
 	settings, err = readSettingsFileJSON()
 	if err != nil {
-		support.LogMessage("Error reading settings file: %s\n", err.Error())
+		support.LogMessage(support.LogWarning, logsrc, "Error reading settings file: %s\n", err.Error())
 	}
 	return settings, err
 }

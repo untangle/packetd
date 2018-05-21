@@ -8,6 +8,7 @@ import (
 	"sync"
 )
 
+var logsrc = "certcache"
 var localMutex sync.Mutex
 
 //-----------------------------------------------------------------------------
@@ -16,7 +17,7 @@ var localMutex sync.Mutex
 // increment the argumented WaitGroup so the main process can wait for
 // our goodbye function to return during shutdown.
 func PluginStartup(childsync *sync.WaitGroup) {
-	support.LogMessage("PluginStartup(%s) has been called\n", "certcache")
+	support.LogMessage(support.LogInfo, logsrc, "PluginStartup(%s) has been called\n", "certcache")
 	childsync.Add(1)
 }
 
@@ -25,7 +26,7 @@ func PluginStartup(childsync *sync.WaitGroup) {
 // PluginGoodbye function called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
 func PluginGoodbye(childsync *sync.WaitGroup) {
-	support.LogMessage("PluginGoodbye(%s) has been called\n", "certcache")
+	support.LogMessage(support.LogInfo, logsrc, "PluginGoodbye(%s) has been called\n", "certcache")
 	childsync.Done()
 }
 
@@ -55,9 +56,9 @@ func PluginNetfilterHandler(ch chan<- int32, mess support.TrafficMessage, ctid u
 	localMutex.Lock()
 
 	if cert, ok = support.FindCertificate(client); ok {
-		support.LogMessage("Loading certificate for %s\n", mess.MsgTuple.ServerAddr)
+		support.LogMessage(support.LogInfo, logsrc, "Loading certificate for %s\n", mess.MsgTuple.ServerAddr)
 	} else {
-		support.LogMessage("Fetching certificate for %s\n", mess.MsgTuple.ServerAddr)
+		support.LogMessage(support.LogInfo, logsrc, "Fetching certificate for %s\n", mess.MsgTuple.ServerAddr)
 
 		conf := &tls.Config{
 			InsecureSkipVerify: true,
@@ -66,7 +67,7 @@ func PluginNetfilterHandler(ch chan<- int32, mess support.TrafficMessage, ctid u
 		target := fmt.Sprintf("%s:443", mess.MsgTuple.ServerAddr)
 		conn, err := tls.Dial("tcp", target, conf)
 		if err != nil {
-			support.LogMessage("TLS ERROR: %s\n", err)
+			support.LogMessage(support.LogWarning, logsrc, "TLS ERROR: %s\n", err)
 		}
 
 		cert = *conn.ConnectionState().PeerCertificates[0]
@@ -77,7 +78,7 @@ func PluginNetfilterHandler(ch chan<- int32, mess support.TrafficMessage, ctid u
 	// TODO - should the cert also be attached to the session?
 
 	localMutex.Unlock()
-	support.LogMessage("CERTIFICATE: %s\n", cert.Subject)
+	support.LogMessage(support.LogDebug, logsrc, "CERTIFICATE: %s\n", cert.Subject)
 	ch <- 8
 }
 

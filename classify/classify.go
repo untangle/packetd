@@ -13,13 +13,15 @@ import (
 	"unsafe"
 )
 
+var logsrc = "classify"
+
 //-----------------------------------------------------------------------------
 
 // PluginStartup is called to allow plugin specific initialization. We
 // increment the argumented WaitGroup so the main process can wait for
 // our goodbye function to return during shutdown.
 func PluginStartup(childsync *sync.WaitGroup) {
-	support.LogMessage("PluginStartup(%s) has been called\n", "classify")
+	support.LogMessage(support.LogInfo, logsrc, "PluginStartup(%s) has been called\n", "classify")
 	childsync.Add(1)
 	C.vendor_startup()
 }
@@ -29,7 +31,7 @@ func PluginStartup(childsync *sync.WaitGroup) {
 // PluginGoodbye is called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
 func PluginGoodbye(childsync *sync.WaitGroup) {
-	support.LogMessage("PluginGoodbye(%s) has been called\n", "classify")
+	support.LogMessage(support.LogInfo, logsrc, "PluginGoodbye(%s) has been called\n", "classify")
 	C.vendor_shutdown()
 	childsync.Done()
 }
@@ -58,16 +60,16 @@ func plugin_navl_callback(appname *C.char, protochain *C.char, ctid C.uint) {
 
 	erra := conndict.SetPair("AppName", app, id)
 	if erra != nil {
-		support.LogMessage("SetPair(navl_appname) ERROR: %s\n", erra)
+		support.LogMessage(support.LogWarning, logsrc, "SetPair(navl_appname) ERROR: %s\n", erra)
 	} else {
-		support.LogMessage("SetPair(navl_appname) %d = %s\n", id, app)
+		support.LogMessage(support.LogDebug, logsrc, "SetPair(navl_appname) %d = %s\n", id, app)
 	}
 
 	errc := conndict.SetPair("ProtoChain", chain, id)
 	if errc != nil {
-		support.LogMessage("SetPair(navl_protochain) ERROR: %s\n", errc)
+		support.LogMessage(support.LogWarning, logsrc, "SetPair(navl_protochain) ERROR: %s\n", errc)
 	} else {
-		support.LogMessage("SetPair(navl_protochain) %d = %s\n", id, chain)
+		support.LogMessage(support.LogDebug, logsrc, "SetPair(navl_protochain) %d = %s\n", id, chain)
 	}
 
 }
@@ -81,9 +83,9 @@ func plugin_attr_callback(detail *C.char, ctid C.uint) {
 
 	errd := conndict.SetPair("Detail", info, id)
 	if errd != nil {
-		support.LogMessage("SetPair(attr_detail) ERROR: %s\n", errd)
+		support.LogMessage(support.LogWarning, logsrc, "SetPair(attr_detail) ERROR: %s\n", errd)
 	} else {
-		support.LogMessage("SetPair(attr_detail) %d = %s\n", id, info)
+		support.LogMessage(support.LogDebug, logsrc, "SetPair(attr_detail) %d = %s\n", id, info)
 	}
 }
 
