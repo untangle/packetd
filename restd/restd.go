@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/untangle/packetd/reports"
 	"github.com/untangle/packetd/settings"
+	"github.com/untangle/packetd/support"
 	"io/ioutil"
 	"strconv"
 	"strings"
@@ -134,6 +135,8 @@ func trimSettings(c *gin.Context) {
 func StartRestDaemon() {
 	reports.ConnectDb()
 
+	gin.DisableConsoleColor()
+	gin.DefaultWriter = support.NewLogWriter("restd")
 	engine = gin.Default()
 
 	// routes

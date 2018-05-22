@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	//	"io"
+	//	"os"
 	"net"
 	"sync"
 	"time"
@@ -346,6 +348,36 @@ func CleanCertificateTable() {
 	}
 
 	LogMessage(LogDebug, logsrc, "CERTIFICATE REMOVED:%d REMAINING:%d\n", counter, len(certificateTable))
+}
+
+//-----------------------------------------------------------------------------
+
+// LogWriter is used to send an output stream to the LogMessage facility
+type LogWriter struct {
+	source string
+	buffer []byte
+}
+
+//-----------------------------------------------------------------------------
+
+// NewLogWriter creates an io Writer to steam output to the LogMessage facility
+func NewLogWriter(source string) *LogWriter {
+	return (&LogWriter{source, make([]byte, 256)})
+}
+
+//-----------------------------------------------------------------------------
+
+// Write takes written data and stores it in a buffer and writes to the log when a line feed is detected
+func (w *LogWriter) Write(p []byte) (int, error) {
+	for _, b := range p {
+		w.buffer = append(w.buffer, b)
+		if b == '\n' {
+			LogMessage(LogInfo, w.source, string(w.buffer))
+			w.buffer = make([]byte, 256)
+		}
+	}
+
+	return len(p), nil
 }
 
 //-----------------------------------------------------------------------------
