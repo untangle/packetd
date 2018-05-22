@@ -3,6 +3,7 @@ package conndict
 import (
 	"bufio"
 	"fmt"
+	"github.com/untangle/packetd/support"
 	"os"
 	"strings"
 	"sync"
@@ -11,6 +12,7 @@ import (
 const pathBase string = "/proc/net/dict"
 
 var readMutex = &sync.Mutex{}
+var logsrc = "conndict"
 
 //-----------------------------------------------------------------------------
 
@@ -33,7 +35,7 @@ func parsePair(line string) DictPair {
 
 // Print a pair's field and value
 func (p DictPair) Print() {
-	fmt.Printf("Field: %s Value: %s\n", p.Field, p.Value)
+	support.LogMessage(support.LogInfo, logsrc, "Field: %s Value: %s\n", p.Field, p.Value)
 }
 
 //-----------------------------------------------------------------------------
@@ -67,8 +69,8 @@ func SetPairs(pairs []DictPair, id uint) error {
 		err := SetPair(p.Field, p.Value, id)
 
 		if err != nil {
-			fmt.Println(err)
-			return fmt.Errorf("conndict: SetPairs: Failed on setting %s:%s for %d", p.Field, p.Value, id)
+			support.LogMessage(support.LogErr, logsrc, "SetPairs failed on setting %s:%s for %d\n", p.Field, p.Value, id)
+			return (err)
 		}
 	}
 

@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	_ "github.com/mattn/go-sqlite3" // blank import required for runtime binding
+	"github.com/untangle/packetd/support"
 	"log"
 	"sync/atomic"
 	"time"
@@ -14,6 +14,7 @@ import (
 var db *sql.DB
 var queries = make(map[uint64]*Query)
 var queryID uint64
+var logsrc = "reports"
 
 //-----------------------------------------------------------------------------
 
@@ -41,7 +42,7 @@ func ConnectDb() {
 func CreateQuery(reportEntry string) (*Query, error) {
 	rows, err := db.Query("SELECT * FROM sessions LIMIT 5")
 	if err != nil {
-		fmt.Println(err)
+		support.LogMessage(support.LogErr, logsrc, "db.Query error: %s\n", err)
 		return nil, err
 	}
 	q := new(Query)
@@ -59,7 +60,7 @@ func CreateQuery(reportEntry string) (*Query, error) {
 func GetData(queryID uint64) (string, error) {
 	q := queries[queryID]
 	if q == nil {
-		fmt.Println("Query not found: ", queryID)
+		support.LogMessage(support.LogWarning, logsrc, "Query not found: %d\n", queryID)
 		return "", errors.New("Query ID not found")
 	}
 	result, err := getRows(q.Rows, 1000)
@@ -120,13 +121,13 @@ func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
 //-----------------------------------------------------------------------------
 
 func cleanupQuery(query *Query) {
-	fmt.Println("cleanupQuery() launched ", query.ID)
+	support.LogMessage(support.LogDebug, logsrc, "cleanupQuery(%d) launched\n", query.ID)
 	time.Sleep(30 * time.Second)
 	delete(queries, query.ID)
 	if query.Rows != nil {
 		query.Rows.Close()
 	}
-	fmt.Println("cleanupQuery() finished ", query.ID)
+	support.LogMessage(support.LogDebug, logsrc, "cleanupQuery(%d) finished\n", query.ID)
 }
 
 //-----------------------------------------------------------------------------

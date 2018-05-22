@@ -2,7 +2,6 @@ package example
 
 import (
 	"encoding/hex"
-	"fmt"
 	"github.com/untangle/packetd/support"
 	"sync"
 )
@@ -37,7 +36,7 @@ func PluginGoodbye(childsync *sync.WaitGroup) {
 // the packet mark.
 func PluginNetfilterHandler(ch chan<- int32, mess support.TrafficMessage, ctid uint) {
 	// our example simply dumps the raw message to the console
-	fmt.Printf("NETFILTER %d BYTES FROM %s to %s\n%s\n", mess.MsgLength, mess.MsgIP.SrcIP, mess.MsgIP.DstIP, hex.Dump(mess.MsgPacket.Data()))
+	support.LogMessage(support.LogDebug, logsrc, "NetfilterHandler recived %d BYTES from %s to %s\n%s\n", mess.MsgLength, mess.MsgIP.SrcIP, mess.MsgIP.DstIP, hex.Dump(mess.MsgPacket.Data()))
 
 	// use the channel to return our mark bits
 	ch <- 1
@@ -49,7 +48,7 @@ func PluginNetfilterHandler(ch chan<- int32, mess support.TrafficMessage, ctid u
 // of three possible values: N, U, or D for new entry, an update to an existing
 // entry, or delete of an existing entry.
 func PluginConntrackHandler(message int, entry *support.ConntrackEntry) {
-	fmt.Printf("CONNTRACK MSG:%c ID:%d PROTO:%d SADDR:%s SPORT:%d DADDR:%s DPORT:%d TX:%d RX:%d UC:%d\n",
+	support.LogMessage(support.LogDebug, logsrc, "ConntrackHandler MSG:%c ID:%d PROTO:%d SADDR:%s SPORT:%d DADDR:%s DPORT:%d TX:%d RX:%d UC:%d\n",
 		message,
 		entry.ConntrackID,
 		entry.SessionTuple.Protocol,
@@ -66,7 +65,7 @@ func PluginConntrackHandler(message int, entry *support.ConntrackEntry) {
 
 // PluginNetloggerHandler receives NFLOG events.
 func PluginNetloggerHandler(logger *support.NetloggerMessage) {
-	fmt.Printf("NETLOGGER PROTO:%d ICMP:%d SIF:%d DIF:%d SADR:%s DADR:%s SPORT:%d DPORT:%d MARK:%X PREFIX:%s\n",
+	support.LogMessage(support.LogDebug, logsrc, "NetloggerHandler PROTO:%d ICMP:%d SIF:%d DIF:%d SADR:%s DADR:%s SPORT:%d DPORT:%d MARK:%X PREFIX:%s\n",
 		logger.Protocol,
 		logger.IcmpType,
 		logger.SrcIntf,

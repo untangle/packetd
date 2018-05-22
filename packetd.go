@@ -18,6 +18,7 @@ import (
 	"github.com/untangle/packetd/restd"
 	"github.com/untangle/packetd/settings"
 	"github.com/untangle/packetd/support"
+	"log"
 	"net"
 	"os"
 	"sync"
@@ -40,6 +41,7 @@ func main() {
 	var counter int
 
 	C.common_startup()
+	log.SetOutput(support.NewLogWriter("log"))
 
 	support.Startup()
 	support.LogMessage(support.LogInfo, logsrc, "Untangle Packet Daemon Version %s\n", "1.00")
