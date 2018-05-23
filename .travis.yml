@@ -9,6 +9,7 @@ before_install:
   - sudo ln -sf ./libnavl.so.4.5.0 /usr/lib/libnavl.so.4.5
   - sudo ln -sf ./libnavl.so.4.5.0 /usr/lib/libnavl.so
   - sudo ldconfig
+  - ls -l /usr/lib/libnavl*
 
 install:
   - go get
