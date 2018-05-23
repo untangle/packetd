@@ -2,7 +2,7 @@
 Userspace packet processing daemon
 
 # required packages
-apt-get install libnetfilter-log-dev libnetfilter-queue-dev
+apt-get install libnetfilter-log-dev libnetfilter-queue-dev libnetfilter-conntrack-dev
 # for libnavl:
 apt-get install untangle-classd
 # lor geoip:
