@@ -1,0 +1,10 @@
+language: go
+
+before_install:
+  - echo "deb http://updates.untangle.com/public/stretch 14.0 main non-free" | sudo tee -a /etc/apt/sources.list
+  - sudo apt-get update -qq
+  - sudo apt-get install -y untangle-classd libnetfilter-log-dev libnetfilter-queue-dev
+
+install:
+  - go get
+  - go build
