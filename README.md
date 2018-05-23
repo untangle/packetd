@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/untangle/packetd.svg?branch=master)](https://travis-ci.org/untangle/packetd)
+
 # packetd
 Userspace packet processing daemon
 
@@ -5,7 +7,7 @@ Userspace packet processing daemon
 apt-get install libnetfilter-log-dev libnetfilter-queue-dev libnetfilter-conntrack-dev
 # for libnavl:
 apt-get install untangle-classd
-# lor geoip:
+# for geoip:
 apt-get install untangle-geoip-database
 
 To build:
