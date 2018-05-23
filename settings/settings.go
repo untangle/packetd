@@ -6,6 +6,7 @@ import (
 	"github.com/untangle/packetd/support"
 	"io/ioutil"
 	"os/exec"
+	"strings"
 )
 
 var logsrc = "settings"
@@ -24,10 +25,14 @@ func Startup() {
 	if settings == nil {
 		settings, err = createNewSettings()
 	}
-	if err != nil || settings == nil {
-		support.LogMessage(support.LogErr, logsrc, "Error reading settings file: %s\n", err.Error())
+	if err != nil {
+		support.LogMessage(support.LogErr, logsrc, "Failed to create/read settings file: %s\n", err.Error())
+		//FIXME abort / exit
+	} else if settings == nil {
+		support.LogMessage(support.LogErr, logsrc, "Failed to create/read settings file.\n")
 		//FIXME abort / exit
 	}
+
 	// jsonString, err := json.MarshalIndent(settings, "", "  ")
 	// if err != nil {
 	// support.LogMessage(support.LogWarning, logsrc, "Error reading settings file: %s\n", err.Error())
@@ -253,13 +258,16 @@ func createJSONErrorString(str string) map[string]interface{} {
 
 // createNewSettings creates a new settings file
 func createNewSettings() (map[string]interface{}, error) {
+	support.LogMessage(support.LogInfo, logsrc, "Initializing new settings...\n")
 	cmd := exec.Command("sh", "-c", "/usr/bin/sync-settings -o openwrt -c -f /etc/config/settings.json")
 	stdoutStderr, err := cmd.CombinedOutput()
 	if err != nil {
 		support.LogMessage(support.LogWarning, logsrc, "Error creating new settings file: %s\n", err.Error())
+		return nil, err
 	}
-	support.LogMessage(support.LogInfo, logsrc, "Initializing new settings...\n")
-	support.LogMessage(support.LogInfo, logsrc, "%s\n", stdoutStderr)
+	for _, line := range strings.Split(strings.TrimSpace(string(stdoutStderr)), "\n") {
+		support.LogMessage(support.LogInfo, logsrc, "sync-settings: %s\n", line)
+	}
 
 	settings, err = readSettingsFileJSON()
 	if err != nil {

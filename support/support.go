@@ -156,10 +156,10 @@ func LogMessage(level int, source string, format string, args ...interface{}) {
 	var elapsed = nowtime.Sub(runtime)
 
 	if len(args) == 0 {
-		fmt.Printf("[%.6f]{%s} %s", elapsed.Seconds(), source, format)
+		fmt.Printf("[%11.5f] %10s: %s", elapsed.Seconds(), source, format)
 	} else {
 		buffer := fmt.Sprintf(format, args...)
-		fmt.Printf("[%.6f]{%s} %s", elapsed.Seconds(), source, buffer)
+		fmt.Printf("[%11.5f] %10s: %s", elapsed.Seconds(), source, buffer)
 	}
 }
 
