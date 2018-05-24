@@ -1,5 +1,11 @@
 language: go
 
+go:
+  - "1.9"
+
+env:
+  - LDFLAGS=-ldl
+
 before_install:
   - echo "deb http://foo:foo@updates.untangle.com/public/stretch 14.0.0 main non-free" | sudo tee -a /etc/apt/sources.list
   - sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 735A9E18E8F62EDF413592460B9D6AE3627BF103
@@ -9,9 +15,5 @@ before_install:
   - sudo ldconfig
   - ldd /usr/lib/libnavl.so
 
-install:
-  - go get
-  - go build
-
 script:
-  - 
+  - true
