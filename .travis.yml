@@ -18,7 +18,7 @@ before_install:
   - ldd /usr/lib/libnavl.so
 
 install:
-  - go get -ldflags '-ld' -v ./...
+  - go get -ldflags '-ldl' -v ./...
 
 script:
   - true
