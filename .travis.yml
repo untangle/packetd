@@ -7,7 +7,7 @@ go:
 
 before_install:
   - sudo apt-get update -qq
-  - sudo apt-get install -y libnetfilter-log-dev libnetfilter-queue-dev libstdc++6
+  - sudo apt-get install -y libnetfilter-log-dev libnetfilter-queue-dev
   - sudo curl -o /usr/lib/libnavl.so http://foo:foo@updates.untangle.com/public/openwrt/libnavl.so.4.5.0
   - sudo ldconfig
   - ldd /usr/lib/libnavl.so
