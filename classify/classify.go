@@ -41,7 +41,7 @@ func PluginGoodbye(childsync *sync.WaitGroup) {
 // PluginNetfilterHandler is called for raw netfilter packets. We pass the
 // packet directly to the Sandvine NAVL library for classification, and
 // push the results to the conntrack dictionary.
-func PluginNetfilterHandler(ch chan<- int32, mess support.TrafficMessage, ctid uint) {
+func PluginNetfilterHandler(ch chan<- uint32, mess support.TrafficMessage, ctid uint) {
 	ptr := (*C.uchar)(unsafe.Pointer(&mess.MsgPacket.Data()[0]))
 	C.vendor_classify(ptr, C.int(mess.MsgLength), C.uint(ctid))
 

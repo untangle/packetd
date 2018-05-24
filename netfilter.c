@@ -58,10 +58,10 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 {
 	struct nfqnl_msg_packet_hdr		*hdr;
 	unsigned char					*rawpkt;
+    unsigned int                    omark,nmark;
 	unsigned int					ctid;
 	struct iphdr					*iphead;
 	int								rawlen;
-	int								omark,nmark;
 
 	// get the packet header and mark
 	hdr = nfq_get_msg_packet_hdr(nfad);

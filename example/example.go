@@ -15,6 +15,7 @@ var logsrc = "example"
 // our goodbye function to return during shutdown.
 func PluginStartup(childsync *sync.WaitGroup) {
 	support.LogMessage(support.LogInfo, logsrc, "PluginStartup(%s) has been called\n", "example")
+	support.InsertNetfilterSubscription(logsrc, PluginNetfilterHandler)
 	childsync.Add(1)
 }
 
@@ -34,7 +35,7 @@ func PluginGoodbye(childsync *sync.WaitGroup) {
 // We do whatever we like with the data, and when finished, we return an
 // integer via the argumented channel with any bits set that we want added to
 // the packet mark.
-func PluginNetfilterHandler(ch chan<- int32, mess support.TrafficMessage, ctid uint) {
+func PluginNetfilterHandler(ch chan<- uint32, mess support.TrafficMessage, ctid uint) {
 	// our example simply dumps the raw message to the console
 	support.LogMessage(support.LogDebug, logsrc, "NetfilterHandler recived %d BYTES from %s to %s\n%s\n", mess.MsgLength, mess.MsgIP.SrcIP, mess.MsgIP.DstIP, hex.Dump(mess.MsgPacket.Data()))
 

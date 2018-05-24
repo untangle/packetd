@@ -35,7 +35,7 @@ func PluginGoodbye(childsync *sync.WaitGroup) {
 // PluginNetfilterHandler is called to handle netfilter packet data. We extract
 // the source and destination IP address from the packet, lookup the GeoIP
 // country code for each, and store them in the conntrack dictionary.
-func PluginNetfilterHandler(ch chan<- int32, mess support.TrafficMessage, ctid uint) {
+func PluginNetfilterHandler(ch chan<- uint32, mess support.TrafficMessage, ctid uint) {
 
 	if mess.MsgTuple.ServerPort != 443 {
 		ch <- 8

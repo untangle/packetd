@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	//	"io"
-	//	"os"
 	"net"
 	"sync"
 	"time"
@@ -35,6 +33,14 @@ const LogInfo = 6
 
 //LogDebug = stdlog.h/LOG_DEBUG
 const LogDebug = 7
+
+type NetfilterHandlerFunction func(chan<- uint32, TrafficMessage, uint)
+type ConntrackHandlerFunction func(int, *ConntrackEntry)
+type NetloggerHandlerFunction func(*NetloggerMessage)
+
+var NetfilterList map[string]NetfilterHandlerFunction
+var ConntrackList map[string]ConntrackHandlerFunction
+var NetloggerList map[string]NetloggerHandlerFunction
 
 var logsrc = "support"
 var runtime time.Time
@@ -138,6 +144,9 @@ func Startup() {
 	conntrackTable = make(map[string]ConntrackEntry)
 	sessionTable = make(map[string]SessionEntry)
 	certificateTable = make(map[string]CertificateHolder)
+
+	// create the netfilter, conntrack, and netlogger subscription tables
+	NetfilterList = make(map[string]NetfilterHandlerFunction)
 
 	// initialize the sessionIndex counter
 	// highest 16 bits are zero
@@ -378,6 +387,12 @@ func (w *LogWriter) Write(p []byte) (int, error) {
 	}
 
 	return len(p), nil
+}
+
+//-----------------------------------------------------------------------------
+
+func InsertNetfilterSubscription(plugin string, function NetfilterHandlerFunction) {
+	NetfilterList[plugin] = function
 }
 
 //-----------------------------------------------------------------------------

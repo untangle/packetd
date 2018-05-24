@@ -50,7 +50,7 @@ struct nfq_data {
 	struct nfattr	**data;
 };
 /*--------------------------------------------------------------------------*/
-extern int go_netfilter_callback(int mark,unsigned char* data,int len,unsigned int ctid);
+extern unsigned int go_netfilter_callback(unsigned int mark,unsigned char* data,int len,unsigned int ctid);
 extern void go_netlogger_callback(struct netlogger_info* info);
 extern void go_conntrack_callback(struct conntrack_info* info);
 extern void go_child_startup(void);

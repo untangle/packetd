@@ -129,7 +129,7 @@ stdinloop:
 //-----------------------------------------------------------------------------
 
 //export go_netfilter_callback
-func go_netfilter_callback(mark C.int, data *C.uchar, size C.int, ctid C.uint) int32 {
+func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) uint32 {
 	var mess support.TrafficMessage
 
 	// ***** this version creates a Go copy of the buffer = SLOWER
@@ -142,7 +142,7 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int, ctid C.uint) i
 	connid := uint(ctid)
 
 	// get the existing mark on the packet
-	var pmark int32 = int32(C.int(mark))
+	var pmark uint32 = uint32(C.int(mark))
 
 	// make a gopacket from the raw packet data
 	mess.MsgPacket = gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
@@ -198,7 +198,14 @@ func go_netfilter_callback(mark C.int, data *C.uchar, size C.int, ctid C.uint) i
 
 	// ********** Call all plugin netfilter handler functions here
 
-	result := make(chan int32)
+	result := make(chan uint32)
+
+	// TODO - this is NOT finished yet :)
+
+	for key, val := range support.NetfilterList {
+		support.LogMessage(support.LogDebug, logsrc, "Calling netfilter handler for %s\n", key)
+		go val(result, mess, connid)
+	}
 
 	go example.PluginNetfilterHandler(result, mess, connid)
 	go classify.PluginNetfilterHandler(result, mess, connid)
