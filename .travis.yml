@@ -1,7 +1,10 @@
 language: go
 
 go:
-  - "1.10"
+  - "1.9"
+
+env:
+  - LDFLAGS=-ldl
 
 before_install:
   - echo "deb http://foo:foo@updates.untangle.com/public/stretch 14.0.0 main non-free" | sudo tee -a /etc/apt/sources.list
@@ -13,6 +16,9 @@ before_install:
   - sudo ln -sf ./libnavl.so.4.5.0 /usr/lib/libnavl.so
   - sudo ldconfig
   - ldd /usr/lib/libnavl.so
+
+install:
+  - go get -ldflags '-ld' -v ./...
 
 script:
   - true
