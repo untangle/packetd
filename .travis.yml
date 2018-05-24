@@ -11,7 +11,9 @@ before_install:
   - sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 735A9E18E8F62EDF413592460B9D6AE3627BF103
   - sudo apt-get update -qq
   - sudo apt-get install -y libnetfilter-log-dev libnetfilter-queue-dev libstdc++6
-  - sudo curl -o /usr/lib/libnavl.so http://foo:foo@updates.untangle.com/public/openwrt/libnavl.so.4.5.0
+  - sudo curl -o /usr/lib/libnavl.so.4.5.0 http://foo:foo@updates.untangle.com/public/openwrt/libnavl.so.4.5.0
+  - sudo ln -sf ./libnavl.so.4.5.0 /usr/lib/libnavl.so.4.5
+  - sudo ln -sf ./libnavl.so.4.5.0 /usr/lib/libnavl.so
   - sudo ldconfig
   - ldd /usr/lib/libnavl.so
 

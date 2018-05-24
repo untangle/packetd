@@ -2,7 +2,7 @@ package main
 
 /*
 #include "common.h"
-#cgo LDFLAGS: -lnetfilter_queue -lnfnetlink -lnetfilter_conntrack -lnetfilter_log -ldl
+#cgo LDFLAGS: -lnetfilter_queue -lnfnetlink -lnetfilter_conntrack -lnetfilter_log
 */
 import "C"
 
