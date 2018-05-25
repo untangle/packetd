@@ -199,26 +199,43 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 	}
 
 	pipe := make(chan support.SubscriptionResult)
-	counter := 0
 
-	// Call all of the subscribed handlers
-	for key, val := range session.NetfilterSubs {
-		support.LogMessage(support.LogDebug, appname, "Calling netfilter handler for %s\n", key)
-		go val.NetfilterFunc(pipe, mess, connid)
-		counter++
-	}
+	// We loop and increment the priority until all subscribtions have been called
+	subtotal := len(session.NetfilterSubs)
+	subcount := 0
+	priority := 0
 
-	// Add the mark bits returned from each package handler and remove
-	// the session subscription for any that set the SessionRelease flag
-	for i := 0; i < counter; i++ {
-		select {
-		case result := <-pipe:
-			pmark |= result.PacketMark
-			if result.SessionRelease {
-				support.LogMessage(support.LogDebug, appname, "Removing %s session netfilter subscription for %d\n", result.Owner, uint32(ctid))
-				delete(session.NetfilterSubs, result.Owner)
+	for subcount != subtotal {
+		// Counts the total number of calls made for each priority so we know
+		// how many SubscriptionResult's to read from the result channel
+		hitcount := 0
+
+		// Call all of the subscribed handlers for the current priority
+		for key, val := range session.NetfilterSubs {
+			if val.Priority != priority {
+				continue
+			}
+			support.LogMessage(support.LogDebug, appname, "Calling netfilter APP:%s PRIORITY:%d\n", key, priority)
+			go val.NetfilterFunc(pipe, mess, connid)
+			hitcount++
+			subcount++
+		}
+
+		// Add the mark bits returned from each handler and remove the session
+		// subscription for any that set the SessionRelease flag
+		for i := 0; i < hitcount; i++ {
+			select {
+			case result := <-pipe:
+				pmark |= result.PacketMark
+				if result.SessionRelease {
+					support.LogMessage(support.LogDebug, appname, "Removing %s session netfilter subscription for %d\n", result.Owner, uint32(ctid))
+					delete(session.NetfilterSubs, result.Owner)
+				}
 			}
 		}
+
+		// Increment the priority and keep looping until we've called all subscribers
+		priority++
 	}
 
 	// return the updated mark to be set on the packet
