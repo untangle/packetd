@@ -34,23 +34,62 @@ const LogInfo = 6
 //LogDebug = stdlog.h/LOG_DEBUG
 const LogDebug = 7
 
-type NetfilterHandlerFunction func(chan<- uint32, TrafficMessage, uint)
+//NetfilterHandlerFunction defines a pointer to a netfilter callback function
+type NetfilterHandlerFunction func(chan<- SubscriptionResult, TrafficMessage, uint)
+
+//ConntrackHandlerFunction defines a pointer to a conntrack callback function
 type ConntrackHandlerFunction func(int, *ConntrackEntry)
+
+//NetloggerHandlerFunction defines a pointer to a netlogger callback function
 type NetloggerHandlerFunction func(*NetloggerMessage)
 
-var NetfilterList map[string]NetfilterHandlerFunction
-var ConntrackList map[string]ConntrackHandlerFunction
-var NetloggerList map[string]NetloggerHandlerFunction
+var netfilterList map[string]SubscriptionHolder
+var conntrackList map[string]SubscriptionHolder
+var netloggerList map[string]SubscriptionHolder
 
-var logsrc = "support"
+var appname = "support"
 var runtime time.Time
-var sessionTable map[string]SessionEntry
+var sessionTable map[uint32]SessionEntry
 var conntrackTable map[string]ConntrackEntry
 var certificateTable map[string]CertificateHolder
 var certificateMutex sync.Mutex
 var conntrackMutex sync.Mutex
 var sessionMutex sync.Mutex
 var sessionIndex uint64
+
+//-----------------------------------------------------------------------------
+
+// SubscriptionHolder stores the details of a data callback subscription
+type SubscriptionHolder struct {
+	Owner         string
+	Priority      int
+	NetfilterFunc NetfilterHandlerFunction
+	ConntrackFunc ConntrackHandlerFunction
+	NetloggerFunc NetloggerHandlerFunction
+}
+
+//-----------------------------------------------------------------------------
+
+// SubscriptionResult returns status and other information from a subscription handler function
+type SubscriptionResult struct {
+	Owner          string
+	PacketMark     uint32
+	SessionRelease bool
+}
+
+//-----------------------------------------------------------------------------
+
+// SessionEntry stores details related to a session
+type SessionEntry struct {
+	SessionID       uint64
+	SessionCreation time.Time
+	SessionActivity time.Time
+	SessionTuple    Tuple
+	UpdateCount     uint64
+	NetfilterSubs   map[string]SubscriptionHolder
+	ConntrackSubs   map[string]SubscriptionHolder
+	NetloggerSubs   map[string]SubscriptionHolder
+}
 
 //-----------------------------------------------------------------------------
 
@@ -62,20 +101,6 @@ type Tuple struct {
 	ClientPort uint16
 	ServerAddr net.IP
 	ServerPort uint16
-}
-
-//-----------------------------------------------------------------------------
-
-// SessionEntry stores details related to a session
-type SessionEntry struct {
-	SessionID         uint64
-	SessionCreation   time.Time
-	SessionActivity   time.Time
-	SessionTuple      Tuple
-	UpdateCount       uint64
-	ServerCertificate x509.Certificate
-	ClientLocation    string
-	ServerLocation    string
 }
 
 //-----------------------------------------------------------------------------
@@ -140,13 +165,15 @@ func Startup() {
 	// capture startup time
 	runtime = time.Now()
 
-	// create the conntrack, session, and certificate tables
+	// create the session, conntrack, and certificate tables
+	sessionTable = make(map[uint32]SessionEntry)
 	conntrackTable = make(map[string]ConntrackEntry)
-	sessionTable = make(map[string]SessionEntry)
 	certificateTable = make(map[string]CertificateHolder)
 
 	// create the netfilter, conntrack, and netlogger subscription tables
-	NetfilterList = make(map[string]NetfilterHandlerFunction)
+	netfilterList = make(map[string]SubscriptionHolder)
+	conntrackList = make(map[string]SubscriptionHolder)
+	netloggerList = make(map[string]SubscriptionHolder)
 
 	// initialize the sessionIndex counter
 	// highest 16 bits are zero
@@ -212,7 +239,7 @@ func NextSessionID() uint64 {
 //-----------------------------------------------------------------------------
 
 // FindSessionEntry searches for an entry in the session table
-func FindSessionEntry(finder string) (SessionEntry, bool) {
+func FindSessionEntry(finder uint32) (SessionEntry, bool) {
 	sessionMutex.Lock()
 	entry, status := sessionTable[finder]
 	sessionMutex.Unlock()
@@ -222,7 +249,7 @@ func FindSessionEntry(finder string) (SessionEntry, bool) {
 //-----------------------------------------------------------------------------
 
 // InsertSessionEntry adds an entry to the session table
-func InsertSessionEntry(finder string, entry SessionEntry) {
+func InsertSessionEntry(finder uint32, entry SessionEntry) {
 	sessionMutex.Lock()
 	sessionTable[finder] = entry
 	sessionMutex.Unlock()
@@ -231,7 +258,7 @@ func InsertSessionEntry(finder string, entry SessionEntry) {
 //-----------------------------------------------------------------------------
 
 // RemoveSessionEntry removes an entry from the session table
-func RemoveSessionEntry(finder string) {
+func RemoveSessionEntry(finder uint32) {
 	sessionMutex.Lock()
 	delete(sessionTable, finder)
 	sessionMutex.Unlock()
@@ -244,19 +271,16 @@ func CleanSessionTable() {
 	var counter int
 	nowtime := time.Now()
 
-	for key, val := range conntrackTable {
-		if val.PurgeFlag == false {
-			continue
-		}
+	for key, val := range sessionTable {
 		if (nowtime.Unix() - val.SessionActivity.Unix()) < 60 {
 			continue
 		}
 		RemoveSessionEntry(key)
 		counter++
-		LogMessage(LogDebug, logsrc, "SESSION Removing %s from table\n", key)
+		LogMessage(LogDebug, appname, "SESSION Removing %s from table\n", key)
 	}
 
-	LogMessage(LogDebug, logsrc, "SESSION REMOVED:%d REMAINING:%d\n", counter, len(sessionTable))
+	LogMessage(LogDebug, appname, "SESSION REMOVED:%d REMAINING:%d\n", counter, len(sessionTable))
 }
 
 //-----------------------------------------------------------------------------
@@ -303,10 +327,10 @@ func CleanConntrackTable() {
 		}
 		RemoveConntrackEntry(key)
 		counter++
-		LogMessage(LogDebug, logsrc, "CONNTRACK Removing %s from table\n", key)
+		LogMessage(LogDebug, appname, "CONNTRACK Removing %s from table\n", key)
 	}
 
-	LogMessage(LogDebug, logsrc, "CONNTRACK REMOVED:%d REMAINING:%d\n", counter, len(conntrackTable))
+	LogMessage(LogDebug, appname, "CONNTRACK REMOVED:%d REMAINING:%d\n", counter, len(conntrackTable))
 }
 
 //-----------------------------------------------------------------------------
@@ -353,10 +377,10 @@ func CleanCertificateTable() {
 		}
 		RemoveCertificate(key)
 		counter++
-		LogMessage(LogDebug, logsrc, "CERTIFICATE Removing %s from table\n", key)
+		LogMessage(LogDebug, appname, "CERTIFICATE Removing %s from table\n", key)
 	}
 
-	LogMessage(LogDebug, logsrc, "CERTIFICATE REMOVED:%d REMAINING:%d\n", counter, len(certificateTable))
+	LogMessage(LogDebug, appname, "CERTIFICATE REMOVED:%d REMAINING:%d\n", counter, len(certificateTable))
 }
 
 //-----------------------------------------------------------------------------
@@ -391,8 +415,60 @@ func (w *LogWriter) Write(p []byte) (int, error) {
 
 //-----------------------------------------------------------------------------
 
-func InsertNetfilterSubscription(plugin string, function NetfilterHandlerFunction) {
-	NetfilterList[plugin] = function
+// AttachSubscriptions attaches active netfilter, conntrack, and netlogger
+// subscriptions to the argumented SessionEntry
+func AttachSubscriptions(session *SessionEntry) {
+	session.NetfilterSubs = make(map[string]SubscriptionHolder)
+	session.ConntrackSubs = make(map[string]SubscriptionHolder)
+	session.NetloggerSubs = make(map[string]SubscriptionHolder)
+
+	for index, element := range netfilterList {
+		session.NetfilterSubs[index] = element
+	}
+
+	for index, element := range conntrackList {
+		session.ConntrackSubs[index] = element
+	}
+
+	for index, element := range netloggerList {
+		session.NetloggerSubs[index] = element
+	}
+}
+
+//-----------------------------------------------------------------------------
+
+// InsertNetfilterSubscription adds a subscription for receiving netfilter messages
+func InsertNetfilterSubscription(owner string, priority int, function NetfilterHandlerFunction) {
+	var holder SubscriptionHolder
+
+	holder.Owner = owner
+	holder.Priority = priority
+	holder.NetfilterFunc = function
+	netfilterList[owner] = holder
+}
+
+//-----------------------------------------------------------------------------
+
+// InsertConntrackSubscription adds a subscription for receiving conntrack messages
+func InsertConntrackSubscription(owner string, priority int, function ConntrackHandlerFunction) {
+	var holder SubscriptionHolder
+
+	holder.Owner = owner
+	holder.Priority = priority
+	holder.ConntrackFunc = function
+	conntrackList[owner] = holder
+}
+
+//-----------------------------------------------------------------------------
+
+// InsertNetloggerSubscription adds a subscription for receiving netlogger messages
+func InsertNetloggerSubscription(owner string, priority int, function NetloggerHandlerFunction) {
+	var holder SubscriptionHolder
+
+	holder.Owner = owner
+	holder.Priority = priority
+	holder.NetloggerFunc = function
+	netloggerList[owner] = holder
 }
 
 //-----------------------------------------------------------------------------

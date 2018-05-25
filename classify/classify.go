@@ -13,7 +13,7 @@ import (
 	"unsafe"
 )
 
-var logsrc = "classify"
+var appname = "classify"
 
 //-----------------------------------------------------------------------------
 
@@ -21,9 +21,10 @@ var logsrc = "classify"
 // increment the argumented WaitGroup so the main process can wait for
 // our goodbye function to return during shutdown.
 func PluginStartup(childsync *sync.WaitGroup) {
-	support.LogMessage(support.LogInfo, logsrc, "PluginStartup(%s) has been called\n", "classify")
-	childsync.Add(1)
+	support.LogMessage(support.LogInfo, appname, "PluginStartup(%s) has been called\n", "classify")
 	C.vendor_startup()
+	support.InsertNetfilterSubscription(appname, 1, PluginNetfilterHandler)
+	childsync.Add(1)
 }
 
 //-----------------------------------------------------------------------------
@@ -31,7 +32,7 @@ func PluginStartup(childsync *sync.WaitGroup) {
 // PluginGoodbye is called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
 func PluginGoodbye(childsync *sync.WaitGroup) {
-	support.LogMessage(support.LogInfo, logsrc, "PluginGoodbye(%s) has been called\n", "classify")
+	support.LogMessage(support.LogInfo, appname, "PluginGoodbye(%s) has been called\n", "classify")
 	C.vendor_shutdown()
 	childsync.Done()
 }
@@ -41,35 +42,40 @@ func PluginGoodbye(childsync *sync.WaitGroup) {
 // PluginNetfilterHandler is called for raw netfilter packets. We pass the
 // packet directly to the Sandvine NAVL library for classification, and
 // push the results to the conntrack dictionary.
-func PluginNetfilterHandler(ch chan<- uint32, mess support.TrafficMessage, ctid uint) {
+func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.TrafficMessage, ctid uint) {
 	ptr := (*C.uchar)(unsafe.Pointer(&mess.MsgPacket.Data()[0]))
 	C.vendor_classify(ptr, C.int(mess.MsgLength), C.uint(ctid))
 
-	// use the channel to return our mark bits
-	ch <- 2
+	var result support.SubscriptionResult
+	result.Owner = appname
+	result.PacketMark = 0
+	result.SessionRelease = false
+
+	// use the channel to return our result
+	ch <- result
 }
 
 //-----------------------------------------------------------------------------
 
 //export plugin_navl_callback
-func plugin_navl_callback(appname *C.char, protochain *C.char, ctid C.uint) {
+func plugin_navl_callback(application *C.char, protochain *C.char, ctid C.uint) {
 
-	app := C.GoString(appname)
+	app := C.GoString(application)
 	chain := C.GoString(protochain)
 	id := uint(ctid)
 
-	erra := conndict.SetPair("AppName", app, id)
+	erra := conndict.SetPair("Application", app, id)
 	if erra != nil {
-		support.LogMessage(support.LogWarning, logsrc, "SetPair(navl_appname) ERROR: %s\n", erra)
+		support.LogMessage(support.LogWarning, appname, "SetPair(Application) ERROR: %s\n", erra)
 	} else {
-		support.LogMessage(support.LogDebug, logsrc, "SetPair(navl_appname) %d = %s\n", id, app)
+		support.LogMessage(support.LogDebug, appname, "SetPair(Application) %d = %s\n", id, app)
 	}
 
 	errc := conndict.SetPair("ProtoChain", chain, id)
 	if errc != nil {
-		support.LogMessage(support.LogWarning, logsrc, "SetPair(navl_protochain) ERROR: %s\n", errc)
+		support.LogMessage(support.LogWarning, appname, "SetPair(ProtoChain) ERROR: %s\n", errc)
 	} else {
-		support.LogMessage(support.LogDebug, logsrc, "SetPair(navl_protochain) %d = %s\n", id, chain)
+		support.LogMessage(support.LogDebug, appname, "SetPair(ProtoChain) %d = %s\n", id, chain)
 	}
 
 }
@@ -83,9 +89,9 @@ func plugin_attr_callback(detail *C.char, ctid C.uint) {
 
 	errd := conndict.SetPair("Detail", info, id)
 	if errd != nil {
-		support.LogMessage(support.LogWarning, logsrc, "SetPair(attr_detail) ERROR: %s\n", errd)
+		support.LogMessage(support.LogWarning, appname, "SetPair(attr_detail) ERROR: %s\n", errd)
 	} else {
-		support.LogMessage(support.LogDebug, logsrc, "SetPair(attr_detail) %d = %s\n", id, info)
+		support.LogMessage(support.LogDebug, appname, "SetPair(attr_detail) %d = %s\n", id, info)
 	}
 }
 

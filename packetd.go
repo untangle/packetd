@@ -32,7 +32,7 @@ import (
 // functions. For children in normal go packages, we pass the WaitGroup
 // directly to the goroutine.
 var childsync sync.WaitGroup
-var logsrc = "packetd"
+var appname = "packetd"
 
 //-----------------------------------------------------------------------------
 
@@ -44,7 +44,7 @@ func main() {
 	log.SetOutput(support.NewLogWriter("log"))
 
 	support.Startup()
-	support.LogMessage(support.LogInfo, logsrc, "Untangle Packet Daemon Version %s\n", "1.00")
+	support.LogMessage(support.LogInfo, appname, "Untangle Packet Daemon Version %s\n", "1.00")
 
 	settings.Startup()
 
@@ -78,7 +78,7 @@ func main() {
 		close(ch)
 	}(ch)
 
-	support.LogMessage(support.LogInfo, logsrc, "RUNNING ON CONSOLE - HIT ENTER TO EXIT\n")
+	support.LogMessage(support.LogInfo, appname, "RUNNING ON CONSOLE - HIT ENTER TO EXIT\n")
 
 stdinloop:
 	for {
@@ -91,7 +91,7 @@ stdinloop:
 			if !ok {
 				break stdinloop
 			} else {
-				support.LogMessage(support.LogInfo, logsrc, "Console input detected - Application shutting down\n")
+				support.LogMessage(support.LogInfo, appname, "Console input detected - Application shutting down\n")
 				_ = stdin
 				break stdinloop
 			}
@@ -100,7 +100,7 @@ stdinloop:
 			if current.Minute() != lastmin {
 				lastmin = current.Minute()
 				counter++
-				support.LogMessage(support.LogDebug, logsrc, "Calling perodic conntrack dump %d\n", counter)
+				support.LogMessage(support.LogDebug, appname, "Calling perodic conntrack dump %d\n", counter)
 				C.conntrack_dump()
 				support.CleanConntrackTable()
 				support.CleanCertificateTable()
@@ -180,45 +180,44 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 		return (pmark)
 	}
 
-	var entry support.SessionEntry
+	var session support.SessionEntry
 	var ok bool
 
-	finder := support.Tuple2String(mess.MsgTuple)
-
 	// If we already have a session entry update the existing, otherwise create a new entry for the table.
-	if entry, ok = support.FindSessionEntry(finder); ok {
-		support.LogMessage(support.LogDebug, logsrc, "SESSION Found %s in table\n", finder)
-		entry.UpdateCount++
+	if session, ok = support.FindSessionEntry(uint32(ctid)); ok {
+		support.LogMessage(support.LogDebug, appname, "SESSION Found %d in table\n", ctid)
+		session.SessionActivity = time.Now()
+		session.UpdateCount++
 	} else {
-		support.LogMessage(support.LogDebug, logsrc, "SESSION Adding %s to table\n", finder)
-		entry.SessionID = support.NextSessionID()
-		entry.SessionCreation = time.Now()
-		entry.UpdateCount = 1
+		support.LogMessage(support.LogDebug, appname, "SESSION Adding %d to table\n", ctid)
+		session.SessionID = support.NextSessionID()
+		session.SessionCreation = time.Now()
+		session.SessionActivity = time.Now()
+		session.UpdateCount = 1
+		support.AttachSubscriptions(&session)
+		support.InsertSessionEntry(uint32(ctid), session)
 	}
 
-	// ********** Call all plugin netfilter handler functions here
+	pipe := make(chan support.SubscriptionResult)
+	counter := 0
 
-	result := make(chan uint32)
-
-	// TODO - this is NOT finished yet :)
-
-	for key, val := range support.NetfilterList {
-		support.LogMessage(support.LogDebug, logsrc, "Calling netfilter handler for %s\n", key)
-		go val(result, mess, connid)
+	// Call all of the subscribed handlers
+	for key, val := range session.NetfilterSubs {
+		support.LogMessage(support.LogDebug, appname, "Calling netfilter handler for %s\n", key)
+		go val.NetfilterFunc(pipe, mess, connid)
+		counter++
 	}
 
-	go example.PluginNetfilterHandler(result, mess, connid)
-	go classify.PluginNetfilterHandler(result, mess, connid)
-	go geoip.PluginNetfilterHandler(result, mess, connid)
-	go certcache.PluginNetfilterHandler(result, mess, connid)
-
-	// ********** End of plugin netfilter callback functions
-
-	// add the mark bits returned from each package handler
-	for i := 0; i < 4; i++ {
+	// Add the mark bits returned from each package handler and remove
+	// the session subscription for any that set the SessionRelease flag
+	for i := 0; i < counter; i++ {
 		select {
-		case mark := <-result:
-			pmark |= mark
+		case result := <-pipe:
+			pmark |= result.PacketMark
+			if result.SessionRelease {
+				support.LogMessage(support.LogDebug, appname, "Removing %s session netfilter subscription for %d\n", result.Owner, uint32(ctid))
+				delete(session.NetfilterSubs, result.Owner)
+			}
 		}
 	}
 
@@ -249,10 +248,10 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 
 	// If we already have a conntrack entry update the existing, otherwise create a new entry for the table.
 	if entry, ok = support.FindConntrackEntry(finder); ok {
-		support.LogMessage(support.LogDebug, logsrc, "CONNTRACK Found %s in table\n", finder)
+		support.LogMessage(support.LogDebug, appname, "CONNTRACK Found %s in table\n", finder)
 		entry.UpdateCount++
 	} else {
-		support.LogMessage(support.LogDebug, logsrc, "CONNTRACK Adding %s to table\n", finder)
+		support.LogMessage(support.LogDebug, appname, "CONNTRACK Adding %s to table\n", finder)
 		entry.ConntrackID = uint(info.conn_id)
 		entry.SessionID = support.NextSessionID()
 		entry.SessionCreation = time.Now()

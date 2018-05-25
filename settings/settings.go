@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-var logsrc = "settings"
+var appname = "settings"
 
 // settings stores the current system settings
 var settings map[string]interface{}
@@ -19,25 +19,25 @@ func Startup() {
 	var err error
 	settings, err = readSettingsFileJSON()
 	if err != nil {
-		support.LogMessage(support.LogWarning, logsrc, "Error reading settings file: %s\n", err.Error())
+		support.LogMessage(support.LogWarning, appname, "Error reading settings file: %s\n", err.Error())
 	}
 
 	if settings == nil {
 		settings, err = createNewSettings()
 	}
 	if err != nil {
-		support.LogMessage(support.LogErr, logsrc, "Failed to create/read settings file: %s\n", err.Error())
+		support.LogMessage(support.LogErr, appname, "Failed to create/read settings file: %s\n", err.Error())
 		//FIXME abort / exit
 	} else if settings == nil {
-		support.LogMessage(support.LogErr, logsrc, "Failed to create/read settings file.\n")
+		support.LogMessage(support.LogErr, appname, "Failed to create/read settings file.\n")
 		//FIXME abort / exit
 	}
 
 	// jsonString, err := json.MarshalIndent(settings, "", "  ")
 	// if err != nil {
-	// support.LogMessage(support.LogWarning, logsrc, "Error reading settings file: %s\n", err.Error())
+	// support.LogMessage(support.LogWarning, appname, "Error reading settings file: %s\n", err.Error())
 	// } else {
-	// support.LogMessage(support.LogDebug, logsrc, "settings: %s\n", jsonString)
+	// support.LogMessage(support.LogDebug, appname, "settings: %s\n", jsonString)
 	// }
 }
 
@@ -258,20 +258,20 @@ func createJSONErrorString(str string) map[string]interface{} {
 
 // createNewSettings creates a new settings file
 func createNewSettings() (map[string]interface{}, error) {
-	support.LogMessage(support.LogInfo, logsrc, "Initializing new settings...\n")
+	support.LogMessage(support.LogInfo, appname, "Initializing new settings...\n")
 	cmd := exec.Command("sh", "-c", "/usr/bin/sync-settings -o openwrt -c -f /etc/config/settings.json")
 	stdoutStderr, err := cmd.CombinedOutput()
 	if err != nil {
-		support.LogMessage(support.LogWarning, logsrc, "Error creating new settings file: %s\n", err.Error())
+		support.LogMessage(support.LogWarning, appname, "Error creating new settings file: %s\n", err.Error())
 		return nil, err
 	}
 	for _, line := range strings.Split(strings.TrimSpace(string(stdoutStderr)), "\n") {
-		support.LogMessage(support.LogInfo, logsrc, "sync-settings: %s\n", line)
+		support.LogMessage(support.LogInfo, appname, "sync-settings: %s\n", line)
 	}
 
 	settings, err = readSettingsFileJSON()
 	if err != nil {
-		support.LogMessage(support.LogWarning, logsrc, "Error reading settings file: %s\n", err.Error())
+		support.LogMessage(support.LogWarning, appname, "Error reading settings file: %s\n", err.Error())
 	}
 	return settings, err
 }

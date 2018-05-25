@@ -12,7 +12,7 @@ import (
 )
 
 var engine *gin.Engine
-var logsrc = "restd"
+var appname = "restd"
 
 //-----------------------------------------------------------------------------
 
@@ -66,7 +66,7 @@ func reportsCreateQuery(c *gin.Context) {
 		return
 	}
 	str := fmt.Sprintf("%v", q.ID)
-	support.LogMessage(support.LogDebug, logsrc, "CreateQuery(%s)\n", str)
+	support.LogMessage(support.LogDebug, appname, "CreateQuery(%s)\n", str)
 	c.String(200, str)
 	// c.JSON(200, gin.H{
 	// 	"queryID": q.ID,
@@ -154,7 +154,7 @@ func StartRestDaemon() {
 	// listen and serve on 0.0.0.0:8080
 	engine.Run()
 
-	support.LogMessage(support.LogInfo, logsrc, "The RestD engine has been started\n")
+	support.LogMessage(support.LogInfo, appname, "The RestD engine has been started\n")
 }
 
 //-----------------------------------------------------------------------------

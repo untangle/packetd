@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-var logsrc = "example"
+var appname = "example"
 
 //-----------------------------------------------------------------------------
 
@@ -14,8 +14,8 @@ var logsrc = "example"
 // increment the argumented WaitGroup so the main process can wait for
 // our goodbye function to return during shutdown.
 func PluginStartup(childsync *sync.WaitGroup) {
-	support.LogMessage(support.LogInfo, logsrc, "PluginStartup(%s) has been called\n", "example")
-	support.InsertNetfilterSubscription(logsrc, PluginNetfilterHandler)
+	support.LogMessage(support.LogInfo, appname, "PluginStartup(%s) has been called\n", "example")
+	support.InsertNetfilterSubscription(appname, 1, PluginNetfilterHandler)
 	childsync.Add(1)
 }
 
@@ -24,7 +24,7 @@ func PluginStartup(childsync *sync.WaitGroup) {
 // PluginGoodbye function called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
 func PluginGoodbye(childsync *sync.WaitGroup) {
-	support.LogMessage(support.LogInfo, logsrc, "PluginGoodbye(%s) has been called\n", "example")
+	support.LogMessage(support.LogInfo, appname, "PluginGoodbye(%s) has been called\n", "example")
 	childsync.Done()
 }
 
@@ -35,12 +35,17 @@ func PluginGoodbye(childsync *sync.WaitGroup) {
 // We do whatever we like with the data, and when finished, we return an
 // integer via the argumented channel with any bits set that we want added to
 // the packet mark.
-func PluginNetfilterHandler(ch chan<- uint32, mess support.TrafficMessage, ctid uint) {
+func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.TrafficMessage, ctid uint) {
 	// our example simply dumps the raw message to the console
-	support.LogMessage(support.LogDebug, logsrc, "NetfilterHandler recived %d BYTES from %s to %s\n%s\n", mess.MsgLength, mess.MsgIP.SrcIP, mess.MsgIP.DstIP, hex.Dump(mess.MsgPacket.Data()))
+	support.LogMessage(support.LogDebug, appname, "NetfilterHandler recived %d BYTES from %s to %s\n%s\n", mess.MsgLength, mess.MsgIP.SrcIP, mess.MsgIP.DstIP, hex.Dump(mess.MsgPacket.Data()))
 
-	// use the channel to return our mark bits
-	ch <- 1
+	var result support.SubscriptionResult
+	result.Owner = appname
+	result.SessionRelease = true
+	result.PacketMark = 0
+
+	// use the channel to return our result
+	ch <- result
 }
 
 //-----------------------------------------------------------------------------
@@ -49,7 +54,7 @@ func PluginNetfilterHandler(ch chan<- uint32, mess support.TrafficMessage, ctid 
 // of three possible values: N, U, or D for new entry, an update to an existing
 // entry, or delete of an existing entry.
 func PluginConntrackHandler(message int, entry *support.ConntrackEntry) {
-	support.LogMessage(support.LogDebug, logsrc, "ConntrackHandler MSG:%c ID:%d PROTO:%d SADDR:%s SPORT:%d DADDR:%s DPORT:%d TX:%d RX:%d UC:%d\n",
+	support.LogMessage(support.LogDebug, appname, "ConntrackHandler MSG:%c ID:%d PROTO:%d SADDR:%s SPORT:%d DADDR:%s DPORT:%d TX:%d RX:%d UC:%d\n",
 		message,
 		entry.ConntrackID,
 		entry.SessionTuple.Protocol,
@@ -66,7 +71,7 @@ func PluginConntrackHandler(message int, entry *support.ConntrackEntry) {
 
 // PluginNetloggerHandler receives NFLOG events.
 func PluginNetloggerHandler(logger *support.NetloggerMessage) {
-	support.LogMessage(support.LogDebug, logsrc, "NetloggerHandler PROTO:%d ICMP:%d SIF:%d DIF:%d SADR:%s DADR:%s SPORT:%d DPORT:%d MARK:%X PREFIX:%s\n",
+	support.LogMessage(support.LogDebug, appname, "NetloggerHandler PROTO:%d ICMP:%d SIF:%d DIF:%d SADR:%s DADR:%s SPORT:%d DPORT:%d MARK:%X PREFIX:%s\n",
 		logger.Protocol,
 		logger.IcmpType,
 		logger.SrcIntf,

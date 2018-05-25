@@ -12,7 +12,7 @@ import (
 const pathBase string = "/proc/net/dict"
 
 var readMutex = &sync.Mutex{}
-var logsrc = "conndict"
+var appname = "conndict"
 
 //-----------------------------------------------------------------------------
 
@@ -35,7 +35,7 @@ func parsePair(line string) DictPair {
 
 // Print a pair's field and value
 func (p DictPair) Print() {
-	support.LogMessage(support.LogInfo, logsrc, "Field: %s Value: %s\n", p.Field, p.Value)
+	support.LogMessage(support.LogInfo, appname, "Field: %s Value: %s\n", p.Field, p.Value)
 }
 
 //-----------------------------------------------------------------------------
@@ -69,7 +69,7 @@ func SetPairs(pairs []DictPair, id uint) error {
 		err := SetPair(p.Field, p.Value, id)
 
 		if err != nil {
-			support.LogMessage(support.LogErr, logsrc, "SetPairs failed on setting %s:%s for %d\n", p.Field, p.Value, id)
+			support.LogMessage(support.LogErr, appname, "SetPairs failed on setting %s:%s for %d\n", p.Field, p.Value, id)
 			return (err)
 		}
 	}
