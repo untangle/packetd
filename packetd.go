@@ -180,6 +180,14 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 		return (pmark)
 	}
 
+	// get the Application layer
+	appLayer := mess.MsgPacket.ApplicationLayer()
+	if appLayer == nil {
+		return (pmark)
+	}
+
+	mess.Payload = appLayer.Payload()
+
 	var session support.SessionEntry
 	var ok bool
 
@@ -193,10 +201,13 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 		session.SessionID = support.NextSessionID()
 		session.SessionCreation = time.Now()
 		session.SessionActivity = time.Now()
+		session.SessionTuple = mess.MsgTuple
 		session.UpdateCount = 1
 		support.AttachSubscriptions(&session)
 		support.InsertSessionEntry(uint32(ctid), session)
 	}
+
+	mess.MsgSession = session
 
 	pipe := make(chan support.SubscriptionResult)
 

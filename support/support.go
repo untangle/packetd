@@ -126,12 +126,14 @@ type ConntrackEntry struct {
 
 // TrafficMessage is used to pass netfilter traffic to interested plugins
 type TrafficMessage struct {
-	MsgTuple  Tuple
-	MsgPacket gopacket.Packet
-	MsgLength int
-	MsgIP     *layers.IPv4
-	MsgTCP    *layers.TCP
-	MsgUDP    *layers.UDP
+	MsgSession SessionEntry
+	MsgTuple   Tuple
+	MsgPacket  gopacket.Packet
+	MsgLength  int
+	MsgIP      *layers.IPv4
+	MsgTCP     *layers.TCP
+	MsgUDP     *layers.UDP
+	Payload    []byte
 }
 
 //-----------------------------------------------------------------------------
