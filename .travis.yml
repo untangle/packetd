@@ -6,7 +6,7 @@ go:
   - "1.10"
 
 before_install:
-  - sudo apt-get install -y libnetfilter-log-dev libnetfilter-queue-dev
+  - sudo apt-get install -y libnetfilter-log-dev libnetfilter-queue-dev libnetfilter-conntrack-dev
 
 script:
   - true
