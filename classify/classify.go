@@ -7,8 +7,11 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 )
 
+var socktime time.Time
+var sockspin int64
 var appname = "classify"
 var daemon net.Conn
 
@@ -21,6 +24,8 @@ func PluginStartup(childsync *sync.WaitGroup) {
 	var err error
 	support.LogMessage(support.LogInfo, appname, "PluginStartup(%s) has been called\n", "classify")
 
+	socktime = time.Now()
+	sockspin = 0
 	daemon, err = net.Dial("tcp", "127.0.0.1:8123")
 
 	if err != nil {
@@ -71,7 +76,7 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 	if mess.MsgSession.UpdateCount == 1 {
 		status, err = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.MsgSession.SessionTuple.ClientAddr, mess.MsgSession.SessionTuple.ClientPort, mess.MsgSession.SessionTuple.ServerAddr, mess.MsgSession.SessionTuple.ServerPort)
 		if err != nil {
-			support.LogMessage(support.LogErr, appname, "%s\n", err.Error())
+			support.LogMessage(support.LogErr, appname, "daemonCommand error: %s\n", err.Error())
 			ch <- result
 			return
 		}
@@ -86,7 +91,7 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 	}
 
 	if err != nil {
-		support.LogMessage(support.LogErr, appname, "%s\n", err.Error())
+		support.LogMessage(support.LogErr, appname, "daemonCommand error: %s\n", err.Error())
 		ch <- result
 		return
 	}
@@ -172,12 +177,30 @@ func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, 
 	var err error
 	var tot int
 
+	// if daemon not connected we do throttled reconnect attempts
 	if daemon == nil {
+		nowtime := time.Now()
+
+		// if not time for another attempt return lost connection error
+		if (socktime.Unix() + sockspin) > nowtime.Unix() {
+			return string(buffer), fmt.Errorf("Lost connection to daemon. Reconnect in %d seconds", sockspin)
+		}
+
+		// update socktime and try to connect to the daemon
+		socktime = time.Now()
 		daemon, err = net.Dial("tcp", "127.0.0.1:8123")
 		if err != nil {
+			// if the connection failed update the throttle counter and return the error
+			if sockspin < 10 {
+				sockspin++
+			}
 			return string(buffer), err
 		}
 	}
+
+	// on successful connect update the socktime and clear the throttle counter
+	socktime = time.Now()
+	sockspin = 0
 
 	// if there are no arguments use the format as the command otherwise create command from the arguments
 	if len(args) == 0 {
