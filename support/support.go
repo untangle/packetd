@@ -87,8 +87,6 @@ type SessionEntry struct {
 	SessionTuple    Tuple
 	UpdateCount     uint64
 	NetfilterSubs   map[string]SubscriptionHolder
-	ConntrackSubs   map[string]SubscriptionHolder
-	NetloggerSubs   map[string]SubscriptionHolder
 }
 
 //-----------------------------------------------------------------------------
@@ -417,28 +415,6 @@ func (w *LogWriter) Write(p []byte) (int, error) {
 
 //-----------------------------------------------------------------------------
 
-// AttachSubscriptions attaches active netfilter, conntrack, and netlogger
-// subscriptions to the argumented SessionEntry
-func AttachSubscriptions(session *SessionEntry) {
-	session.NetfilterSubs = make(map[string]SubscriptionHolder)
-	session.ConntrackSubs = make(map[string]SubscriptionHolder)
-	session.NetloggerSubs = make(map[string]SubscriptionHolder)
-
-	for index, element := range netfilterList {
-		session.NetfilterSubs[index] = element
-	}
-
-	for index, element := range conntrackList {
-		session.ConntrackSubs[index] = element
-	}
-
-	for index, element := range netloggerList {
-		session.NetloggerSubs[index] = element
-	}
-}
-
-//-----------------------------------------------------------------------------
-
 // InsertNetfilterSubscription adds a subscription for receiving netfilter messages
 func InsertNetfilterSubscription(owner string, priority int, function NetfilterHandlerFunction) {
 	var holder SubscriptionHolder
@@ -471,6 +447,31 @@ func InsertNetloggerSubscription(owner string, priority int, function NetloggerH
 	holder.Priority = priority
 	holder.NetloggerFunc = function
 	netloggerList[owner] = holder
+}
+
+//-----------------------------------------------------------------------------
+
+// AttachNetfilterSubscriptions attaches active netfilter subscriptions to the argumented SessionEntry
+func AttachNetfilterSubscriptions(session *SessionEntry) {
+	session.NetfilterSubs = make(map[string]SubscriptionHolder)
+
+	for index, element := range netfilterList {
+		session.NetfilterSubs[index] = element
+	}
+}
+
+//-----------------------------------------------------------------------------
+
+// GetConntrackSubscriptions returns the list of active conntrack subscriptions
+func GetConntrackSubscriptions() map[string]SubscriptionHolder {
+	return conntrackList
+}
+
+//-----------------------------------------------------------------------------
+
+// GetNetloggerSubscriptions returns the list of active netlogger subscriptions
+func GetNetloggerSubscriptions() map[string]SubscriptionHolder {
+	return netloggerList
 }
 
 //-----------------------------------------------------------------------------

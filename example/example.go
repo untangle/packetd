@@ -16,6 +16,8 @@ var appname = "example"
 func PluginStartup(childsync *sync.WaitGroup) {
 	support.LogMessage(support.LogInfo, appname, "PluginStartup(%s) has been called\n", "example")
 	support.InsertNetfilterSubscription(appname, 1, PluginNetfilterHandler)
+	support.InsertConntrackSubscription(appname, 1, PluginConntrackHandler)
+	support.InsertNetloggerSubscription(appname, 1, PluginNetloggerHandler)
 	childsync.Add(1)
 }
 

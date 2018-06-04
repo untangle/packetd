@@ -203,7 +203,7 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 		session.SessionActivity = time.Now()
 		session.SessionTuple = mess.MsgTuple
 		session.UpdateCount = 1
-		support.AttachSubscriptions(&session)
+		support.AttachNetfilterSubscriptions(&session)
 		support.InsertSessionEntry(uint32(ctid), session)
 	}
 
@@ -333,14 +333,26 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 
 	support.InsertConntrackEntry(finder, entry)
 
-	// ********** Call all plugin conntrack handler functions here
+	// We loop and increment the priority until all subscribtions have been called
+	sublist := support.GetConntrackSubscriptions()
+	subtotal := len(sublist)
+	subcount := 0
+	priority := 0
 
-	// TODO - replace with subscription list instead of hard coded functions
+	for subcount != subtotal {
+		// Call all of the subscribed handlers for the current priority
+		for key, val := range sublist {
+			if val.Priority != priority {
+				continue
+			}
+			support.LogMessage(support.LogDebug, appname, "Calling conntrack APP:%s PRIORITY:%d\n", key, priority)
+			go val.ConntrackFunc(int(info.msg_type), &entry)
+			subcount++
+		}
 
-	go example.PluginConntrackHandler(int(info.msg_type), &entry)
-
-	// ********** End of plugin netfilter callback functions
-
+		// Increment the priority and keep looping until we've called all subscribers
+		priority++
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -360,13 +372,26 @@ func go_netlogger_callback(info *C.struct_netlogger_info) {
 	logger.Mark = uint32(info.mark)
 	logger.Prefix = C.GoString(info.prefix)
 
-	// ********** Call all plugin netlogger handler functions here
+	// We loop and increment the priority until all subscribtions have been called
+	sublist := support.GetNetloggerSubscriptions()
+	subtotal := len(sublist)
+	subcount := 0
+	priority := 0
 
-	// TODO - replace with subscription list instead of hard coded functions
+	for subcount != subtotal {
+		// Call all of the subscribed handlers for the current priority
+		for key, val := range sublist {
+			if val.Priority != priority {
+				continue
+			}
+			support.LogMessage(support.LogDebug, appname, "Calling netlogger APP:%s PRIORITY:%d\n", key, priority)
+			go val.NetloggerFunc(&logger)
+			subcount++
+		}
 
-	go example.PluginNetloggerHandler(&logger)
-
-	// ********** End of plugin netlogger callback functions
+		// Increment the priority and keep looping until we've called all subscribers
+		priority++
+	}
 }
 
 //-----------------------------------------------------------------------------
