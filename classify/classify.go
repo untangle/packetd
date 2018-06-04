@@ -37,7 +37,11 @@ func PluginStartup(childsync *sync.WaitGroup) {
 // for the argumented WaitGroup to let the main process know we're finished.
 func PluginGoodbye(childsync *sync.WaitGroup) {
 	support.LogMessage(support.LogInfo, appname, "PluginGoodbye(%s) has been called\n", "classify")
-	daemon.Close()
+
+	if daemon != nil {
+		daemon.Close()
+	}
+
 	childsync.Done()
 }
 
@@ -47,8 +51,14 @@ func PluginGoodbye(childsync *sync.WaitGroup) {
 // packet directly to the Sandvine NAVL library for classification, and
 // push the results to the conntrack dictionary.
 func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.TrafficMessage, ctid uint) {
+	var result support.SubscriptionResult
+	result.Owner = appname
+	result.PacketMark = 0
+	result.SessionRelease = false
+
 	var status string
 	var proto string
+	var err error
 
 	if mess.MsgUDP != nil {
 		proto = "UDP"
@@ -59,16 +69,29 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 
 	// if this is the first packet of the session we send a session create command
 	if mess.MsgSession.UpdateCount == 1 {
-		status = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.MsgSession.SessionTuple.ClientAddr, mess.MsgSession.SessionTuple.ClientPort, mess.MsgSession.SessionTuple.ServerAddr, mess.MsgSession.SessionTuple.ServerPort)
+		status, err = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.MsgSession.SessionTuple.ClientAddr, mess.MsgSession.SessionTuple.ClientPort, mess.MsgSession.SessionTuple.ServerAddr, mess.MsgSession.SessionTuple.ServerPort)
+		if err != nil {
+			support.LogMessage(support.LogErr, appname, "%s\n", err.Error())
+			ch <- result
+			return
+		}
 		support.LogMessage(support.LogDebug, appname, "daemonCommand result: %s\n", status)
 	}
 
 	// send the application payload to the daemon
 	if mess.MsgSession.SessionTuple.ClientAddr.Equal(mess.MsgIP.SrcIP) {
-		status = daemonCommand(mess.Payload, "CLIENT:%d:%d\r\n", ctid, len(mess.Payload))
+		status, err = daemonCommand(mess.Payload, "CLIENT:%d:%d\r\n", ctid, len(mess.Payload))
 	} else {
-		status = daemonCommand(mess.Payload, "SERVER:%d:%d\r\n", ctid, len(mess.Payload))
+		status, err = daemonCommand(mess.Payload, "SERVER:%d:%d\r\n", ctid, len(mess.Payload))
 	}
+
+	if err != nil {
+		support.LogMessage(support.LogErr, appname, "%s\n", err.Error())
+		ch <- result
+		return
+	}
+
+	support.LogMessage(support.LogDebug, appname, "daemonCommand result: %s\n", status)
 
 	// Parse the output from classd to get the classification details
 	var pairname string
@@ -118,22 +141,23 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 			pairflag = true
 		}
 
+		// continue if the tag is something we don't want
 		if pairflag == false {
 			continue
 		}
 
-		err := conndict.SetPair(pairname, pairdata, ctid)
-		if err != nil {
-			support.LogMessage(support.LogWarning, appname, "SetPair(%s,%s,%d) ERROR: %s\n", pairname, pairdata, ctid, err)
+		// continue if the tag has no data
+		if len(pairdata) == 0 {
+			continue
+		}
+
+		ret := conndict.SetPair(pairname, pairdata, ctid)
+		if ret != nil {
+			support.LogMessage(support.LogWarning, appname, "SetPair(%s,%s,%d) ERROR: %s\n", pairname, pairdata, ctid, ret)
 		} else {
 			support.LogMessage(support.LogDebug, appname, "SetPair(%s,%s,%d) SUCCESS\n", pairname, pairdata, ctid)
 		}
 	}
-
-	var result support.SubscriptionResult
-	result.Owner = appname
-	result.PacketMark = 0
-	result.SessionRelease = false
 
 	// use the channel to return our result
 	ch <- result
@@ -142,14 +166,18 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 //-----------------------------------------------------------------------------
 
 // daemonCommand will send a command to the untangle-classd daemon and return the result message
-func daemonCommand(rawdata []byte, format string, args ...interface{}) string {
-
-	// TODO - need to add timeout, reconnect, rx and tx buffering, and other exception detection and handling here
-
+func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, error) {
 	buffer := make([]byte, 1024)
 	var command string
 	var err error
 	var tot int
+
+	if daemon == nil {
+		daemon, err = net.Dial("tcp", "127.0.0.1:8123")
+		if err != nil {
+			return string(buffer), err
+		}
+	}
 
 	// if there are no arguments use the format as the command otherwise create command from the arguments
 	if len(args) == 0 {
@@ -162,13 +190,15 @@ func daemonCommand(rawdata []byte, format string, args ...interface{}) string {
 	tot, err = daemon.Write([]byte(command))
 
 	if err != nil {
-		support.LogMessage(support.LogErr, appname, "Error calling daemon.Write(%s): %v\n", command, err)
-		return (string(buffer))
+		daemon.Close()
+		daemon = nil
+		return string(buffer), err
 	}
 
 	if tot != len(command) {
-		support.LogMessage(support.LogErr, appname, "Underrun %d of %d calling daemon.Write(%s)\n", tot, len(command), command)
-		return (string(buffer))
+		daemon.Close()
+		daemon = nil
+		return string(buffer), fmt.Errorf("Underrun %d of %d calling daemon.Write(%s)", tot, len(command), command)
 	}
 
 	// if we have raw payload data send to the daemon socket after the command
@@ -176,13 +206,15 @@ func daemonCommand(rawdata []byte, format string, args ...interface{}) string {
 		tot, err = daemon.Write(rawdata)
 
 		if err != nil {
-			support.LogMessage(support.LogErr, appname, "Error calling daemon.Write(): %v\n", err)
-			return (string(buffer))
+			daemon.Close()
+			daemon = nil
+			return string(buffer), err
 		}
 
 		if tot != len(rawdata) {
-			support.LogMessage(support.LogErr, appname, "Write could only send %d of %d rawdata bytes\n", tot, len(rawdata))
-			return (string(buffer))
+			daemon.Close()
+			daemon = nil
+			return string(buffer), fmt.Errorf("Underrun %d of %d calling daemon.Write(rawdata)", tot, len(rawdata))
 		}
 
 	}
@@ -191,10 +223,12 @@ func daemonCommand(rawdata []byte, format string, args ...interface{}) string {
 	tot, err = daemon.Read(buffer)
 
 	if err != nil {
-		support.LogMessage(support.LogErr, appname, "Error calling daemon.Read(): %v\n", err)
+		daemon.Close()
+		daemon = nil
+		return string(buffer), err
 	}
 
-	return (string(buffer))
+	return string(buffer), nil
 }
 
 //-----------------------------------------------------------------------------

@@ -274,6 +274,8 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 
 	finder := support.Tuple2String(tuple)
 
+	// TODO - clean up our table when we receive delete messages
+
 	// If we already have a conntrack entry update the existing, otherwise create a new entry for the table.
 	if entry, ok = support.FindConntrackEntry(finder); ok {
 		support.LogMessage(support.LogDebug, appname, "CONNTRACK Found %s in table\n", finder)
@@ -333,6 +335,8 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 
 	// ********** Call all plugin conntrack handler functions here
 
+	// TODO - replace with subscription list instead of hard coded functions
+
 	go example.PluginConntrackHandler(int(info.msg_type), &entry)
 
 	// ********** End of plugin netfilter callback functions
@@ -357,6 +361,8 @@ func go_netlogger_callback(info *C.struct_netlogger_info) {
 	logger.Prefix = C.GoString(info.prefix)
 
 	// ********** Call all plugin netlogger handler functions here
+
+	// TODO - replace with subscription list instead of hard coded functions
 
 	go example.PluginNetloggerHandler(&logger)
 
