@@ -275,6 +275,26 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 
 	ctid = uint32(info.conn_id)
 
+	// TODO - to be removed some day
+
+	// This is temporary and is used to look for conntrack id's being re-used
+	// unexpectedly. On the first packet, the netfilter handler seems to get
+	// called first, before the conntrack handler, so we use the ctid in that
+	// handler to create the session entry. It's possible we'll get the
+	// conntrack NEW message before the session gets added by the other
+	// handler, so we don't care if the session is not found, but if we find
+	// the session and the update count is greater than one, it likely means a
+	// conntrack ID has been reused, and we need to re-think some things.
+	if info.msg_type == 'N' {
+		if session, ok := support.FindSessionEntry(uint32(ctid)); ok {
+			if session.UpdateCount != 1 {
+				support.LogMessage(support.LogWarning, appname, "!!!!!!!!!! UNEXPECTED UPDATE COUNT %d FOR SESSION %d !!!!!!!!!!\n", session.UpdateCount, ctid)
+			}
+		}
+	}
+
+	// TODO - end of 'to be removed some day' section
+
 	// for delete messages we remove the entry from the session table
 	if info.msg_type == 'D' {
 		support.LogMessage(support.LogDebug, appname, "SESSION Removing %d from table\n", ctid)
