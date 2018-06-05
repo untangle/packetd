@@ -9,28 +9,32 @@
 
 #include "common.h"
 /*--------------------------------------------------------------------------*/
-static struct nflog_handle		*l_log_handle;
-static struct nflog_g_handle	*l_grp_handle;
-static int						l_logsock;
+static struct nflog_handle      *l_log_handle;
+static struct nflog_g_handle    *l_grp_handle;
+static int                      l_logsock;
 static char                     *appname = "netlogger";
 /*--------------------------------------------------------------------------*/
 int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct nflog_data *nfa,void *data)
 {
-	struct netlogger_info	info;
-	struct icmphdr			*icmphead;
-	struct tcphdr			*tcphead;
-	struct udphdr			*udphead;
-	struct iphdr			*iphead;
-	char					*packet_data;
-	int						packet_size;
+	struct netlogger_info   info;
+	struct icmphdr          *icmphead;
+	struct tcphdr           *tcphead;
+	struct udphdr           *udphead;
+	struct iphdr            *iphead;
+	char                    *packet_data;
+	char                    *prefix;
+	char                    *srcaddr;
+	char                    *dstaddr;
+	int                     packet_size;
 
 	// get the raw packet and check for sanity
 	packet_size = nflog_get_payload(nfa,&packet_data);
 	if ((packet_data == NULL) || (packet_size < 20)) return(0);
 
 	// get the prefix string
-	info.prefix = nflog_get_prefix(nfa);
-	if (info.prefix == NULL) info.prefix = "";
+	prefix = nflog_get_prefix(nfa);
+	if (prefix == NULL)	prefix = "";
+	strncpy(info.prefix,prefix,sizeof(info.prefix));
 
 	// get the mark and parse the source and dest interfaces
 	info.mark = nflog_get_nfmark(nfa);
@@ -46,9 +50,28 @@ int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct n
 	// grab the protocol
 	info.protocol = iphead->protocol;
 
-	// grab the source and destination addresses
-	info.src_addr = iphead->saddr;
-	info.dst_addr = iphead->daddr;
+    // start with unknown in case we don't extract the addresses
+	strcpy(info.src_addr,"UNKNOWN");
+	strcpy(info.dst_addr,"UNKNOWN");
+    info.version = 0;
+
+	// grab the source and destination addresses for IPv4 packets
+	if (nfmsg->nfgen_family == AF_INET) {
+        info.version = 4;
+        if (packet_size >= sizeof(struct iphdr)) {
+            inet_ntop(AF_INET,&((struct iphdr *)packet_data)->saddr,info.src_addr,sizeof(info.src_addr));
+    		inet_ntop(AF_INET,&((struct iphdr *)packet_data)->daddr,info.dst_addr,sizeof(info.dst_addr));
+        }
+	}
+
+	// grab the source and destination addresses for IPv6 packets
+	if (nfmsg->nfgen_family == AF_INET6) {
+        info.version = 6;
+        if (packet_size >= sizeof(struct ip6_hdr)) {
+            inet_ntop(AF_INET6,&((struct ip6_hdr *)packet_data)->ip6_src,info.src_addr,sizeof(info.src_addr));
+    		inet_ntop(AF_INET6,&((struct ip6_hdr *)packet_data)->ip6_dst,info.dst_addr,sizeof(info.dst_addr));
+        }
+	}
 
 	// Since 0 is a valid ICMP type we use 999 to signal null or unknown
 	info.src_port = info.dst_port = 0;
@@ -75,7 +98,7 @@ int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct n
 /*--------------------------------------------------------------------------*/
 int netlogger_startup(void)
 {
-	int		ret;
+	int     ret;
 
 	// open a log handle to the netfilter log library
 	l_log_handle = nflog_open();
@@ -135,7 +158,7 @@ int netlogger_startup(void)
 /*--------------------------------------------------------------------------*/
 void netlogger_shutdown(void)
 {
-	int		ret;
+	int     ret;
 
 	// unbind from our group
 	if (l_grp_handle != NULL) {
@@ -152,10 +175,10 @@ void netlogger_shutdown(void)
 /*--------------------------------------------------------------------------*/
 int netlogger_thread(void)
 {
-	struct timeval	tv;
-	fd_set			tester;
-	char			buffer[4096];
-	int				ret;
+	struct timeval  tv;
+	fd_set          tester;
+	char            buffer[4096];
+	int             ret;
 
 	logmessage(LOG_INFO,appname,"The netlogger thread is starting\n");
 

@@ -50,7 +50,7 @@ var netloggerList map[string]SubscriptionHolder
 var appname = "support"
 var runtime time.Time
 var sessionTable map[uint32]SessionEntry
-var conntrackTable map[string]ConntrackEntry
+var conntrackTable map[uint32]ConntrackEntry
 var certificateTable map[string]CertificateHolder
 var certificateMutex sync.Mutex
 var conntrackMutex sync.Mutex
@@ -105,7 +105,7 @@ type Tuple struct {
 
 // ConntrackEntry stores the details of a conntrack entry
 type ConntrackEntry struct {
-	ConntrackID     uint
+	ConntrackID     uint32
 	SessionID       uint64
 	SessionCreation time.Time
 	SessionActivity time.Time
@@ -138,12 +138,13 @@ type TrafficMessage struct {
 
 // NetloggerMessage is used to pass the details of NFLOG events to interested plugins
 type NetloggerMessage struct {
+	Version  uint8
 	Protocol uint8
 	IcmpType uint16
 	SrcIntf  uint8
 	DstIntf  uint8
-	SrcAddr  uint32
-	DstAddr  uint32
+	SrcAddr  string
+	DstAddr  string
 	SrcPort  uint16
 	DstPort  uint16
 	Mark     uint32
@@ -167,7 +168,7 @@ func Startup() {
 
 	// create the session, conntrack, and certificate tables
 	sessionTable = make(map[uint32]SessionEntry)
-	conntrackTable = make(map[string]ConntrackEntry)
+	conntrackTable = make(map[uint32]ConntrackEntry)
 	certificateTable = make(map[string]CertificateHolder)
 
 	// create the netfilter, conntrack, and netlogger subscription tables
@@ -197,26 +198,6 @@ func LogMessage(level int, source string, format string, args ...interface{}) {
 		buffer := fmt.Sprintf(format, args...)
 		fmt.Printf("[%11.5f] %10s: %s", elapsed.Seconds(), source, buffer)
 	}
-}
-
-//-----------------------------------------------------------------------------
-
-// Int2Ip converts an IPv4 address from uint32 to net.IP
-func Int2Ip(value uint32) net.IP {
-	ip := make(net.IP, 4)
-	ip[0] = byte(value)
-	ip[1] = byte(value >> 8)
-	ip[2] = byte(value >> 16)
-	ip[3] = byte(value >> 24)
-	return (ip)
-}
-
-//-----------------------------------------------------------------------------
-
-// Tuple2String generates a string from a Tuple for use as a map index
-func Tuple2String(tuple Tuple) string {
-	retval := fmt.Sprintf("%d|%s:%d-%s:%d", tuple.Protocol, tuple.ClientAddr, tuple.ClientPort, tuple.ServerAddr, tuple.ServerPort)
-	return (retval)
 }
 
 //-----------------------------------------------------------------------------
@@ -286,7 +267,7 @@ func CleanSessionTable() {
 //-----------------------------------------------------------------------------
 
 // FindConntrackEntry finds an entry in the conntrack table
-func FindConntrackEntry(finder string) (ConntrackEntry, bool) {
+func FindConntrackEntry(finder uint32) (ConntrackEntry, bool) {
 	conntrackMutex.Lock()
 	entry, status := conntrackTable[finder]
 	conntrackMutex.Unlock()
@@ -296,7 +277,7 @@ func FindConntrackEntry(finder string) (ConntrackEntry, bool) {
 //-----------------------------------------------------------------------------
 
 // InsertConntrackEntry adds an entry to the conntrack table
-func InsertConntrackEntry(finder string, entry ConntrackEntry) {
+func InsertConntrackEntry(finder uint32, entry ConntrackEntry) {
 	conntrackMutex.Lock()
 	conntrackTable[finder] = entry
 	conntrackMutex.Unlock()
@@ -305,7 +286,7 @@ func InsertConntrackEntry(finder string, entry ConntrackEntry) {
 //-----------------------------------------------------------------------------
 
 // RemoveConntrackEntry removes an entry from the conntrack table
-func RemoveConntrackEntry(finder string) {
+func RemoveConntrackEntry(finder uint32) {
 	conntrackMutex.Lock()
 	delete(conntrackTable, finder)
 	conntrackMutex.Unlock()
@@ -327,7 +308,7 @@ func CleanConntrackTable() {
 		}
 		RemoveConntrackEntry(key)
 		counter++
-		LogMessage(LogDebug, appname, "CONNTRACK Removing %s from table\n", key)
+		LogMessage(LogDebug, appname, "CONNTRACK Removing %d from table\n", key)
 	}
 
 	LogMessage(LogDebug, appname, "CONNTRACK REMOVED:%d REMAINING:%d\n", counter, len(conntrackTable))

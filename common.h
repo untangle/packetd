@@ -15,6 +15,9 @@
 #include <stdio.h>
 #include <errno.h>
 #include <poll.h>
+#include <arpa/inet.h>
+#include <netinet/ip.h>
+#include <netinet/ip6.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
@@ -37,13 +40,17 @@ struct conntrack_info {
 };
 /*--------------------------------------------------------------------------*/
 struct netlogger_info {
+	u_int8_t		version;
 	u_int8_t		protocol;
 	u_int16_t		icmp_type;
-	u_int8_t		src_intf, dst_intf;
-	u_int32_t		src_addr, dst_addr;
-	u_int16_t		src_port, dst_port;
+	u_int8_t		src_intf;
+	u_int8_t		dst_intf;
+	char			src_addr[64];
+	char			dst_addr[64];
+	u_int16_t		src_port;
+	u_int16_t		dst_port;
 	u_int32_t		mark;
-	const char		*prefix;
+	char			prefix[64];
 };
 /*--------------------------------------------------------------------------*/
 struct nfq_data {

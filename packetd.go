@@ -272,17 +272,15 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	binary.LittleEndian.PutUint32(tuple.ServerAddr, uint32(info.orig_daddr))
 	tuple.ServerPort = uint16(info.orig_dport)
 
-	finder := support.Tuple2String(tuple)
-
 	// TODO - clean up our table when we receive delete messages
 
 	// If we already have a conntrack entry update the existing, otherwise create a new entry for the table.
-	if entry, ok = support.FindConntrackEntry(finder); ok {
-		support.LogMessage(support.LogDebug, appname, "CONNTRACK Found %s in table\n", finder)
+	if entry, ok = support.FindConntrackEntry(uint32(info.conn_id)); ok {
+		support.LogMessage(support.LogDebug, appname, "CONNTRACK Found %d in table\n", uint32(info.conn_id))
 		entry.UpdateCount++
 	} else {
-		support.LogMessage(support.LogDebug, appname, "CONNTRACK Adding %s to table\n", finder)
-		entry.ConntrackID = uint(info.conn_id)
+		support.LogMessage(support.LogDebug, appname, "CONNTRACK Adding %d to table\n", uint32(info.conn_id))
+		entry.ConntrackID = uint32(info.conn_id)
 		entry.SessionID = support.NextSessionID()
 		entry.SessionCreation = time.Now()
 		entry.SessionTuple = tuple
@@ -331,7 +329,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 		entry.PurgeFlag = false
 	}
 
-	support.InsertConntrackEntry(finder, entry)
+	support.InsertConntrackEntry(uint32(info.conn_id), entry)
 
 	// We loop and increment the priority until all subscribtions have been called
 	sublist := support.GetConntrackSubscriptions()
@@ -361,16 +359,17 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 func go_netlogger_callback(info *C.struct_netlogger_info) {
 	var logger support.NetloggerMessage
 
+	logger.Version = uint8(info.version)
 	logger.Protocol = uint8(info.protocol)
 	logger.IcmpType = uint16(info.icmp_type)
 	logger.SrcIntf = uint8(info.src_intf)
 	logger.DstIntf = uint8(info.dst_intf)
-	logger.SrcAddr = uint32(info.src_addr)
-	logger.DstAddr = uint32(info.dst_addr)
+	logger.SrcAddr = C.GoString(&info.src_addr[0])
+	logger.DstAddr = C.GoString(&info.dst_addr[0])
 	logger.SrcPort = uint16(info.src_port)
 	logger.DstPort = uint16(info.dst_port)
 	logger.Mark = uint32(info.mark)
-	logger.Prefix = C.GoString(info.prefix)
+	logger.Prefix = C.GoString(&info.prefix[0])
 
 	// We loop and increment the priority until all subscribtions have been called
 	sublist := support.GetNetloggerSubscriptions()
