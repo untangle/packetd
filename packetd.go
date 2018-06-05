@@ -102,6 +102,7 @@ stdinloop:
 				counter++
 				support.LogMessage(support.LogDebug, appname, "Calling perodic conntrack dump %d\n", counter)
 				C.conntrack_dump()
+				support.CleanSessionTable()
 				support.CleanConntrackTable()
 				support.CleanCertificateTable()
 			}
@@ -259,7 +260,7 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 func go_conntrack_callback(info *C.struct_conntrack_info) {
 	var tuple support.Tuple
 	var entry support.ConntrackEntry
-
+	var ctid uint32
 	var ok bool
 
 	tuple.Protocol = uint8(info.orig_proto)
@@ -272,15 +273,21 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	binary.LittleEndian.PutUint32(tuple.ServerAddr, uint32(info.orig_daddr))
 	tuple.ServerPort = uint16(info.orig_dport)
 
-	// TODO - clean up our table when we receive delete messages
+	ctid = uint32(info.conn_id)
+
+	// for delete messages we remove the entry from the session table
+	if info.msg_type == 'D' {
+		support.LogMessage(support.LogDebug, appname, "SESSION Removing %d from table\n", ctid)
+		support.RemoveSessionEntry(ctid)
+	}
 
 	// If we already have a conntrack entry update the existing, otherwise create a new entry for the table.
-	if entry, ok = support.FindConntrackEntry(uint32(info.conn_id)); ok {
-		support.LogMessage(support.LogDebug, appname, "CONNTRACK Found %d in table\n", uint32(info.conn_id))
+	if entry, ok = support.FindConntrackEntry(ctid); ok {
+		support.LogMessage(support.LogDebug, appname, "CONNTRACK Found %d in table\n", ctid)
 		entry.UpdateCount++
 	} else {
-		support.LogMessage(support.LogDebug, appname, "CONNTRACK Adding %d to table\n", uint32(info.conn_id))
-		entry.ConntrackID = uint32(info.conn_id)
+		support.LogMessage(support.LogDebug, appname, "CONNTRACK Adding %d to table\n", ctid)
+		entry.ConntrackID = ctid
 		entry.SessionID = support.NextSessionID()
 		entry.SessionCreation = time.Now()
 		entry.SessionTuple = tuple
@@ -329,7 +336,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 		entry.PurgeFlag = false
 	}
 
-	support.InsertConntrackEntry(uint32(info.conn_id), entry)
+	support.InsertConntrackEntry(ctid, entry)
 
 	// We loop and increment the priority until all subscribtions have been called
 	sublist := support.GetConntrackSubscriptions()
