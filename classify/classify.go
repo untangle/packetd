@@ -65,16 +65,16 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 	var proto string
 	var err error
 
-	if mess.MsgUDP != nil {
+	if mess.UDPlayer != nil {
 		proto = "UDP"
 	}
-	if mess.MsgTCP != nil {
+	if mess.TCPlayer != nil {
 		proto = "TCP"
 	}
 
 	// if this is the first packet of the session we send a session create command
-	if mess.MsgSession.UpdateCount == 1 {
-		status, err = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.MsgSession.SessionTuple.ClientAddr, mess.MsgSession.SessionTuple.ClientPort, mess.MsgSession.SessionTuple.ServerAddr, mess.MsgSession.SessionTuple.ServerPort)
+	if mess.Session.UpdateCount == 1 {
+		status, err = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.Session.SessionTuple.ClientAddr, mess.Session.SessionTuple.ClientPort, mess.Session.SessionTuple.ServerAddr, mess.Session.SessionTuple.ServerPort)
 		if err != nil {
 			support.LogMessage(support.LogErr, appname, "daemonCommand error: %s\n", err.Error())
 			ch <- result
@@ -84,7 +84,7 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 	}
 
 	// send the application payload to the daemon
-	if mess.MsgSession.SessionTuple.ClientAddr.Equal(mess.MsgIP.SrcIP) {
+	if mess.Session.SessionTuple.ClientAddr.Equal(mess.IPlayer.SrcIP) {
 		status, err = daemonCommand(mess.Payload, "CLIENT:%d:%d\r\n", ctid, len(mess.Payload))
 	} else {
 		status, err = daemonCommand(mess.Payload, "SERVER:%d:%d\r\n", ctid, len(mess.Payload))

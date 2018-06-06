@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"github.com/untangle/packetd/conndict"
 	"github.com/untangle/packetd/support"
 	"sync"
 )
@@ -42,12 +43,12 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 	result.PacketMark = 0
 	result.SessionRelease = true
 
-	if mess.MsgTuple.ServerPort != 443 {
+	if mess.Tuple.ServerPort != 443 {
 		ch <- result
 		return
 	}
 
-	client := fmt.Sprintf("%s", mess.MsgTuple.ClientAddr)
+	client := fmt.Sprintf("%s", mess.Tuple.ClientAddr)
 
 	// TODO - remove this hack once we can ignore locally generated traffic
 	if client == "192.168.222.20" {
@@ -61,29 +62,57 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 	localMutex.Lock()
 
 	if cert, ok = support.FindCertificate(client); ok {
-		support.LogMessage(support.LogInfo, appname, "Loading certificate for %s\n", mess.MsgTuple.ServerAddr)
+		support.LogMessage(support.LogInfo, appname, "Loading certificate for %s\n", mess.Tuple.ServerAddr)
 	} else {
-		support.LogMessage(support.LogInfo, appname, "Fetching certificate for %s\n", mess.MsgTuple.ServerAddr)
+		support.LogMessage(support.LogInfo, appname, "Fetching certificate for %s\n", mess.Tuple.ServerAddr)
 
 		conf := &tls.Config{
 			InsecureSkipVerify: true,
 		}
 
-		target := fmt.Sprintf("%s:443", mess.MsgTuple.ServerAddr)
+		target := fmt.Sprintf("%s:443", mess.Tuple.ServerAddr)
 		conn, err := tls.Dial("tcp", target, conf)
+		defer conn.Close()
+
 		if err != nil {
 			support.LogMessage(support.LogWarning, appname, "TLS ERROR: %s\n", err)
+			ch <- result
+			return
+		}
+
+		if len(conn.ConnectionState().PeerCertificates) < 1 {
+			support.LogMessage(support.LogWarning, appname, "Could not fetch certificate from %s\n", mess.Tuple.ServerAddr)
+			ch <- result
+			return
 		}
 
 		cert = *conn.ConnectionState().PeerCertificates[0]
 		support.InsertCertificate(client, cert)
-		conn.Close()
 	}
 
-	// TODO - should the cert also be attached to the session?
+	mess.Session.SessionCertificate = cert
 
 	localMutex.Unlock()
-	support.LogMessage(support.LogDebug, appname, "CERTIFICATE: %s\n", cert.Subject)
+
+	// TODO - need better parsing of the cert subject and issuer
+
+	subject := fmt.Sprintf("%v", cert.Subject)
+	issuer := fmt.Sprintf("%v", cert.Issuer)
+
+	errs := conndict.SetPair("CertSubject", subject, ctid)
+	if errs != nil {
+		support.LogMessage(support.LogWarning, appname, "SetPair(CertSubject) ERROR: %s\n", errs)
+	} else {
+		support.LogMessage(support.LogDebug, appname, "SetPair(CertSubject) %d = %s\n", ctid, subject)
+	}
+
+	erri := conndict.SetPair("CertIssuer", issuer, ctid)
+	if erri != nil {
+		support.LogMessage(support.LogWarning, appname, "SetPair(CertIssuer) ERROR: %s\n", erri)
+	} else {
+		support.LogMessage(support.LogDebug, appname, "SetPair(CertIssuer) %d = %s\n", ctid, string(issuer))
+	}
+
 	ch <- result
 }
 

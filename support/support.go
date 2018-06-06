@@ -81,12 +81,13 @@ type SubscriptionResult struct {
 
 // SessionEntry stores details related to a session
 type SessionEntry struct {
-	SessionID       uint64
-	SessionCreation time.Time
-	SessionActivity time.Time
-	SessionTuple    Tuple
-	UpdateCount     uint64
-	NetfilterSubs   map[string]SubscriptionHolder
+	SessionID          uint64
+	SessionCreation    time.Time
+	SessionActivity    time.Time
+	SessionTuple       Tuple
+	SessionCertificate x509.Certificate
+	UpdateCount        uint64
+	NetfilterSubs      map[string]SubscriptionHolder
 }
 
 //-----------------------------------------------------------------------------
@@ -124,14 +125,14 @@ type ConntrackEntry struct {
 
 // TrafficMessage is used to pass netfilter traffic to interested plugins
 type TrafficMessage struct {
-	MsgSession SessionEntry
-	MsgTuple   Tuple
-	MsgPacket  gopacket.Packet
-	MsgLength  int
-	MsgIP      *layers.IPv4
-	MsgTCP     *layers.TCP
-	MsgUDP     *layers.UDP
-	Payload    []byte
+	Session  SessionEntry
+	Tuple    Tuple
+	Packet   gopacket.Packet
+	Length   int
+	IPlayer  *layers.IPv4
+	TCPlayer *layers.TCP
+	UDPlayer *layers.UDP
+	Payload  []byte
 }
 
 //-----------------------------------------------------------------------------

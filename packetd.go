@@ -146,34 +146,34 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 	var pmark uint32 = uint32(C.int(mark))
 
 	// make a gopacket from the raw packet data
-	mess.MsgPacket = gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
-	mess.MsgLength = int(size)
+	mess.Packet = gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
+	mess.Length = int(size)
 
 	// get the IPv4 layer
-	ipLayer := mess.MsgPacket.Layer(layers.LayerTypeIPv4)
+	ipLayer := mess.Packet.Layer(layers.LayerTypeIPv4)
 	if ipLayer == nil {
 		return (pmark)
 	}
-	mess.MsgIP = ipLayer.(*layers.IPv4)
+	mess.IPlayer = ipLayer.(*layers.IPv4)
 
-	mess.MsgTuple.Protocol = uint8(mess.MsgIP.Protocol)
-	mess.MsgTuple.ClientAddr = mess.MsgIP.SrcIP
-	mess.MsgTuple.ServerAddr = mess.MsgIP.DstIP
+	mess.Tuple.Protocol = uint8(mess.IPlayer.Protocol)
+	mess.Tuple.ClientAddr = mess.IPlayer.SrcIP
+	mess.Tuple.ServerAddr = mess.IPlayer.DstIP
 
 	// get the TCP layer
-	tcpLayer := mess.MsgPacket.Layer(layers.LayerTypeTCP)
+	tcpLayer := mess.Packet.Layer(layers.LayerTypeTCP)
 	if tcpLayer != nil {
-		mess.MsgTCP = tcpLayer.(*layers.TCP)
-		mess.MsgTuple.ClientPort = uint16(mess.MsgTCP.SrcPort)
-		mess.MsgTuple.ServerPort = uint16(mess.MsgTCP.DstPort)
+		mess.TCPlayer = tcpLayer.(*layers.TCP)
+		mess.Tuple.ClientPort = uint16(mess.TCPlayer.SrcPort)
+		mess.Tuple.ServerPort = uint16(mess.TCPlayer.DstPort)
 	}
 
 	// get the UDP layer
-	udpLayer := mess.MsgPacket.Layer(layers.LayerTypeUDP)
+	udpLayer := mess.Packet.Layer(layers.LayerTypeUDP)
 	if udpLayer != nil {
-		mess.MsgUDP = udpLayer.(*layers.UDP)
-		mess.MsgTuple.ClientPort = uint16(mess.MsgUDP.SrcPort)
-		mess.MsgTuple.ServerPort = uint16(mess.MsgUDP.DstPort)
+		mess.UDPlayer = udpLayer.(*layers.UDP)
+		mess.Tuple.ClientPort = uint16(mess.UDPlayer.SrcPort)
+		mess.Tuple.ServerPort = uint16(mess.UDPlayer.DstPort)
 	}
 
 	// right now we only care about TCP and UDP
@@ -182,7 +182,7 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 	}
 
 	// get the Application layer
-	appLayer := mess.MsgPacket.ApplicationLayer()
+	appLayer := mess.Packet.ApplicationLayer()
 	if appLayer == nil {
 		return (pmark)
 	}
@@ -202,13 +202,13 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 		session.SessionID = support.NextSessionID()
 		session.SessionCreation = time.Now()
 		session.SessionActivity = time.Now()
-		session.SessionTuple = mess.MsgTuple
+		session.SessionTuple = mess.Tuple
 		session.UpdateCount = 1
 		support.AttachNetfilterSubscriptions(&session)
 		support.InsertSessionEntry(uint32(ctid), session)
 	}
 
-	mess.MsgSession = session
+	mess.Session = session
 
 	pipe := make(chan support.SubscriptionResult)
 

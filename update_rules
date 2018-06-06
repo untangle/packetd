@@ -28,7 +28,8 @@ is_queue_open()
 
     if [ -z "${t_queue_pid}" ]; then
         echo "[`date`] The packetd netfilter queue is not open - not inserting rules for packetd"
-        return 1
+#        return 1
+        return 0
     fi
 
     t_packetd_pid=${t_queue_pid}

@@ -39,7 +39,7 @@ func PluginGoodbye(childsync *sync.WaitGroup) {
 // the packet mark.
 func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.TrafficMessage, ctid uint) {
 	// our example simply dumps the raw message to the console
-	support.LogMessage(support.LogDebug, appname, "NetfilterHandler recived %d BYTES from %s to %s\n%s\n", mess.MsgLength, mess.MsgIP.SrcIP, mess.MsgIP.DstIP, hex.Dump(mess.MsgPacket.Data()))
+	support.LogMessage(support.LogDebug, appname, "NetfilterHandler recived %d BYTES from %s to %s\n%s\n", mess.Length, mess.IPlayer.SrcIP, mess.IPlayer.DstIP, hex.Dump(mess.Packet.Data()))
 
 	var result support.SubscriptionResult
 	result.Owner = appname

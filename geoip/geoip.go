@@ -73,16 +73,16 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 	var SrcCode = "XX"
 	var DstCode = "XX"
 
-	SrcRecord, err := geodb.City(mess.MsgIP.SrcIP)
+	SrcRecord, err := geodb.City(mess.IPlayer.SrcIP)
 	if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
 		SrcCode = SrcRecord.Country.IsoCode
-		support.LogMessage(support.LogDebug, appname, "SRC: %s = %s\n", mess.MsgIP.SrcIP, SrcCode)
+		support.LogMessage(support.LogDebug, appname, "SRC: %s = %s\n", mess.IPlayer.SrcIP, SrcCode)
 	}
 
-	DstRecord, err := geodb.City(mess.MsgIP.DstIP)
+	DstRecord, err := geodb.City(mess.IPlayer.DstIP)
 	if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
 		DstCode = DstRecord.Country.IsoCode
-		support.LogMessage(support.LogDebug, appname, "DST: %s = %s\n", mess.MsgIP.DstIP, DstCode)
+		support.LogMessage(support.LogDebug, appname, "DST: %s = %s\n", mess.IPlayer.DstIP, DstCode)
 	}
 
 	errc := conndict.SetPair("SrcCountry", SrcCode, ctid)
