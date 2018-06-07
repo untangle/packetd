@@ -34,6 +34,27 @@ const LogInfo = 6
 //LogDebug = stdlog.h/LOG_DEBUG
 const LogDebug = 7
 
+//LogLogic = custom value
+const LogLogic = 8
+
+var logLevelName = [...]string{"EMERG", "ALERT", "CRIT", "ERROR", "WARN", "NOTICE", "INFO", "DEBUG", "LOGIC"}
+
+var appLogLevel = map[string]int{
+	"certcache": LogDebug,
+	"classify":  LogInfo,
+	"conndict":  LogInfo,
+	"conntrack": LogInfo,
+	"example":   LogInfo,
+	"geoip":     LogInfo,
+	"netfilter": LogInfo,
+	"netlogger": LogInfo,
+	"packetd":   LogInfo,
+	"reports":   LogInfo,
+	"restd":     LogInfo,
+	"settings":  LogInfo,
+	"support":   LogInfo,
+}
+
 //NetfilterHandlerFunction defines a pointer to a netfilter callback function
 type NetfilterHandlerFunction func(chan<- SubscriptionResult, TrafficMessage, uint)
 
@@ -190,14 +211,27 @@ func Startup() {
 
 // LogMessage is called to write messages to the system log
 func LogMessage(level int, source string, format string, args ...interface{}) {
+	var ignore bool
+
+	item, stat := appLogLevel[source]
+	if stat == true {
+		if item < level {
+			ignore = true
+		}
+	}
+
+	if ignore == true {
+		return
+	}
+
 	nowtime := time.Now()
 	var elapsed = nowtime.Sub(runtime)
 
 	if len(args) == 0 {
-		fmt.Printf("[%11.5f] %10s: %s", elapsed.Seconds(), source, format)
+		fmt.Printf("[%11.5f] %-6s %10s: %s", elapsed.Seconds(), logLevelName[level], source, format)
 	} else {
 		buffer := fmt.Sprintf(format, args...)
-		fmt.Printf("[%11.5f] %10s: %s", elapsed.Seconds(), source, buffer)
+		fmt.Printf("[%11.5f] %-6s %10s: %s", elapsed.Seconds(), logLevelName[level], source, buffer)
 	}
 }
 

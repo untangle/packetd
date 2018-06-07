@@ -14,33 +14,41 @@ debug()
 
 is_queue_open()
 {
-    local t_packetd_pid
-    local t_queue_pid
+    local l_queue_stat
+    local l_queue_mode
+    local l_queue_size
 
-    t_packetd_pid="invalid"
-
+    # make sure the nfnetlink_queue file is available
     if [ ! -f /proc/net/netfilter/nfnetlink_queue ]; then
         echo "[`date`] The netfilter nfnetlink_queue does not exist - not inserting rules for packetd"
         return 1
     fi
 
-    t_queue_pid=`awk -v queue=${PACKETD_QUEUE_NUM} '{ if ( $1 == queue ) print $2 }' /proc/net/netfilter/nfnetlink_queue`
+    # see if our queue is active
+    l_queue_stat=`awk -v queue=${PACKETD_QUEUE_NUM} '{ if ( $1 == queue ) print $2 }' /proc/net/netfilter/nfnetlink_queue`
 
-    if [ -z "${t_queue_pid}" ]; then
+    if [ -z "${l_queue_stat}" ]; then
         echo "[`date`] The packetd netfilter queue is not open - not inserting rules for packetd"
-#        return 1
-        return 0
+        return 1
     fi
 
-    t_packetd_pid=${t_queue_pid}
+    # see if the queue copy mode is what we expect
+    l_queue_mode=`awk '{ print $4 }' /proc/net/netfilter/nfnetlink_queue`
 
-    t_packetd_cmd=`grep -c packetd /proc/${t_packetd_pid}/cmdline 2>| /dev/null`
-
-    if [ $((t_packetd_cmd)) -eq 0 ]; then
-        echo "[`date`] Something other than packetd seems to own the queue: `cat /proc/${t_packetd_pid}/cmdline`"
-    return 1
+    if [ $((l_queue_mode)) -ne 2 ]; then
+        echo "[`date`] Unexpected queue copy mode - not inserting rules for packetd"
+        return 1
     fi
 
+    # see if the queue copy size is what we expect
+    l_queue_mode=`awk '{ print $5 }' /proc/net/netfilter/nfnetlink_queue`
+
+    if [ $((l_queue_mode)) -ne 32768 ]; then
+        echo "[`date`] Unexpected queue copy size - not inserting rules for packetd"
+        return 1
+    fi
+
+    # the queue is open and seems to be owned by packetd so return success
     return 0
 }
 

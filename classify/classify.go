@@ -85,7 +85,7 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 			ch <- result
 			return
 		}
-		support.LogMessage(support.LogDebug, appname, "daemonCommand result: %s\n", status)
+		support.LogMessage(support.LogLogic, appname, "daemonCommand result: %s\n", status)
 	}
 
 	// send the application payload to the daemon
@@ -101,7 +101,7 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 		return
 	}
 
-	support.LogMessage(support.LogDebug, appname, "daemonCommand result: %s\n", status)
+	support.LogMessage(support.LogLogic, appname, "daemonCommand result: %s\n", status)
 
 	// Parse the output from classd to get the classification details
 	var pairname string
