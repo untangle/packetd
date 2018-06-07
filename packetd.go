@@ -18,6 +18,7 @@ import (
 	"github.com/untangle/packetd/restd"
 	"github.com/untangle/packetd/settings"
 	"github.com/untangle/packetd/support"
+	"flag"
 	"log"
 	"net"
 	"os"
@@ -37,6 +38,9 @@ var appname = "packetd"
 //-----------------------------------------------------------------------------
 
 func main() {
+	var classdPtr = flag.String("classd", "127.0.0.1:8123", "host:port for classd daemon")
+	flag.Parse()
+
 	var lastmin int
 	var counter int
 
@@ -55,7 +59,7 @@ func main() {
 	// ********** Call all plugin startup functions here
 
 	go example.PluginStartup(&childsync)
-	go classify.PluginStartup(&childsync)
+	go classify.PluginStartup(&childsync, classdPtr)
 	go geoip.PluginStartup(&childsync)
 	go certcache.PluginStartup(&childsync)
 

@@ -15,18 +15,23 @@ var sockspin int64
 var appname = "classify"
 var daemon net.Conn
 
+var classdHostPort string
+
 //-----------------------------------------------------------------------------
 
 // PluginStartup is called to allow plugin specific initialization. We
 // increment the argumented WaitGroup so the main process can wait for
 // our goodbye function to return during shutdown.
-func PluginStartup(childsync *sync.WaitGroup) {
+func PluginStartup(childsync *sync.WaitGroup, classdPtr *string) {
 	var err error
+
+	classdHostPort = *classdPtr
+
 	support.LogMessage(support.LogInfo, appname, "PluginStartup(%s) has been called\n", "classify")
 
 	socktime = time.Now()
 	sockspin = 0
-	daemon, err = net.Dial("tcp", "127.0.0.1:8123")
+	daemon, err = net.Dial("tcp", classdHostPort)
 
 	if err != nil {
 		support.LogMessage(support.LogErr, appname, "Error calling net.Dial(): %v\n", err)
@@ -188,7 +193,7 @@ func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, 
 
 		// update socktime and try to connect to the daemon
 		socktime = time.Now()
-		daemon, err = net.Dial("tcp", "127.0.0.1:8123")
+		daemon, err = net.Dial("tcp", classdHostPort)
 		if err != nil {
 			// if the connection failed update the throttle counter and return the error
 			if sockspin < 10 {
