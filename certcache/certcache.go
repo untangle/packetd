@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/untangle/packetd/conndict"
 	"github.com/untangle/packetd/support"
+	"strings"
 	"sync"
 )
 
@@ -94,26 +95,65 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 
 	localMutex.Unlock()
 
-	// TODO - need better parsing of the cert subject and issuer
+	setConnDictPair("SubjectCN", cert.Subject.CommonName, ctid)
+	setConnDictPair("SubjectSN", cert.Subject.SerialNumber, ctid)
+	setConnDictList("SubjectC", cert.Subject.Country, ctid)
+	setConnDictList("SubjectO", cert.Subject.Organization, ctid)
+	setConnDictList("SubjectOU", cert.Subject.OrganizationalUnit, ctid)
+	setConnDictList("SubjectL", cert.Subject.Locality, ctid)
+	setConnDictList("SubjectP", cert.Subject.Province, ctid)
+	setConnDictList("SubjectSA", cert.Subject.StreetAddress, ctid)
+	setConnDictList("SubjectPC", cert.Subject.PostalCode, ctid)
+	setConnDictList("SubjectSAN", cert.DNSNames, ctid)
 
-	subject := fmt.Sprintf("%v", cert.Subject)
-	issuer := fmt.Sprintf("%v", cert.Issuer)
-
-	errs := conndict.SetPair("CertSubject", subject, ctid)
-	if errs != nil {
-		support.LogMessage(support.LogWarning, appname, "SetPair(CertSubject) ERROR: %s\n", errs)
-	} else {
-		support.LogMessage(support.LogDebug, appname, "SetPair(CertSubject) %d = %s\n", ctid, subject)
-	}
-
-	erri := conndict.SetPair("CertIssuer", issuer, ctid)
-	if erri != nil {
-		support.LogMessage(support.LogWarning, appname, "SetPair(CertIssuer) ERROR: %s\n", erri)
-	} else {
-		support.LogMessage(support.LogDebug, appname, "SetPair(CertIssuer) %d = %s\n", ctid, string(issuer))
-	}
+	setConnDictPair("IssuerCN", cert.Issuer.CommonName, ctid)
+	setConnDictPair("IssuerSN", cert.Issuer.SerialNumber, ctid)
+	setConnDictList("IssuerC", cert.Issuer.Country, ctid)
+	setConnDictList("IssuerO", cert.Issuer.Organization, ctid)
+	setConnDictList("IssuerOU", cert.Issuer.OrganizationalUnit, ctid)
+	setConnDictList("IssuerL", cert.Issuer.Locality, ctid)
+	setConnDictList("IssuerP", cert.Issuer.Province, ctid)
+	setConnDictList("IssuerSA", cert.Issuer.StreetAddress, ctid)
+	setConnDictList("IssuerPC", cert.Issuer.PostalCode, ctid)
 
 	ch <- result
 }
 
 //-----------------------------------------------------------------------------
+
+func setConnDictPair(field string, value string, ctid uint) {
+	output := strings.Replace(value, ",", "-", -1)
+	err := conndict.SetPair(field, output, ctid)
+	if err != nil {
+		support.LogMessage(support.LogWarning, appname, "SetPair(%s,%s,%d) ERROR: %v\n", field, output, ctid, err)
+	} else {
+		support.LogMessage(support.LogDebug, appname, "SetPair(%s,%s,%d) SUCCESS\n", field, output, ctid)
+	}
+}
+
+//-----------------------------------------------------------------------------
+
+func setConnDictList(field string, value []string, ctid uint) {
+
+	if len(value) == 0 {
+		return
+	}
+
+	var buffer string
+
+	for index, item := range value {
+		if index != 0 {
+			buffer += "|"
+		}
+		buffer += item
+	}
+
+	output := strings.Replace(buffer, ",", "-", -1)
+
+	err := conndict.SetPair(field, output, ctid)
+	if err != nil {
+		support.LogMessage(support.LogWarning, appname, "SetPair(%s,%s,%d) ERROR: %v\n", field, output, ctid, err)
+	} else {
+		support.LogMessage(support.LogDebug, appname, "SetPair(%s,%s,%d) SUCCESS\n", field, output, ctid)
+	}
+}
