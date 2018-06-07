@@ -3,12 +3,11 @@
 # packetd
 Userspace packet processing daemon
 
-# required packages
+# packages required to build
 apt-get install libnetfilter-log-dev libnetfilter-queue-dev libnetfilter-conntrack-dev
-# for libnavl:
-apt-get install untangle-classd
-# for geoip:
-apt-get install untangle-geoip-database
+
+# packages required to run
+apt-get install untangle-classd untangle-geoip-database untangle-python3-sync-settings libnetfilter-log1 libnetfilter-queue1 libnetfilter-conntrack3
 
 To build:
 go build
