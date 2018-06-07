@@ -1,0 +1,13 @@
+version: '2'
+services:
+    classd:
+      image: untangleinc/ngfw:classd
+      ports:
+        - "0.0.0.0:8123:8123"
+    run:
+      build: .
+      depends_on:
+        - classd
+      command: -classd classd:8123
+      ports:
+        - "0.0.0.0:8080:8080"
