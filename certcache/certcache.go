@@ -118,6 +118,12 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 	setConnDictList("IssuerSA", cert.Issuer.StreetAddress, ctid)
 	setConnDictList("IssuerPC", cert.Issuer.PostalCode, ctid)
 
+	// grab the SNI hostname from the client hello
+	hostname := extractSNIhostname(mess.Payload)
+	if hostname != "" {
+		setConnDictPair("ClientSNI", hostname, ctid)
+	}
+
 	ch <- result
 }
 
@@ -158,6 +164,84 @@ func setConnDictList(field string, value []string, ctid uint) {
 	} else {
 		support.LogMessage(support.LogDebug, appname, "SetPair(%s,%s,%d) SUCCESS\n", field, output, ctid)
 	}
+}
+
+//-----------------------------------------------------------------------------
+
+// This was pulled from https://github.com/polvi/sni/sni.go
+
+func extractSNIhostname(b []byte) string {
+	rest := b[5:]
+	current := 0
+	handshakeType := rest[0]
+	current++
+
+	if handshakeType != 0x1 {
+		support.LogMessage(support.LogDebug, appname, "Packet does not contain TLS ClientHello message\n")
+		return ""
+	}
+
+	// Skip over another length
+	current += 3
+	// Skip over protocolversion
+	current += 2
+	// Skip over client epoch
+	current += 4
+	// Skip over random data
+	current += 28
+	// Skip over session ID
+	sessionIDLength := int(rest[current])
+	current++
+	current += sessionIDLength
+
+	cipherSuiteLength := (int(rest[current]) << 8) + int(rest[current+1])
+	current += 2
+	current += cipherSuiteLength
+
+	compressionMethodLength := int(rest[current])
+	current++
+	current += compressionMethodLength
+
+	if current > len(rest) {
+		support.LogMessage(support.LogWarning, appname, "Packet does not contain TLS extensions\n")
+		return ""
+	}
+
+	current += 2
+
+	hostname := ""
+	for current < len(rest) && hostname == "" {
+		extensionType := (int(rest[current]) << 8) + int(rest[current+1])
+		current += 2
+
+		extensionDataLength := (int(rest[current]) << 8) + int(rest[current+1])
+		current += 2
+
+		if extensionType == 0 {
+
+			// Skip over number of names as we're assuming there's just one
+			current += 2
+
+			nameType := rest[current]
+			current++
+			if nameType != 0 {
+				support.LogMessage(support.LogWarning, appname, "Extension is not a hostname\n")
+				return ""
+			}
+			nameLen := (int(rest[current]) << 8) + int(rest[current+1])
+			current += 2
+			hostname = string(rest[current : current+nameLen])
+		}
+
+		current += extensionDataLength
+	}
+
+	if hostname == "" {
+		support.LogMessage(support.LogDebug, appname, "No SNI hostname detected\n")
+		return ""
+	}
+
+	return hostname
 }
 
 //-----------------------------------------------------------------------------
