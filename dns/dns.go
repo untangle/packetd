@@ -1,7 +1,6 @@
 package dns
 
 import (
-	"encoding/hex"
 	"github.com/untangle/packetd/support"
 	"sync"
 )
