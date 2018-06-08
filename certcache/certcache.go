@@ -203,7 +203,7 @@ func extractSNIhostname(b []byte) string {
 	current += compressionMethodLength
 
 	if current > len(rest) {
-		support.LogMessage(support.LogWarning, appname, "Packet does not contain TLS extensions\n")
+		support.LogMessage(support.LogDebug, appname, "Packet does not contain TLS extensions\n")
 		return ""
 	}
 
@@ -225,7 +225,7 @@ func extractSNIhostname(b []byte) string {
 			nameType := rest[current]
 			current++
 			if nameType != 0 {
-				support.LogMessage(support.LogWarning, appname, "Extension is not a hostname\n")
+				support.LogMessage(support.LogDebug, appname, "Extension is not a hostname\n")
 				return ""
 			}
 			nameLen := (int(rest[current]) << 8) + int(rest[current+1])
