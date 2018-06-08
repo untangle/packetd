@@ -27,7 +27,7 @@ func PluginStartup(childsync *sync.WaitGroup, classdPtr *string) {
 
 	classdHostPort = *classdPtr
 
-	support.LogMessage(support.LogInfo, appname, "PluginStartup(%s) has been called\n", "classify")
+	support.LogMessage(support.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
 
 	socktime = time.Now()
 	sockspin = 0
@@ -46,7 +46,7 @@ func PluginStartup(childsync *sync.WaitGroup, classdPtr *string) {
 // PluginGoodbye is called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
 func PluginGoodbye(childsync *sync.WaitGroup) {
-	support.LogMessage(support.LogInfo, appname, "PluginGoodbye(%s) has been called\n", "classify")
+	support.LogMessage(support.LogInfo, appname, "PluginGoodbye(%s) has been called\n", appname)
 
 	if daemon != nil {
 		daemon.Close()

@@ -44,6 +44,7 @@ var appLogLevel = map[string]int{
 	"classify":  LogInfo,
 	"conndict":  LogInfo,
 	"conntrack": LogInfo,
+	"dns":       LogInfo,
 	"example":   LogInfo,
 	"geoip":     LogInfo,
 	"netfilter": LogInfo,
@@ -67,6 +68,9 @@ type NetloggerHandlerFunction func(*NetloggerMessage)
 var netfilterList map[string]SubscriptionHolder
 var conntrackList map[string]SubscriptionHolder
 var netloggerList map[string]SubscriptionHolder
+var netfilterListMutex sync.Mutex
+var conntrackListMutex sync.Mutex
+var netloggerListMutex sync.Mutex
 
 var appname = "support"
 var runtime time.Time
@@ -438,7 +442,9 @@ func InsertNetfilterSubscription(owner string, priority int, function NetfilterH
 	holder.Owner = owner
 	holder.Priority = priority
 	holder.NetfilterFunc = function
+	netfilterListMutex.Lock()
 	netfilterList[owner] = holder
+	netfilterListMutex.Unlock()
 }
 
 //-----------------------------------------------------------------------------
@@ -450,7 +456,9 @@ func InsertConntrackSubscription(owner string, priority int, function ConntrackH
 	holder.Owner = owner
 	holder.Priority = priority
 	holder.ConntrackFunc = function
+	conntrackListMutex.Lock()
 	conntrackList[owner] = holder
+	conntrackListMutex.Unlock()
 }
 
 //-----------------------------------------------------------------------------
@@ -462,7 +470,9 @@ func InsertNetloggerSubscription(owner string, priority int, function NetloggerH
 	holder.Owner = owner
 	holder.Priority = priority
 	holder.NetloggerFunc = function
+	netloggerListMutex.Lock()
 	netloggerList[owner] = holder
+	netloggerListMutex.Unlock()
 }
 
 //-----------------------------------------------------------------------------

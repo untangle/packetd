@@ -14,6 +14,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/untangle/packetd/certcache"
 	"github.com/untangle/packetd/classify"
+	"github.com/untangle/packetd/dns"
 	"github.com/untangle/packetd/example"
 	"github.com/untangle/packetd/geoip"
 	"github.com/untangle/packetd/restd"
@@ -62,6 +63,7 @@ func main() {
 	go classify.PluginStartup(&childsync, classdPtr)
 	go geoip.PluginStartup(&childsync)
 	go certcache.PluginStartup(&childsync)
+	go dns.PluginStartup(&childsync)
 
 	// Start REST HTTP daemon
 	go restd.StartRestDaemon()
@@ -119,6 +121,7 @@ stdinloop:
 	go classify.PluginGoodbye(&childsync)
 	go geoip.PluginGoodbye(&childsync)
 	go certcache.PluginGoodbye(&childsync)
+	go dns.PluginGoodbye(&childsync)
 
 	// ********** End of plugin goodbye functions
 
