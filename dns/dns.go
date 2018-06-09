@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"github.com/google/gopacket/layers"
 	"github.com/untangle/packetd/support"
 	"sync"
 )
@@ -36,6 +37,23 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 	result.Owner = appname
 	result.SessionRelease = true
 	result.PacketMark = 0
+
+	// get the DNS layer
+	dnsLayer := mess.Packet.Layer(layers.LayerTypeDNS)
+	if dnsLayer == nil {
+		ch <- result
+		return
+	}
+
+	dns := dnsLayer.(*layers.DNS)
+
+	if dns.QDCount < 1 {
+		ch <- result
+		return
+	}
+
+	query := dns.Questions[0]
+	support.LogMessage(support.LogInfo, appname, "DNS QUERY DETECTED NAME:%s TYPE:%d CLASS:%d\n", query.Name, query.Type, query.Class)
 
 	// use the channel to return our result
 	ch <- result

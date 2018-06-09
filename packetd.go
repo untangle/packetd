@@ -190,11 +190,9 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 
 	// get the Application layer
 	appLayer := mess.Packet.ApplicationLayer()
-	if appLayer == nil {
-		return (pmark)
+	if appLayer != nil {
+		mess.Payload = appLayer.Payload()
 	}
-
-	mess.Payload = appLayer.Payload()
 
 	var session support.SessionEntry
 	var ok bool

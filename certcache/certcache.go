@@ -46,7 +46,8 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 	result.PacketMark = 0
 	result.SessionRelease = true
 
-	if mess.Tuple.ServerPort != 443 {
+	// we only need to fetch certs for TCP traffic going to port 443
+	if mess.TCPlayer == nil || mess.Tuple.ServerPort != 443 {
 		ch <- result
 		return
 	}
@@ -177,7 +178,7 @@ func extractSNIhostname(b []byte) string {
 	current++
 
 	if handshakeType != 0x1 {
-		support.LogMessage(support.LogDebug, appname, "Packet does not contain TLS ClientHello message\n")
+		support.LogMessage(support.LogDebug, appname, "Packet does not contain a TLS ClientHello message\n")
 		return ""
 	}
 
