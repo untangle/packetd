@@ -550,10 +550,15 @@ func loadLoggerConfig() {
 		}
 
 		// find the index of the logLevelName that matches the configured level
+		found := false
 		for levelvalue, levelname := range logLevelName {
 			if strings.Compare(levelname, strings.ToUpper(cfglevel)) == 0 {
 				appLogLevel[cfgname] = levelvalue
+				found = true
 			}
+		}
+		if found == false {
+			LogMessage(LogWarn, appname, "Invalid LogMessage configuration entry: %s=%s\n", cfgname, cfglevel)
 		}
 	}
 }
@@ -579,14 +584,14 @@ func initLoggerConfig() {
 	config["classify"] = "INFO"
 	config["conndict"] = "INFO"
 	config["conntrack"] = "INFO"
-	config["dns="] = "INFO"
+	config["dns"] = "INFO"
 	config["example"] = "INFO"
 	config["geoip"] = "INFO"
 	config["netfilter"] = "INFO"
 	config["netlogger"] = "INFO"
 	config["packetd"] = "INFO"
 	config["reports"] = "INFO"
-	config["restd="] = "INFO"
+	config["restd"] = "INFO"
 	config["settings"] = "INFO"
 	config["support"] = "INFO"
 
