@@ -23,6 +23,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"sync"
 	"time"
 	"unsafe"
@@ -50,6 +51,10 @@ func main() {
 
 	support.Startup()
 	support.LogMessage(support.LogInfo, appname, "Untangle Packet Daemon Version %s\n", "1.00")
+
+	// load the conndict module and start classd daemon
+	systemCommand("modprobe", []string{"nf_conntrack_dict"})
+	systemCommand("systemctl", []string{"start", "untangle-classd.service"})
 
 	settings.Startup()
 
@@ -447,6 +452,20 @@ func go_child_message(level C.int, source *C.char, message *C.char) {
 	lsrc := C.GoString(source)
 	lmsg := C.GoString(message)
 	support.LogMessage(int(level), lsrc, lmsg)
+}
+
+//-----------------------------------------------------------------------------
+
+func systemCommand(command string, arguments []string) {
+	var result []byte
+	var err error
+
+	result, err = exec.Command(command, arguments...).CombinedOutput()
+	if err != nil {
+		support.LogMessage(support.LogInfo, appname, "COMMAND:%s | RESULT:%s | ERROR:%s\n", command, string(result), err.Error())
+	} else {
+		support.LogMessage(support.LogDebug, appname, "COMMAND:%s | RESULT:%s\n", command, string(result))
+	}
 }
 
 //-----------------------------------------------------------------------------
