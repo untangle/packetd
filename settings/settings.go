@@ -19,7 +19,7 @@ func Startup() {
 	var err error
 	settings, err = readSettingsFileJSON()
 	if err != nil {
-		support.LogMessage(support.LogWarning, appname, "Error reading settings file: %s\n", err.Error())
+		support.LogMessage(support.LogWarn, appname, "Error reading settings file: %s\n", err.Error())
 	}
 
 	if settings == nil {
@@ -35,7 +35,7 @@ func Startup() {
 
 	// jsonString, err := json.MarshalIndent(settings, "", "  ")
 	// if err != nil {
-	// support.LogMessage(support.LogWarning, appname, "Error reading settings file: %s\n", err.Error())
+	// support.LogMessage(support.LogWarn, appname, "Error reading settings file: %s\n", err.Error())
 	// } else {
 	// support.LogMessage(support.LogDebug, appname, "settings: %s\n", jsonString)
 	// }
@@ -262,7 +262,7 @@ func createNewSettings() (map[string]interface{}, error) {
 	cmd := exec.Command("sh", "-c", "/usr/bin/sync-settings -o openwrt -c -f /etc/config/settings.json")
 	stdoutStderr, err := cmd.CombinedOutput()
 	if err != nil {
-		support.LogMessage(support.LogWarning, appname, "Error creating new settings file: %s\n", err.Error())
+		support.LogMessage(support.LogWarn, appname, "Error creating new settings file: %s\n", err.Error())
 		return nil, err
 	}
 	for _, line := range strings.Split(strings.TrimSpace(string(stdoutStderr)), "\n") {
@@ -271,7 +271,7 @@ func createNewSettings() (map[string]interface{}, error) {
 
 	settings, err = readSettingsFileJSON()
 	if err != nil {
-		support.LogMessage(support.LogWarning, appname, "Error reading settings file: %s\n", err.Error())
+		support.LogMessage(support.LogWarn, appname, "Error reading settings file: %s\n", err.Error())
 	}
 	return settings, err
 }

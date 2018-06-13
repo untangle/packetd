@@ -60,7 +60,7 @@ func CreateQuery(reportEntry string) (*Query, error) {
 func GetData(queryID uint64) (string, error) {
 	q := queries[queryID]
 	if q == nil {
-		support.LogMessage(support.LogWarning, appname, "Query not found: %d\n", queryID)
+		support.LogMessage(support.LogWarn, appname, "Query not found: %d\n", queryID)
 		return "", errors.New("Query ID not found")
 	}
 	result, err := getRows(q.Rows, 1000)

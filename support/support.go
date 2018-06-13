@@ -1,14 +1,22 @@
 package support
 
 import (
+	"bufio"
 	"crypto/x509"
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"net"
+	"os"
+	"strings"
 	"sync"
 	"time"
 )
+
+const logConfigFile = "/tmp/logconfig.cfg"
+
+var logLevelName = [...]string{"EMERG", "ALERT", "CRIT", "ERROR", "WARN", "NOTICE", "INFO", "DEBUG", "LOGIC"}
+var appLogLevel map[string]int
 
 //LogEmerg = stdlog.h/LOG_EMERG
 const LogEmerg = 0
@@ -22,8 +30,8 @@ const LogCrit = 2
 //LogErr = stdlog.h/LOG_ERR
 const LogErr = 3
 
-//LogWarning = stdlog.h/LOG_WARNING
-const LogWarning = 4
+//LogWarn = stdlog.h/LOG_WARNING
+const LogWarn = 4
 
 //LogNotice = stdlog.h/LOG_NOTICE
 const LogNotice = 5
@@ -36,25 +44,6 @@ const LogDebug = 7
 
 //LogLogic = custom value
 const LogLogic = 8
-
-var logLevelName = [...]string{"EMERG", "ALERT", "CRIT", "ERROR", "WARN", "NOTICE", "INFO", "DEBUG", "LOGIC"}
-
-var appLogLevel = map[string]int{
-	"certcache": LogDebug,
-	"classify":  LogInfo,
-	"conndict":  LogInfo,
-	"conntrack": LogInfo,
-	"dns":       LogInfo,
-	"example":   LogInfo,
-	"geoip":     LogInfo,
-	"netfilter": LogInfo,
-	"netlogger": LogInfo,
-	"packetd":   LogInfo,
-	"reports":   LogInfo,
-	"restd":     LogInfo,
-	"settings":  LogInfo,
-	"support":   LogInfo,
-}
 
 //NetfilterHandlerFunction defines a pointer to a netfilter callback function
 type NetfilterHandlerFunction func(chan<- SubscriptionResult, TrafficMessage, uint)
@@ -191,6 +180,10 @@ type CertificateHolder struct {
 func Startup() {
 	// capture startup time
 	runtime = time.Now()
+
+	// create the map and load the LogMessage configuration
+	appLogLevel = make(map[string]int)
+	loadLoggerConfig()
 
 	// create the session, conntrack, and certificate tables
 	sessionTable = make(map[uint32]SessionEntry)
@@ -498,6 +491,96 @@ func GetConntrackSubscriptions() map[string]SubscriptionHolder {
 // GetNetloggerSubscriptions returns the list of active netlogger subscriptions
 func GetNetloggerSubscriptions() map[string]SubscriptionHolder {
 	return netloggerList
+}
+
+//-----------------------------------------------------------------------------
+
+func loadLoggerConfig() {
+	var file *os.File
+	var err error
+
+	// open the logger configuration file
+	file, err = os.Open(logConfigFile)
+
+	// if there was an error create the config and try the open again
+	if err != nil {
+		initLoggerConfig()
+		file, err = os.Open(logConfigFile)
+
+		// if there is still an error we are out of options
+		if err != nil {
+			LogMessage(LogErr, appname, "Unable to load LogMessage configuration file: %s\n", logConfigFile)
+			return
+		}
+	}
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// ignore lines that start with an octothorpe
+		if strings.HasPrefix(strings.TrimSpace(line), "#") {
+			continue
+		}
+
+		// split the line into the app and level
+		pair := strings.Split(line, "=")
+		if len(pair) != 2 {
+			continue
+		}
+
+		// find numeric value for the level and put in map
+		for index, value := range logLevelName {
+			if strings.Compare(value, strings.ToUpper(pair[1])) == 0 {
+				appLogLevel[pair[0]] = index
+			}
+		}
+	}
+
+	file.Close()
+}
+
+//-----------------------------------------------------------------------------
+
+func initLoggerConfig() {
+	file, err := os.Create(logConfigFile)
+	if err != nil {
+		return
+	}
+
+	LogMessage(LogAlert, appname, "LogMessage configuration not found. Creating default file: %s\n", logConfigFile)
+
+	file.WriteString("# LogMessage configuration for packet daemon. One entry per line. Format:\n")
+	file.WriteString("#   application=LEVEL\n")
+	file.WriteString("# Valid log levels:\n")
+
+	for item, element := range logLevelName {
+		if item == 0 {
+			file.WriteString("#   ")
+		} else {
+			file.WriteString(",")
+		}
+
+		file.WriteString(element)
+	}
+	file.WriteString("\n#\n")
+
+	file.WriteString("certcache=INFO\n")
+	file.WriteString("classify=INFO\n")
+	file.WriteString("conndict=INFO\n")
+	file.WriteString("conntrack=INFO\n")
+	file.WriteString("dns=INFO\n")
+	file.WriteString("example=INFO\n")
+	file.WriteString("geoip=INFO\n")
+	file.WriteString("netfilter=INFO\n")
+	file.WriteString("netlogger=INFO\n")
+	file.WriteString("packetd=INFO\n")
+	file.WriteString("reports=INFO\n")
+	file.WriteString("restd=INFO\n")
+	file.WriteString("settings=INFO\n")
+	file.WriteString("support=INFO\n")
+
+	file.Close()
 }
 
 //-----------------------------------------------------------------------------

@@ -79,13 +79,13 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 		defer conn.Close()
 
 		if err != nil {
-			support.LogMessage(support.LogWarning, appname, "TLS ERROR: %s\n", err)
+			support.LogMessage(support.LogWarn, appname, "TLS ERROR: %s\n", err)
 			ch <- result
 			return
 		}
 
 		if len(conn.ConnectionState().PeerCertificates) < 1 {
-			support.LogMessage(support.LogWarning, appname, "Could not fetch certificate from %s\n", mess.Tuple.ServerAddr)
+			support.LogMessage(support.LogWarn, appname, "Could not fetch certificate from %s\n", mess.Tuple.ServerAddr)
 			ch <- result
 			return
 		}
@@ -134,7 +134,7 @@ func setConnDictPair(field string, value string, ctid uint) {
 	output := strings.Replace(value, ",", "-", -1)
 	err := conndict.SetPair(field, output, ctid)
 	if err != nil {
-		support.LogMessage(support.LogWarning, appname, "SetPair(%s,%s,%d) ERROR: %v\n", field, output, ctid, err)
+		support.LogMessage(support.LogWarn, appname, "SetPair(%s,%s,%d) ERROR: %v\n", field, output, ctid, err)
 	} else {
 		support.LogMessage(support.LogDebug, appname, "SetPair(%s,%s,%d) SUCCESS\n", field, output, ctid)
 	}
@@ -161,7 +161,7 @@ func setConnDictList(field string, value []string, ctid uint) {
 
 	err := conndict.SetPair(field, output, ctid)
 	if err != nil {
-		support.LogMessage(support.LogWarning, appname, "SetPair(%s,%s,%d) ERROR: %v\n", field, output, ctid, err)
+		support.LogMessage(support.LogWarn, appname, "SetPair(%s,%s,%d) ERROR: %v\n", field, output, ctid, err)
 	} else {
 		support.LogMessage(support.LogDebug, appname, "SetPair(%s,%s,%d) SUCCESS\n", field, output, ctid)
 	}

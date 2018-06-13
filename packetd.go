@@ -293,7 +293,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	if info.msg_type == 'N' {
 		if session, ok := support.FindSessionEntry(uint32(ctid)); ok {
 			if session.UpdateCount != 1 {
-				support.LogMessage(support.LogWarning, appname, "!!!!!!!!!! UNEXPECTED UPDATE COUNT %d FOR SESSION %d !!!!!!!!!!\n", session.UpdateCount, ctid)
+				support.LogMessage(support.LogWarn, appname, "!!!!!!!!!! UNEXPECTED UPDATE COUNT %d FOR SESSION %d !!!!!!!!!!\n", session.UpdateCount, ctid)
 				panic("CONNTRACK ID RE-USE DETECTED")
 			}
 		}

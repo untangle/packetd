@@ -43,7 +43,7 @@ func PluginStartup(childsync *sync.WaitGroup) {
 
 	db, err := geoip2.Open(filename)
 	if err != nil {
-		support.LogMessage(support.LogWarning, appname, "Unable to load GeoIP Database: %s\n", err)
+		support.LogMessage(support.LogWarn, appname, "Unable to load GeoIP Database: %s\n", err)
 	} else {
 		support.LogMessage(support.LogInfo, appname, "Loading GeoIP Database: %s\n", filename)
 		geodb = db
@@ -87,14 +87,14 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 
 	errc := conndict.SetPair("SrcCountry", SrcCode, ctid)
 	if errc != nil {
-		support.LogMessage(support.LogWarning, appname, "SetPair(client) ERROR: %s\n", errc)
+		support.LogMessage(support.LogWarn, appname, "SetPair(client) ERROR: %s\n", errc)
 	} else {
 		support.LogMessage(support.LogDebug, appname, "SetPair(client) %d = %s\n", ctid, SrcCode)
 	}
 
 	errs := conndict.SetPair("DstCountry", DstCode, ctid)
 	if errs != nil {
-		support.LogMessage(support.LogWarning, appname, "SetPair(server) ERROR: %s\n", errs)
+		support.LogMessage(support.LogWarn, appname, "SetPair(server) ERROR: %s\n", errs)
 	} else {
 		support.LogMessage(support.LogDebug, appname, "SetPair(server) %d = %s\n", ctid, DstCode)
 	}
@@ -120,7 +120,7 @@ func databaseDownload(filename string) {
 
 	// Check server response
 	if resp.StatusCode != http.StatusOK {
-		support.LogMessage(support.LogWarning, appname, "Download failure: %s\n", resp.Status)
+		support.LogMessage(support.LogWarn, appname, "Download failure: %s\n", resp.Status)
 		return
 	}
 
