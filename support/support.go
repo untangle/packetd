@@ -1,8 +1,8 @@
 package support
 
 import (
-	"bufio"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const logConfigFile = "/tmp/logconfig.cfg"
+const logConfigFile = "/tmp/logconfig.js"
 
 var logLevelName = [...]string{"EMERG", "ALERT", "CRIT", "ERROR", "WARN", "NOTICE", "INFO", "DEBUG", "LOGIC"}
 var appLogLevel map[string]int
@@ -497,6 +497,7 @@ func GetNetloggerSubscriptions() map[string]SubscriptionHolder {
 
 func loadLoggerConfig() {
 	var file *os.File
+	var info os.FileInfo
 	var err error
 
 	// open the logger configuration file
@@ -514,72 +515,96 @@ func loadLoggerConfig() {
 		}
 	}
 
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
+	// make sure the file gets closed
+	defer file.Close()
 
-		// ignore lines that start with an octothorpe
-		if strings.HasPrefix(strings.TrimSpace(line), "#") {
+	// get the file status
+	info, err = file.Stat()
+	if err != nil {
+		LogMessage(LogErr, appname, "Unable to query file information\n")
+		return
+	}
+
+	// read the raw configuration json from the file
+	config := make(map[string]string)
+	var data = make([]byte, info.Size())
+	len, err := file.Read(data)
+
+	if (err != nil) || (len < 1) {
+		LogMessage(LogErr, appname, "Unable to read LogMessage configuration\n")
+		return
+	}
+
+	// unmarshal the configuration into a map
+	err = json.Unmarshal(data, &config)
+	if err != nil {
+		LogMessage(LogErr, appname, "Unable to parse LogMessage configuration\n")
+		return
+	}
+
+	// put the name/string pairs from the file into the name/int lookup map we us in the LogMessage function
+	for cfgname, cfglevel := range config {
+		// ignore any comment strings that start and end with underscore
+		if strings.HasPrefix(cfgname, "_") && strings.HasSuffix(cfgname, "_") {
 			continue
 		}
 
-		// split the line into the app and level
-		pair := strings.Split(line, "=")
-		if len(pair) != 2 {
-			continue
-		}
-
-		// find numeric value for the level and put in map
-		for index, value := range logLevelName {
-			if strings.Compare(value, strings.ToUpper(pair[1])) == 0 {
-				appLogLevel[pair[0]] = index
+		// find the index of the logLevelName that matches the configured level
+		for levelvalue, levelname := range logLevelName {
+			if strings.Compare(levelname, strings.ToUpper(cfglevel)) == 0 {
+				appLogLevel[cfgname] = levelvalue
 			}
 		}
 	}
-
-	file.Close()
 }
 
 //-----------------------------------------------------------------------------
 
 func initLoggerConfig() {
+	LogMessage(LogAlert, appname, "LogMessage configuration not found. Creating default file: %s\n", logConfigFile)
+
+	// create a comment that shows all valid log level names
+	var comment string
+	for item, element := range logLevelName {
+		if item != 0 {
+			comment += "|"
+		}
+		comment += element
+	}
+
+	// make a map and fill it with a default log level for every application
+	config := make(map[string]string)
+	config["_ValidLevels_"] = comment
+	config["certcache"] = "INFO"
+	config["classify"] = "INFO"
+	config["conndict"] = "INFO"
+	config["conntrack"] = "INFO"
+	config["dns="] = "INFO"
+	config["example"] = "INFO"
+	config["geoip"] = "INFO"
+	config["netfilter"] = "INFO"
+	config["netlogger"] = "INFO"
+	config["packetd"] = "INFO"
+	config["reports"] = "INFO"
+	config["restd="] = "INFO"
+	config["settings"] = "INFO"
+	config["support"] = "INFO"
+
+	// convert the config map to a json object
+	jstr, err := json.MarshalIndent(config, "", "")
+	if err != nil {
+		LogMessage(LogAlert, appname, "LogMessage failure creating default configuration: %s\n", err.Error())
+		return
+	}
+
+	// create the logger configuration file
 	file, err := os.Create(logConfigFile)
 	if err != nil {
 		return
 	}
 
-	LogMessage(LogAlert, appname, "LogMessage configuration not found. Creating default file: %s\n", logConfigFile)
-
-	file.WriteString("# LogMessage configuration for packet daemon. One entry per line. Format:\n")
-	file.WriteString("#   application=LEVEL\n")
-	file.WriteString("# Valid log levels:\n")
-
-	for item, element := range logLevelName {
-		if item == 0 {
-			file.WriteString("#   ")
-		} else {
-			file.WriteString(",")
-		}
-
-		file.WriteString(element)
-	}
-	file.WriteString("\n#\n")
-
-	file.WriteString("certcache=INFO\n")
-	file.WriteString("classify=INFO\n")
-	file.WriteString("conndict=INFO\n")
-	file.WriteString("conntrack=INFO\n")
-	file.WriteString("dns=INFO\n")
-	file.WriteString("example=INFO\n")
-	file.WriteString("geoip=INFO\n")
-	file.WriteString("netfilter=INFO\n")
-	file.WriteString("netlogger=INFO\n")
-	file.WriteString("packetd=INFO\n")
-	file.WriteString("reports=INFO\n")
-	file.WriteString("restd=INFO\n")
-	file.WriteString("settings=INFO\n")
-	file.WriteString("support=INFO\n")
-
+	// write the default configuration and close the file
+	file.Write(jstr)
 	file.Close()
 }
 
