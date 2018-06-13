@@ -32,7 +32,7 @@ func PluginStartup(childsync *sync.WaitGroup) {
 
 	// if not found look for the MicroFW country database file
 	if os.IsNotExist(err) {
-		filename = "/tmp/GeoLite2-Country.mmdb" // TODO - where should this file be stored?
+		filename = "/usr/share/untangle-geoip/GeoLite2-Country.mmdb" // TODO - where should this file be stored?
 		_, err := os.Stat(filename)
 
 		// if still not found download the country database
