@@ -2,8 +2,8 @@ sudo: required
 
 env:
   global:
-    - GOPATH="$HOME/gopath"
-    - DIR="$GOPATH/src/github.com/untangle" 
+    - GOPATH="${HOME}/gopath"
+    - DIR="${GOPATH}/src/github.com/untangle"
   matrix:
     - TARGET=libc
     - TARGET=musl
@@ -11,10 +11,14 @@ env:
 services:
   - docker
 
-script:
+before_install:
+  - env
+  - pwd
   - mkdir -p "$DIR"
-  - mv "$TRAVIS_BUILD_DIR" "$DIR"
+  - mv "$TRAVIS_BUILD_DIR" "${DIR}/classd"
   - cd "${DIR}/classd"
+
+script:
   - docker-compose -f docker-compose.build.yml up --build $TARGET
 
 notifications:
