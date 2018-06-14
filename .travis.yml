@@ -5,8 +5,8 @@ env:
     - GOPATH="${HOME}/go"
     - DIR="${GOPATH}/src/github.com/untangle"
   matrix:
-    - TARGET=libc LD_TARGET=linux
-    - TARGET=musl LD_TARGET=musl
+    - TARGET=libc TEST="grep -q GNU/Linux"
+    - TARGET=musl TEST="grep -q -v GNU/Linux"
 
 services:
   - docker
@@ -20,7 +20,7 @@ script:
   - docker-compose -f docker-compose.build.yml up --build $TARGET
   - echo $LD_TARGET
   - file ./packetd
-  - file ./packetd | grep -E "interpreter /lib.*/ld-${LD_TARGET}-x86-64.so"
+  - file ./packetd | $TEST
 
 notifications:
   email: false
