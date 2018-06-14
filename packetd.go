@@ -2,6 +2,7 @@ package main
 
 /*
 #include "common.h"
+#cgo CFLAGS: -D_GNU_SOURCE
 #cgo LDFLAGS: -lnetfilter_queue -lnfnetlink -lnetfilter_conntrack -lnetfilter_log
 */
 import "C"
