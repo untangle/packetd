@@ -1,10 +1,18 @@
 sudo: required
 
+env:
+  global:
+    - GOPATH="$HOME/gopath"
+    - DIR="$GOPATH/src/github.com/untangle" 
+  matrix:
+    - TARGET=libc
+    - TARGET=musl
+
 services:
   - docker
 
 script:
-  - docker-compose -f docker-compose.build.yml up --build musl
-  - file ./packet | grep 'interpreter /lib/ld-musl-x86_64.so.1'
-  - docker-compose -f docker-compose.build.yml up --build libc
-  - file ./packet | grep 'interpreter /lib64/ld-linux-x86-64.so.2'
+  - mkdir -p "$DIR"
+  - mv "$TRAVIS_BUILD_DIR" "$DIR"
+  - cd "${DIR}/untangle"
+  - docker-compose -f docker-compose.build.yml up --build $TARGET
