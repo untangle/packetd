@@ -21,7 +21,9 @@ before_install:
   - ls
 
 script:
-  - docker-compose -f docker-compose.build.yml up --build $TARGET
+  - docker build -it --rm -f Dockerfile.build-$TARGET -t untangleinc/packetd:build-$TARGET .
+  - docker run -it --rm -v ./../../..:/go/src untangleinc/packetd:build-$TARGET
+#  - docker-compose -f docker-compose.build.yml up --build $TARGET
 
 notifications:
   email: false
