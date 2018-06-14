@@ -1,16 +1,10 @@
-language: go
+sudo: required
 
-go:
-  - "1.7"
-  - "1.9"
-  - "1.10"
-
-before_install:
-  - echo "deb http://foo:foo@updates.untangle.com/public/stretch 14.0.0 main non-free" | sudo tee -a /etc/apt/sources.list
-  - sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 735A9E18E8F62EDF413592460B9D6AE3627BF103
-  - sudo apt-get update
-  - apt-cache policy libnetfilter-conntrack-dev
-  - sudo apt-get install -y libnetfilter-log-dev libnetfilter-queue-dev libnetfilter-conntrack-dev
+services:
+  - docker
 
 script:
-  - true
+  - docker-compose -f docker-compose.build.yml up --build musl
+  - file ./packet | grep 'interpreter /lib/ld-musl-x86_64.so.1'
+  - docker-compose -f docker-compose.build.yml up --build libc
+  - file ./packet | grep 'interpreter /lib64/ld-linux-x86-64.so.2'
