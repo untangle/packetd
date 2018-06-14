@@ -17,6 +17,8 @@ before_install:
   - mkdir -p "$DIR"
   - mv "$TRAVIS_BUILD_DIR" "${DIR}/classd"
   - cd "${DIR}/classd"
+  - pwd
+  - ls
 
 script:
   - docker-compose -f docker-compose.build.yml up --build $TARGET
