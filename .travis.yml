@@ -12,8 +12,6 @@ services:
   - docker
 
 before_install:
-  - env
-  - pwd
   - mkdir -p "$DIR"
   - mv "$TRAVIS_BUILD_DIR" "${DIR}/classd"
   - cd "${DIR}/classd"
@@ -21,7 +19,7 @@ before_install:
   - ls
 
 script:
-  - docker build -it --rm -f Dockerfile.build-$TARGET -t untangleinc/packetd:build-$TARGET .
+  - docker build --rm -f Dockerfile.build-$TARGET -t untangleinc/packetd:build-$TARGET .
   - docker run -it --rm -v ./../../..:/go/src untangleinc/packetd:build-$TARGET
 #  - docker-compose -f docker-compose.build.yml up --build $TARGET
 
