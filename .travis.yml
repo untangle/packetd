@@ -1,5 +1,3 @@
-language: go
-
 sudo: required
 
 env:
@@ -18,3 +16,6 @@ script:
   - mv "$TRAVIS_BUILD_DIR" "$DIR"
   - cd "${DIR}/classd"
   - docker-compose -f docker-compose.build.yml up --build $TARGET
+
+notifications:
+  email: false
