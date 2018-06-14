@@ -18,6 +18,8 @@ before_install:
 
 script:
   - docker-compose -f docker-compose.build.yml up --build $TARGET
+  - echo $LD_TARGET
+  - file ./packetd
   - file ./packetd | grep -E "interpreter /lib.*/ld-${LD_TARGET}-x86-64.so"
 
 notifications:
