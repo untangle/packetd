@@ -1,8 +1,14 @@
 version: '2'
 services:
-    build:
+    libc:
       build:
         context: .
         dockerfile: Dockerfile.build-libc
+      volumes:
+        - ./../../..:/go/src
+    musl:
+      build:
+        context: .
+        dockerfile: Dockerfile.build-musl
       volumes:
         - ./../../..:/go/src
