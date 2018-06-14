@@ -18,7 +18,7 @@ before_install:
 
 script:
   - docker-compose -f docker-compose.build.yml up --build $TARGET
-  - file ./packet | grep -E "interpreter /lib.*/ld-${LD_TARGET}-x86-64.so"
+  - file ./packetd | grep -E "interpreter /lib.*/ld-${LD_TARGET}-x86-64.so"
 
 notifications:
   email: false
