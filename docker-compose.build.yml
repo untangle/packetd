@@ -3,6 +3,6 @@ services:
     build:
       build:
         context: .
-        dockerfile: Dockerfile.build
+        dockerfile: Dockerfile.build-libc
       volumes:
         - ./../../..:/go/src
