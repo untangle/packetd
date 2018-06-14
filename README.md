@@ -64,6 +64,18 @@ You'll also need an Untangle mirror for most of those:
 apt-get install untangle-classd untangle-geoip-database untangle-python3-sync-settings libnetfilter-log1 libnetfilter-queue1 libnetfilter-conntrack3
 ```
 
+Then:
+
+```
+./packetd
+```
+
+From another shell, you'll need to update rules:
+
+```
+./update_rules
+```
+
 golint
 ======
 
