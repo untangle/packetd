@@ -19,6 +19,7 @@ before_install:
   - ls
 
 script:
+  - pwd ; ls
   - docker build --rm -f Dockerfile.build-$TARGET -t untangleinc/packetd:build-$TARGET .
   - docker run -it --rm -v $(pwd)/../../..:/go/src untangleinc/packetd:build-$TARGET
 #  - docker-compose -f docker-compose.build.yml up --build $TARGET
