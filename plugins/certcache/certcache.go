@@ -129,7 +129,7 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 
 func setConnDictPair(field string, value string, ctid uint) {
 	output := strings.Replace(value, ",", "-", -1)
-	dict.SetPair(field, output, ctid)
+	dict.AddSessionEntry(ctid, field, output)
 }
 
 func setConnDictList(field string, value []string, ctid uint) {
@@ -149,7 +149,7 @@ func setConnDictList(field string, value []string, ctid uint) {
 
 	output := strings.Replace(buffer, ",", "-", -1)
 
-	dict.SetPair(field, output, ctid)
+	dict.AddSessionEntry(ctid, field, output)
 }
 
 // findCertificate fetches the cached certificate for the argumented address.

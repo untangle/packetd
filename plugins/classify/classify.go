@@ -188,7 +188,7 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 			continue
 		}
 
-		dict.SetPair(pairname, pairdata, ctid)
+		dict.AddSessionEntry(ctid, pairname, pairdata)
 	}
 
 	// FIXME we should not log this on every packet, only when:

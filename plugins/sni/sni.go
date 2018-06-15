@@ -43,7 +43,7 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 	hostname := extractSNIhostname(mess.Payload)
 	if hostname != "" {
 		logger.LogDebug(logsrc, "Extracted SNI %s for %d\n", hostname, ctid)
-		dict.SetPair("ClientSNI", hostname, ctid)
+		dict.AddSessionEntry(ctid, "ClientSNI", hostname)
 		result.SessionRelease = true
 		return result
 	}
