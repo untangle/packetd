@@ -134,7 +134,6 @@ func trimSettings(c *gin.Context) {
 
 // StartRestDaemon is called to start the rest daemon
 func StartRestDaemon() {
-	reports.ConnectDb()
 
 	gin.DisableConsoleColor()
 	gin.DefaultWriter = support.NewLogWriter("restd")

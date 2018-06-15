@@ -8,6 +8,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"net"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -491,6 +492,19 @@ func GetConntrackSubscriptions() map[string]SubscriptionHolder {
 // GetNetloggerSubscriptions returns the list of active netlogger subscriptions
 func GetNetloggerSubscriptions() map[string]SubscriptionHolder {
 	return netloggerList
+}
+
+// Run a system command
+func SystemCommand(command string, arguments []string) {
+	var result []byte
+	var err error
+
+	result, err = exec.Command(command, arguments...).CombinedOutput()
+	if err != nil {
+		LogMessage(LogInfo, appname, "COMMAND:%s | RESULT:%s | ERROR:%s\n", command, string(result), err.Error())
+	} else {
+		LogMessage(LogDebug, appname, "COMMAND:%s | RESULT:%s\n", command, string(result))
+	}
 }
 
 //-----------------------------------------------------------------------------

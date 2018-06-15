@@ -29,6 +29,8 @@ func PluginStartup(childsync *sync.WaitGroup, classdPtr *string) {
 
 	support.LogMessage(support.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
 
+	support.SystemCommand("systemctl", []string{"start", "untangle-classd.service"})
+
 	socktime = time.Now()
 	sockspin = 0
 	daemon, err = net.Dial("tcp", classdHostPort)

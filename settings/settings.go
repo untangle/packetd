@@ -259,7 +259,7 @@ func createJSONErrorString(str string) map[string]interface{} {
 // createNewSettings creates a new settings file
 func createNewSettings() (map[string]interface{}, error) {
 	support.LogMessage(support.LogInfo, appname, "Initializing new settings...\n")
-	cmd := exec.Command("sh", "-c", "/usr/bin/sync-settings -o openwrt -c -f /etc/config/settings.json")
+	cmd := exec.Command("sh", "-c", "/usr/bin/sync-settings -c -f /etc/config/settings.json")
 	stdoutStderr, err := cmd.CombinedOutput()
 	if err != nil {
 		support.LogMessage(support.LogWarn, appname, "Error creating new settings file: %s\n", err.Error())

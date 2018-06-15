@@ -18,13 +18,13 @@ import (
 	"github.com/untangle/packetd/dns"
 	"github.com/untangle/packetd/example"
 	"github.com/untangle/packetd/geoip"
+	"github.com/untangle/packetd/reports"
 	"github.com/untangle/packetd/restd"
 	"github.com/untangle/packetd/settings"
 	"github.com/untangle/packetd/support"
 	"log"
 	"net"
 	"os"
-	"os/exec"
 	"sync"
 	"time"
 	"unsafe"
@@ -53,11 +53,11 @@ func main() {
 	support.Startup()
 	support.LogMessage(support.LogInfo, appname, "Untangle Packet Daemon Version %s\n", "1.00")
 
-	// load the conndict module and start classd daemon
-	systemCommand("modprobe", []string{"nf_conntrack_dict"})
-	systemCommand("systemctl", []string{"start", "untangle-classd.service"})
+	// load the conndict module
+	support.SystemCommand("modprobe", []string{"nf_conntrack_dict"})
 
 	settings.Startup()
+	reports.Startup()
 
 	go C.netfilter_thread()
 	go C.conntrack_thread()
@@ -202,6 +202,7 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 
 	var session support.SessionEntry
 	var ok bool
+	var newSession bool = false
 
 	// If we already have a session entry update the existing, otherwise create a new entry for the table.
 	if session, ok = support.FindSessionEntry(uint32(ctid)); ok {
@@ -210,6 +211,7 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 		session.UpdateCount++
 	} else {
 		support.LogMessage(support.LogDebug, appname, "SESSION Adding %d to table\n", ctid)
+		newSession = true
 		session.SessionID = support.NextSessionID()
 		session.SessionCreation = time.Now()
 		session.SessionActivity = time.Now()
@@ -259,6 +261,14 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 
 		// Increment the priority and keep looping until we've called all subscribers
 		priority++
+	}
+
+	if newSession {
+		columns := map[string]interface{}{
+			"session_id": 1,
+			//FIXME add other values
+		}
+		reports.LogEvent(reports.CreateEvent("new_session", "sessions", reports.INSERT, columns, nil))
 	}
 
 	// return the updated mark to be set on the packet
@@ -453,20 +463,6 @@ func go_child_message(level C.int, source *C.char, message *C.char) {
 	lsrc := C.GoString(source)
 	lmsg := C.GoString(message)
 	support.LogMessage(int(level), lsrc, lmsg)
-}
-
-//-----------------------------------------------------------------------------
-
-func systemCommand(command string, arguments []string) {
-	var result []byte
-	var err error
-
-	result, err = exec.Command(command, arguments...).CombinedOutput()
-	if err != nil {
-		support.LogMessage(support.LogInfo, appname, "COMMAND:%s | RESULT:%s | ERROR:%s\n", command, string(result), err.Error())
-	} else {
-		support.LogMessage(support.LogDebug, appname, "COMMAND:%s | RESULT:%s\n", command, string(result))
-	}
 }
 
 //-----------------------------------------------------------------------------

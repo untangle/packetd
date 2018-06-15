@@ -6,17 +6,24 @@ import (
 	"errors"
 	_ "github.com/mattn/go-sqlite3" // blank import required for runtime binding
 	"github.com/untangle/packetd/support"
-	"log"
 	"sync/atomic"
 	"time"
 )
 
-var db *sql.DB
-var queries = make(map[uint64]*Query)
-var queryID uint64
-var appname = "reports"
+// SqlOp enum
+const (
+	INSERT = 1
+	UPDATE = 2
+)
 
-//-----------------------------------------------------------------------------
+// An arbitrary event
+type Event struct {
+	Name            string
+	Table           string
+	SqlOp           int
+	Columns         map[string]interface{}
+	ModifiedColumns map[string]interface{}
+}
 
 // Query holds the results of a database query operation
 type Query struct {
@@ -24,19 +31,23 @@ type Query struct {
 	Rows *sql.Rows
 }
 
-//-----------------------------------------------------------------------------
+var db *sql.DB
+var queries = make(map[uint64]*Query)
+var queryID uint64
+var appname = "reports"
+var eventQueue = make(chan Event)
 
-// ConnectDb creates a connection to the database
-func ConnectDb() {
+// Initialize creates a connection to the database
+func Startup() {
 	var err error
 	db, err = sql.Open("sqlite3", "/tmp/reports.db")
 
 	if err != nil {
-		log.Fatal(err)
+		support.LogMessage(support.LogErr, appname, "Failed to open database: %s\n", err.Error())
 	}
-}
 
-//-----------------------------------------------------------------------------
+	go createTables()
+}
 
 // CreateQuery submits a database query and returns the results
 func CreateQuery(reportEntry string) (*Query, error) {
@@ -53,8 +64,6 @@ func CreateQuery(reportEntry string) (*Query, error) {
 	go cleanupQuery(q)
 	return q, nil
 }
-
-//-----------------------------------------------------------------------------
 
 // GetData returns the data for the provided QueryID
 func GetData(queryID uint64) (string, error) {
@@ -75,7 +84,25 @@ func GetData(queryID uint64) (string, error) {
 	return string(jsonData), nil
 }
 
-//-----------------------------------------------------------------------------
+// Create an Event
+func CreateEvent(name string, table string, sqlOp int, columns map[string]interface{}, modifiedColumns map[string]interface{}) Event {
+	event := Event{Name: name, Table: table, SqlOp: sqlOp, Columns: columns, ModifiedColumns: modifiedColumns}
+
+	return event
+}
+
+// Log an Event
+func LogEvent(event Event) error {
+	eventQueue <- event
+	return nil
+}
+
+func eventLogger() {
+	for {
+		event := <-eventQueue
+		support.LogMessage(support.LogInfo, appname, "Log Event: %s\n", event.Name)
+	}
+}
 
 func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
 	if rows == nil {
@@ -118,8 +145,6 @@ func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
 	return tableData, nil
 }
 
-//-----------------------------------------------------------------------------
-
 func cleanupQuery(query *Query) {
 	support.LogMessage(support.LogDebug, appname, "cleanupQuery(%d) launched\n", query.ID)
 	time.Sleep(30 * time.Second)
@@ -130,4 +155,47 @@ func cleanupQuery(query *Query) {
 	support.LogMessage(support.LogDebug, appname, "cleanupQuery(%d) finished\n", query.ID)
 }
 
-//-----------------------------------------------------------------------------
+func createTables() {
+	var err error
+
+	_, err = db.Exec(
+		`CREATE TABLE sessions (
+                     session_id int8 PRIMARY KEY NOT NULL,
+                     time_stamp timestamp NOT NULL,
+                     end_time timestamp,
+                     ip_protocol int2,
+                     hostname text,
+                     username text,
+                     client_intf int2,
+                     server_intf int2,
+                     local_addr inet,
+                     remote_addr inet,
+                     client_addr inet,
+                     server_addr inet,
+                     server_port int4,
+                     client_port int4,
+                     client_addr_new inet,
+                     server_addr_new inet,
+                     server_port_new int4,
+                     client_port_new int4,
+                     client_country text,
+                     client_latitude real,
+                     client_longitude real,
+                     server_country text,
+                     server_latitude real,
+                     server_longitude real,
+                     c2s_bytes int8 default 0,
+                     s2c_bytes int8 default 0)`)
+
+	if err != nil {
+		support.LogMessage(support.LogErr, appname, "Failed to create table: %s\n", err.Error())
+	}
+
+	//test REMOVE ME
+	_, err = db.Exec("INSERT INTO sessions (time_stamp, session_id) VALUES (DATETIME('now'),1)")
+	if err != nil {
+		support.LogMessage(support.LogErr, appname, "Failed to insert: %s\n", err.Error())
+	}
+
+	eventLogger()
+}
