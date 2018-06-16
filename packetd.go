@@ -12,15 +12,15 @@ import (
 	"flag"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/untangle/packetd/certcache"
-	"github.com/untangle/packetd/classify"
-	"github.com/untangle/packetd/dns"
-	"github.com/untangle/packetd/example"
-	"github.com/untangle/packetd/geoip"
-	"github.com/untangle/packetd/reports"
-	"github.com/untangle/packetd/restd"
-	"github.com/untangle/packetd/settings"
-	"github.com/untangle/packetd/support"
+	"github.com/untangle/packetd/plugins/certcache"
+	"github.com/untangle/packetd/plugins/classify"
+	"github.com/untangle/packetd/plugins/dns"
+	"github.com/untangle/packetd/plugins/example"
+	"github.com/untangle/packetd/plugins/geoip"
+	"github.com/untangle/packetd/services/reports"
+	"github.com/untangle/packetd/services/restd"
+	"github.com/untangle/packetd/services/settings"
+	"github.com/untangle/packetd/services/support"
 	"log"
 	"net"
 	"os"
@@ -95,10 +95,6 @@ func main() {
 			support.LogMessage(support.LogInfo, appname, ".\n")
 		}
 	}
-}
-
-func Test() {
-	support.LogMessage(support.LogInfo, appname, "XXXXXXX TEST\n")
 }
 
 // Cleanup packetd and exit

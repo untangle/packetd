@@ -3,8 +3,8 @@ package geoip
 import (
 	"compress/gzip"
 	"github.com/oschwald/geoip2-golang"
-	"github.com/untangle/packetd/conndict"
-	"github.com/untangle/packetd/support"
+	"github.com/untangle/packetd/services/conndict"
+	"github.com/untangle/packetd/services/support"
 	"io"
 	"net/http"
 	"os"

@@ -3,9 +3,9 @@ package restd
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/untangle/packetd/reports"
-	"github.com/untangle/packetd/settings"
-	"github.com/untangle/packetd/support"
+	"github.com/untangle/packetd/services/reports"
+	"github.com/untangle/packetd/services/settings"
+	"github.com/untangle/packetd/services/support"
 	"io/ioutil"
 	"strconv"
 	"strings"

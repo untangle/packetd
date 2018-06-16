@@ -2,7 +2,7 @@ package dns
 
 import (
 	"github.com/google/gopacket/layers"
-	"github.com/untangle/packetd/support"
+	"github.com/untangle/packetd/services/support"
 	"sync"
 )
 

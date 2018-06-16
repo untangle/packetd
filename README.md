@@ -72,12 +72,6 @@ Then:
 ./packetd
 ```
 
-From another shell, you'll need to update rules:
-
-```
-./update_rules
-```
-
 golint
 ======
 

@@ -2,7 +2,7 @@ package example
 
 import (
 	"encoding/hex"
-	"github.com/untangle/packetd/support"
+	"github.com/untangle/packetd/services/support"
 	"sync"
 )
 

@@ -3,7 +3,7 @@ package settings
 import (
 	"encoding/json"
 	"errors"
-	"github.com/untangle/packetd/support"
+	"github.com/untangle/packetd/services/support"
 	"io/ioutil"
 	"os/exec"
 	"strings"

@@ -2,8 +2,8 @@ package classify
 
 import (
 	"fmt"
-	"github.com/untangle/packetd/conndict"
-	"github.com/untangle/packetd/support"
+	"github.com/untangle/packetd/services/conndict"
+	"github.com/untangle/packetd/services/support"
 	"net"
 	"strings"
 	"sync"

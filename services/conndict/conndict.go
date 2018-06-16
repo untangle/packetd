@@ -3,7 +3,7 @@ package conndict
 import (
 	"bufio"
 	"fmt"
-	"github.com/untangle/packetd/support"
+	"github.com/untangle/packetd/services/support"
 	"os"
 	"strings"
 	"sync"

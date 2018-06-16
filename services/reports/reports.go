@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	_ "github.com/mattn/go-sqlite3" // blank import required for runtime binding
-	"github.com/untangle/packetd/support"
+	"github.com/untangle/packetd/services/support"
 	"sync/atomic"
 	"time"
 )

@@ -6,8 +6,8 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y untangle-python3-sync-sett
 RUN mkdir /etc/config
 RUN touch /etc/init.d/network
 
-COPY packetd update_rules /usr/bin/
+COPY packetd packetd_rules /usr/bin/
 
 EXPOSE 8080
 
-ENTRYPOINT update_rules ; packetd
+ENTRYPOINT packetd_rules ; packetd
