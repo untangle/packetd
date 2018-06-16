@@ -18,6 +18,8 @@ import (
 	"unsafe"
 )
 
+var shutdownChannel = make(chan bool)
+
 // CStartup starts C services
 func CStartup() {
 	C.common_startup()
@@ -30,6 +32,9 @@ func CStartCallbacks() {
 	go C.netfilter_thread()
 	go C.conntrack_thread()
 	go C.netlogger_thread()
+
+	// start the conntrack 60-second update task
+	go periodicTask()
 }
 
 // CStopCallbacks stops all services and callbacks
@@ -38,6 +43,14 @@ func CStopCallbacks() {
 	C.netfilter_shutdown()
 	C.conntrack_shutdown()
 	C.netlogger_shutdown()
+
+	// Send shutdown signal to periodicTask and wait for it to return
+	shutdownChannel <- true
+	select {
+	case <-shutdownChannel:
+	case <-time.After(10 * time.Second):
+		support.LogMessage(support.LogErr, appname, "Failed to properly shutdown periodicTask\n")
+	}
 }
 
 // CShutdown all C services
@@ -48,11 +61,6 @@ func CShutdown() {
 // CGetShutdownFlag returns the c shutdown flag
 func CGetShutdownFlag() int {
 	return int(C.get_shutdown_flag())
-}
-
-// ConntrackDump forces a conntrack dump
-func ConntrackDump() {
-	C.conntrack_dump()
 }
 
 //export go_netfilter_callback
@@ -366,4 +374,22 @@ func go_child_message(level C.int, source *C.char, message *C.char) {
 	lsrc := C.GoString(source)
 	lmsg := C.GoString(message)
 	support.LogMessage(int(level), lsrc, lmsg)
+}
+
+//conntrack periodic task
+func periodicTask() {
+	var counter int
+
+	// FIXME first sleep should be calibrated so it wakes on first second on minute for conntrack_dump
+	for {
+		select {
+		case <-shutdownChannel:
+			shutdownChannel <- true
+			return
+		case <-time.After(60 * time.Second):
+			counter++
+			support.LogMessage(support.LogDebug, appname, "Calling periodic conntrack dump %d\n", counter)
+			C.conntrack_dump()
+		}
+	}
 }

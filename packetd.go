@@ -46,7 +46,7 @@ func main() {
 	support.SystemCommand("modprobe", []string{"nf_conntrack_dict"})
 
 	// Start services
-	support.Startup(ConntrackDump)
+	support.Startup()
 	settings.Startup()
 	reports.Startup()
 	conndict.Startup()
@@ -90,19 +90,26 @@ func cleanup() {
 	exitLock.Lock()
 
 	// Remove netfilter rules
+	support.LogMessage(support.LogInfo, appname, "Removing netfilter rules...\n")
 	removeRules()
 
 	// Stop kernel callbacks
+	support.LogMessage(support.LogInfo, appname, "Removing kernel hooks...\n")
 	CStopCallbacks()
 
 	// Stop all plugins
+	support.LogMessage(support.LogInfo, appname, "Stopping plugins...\n")
 	go example.PluginShutdown(&childsync)
 	go classify.PluginShutdown(&childsync)
 	go geoip.PluginShutdown(&childsync)
 	go certcache.PluginShutdown(&childsync)
 	go dns.PluginShutdown(&childsync)
 
+	support.LogMessage(support.LogInfo, appname, "Waiting on plugins...\n")
+	childsync.Wait()
+
 	// Stop services
+	support.LogMessage(support.LogInfo, appname, "Shutting down services...\n")
 	support.Shutdown()
 	reports.Shutdown()
 	settings.Shutdown()
@@ -111,9 +118,6 @@ func cleanup() {
 
 	// Call C cleanup
 	CShutdown()
-
-	// Wait for all plugins to finish
-	childsync.Wait()
 }
 
 // Add signal handlers

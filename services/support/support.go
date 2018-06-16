@@ -69,7 +69,6 @@ var conntrackTable map[uint32]ConntrackEntry
 var conntrackMutex sync.Mutex
 var sessionMutex sync.Mutex
 var sessionIndex uint64
-var conntrackDumpFunc func()
 var shutdownChannel = make(chan bool)
 
 //-----------------------------------------------------------------------------
@@ -170,12 +169,9 @@ type NetloggerMessage struct {
 //-----------------------------------------------------------------------------
 
 // Startup is called during daemon startup to handle initialization
-func Startup(conntrackDumpFunc func()) {
+func Startup() {
 	// capture startup time
 	runtime = time.Now()
-
-	// set the conntrackDumpFunc
-	conntrackDumpFunc = conntrackDumpFunc
 
 	// create the map and load the LogMessage configuration
 	appLogLevel = make(map[string]int)
@@ -203,14 +199,13 @@ func Startup(conntrackDumpFunc func()) {
 
 // Shutdown any support services
 func Shutdown() {
-	// Send shutdown signal to cleanupTask and wait for it to return
+	// Send shutdown signal to periodicTask and wait for it to return
 	shutdownChannel <- true
 	select {
 	case <-shutdownChannel:
 	case <-time.After(10 * time.Second):
 		LogMessage(LogErr, appname, "Failed to properly shutdown periodicTask\n")
 	}
-
 }
 
 //-----------------------------------------------------------------------------
@@ -588,17 +583,16 @@ func initLoggerConfig() {
 func periodicTask() {
 	var counter int
 
-	select {
-	case <-shutdownChannel:
-		shutdownChannel <- true
-		return
-	case <-time.After(60 * time.Second):
-		// FIXME first sleep should be calibrated so it wakes on first second on minute for conntrack_dump
-		time.Sleep(60 * time.Second)
-		counter++
-		LogMessage(LogWarn, appname, "Calling perodic conntrack dump %d\n", counter)
-		conntrackDumpFunc()   //FIXME move to conntrack service
-		CleanSessionTable()   //FIXME move to session service
-		CleanConntrackTable() //FIXME move to conntrack service
+	for {
+		select {
+		case <-shutdownChannel:
+			shutdownChannel <- true
+			return
+		case <-time.After(60 * time.Second):
+			counter++
+			LogMessage(LogDebug, appname, "Calling periodic support task %d\n", counter)
+			CleanSessionTable()   //FIXME move to session service
+			CleanConntrackTable() //FIXME move to conntrack service
+		}
 	}
 }

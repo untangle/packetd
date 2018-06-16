@@ -304,11 +304,13 @@ func cleanCertificateTable() {
 
 // periodic task to clean the certificate table
 func cleanupTask() {
-	select {
-	case <-shutdownChannel:
-		shutdownChannel <- true
-		return
-	case <-time.After(60 * time.Second):
-		cleanCertificateTable()
+	for {
+		select {
+		case <-shutdownChannel:
+			shutdownChannel <- true
+			return
+		case <-time.After(60 * time.Second):
+			cleanCertificateTable()
+		}
 	}
 }
