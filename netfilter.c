@@ -168,7 +168,7 @@ int netfilter_startup(void)
 	return(0);
 }
 /*--------------------------------------------------------------------------*/
-void netfilter_shutdown(void)
+void netfilter_close(void)
 {
 	// destroy the netfilter queue
 	nfq_destroy_queue(nfqqh);
@@ -257,17 +257,17 @@ int netfilter_thread(void)
 	}
 
 	// call our netfilter shutdown function
-	netfilter_shutdown();
+	netfilter_close();
 
 	// free our packet buffer memory
 	free(buffer);
 
 	logmessage(LOG_INFO,appname,"The netfilter thread has terminated\n");
-	go_child_goodbye();
+	go_child_shutdown();
 	return(0);
 }
 /*--------------------------------------------------------------------------*/
-void netfilter_goodbye(void)
+void netfilter_shutdown(void)
 {
 	set_shutdown_flag(1);
 }

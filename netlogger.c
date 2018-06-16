@@ -156,7 +156,7 @@ int netlogger_startup(void)
 	return(0);
 }
 /*--------------------------------------------------------------------------*/
-void netlogger_shutdown(void)
+void netlogger_close(void)
 {
 	int     ret;
 
@@ -211,7 +211,7 @@ int netlogger_thread(void)
 		// recycle connection on error
 		if (ret < 0) {
 			logmessage(LOG_ERR,appname,"Error %d returned from recv() - Recycling nflog connection\n",errno);
-			netlogger_shutdown();
+			netlogger_close();
 			sleep(1000);
 			ret = netlogger_startup();
 
@@ -230,14 +230,14 @@ int netlogger_thread(void)
 	}
 
 	// call our logger shutdown function
-	netlogger_shutdown();
+	netlogger_close();
 
 	logmessage(LOG_INFO,appname,"The netlogger thread has terminated\n");
-	go_child_goodbye();
+	go_child_shutdown();
 	return(0);
 }
 /*--------------------------------------------------------------------------*/
-void netlogger_goodbye(void)
+void netlogger_shutdown(void)
 {
 	set_shutdown_flag(1);
 }

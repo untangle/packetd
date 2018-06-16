@@ -96,7 +96,7 @@ int conntrack_startup(void)
 	return(0);
 }
 /*--------------------------------------------------------------------------*/
-void conntrack_shutdown(void)
+void conntrack_unregister(void)
 {
 	if (nfcth == NULL) return;
 
@@ -134,14 +134,14 @@ int conntrack_thread(void)
 	}
 
 	// call our conntrack shutdown function
-	conntrack_shutdown();
+	conntrack_unregister();
 
 	logmessage(LOG_INFO,appname,"The conntrack thread has terminated\n");
-	go_child_goodbye();
+	go_child_shutdown();
 	return(0);
 }
 /*--------------------------------------------------------------------------*/
-void conntrack_goodbye(void)
+void conntrack_shutdown(void)
 {
 	u_int32_t	family;
 

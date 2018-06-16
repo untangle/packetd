@@ -25,7 +25,7 @@ var localMutex sync.Mutex
 
 // PluginStartup function is called to allow plugin specific initialization. We
 // increment the argumented WaitGroup so the main process can wait for
-// our goodbye function to return during shutdown.
+// our shutdown function to return during shutdown.
 func PluginStartup(childsync *sync.WaitGroup) {
 	support.LogMessage(support.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
 	certificateTable = make(map[string]CertificateHolder)
@@ -35,9 +35,9 @@ func PluginStartup(childsync *sync.WaitGroup) {
 	childsync.Add(1)
 }
 
-// PluginGoodbye function called when the daemon is shutting down. We call Done
+// PluginShutdown function called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
-func PluginGoodbye(childsync *sync.WaitGroup) {
+func PluginShutdown(childsync *sync.WaitGroup) {
 	// Send shutdown signal to cleanupTask and wait for it to return
 	shutdownChannel <- true
 	select {
@@ -46,7 +46,7 @@ func PluginGoodbye(childsync *sync.WaitGroup) {
 		support.LogMessage(support.LogErr, appname, "Failed to properly shutdown cleanupTask\n")
 	}
 
-	support.LogMessage(support.LogInfo, appname, "PluginGoodbye(%s) has been called\n", appname)
+	support.LogMessage(support.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
 	childsync.Done()
 }
 

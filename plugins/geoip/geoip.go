@@ -19,7 +19,7 @@ var geodb *geoip2.Reader
 // PluginStartup is called to allow plugin specific initialization.
 // We initialize an instance of the GeoIP engine using any existing
 // database we can find, or we download if needed. We increment the
-// argumented WaitGroup so the main process can wait for our goodbye function
+// argumented WaitGroup so the main process can wait for our shutdown function
 // to return during shutdown.
 func PluginStartup(childsync *sync.WaitGroup) {
 	support.LogMessage(support.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
@@ -55,11 +55,11 @@ func PluginStartup(childsync *sync.WaitGroup) {
 
 //-----------------------------------------------------------------------------
 
-// PluginGoodbye is called when the daemon is shutting down. We close our
+// PluginShutdown is called when the daemon is shutting down. We close our
 // GeoIP engine and call done for the argumented WaitGroup to let the main
 // process know we're finished.
-func PluginGoodbye(childsync *sync.WaitGroup) {
-	support.LogMessage(support.LogInfo, appname, "PluginGoodbye(%s) has been called\n", appname)
+func PluginShutdown(childsync *sync.WaitGroup) {
+	support.LogMessage(support.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
 	geodb.Close()
 	childsync.Done()
 }
