@@ -8,7 +8,6 @@ package main
 import "C"
 
 import (
-	"bufio"
 	"encoding/binary"
 	"flag"
 	"github.com/google/gopacket"
@@ -25,18 +24,22 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
+	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 	"unsafe"
 )
 
-// The childsync is used to give the main process something to watch while
+// The pluginSync is used to give the main process something to watch while
 // waiting for all of the goroutine children to finish execution and cleanup.
 // To give C child functions access we export go_child_startup and goodbye
 // functions. For children in normal go packages, we pass the WaitGroup
 // directly to the goroutine.
 var childsync sync.WaitGroup
 var appname = "packetd"
+var exitLock sync.Mutex
 
 //-----------------------------------------------------------------------------
 
@@ -44,27 +47,28 @@ func main() {
 	var classdPtr = flag.String("classd", "127.0.0.1:8123", "host:port for classd daemon")
 	flag.Parse()
 
-	var lastmin int
-	var counter int
-
+	handleSignals()
 	C.common_startup()
-	log.SetOutput(support.NewLogWriter("log"))
 
-	support.Startup()
-	support.LogMessage(support.LogInfo, appname, "Untangle Packet Daemon Version %s\n", "1.00")
+	// set system logger to use our logger
+	log.SetOutput(support.NewLogWriter("log"))
 
 	// load the conndict module
 	support.SystemCommand("modprobe", []string{"nf_conntrack_dict"})
 
+	// start services
+	support.Startup(conntrackDump)
 	settings.Startup()
 	reports.Startup()
 
+	support.LogMessage(support.LogInfo, appname, "Untangle Packet Daemon Version %s\n", "1.00")
+
+	// Donate threads to kernel hooks
 	go C.netfilter_thread()
 	go C.conntrack_thread()
 	go C.netlogger_thread()
 
-	// ********** Call all plugin startup functions here
-
+	// Start Plugins
 	go example.PluginStartup(&childsync)
 	go classify.PluginStartup(&childsync, classdPtr)
 	go geoip.PluginStartup(&childsync)
@@ -74,73 +78,90 @@ func main() {
 	// Start REST HTTP daemon
 	go restd.StartRestDaemon()
 
-	// ********** End of plugin startup functions
+	// Insert netfilter rules
+	updateRules()
 
-	ch := make(chan string)
-	go func(ch chan string) {
-		reader := bufio.NewReader(os.Stdin)
-		for {
-			s, err := reader.ReadString('\n')
-			if err != nil {
-				close(ch)
-				return
-			}
-			ch <- s
-		}
-		close(ch)
-	}(ch)
-
-	support.LogMessage(support.LogInfo, appname, "RUNNING ON CONSOLE - HIT ENTER TO EXIT\n")
-
-stdinloop:
+	// Wait for exit
 	for {
+		time.Sleep(1 * time.Second)
 		shutdown := C.get_shutdown_flag()
 		if shutdown != 0 {
-			break
+			cleanup()
+			os.Exit(0)
 		}
-		select {
-		case stdin, ok := <-ch:
-			if !ok {
-				break stdinloop
-			} else {
-				support.LogMessage(support.LogInfo, appname, "Console input detected - Application shutting down\n")
-				_ = stdin
-				break stdinloop
-			}
-		case <-time.After(1 * time.Second):
-			current := time.Now()
-			if current.Minute() != lastmin {
-				lastmin = current.Minute()
-				counter++
-				support.LogMessage(support.LogDebug, appname, "Calling perodic conntrack dump %d\n", counter)
-				C.conntrack_dump()
-				support.CleanSessionTable()
-				support.CleanConntrackTable()
-				support.CleanCertificateTable()
-			}
+
+		current := time.Now()
+		if current.Second()%60 == 0 {
+			support.LogMessage(support.LogInfo, appname, ".\n")
 		}
 	}
+}
 
-	// ********** Call all plugin goodbye functions here
+func Test() {
+	support.LogMessage(support.LogInfo, appname, "XXXXXXX TEST\n")
+}
 
+// Cleanup packetd and exit
+func cleanup() {
+	// Prevent further calls
+	exitLock.Lock()
+
+	// Remove netfilter rules
+	removeRules()
+
+	// Stop all plugins
 	go example.PluginGoodbye(&childsync)
 	go classify.PluginGoodbye(&childsync)
 	go geoip.PluginGoodbye(&childsync)
 	go certcache.PluginGoodbye(&childsync)
 	go dns.PluginGoodbye(&childsync)
 
-	// ********** End of plugin goodbye functions
+	// Stop services
+	support.Shutdown()
 
+	// Remove all kernel hooks
 	C.netfilter_goodbye()
 	C.conntrack_goodbye()
 	C.netlogger_goodbye()
 
 	C.common_goodbye()
 
+	// Wait for all plugins to finish
 	childsync.Wait()
 }
 
-//-----------------------------------------------------------------------------
+// Add signal handlers
+func handleSignals() {
+	ch := make(chan os.Signal)
+	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(ch, os.Interrupt, syscall.SIGINT)
+	go func() {
+		<-ch
+		support.LogMessage(support.LogInfo, appname, "Received signal. Exiting...\n")
+		cleanup()
+		os.Exit(1)
+	}()
+}
+
+//update the netfilter queue rules for packetd
+func updateRules() {
+	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		support.LogMessage(support.LogErr, appname, "Error determining directory: %s\n", err.Error())
+		return
+	}
+	support.SystemCommand(dir+"/packetd_rules", []string{})
+}
+
+//remove the netfilter queue rules for packetd
+func removeRules() {
+	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		support.LogMessage(support.LogErr, appname, "Error determining directory: %s\n", err.Error())
+		return
+	}
+	support.SystemCommand(dir+"/packetd_rules", []string{"-r"})
+}
 
 //export go_netfilter_callback
 func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) uint32 {
@@ -202,7 +223,7 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 
 	var session support.SessionEntry
 	var ok bool
-	var newSession bool = false
+	var newSession = false
 
 	// If we already have a session entry update the existing, otherwise create a new entry for the table.
 	if session, ok = support.FindSessionEntry(uint32(ctid)); ok {
@@ -465,4 +486,7 @@ func go_child_message(level C.int, source *C.char, message *C.char) {
 	support.LogMessage(int(level), lsrc, lmsg)
 }
 
-//-----------------------------------------------------------------------------
+//conntrack dump
+func conntrackDump() {
+	C.conntrack_dump()
+}

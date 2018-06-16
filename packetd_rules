@@ -84,11 +84,29 @@ insert_packetd_iptables_rules()
 
     # insert rule to send traffic to our capture chain
     ${IPTABLES} -t ${TABLE_NAME} -I ${TABLE_HOOK} -j ${CHAIN_NAME}
+}
 
-    return 0
+usage() {
+    echo "$0 [options]"
+    echo "optional options: "
+    echo " -r              (force removal only)"
+    echo " -i              (force insert only)"
+    echo " -i              (help)"
+    echo
 }
 
 ##### Start of script
+
+OP=""
+while getopts "rih" opt; do
+  case $opt in
+    r) OP="remove";;
+    i) OP="insert";;
+    h) usage;exit 0;;
+    *) usage;exit 0;;
+  esac
+done
+
 
 ## make sure we are called as root
 USERVAL=`id -u`
@@ -103,18 +121,18 @@ if [ -f /etc/default/untangle-packetd ]; then
     . /etc/default/untangle-packetd
 fi
 
-## Remove the existing rules
-remove_packetd_iptables_rules
-
-case  $1 in
-    *del)
-    echo "[`date`] The packetd daemon rules have been removed."
+if [ "$OP" = "remove" ] ; then
+    remove_packetd_iptables_rules
+    echo "[`date`] The packetd netfilter rules removed."
     exit 0
-    ;;
-esac
-
-## If the queue is open generate the new rules
-is_queue_open && {
-    echo "[`date`] The packetd daemon is running. Inserting rules."
+elif [ "$OP" = "insert" ] ; then
     insert_packetd_iptables_rules
-}
+    echo "[`date`] The packetd netfilter rules inserted."
+    exit 0
+else
+    remove_packetd_iptables_rules
+    is_queue_open && {
+        insert_packetd_iptables_rules
+        echo "[`date`] The packetd netfilter rules inserted."
+    }
+fi

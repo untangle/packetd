@@ -66,11 +66,11 @@ var appname = "support"
 var runtime time.Time
 var sessionTable map[uint32]SessionEntry
 var conntrackTable map[uint32]ConntrackEntry
-var certificateTable map[string]CertificateHolder
-var certificateMutex sync.Mutex
 var conntrackMutex sync.Mutex
 var sessionMutex sync.Mutex
 var sessionIndex uint64
+var conntrackDumpFunc func()
+var shutdownChannel = make(chan bool)
 
 //-----------------------------------------------------------------------------
 
@@ -169,18 +169,13 @@ type NetloggerMessage struct {
 
 //-----------------------------------------------------------------------------
 
-// CertificateHolder is used to cache SSL/TLS certificates
-type CertificateHolder struct {
-	CreationTime time.Time
-	Certificate  x509.Certificate
-}
-
-//-----------------------------------------------------------------------------
-
 // Startup is called during daemon startup to handle initialization
-func Startup() {
+func Startup(conntrackDumpFunc func()) {
 	// capture startup time
 	runtime = time.Now()
+
+	// set the conntrackDumpFunc
+	conntrackDumpFunc = conntrackDumpFunc
 
 	// create the map and load the LogMessage configuration
 	appLogLevel = make(map[string]int)
@@ -189,7 +184,6 @@ func Startup() {
 	// create the session, conntrack, and certificate tables
 	sessionTable = make(map[uint32]SessionEntry)
 	conntrackTable = make(map[uint32]ConntrackEntry)
-	certificateTable = make(map[string]CertificateHolder)
 
 	// create the netfilter, conntrack, and netlogger subscription tables
 	netfilterList = make(map[string]SubscriptionHolder)
@@ -203,6 +197,20 @@ func Startup() {
 	// this means that sessionIndex should be ever increasing despite restarts
 	// (unless there are more than 16 bits or 65k sessions per sec on average)
 	sessionIndex = ((uint64(runtime.Unix()) & 0xFFFFFFFF) << 16)
+
+	go periodicTask()
+}
+
+// Shutdown any support services
+func Shutdown() {
+	// Send shutdown signal to cleanupTask and wait for it to return
+	shutdownChannel <- true
+	select {
+	case <-shutdownChannel:
+	case <-time.After(10 * time.Second):
+		LogMessage(LogErr, appname, "Failed to properly shutdown periodicTask\n")
+	}
+
 }
 
 //-----------------------------------------------------------------------------
@@ -347,58 +355,6 @@ func CleanConntrackTable() {
 	LogMessage(LogDebug, appname, "CONNTRACK REMOVED:%d REMAINING:%d\n", counter, len(conntrackTable))
 }
 
-//-----------------------------------------------------------------------------
-
-// FindCertificate fetches the cached certificate for the argumented address.
-func FindCertificate(finder string) (x509.Certificate, bool) {
-	certificateMutex.Lock()
-	entry, status := certificateTable[finder]
-	certificateMutex.Unlock()
-	return entry.Certificate, status
-}
-
-//-----------------------------------------------------------------------------
-
-// InsertCertificate adds a certificate to the cache
-func InsertCertificate(finder string, cert x509.Certificate) {
-	var holder CertificateHolder
-	holder.CreationTime = time.Now()
-	holder.Certificate = cert
-	certificateMutex.Lock()
-	certificateTable[finder] = holder
-	certificateMutex.Unlock()
-}
-
-//-----------------------------------------------------------------------------
-
-// RemoveCertificate removes a certificate from the cache
-func RemoveCertificate(finder string) {
-	certificateMutex.Lock()
-	delete(certificateTable, finder)
-	certificateMutex.Unlock()
-}
-
-//-----------------------------------------------------------------------------
-
-// CleanCertificateTable cleans the certificate table by removing stale entries
-func CleanCertificateTable() {
-	var counter int
-	nowtime := time.Now()
-
-	for key, val := range certificateTable {
-		if (nowtime.Unix() - val.CreationTime.Unix()) < 86400 {
-			continue
-		}
-		RemoveCertificate(key)
-		counter++
-		LogMessage(LogDebug, appname, "CERTIFICATE Removing %s from table\n", key)
-	}
-
-	LogMessage(LogDebug, appname, "CERTIFICATE REMOVED:%d REMAINING:%d\n", counter, len(certificateTable))
-}
-
-//-----------------------------------------------------------------------------
-
 // LogWriter is used to send an output stream to the LogMessage facility
 type LogWriter struct {
 	source string
@@ -495,16 +451,17 @@ func GetNetloggerSubscriptions() map[string]SubscriptionHolder {
 }
 
 // Run a system command
-func SystemCommand(command string, arguments []string) {
+func SystemCommand(command string, arguments []string) ([]byte, error) {
 	var result []byte
 	var err error
 
 	result, err = exec.Command(command, arguments...).CombinedOutput()
 	if err != nil {
-		LogMessage(LogInfo, appname, "COMMAND:%s | RESULT:%s | ERROR:%s\n", command, string(result), err.Error())
+		LogMessage(LogInfo, appname, "COMMAND:%s | OUTPUT:%s | ERROR:%s\n", command, string(result), err.Error())
 	} else {
-		LogMessage(LogDebug, appname, "COMMAND:%s | RESULT:%s\n", command, string(result))
+		LogMessage(LogInfo, appname, "COMMAND:%s | OUTPUT:%s\n", command, string(result))
 	}
+	return result, err
 }
 
 //-----------------------------------------------------------------------------
@@ -627,4 +584,21 @@ func initLoggerConfig() {
 	file.Close()
 }
 
-//-----------------------------------------------------------------------------
+// FIXME this should be split into separate tasks in separate services
+func periodicTask() {
+	var counter int
+
+	select {
+	case <-shutdownChannel:
+		shutdownChannel <- true
+		return
+	case <-time.After(60 * time.Second):
+		// FIXME first sleep should be calibrated so it wakes on first second on minute for conntrack_dump
+		time.Sleep(60 * time.Second)
+		counter++
+		LogMessage(LogWarn, appname, "Calling perodic conntrack dump %d\n", counter)
+		conntrackDumpFunc()   //FIXME move to conntrack service
+		CleanSessionTable()   //FIXME move to session service
+		CleanConntrackTable() //FIXME move to conntrack service
+	}
+}

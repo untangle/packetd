@@ -8,32 +8,47 @@ import (
 	"github.com/untangle/packetd/support"
 	"strings"
 	"sync"
+	"time"
 )
 
+// CertificateHolder is used to cache SSL/TLS certificates
+type CertificateHolder struct {
+	CreationTime time.Time
+	Certificate  x509.Certificate
+}
+
+var shutdownChannel = make(chan bool)
+var certificateTable map[string]CertificateHolder
+var certificateMutex sync.Mutex
 var appname = "certcache"
 var localMutex sync.Mutex
-
-//-----------------------------------------------------------------------------
 
 // PluginStartup function is called to allow plugin specific initialization. We
 // increment the argumented WaitGroup so the main process can wait for
 // our goodbye function to return during shutdown.
 func PluginStartup(childsync *sync.WaitGroup) {
 	support.LogMessage(support.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
+	certificateTable = make(map[string]CertificateHolder)
+	go cleanupTask()
+
 	support.InsertNetfilterSubscription(appname, 1, PluginNetfilterHandler)
 	childsync.Add(1)
 }
 
-//-----------------------------------------------------------------------------
-
 // PluginGoodbye function called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
 func PluginGoodbye(childsync *sync.WaitGroup) {
+	// Send shutdown signal to cleanupTask and wait for it to return
+	shutdownChannel <- true
+	select {
+	case <-shutdownChannel:
+	case <-time.After(10 * time.Second):
+		support.LogMessage(support.LogErr, appname, "Failed to properly shutdown cleanupTask\n")
+	}
+
 	support.LogMessage(support.LogInfo, appname, "PluginGoodbye(%s) has been called\n", appname)
 	childsync.Done()
 }
-
-//-----------------------------------------------------------------------------
 
 // PluginNetfilterHandler is called to handle netfilter packet data. We only
 // look at traffic with port 443 as destination. When detected, we load
@@ -65,7 +80,7 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 
 	localMutex.Lock()
 
-	if cert, ok = support.FindCertificate(client); ok {
+	if cert, ok = findCertificate(client); ok {
 		support.LogMessage(support.LogInfo, appname, "Loading certificate for %s\n", mess.Tuple.ServerAddr)
 	} else {
 		support.LogMessage(support.LogInfo, appname, "Fetching certificate for %s\n", mess.Tuple.ServerAddr)
@@ -91,7 +106,7 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 		}
 
 		cert = *conn.ConnectionState().PeerCertificates[0]
-		support.InsertCertificate(client, cert)
+		insertCertificate(client, cert)
 	}
 
 	mess.Session.SessionCertificate = cert
@@ -245,4 +260,55 @@ func extractSNIhostname(b []byte) string {
 	return hostname
 }
 
-//-----------------------------------------------------------------------------
+// findCertificate fetches the cached certificate for the argumented address.
+func findCertificate(finder string) (x509.Certificate, bool) {
+	certificateMutex.Lock()
+	entry, status := certificateTable[finder]
+	certificateMutex.Unlock()
+	return entry.Certificate, status
+}
+
+// InsertCertificate adds a certificate to the cache
+func insertCertificate(finder string, cert x509.Certificate) {
+	var holder CertificateHolder
+	holder.CreationTime = time.Now()
+	holder.Certificate = cert
+	certificateMutex.Lock()
+	certificateTable[finder] = holder
+	certificateMutex.Unlock()
+}
+
+// removeCertificate removes a certificate from the cache
+func removeCertificate(finder string) {
+	certificateMutex.Lock()
+	delete(certificateTable, finder)
+	certificateMutex.Unlock()
+}
+
+// cleanCertificateTable cleans the certificate table by removing stale entries
+func cleanCertificateTable() {
+	var counter int
+	nowtime := time.Now()
+
+	for key, val := range certificateTable {
+		if (nowtime.Unix() - val.CreationTime.Unix()) < 86400 {
+			continue
+		}
+		removeCertificate(key)
+		counter++
+		support.LogMessage(support.LogDebug, appname, "CERTIFICATE Removing %s from table\n", key)
+	}
+
+	support.LogMessage(support.LogDebug, appname, "CERTIFICATE REMOVED:%d REMAINING:%d\n", counter, len(certificateTable))
+}
+
+// periodic task to clean the certificate table
+func cleanupTask() {
+	select {
+	case <-shutdownChannel:
+		shutdownChannel <- true
+		return
+	case <-time.After(60 * time.Second):
+		cleanCertificateTable()
+	}
+}
