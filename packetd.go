@@ -51,8 +51,7 @@ func main() {
 	reports.Startup()
 	conndict.Startup()
 
-	support.LogMessage(support.LogInfo, appname, "Untangle Packet Daemon Version %s\n", "1.00")
-
+	// Start all the callbacks
 	CStartCallbacks()
 
 	// Start Plugins
@@ -67,6 +66,8 @@ func main() {
 
 	// Insert netfilter rules
 	updateRules()
+
+	support.LogMessage(support.LogInfo, appname, "Untangle Packet Daemon Version %s\n", "1.00")
 
 	// Check that all the C services started correctly
 	// This flag is only set on Startup so this only needs to be checked once

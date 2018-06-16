@@ -313,8 +313,6 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	}
 }
 
-//-----------------------------------------------------------------------------
-
 //export go_netlogger_callback
 func go_netlogger_callback(info *C.struct_netlogger_info) {
 	var logger support.NetloggerMessage
@@ -353,21 +351,15 @@ func go_netlogger_callback(info *C.struct_netlogger_info) {
 	}
 }
 
-//-----------------------------------------------------------------------------
-
 //export go_child_startup
 func go_child_startup() {
 	childsync.Add(1)
 }
 
-//-----------------------------------------------------------------------------
-
 //export go_child_shutdown
 func go_child_shutdown() {
 	childsync.Done()
 }
-
-//-----------------------------------------------------------------------------
 
 //export go_child_message
 func go_child_message(level C.int, source *C.char, message *C.char) {
