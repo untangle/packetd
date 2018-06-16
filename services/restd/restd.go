@@ -14,15 +14,40 @@ import (
 var engine *gin.Engine
 var appname = "restd"
 
-//-----------------------------------------------------------------------------
+// Startup is called to start the rest daemon
+func Startup() {
+
+	gin.DisableConsoleColor()
+	gin.DefaultWriter = support.NewLogWriter("restd")
+	engine = gin.Default()
+
+	// routes
+	engine.GET("/ping", pingHandler)
+	engine.POST("/reports/create_query", reportsCreateQuery)
+	engine.GET("/reports/get_data/:query_id", reportsGetData)
+	engine.GET("/settings/get_settings", getSettings)
+	engine.GET("/settings/get_settings/*path", getSettings)
+	engine.POST("/settings/set_settings", setSettings)
+	engine.POST("/settings/set_settings/*path", setSettings)
+	engine.DELETE("/settings/trim_settings", trimSettings)
+	engine.DELETE("/settings/trim_settings/*path", trimSettings)
+
+	// listen and serve on 0.0.0.0:8080
+	engine.Run()
+
+	support.LogMessage(support.LogInfo, appname, "The RestD engine has been started\n")
+}
+
+// Shutdown restd
+func Shutdown() {
+
+}
 
 func pingHandler(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"message": "pong",
 	})
 }
-
-//-----------------------------------------------------------------------------
 
 func reportsGetData(c *gin.Context) {
 	// body, err := ioutil.ReadAll(c.Request.Body)
@@ -52,8 +77,6 @@ func reportsGetData(c *gin.Context) {
 	return
 }
 
-//-----------------------------------------------------------------------------
-
 func reportsCreateQuery(c *gin.Context) {
 	body, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
@@ -73,8 +96,6 @@ func reportsCreateQuery(c *gin.Context) {
 	// })
 }
 
-//-----------------------------------------------------------------------------
-
 func getSettings(c *gin.Context) {
 	var segments []string
 
@@ -90,8 +111,6 @@ func getSettings(c *gin.Context) {
 	c.JSON(200, jsonResult)
 	return
 }
-
-//-----------------------------------------------------------------------------
 
 func setSettings(c *gin.Context) {
 	var segments []string
@@ -113,8 +132,6 @@ func setSettings(c *gin.Context) {
 	return
 }
 
-//-----------------------------------------------------------------------------
-
 func trimSettings(c *gin.Context) {
 	var segments []string
 	path := c.Param("path")
@@ -130,34 +147,6 @@ func trimSettings(c *gin.Context) {
 	return
 }
 
-//-----------------------------------------------------------------------------
-
-// StartRestDaemon is called to start the rest daemon
-func StartRestDaemon() {
-
-	gin.DisableConsoleColor()
-	gin.DefaultWriter = support.NewLogWriter("restd")
-	engine = gin.Default()
-
-	// routes
-	engine.GET("/ping", pingHandler)
-	engine.POST("/reports/create_query", reportsCreateQuery)
-	engine.GET("/reports/get_data/:query_id", reportsGetData)
-	engine.GET("/settings/get_settings", getSettings)
-	engine.GET("/settings/get_settings/*path", getSettings)
-	engine.POST("/settings/set_settings", setSettings)
-	engine.POST("/settings/set_settings/*path", setSettings)
-	engine.DELETE("/settings/trim_settings", trimSettings)
-	engine.DELETE("/settings/trim_settings/*path", trimSettings)
-
-	// listen and serve on 0.0.0.0:8080
-	engine.Run()
-
-	support.LogMessage(support.LogInfo, appname, "The RestD engine has been started\n")
-}
-
-//-----------------------------------------------------------------------------
-
 func removeEmptyStrings(strings []string) []string {
 
 	b := strings[:0]
@@ -168,5 +157,3 @@ func removeEmptyStrings(strings []string) []string {
 	}
 	return b
 }
-
-//-----------------------------------------------------------------------------

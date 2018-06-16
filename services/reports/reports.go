@@ -49,6 +49,11 @@ func Startup() {
 	go createTables()
 }
 
+// Shutdown reports
+func Shutdown() {
+	db.Close()
+}
+
 // CreateQuery submits a database query and returns the results
 func CreateQuery(reportEntry string) (*Query, error) {
 	rows, err := db.Query("SELECT * FROM sessions LIMIT 5")

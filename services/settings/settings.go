@@ -41,6 +41,11 @@ func Startup() {
 	// }
 }
 
+// Shutdown settings service
+func Shutdown() {
+
+}
+
 // GetSettings returns the daemon settings
 func GetSettings(segments []string) interface{} {
 	var ok bool

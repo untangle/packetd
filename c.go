@@ -18,30 +18,41 @@ import (
 	"unsafe"
 )
 
-func C_Startup() {
+// CStartup starts C services
+func CStartup() {
 	C.common_startup()
 }
 
-func C_StartCallbacks() {
+// CStartCallbacks donates threads for all the C services
+// after this all callbacks will be called using these threads
+func CStartCallbacks() {
 	// Donate threads to kernel hooks
 	go C.netfilter_thread()
 	go C.conntrack_thread()
 	go C.netlogger_thread()
 }
 
-func C_StopCallbacks() {
+// CStopCallbacks stops all services and callbacks
+func CStopCallbacks() {
 	// Remove all kernel hooks
 	C.netfilter_shutdown()
 	C.conntrack_shutdown()
 	C.netlogger_shutdown()
 }
 
-func C_Shutdown() {
+// CShutdown all C services
+func CShutdown() {
 	C.common_shutdown()
 }
 
-func C_GetShutdownFlag() int {
+// CGetShutdownFlag returns the c shutdown flag
+func CGetShutdownFlag() int {
 	return int(C.get_shutdown_flag())
+}
+
+// ConntrackDump forces a conntrack dump
+func ConntrackDump() {
+	C.conntrack_dump()
 }
 
 //export go_netfilter_callback
@@ -363,9 +374,4 @@ func go_child_message(level C.int, source *C.char, message *C.char) {
 	lsrc := C.GoString(source)
 	lmsg := C.GoString(message)
 	support.LogMessage(int(level), lsrc, lmsg)
-}
-
-// ConntrackDump forces a conntrack dump
-func ConntrackDump() {
-	C.conntrack_dump()
 }

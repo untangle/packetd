@@ -7,6 +7,7 @@ import (
 	"github.com/untangle/packetd/plugins/dns"
 	"github.com/untangle/packetd/plugins/example"
 	"github.com/untangle/packetd/plugins/geoip"
+	"github.com/untangle/packetd/services/conndict"
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/restd"
 	"github.com/untangle/packetd/services/settings"
@@ -29,8 +30,6 @@ var childsync sync.WaitGroup
 var appname = "packetd"
 var exitLock sync.Mutex
 
-//-----------------------------------------------------------------------------
-
 func main() {
 	var classdPtr = flag.String("classd", "127.0.0.1:8123", "host:port for classd daemon")
 	flag.Parse()
@@ -38,7 +37,7 @@ func main() {
 	handleSignals()
 
 	// Call C Startup
-	C_Startup()
+	CStartup()
 
 	// Set system logger to use our logger
 	log.SetOutput(support.NewLogWriter("log"))
@@ -50,10 +49,11 @@ func main() {
 	support.Startup(ConntrackDump)
 	settings.Startup()
 	reports.Startup()
+	conndict.Startup()
 
 	support.LogMessage(support.LogInfo, appname, "Untangle Packet Daemon Version %s\n", "1.00")
 
-	C_StartCallbacks()
+	CStartCallbacks()
 
 	// Start Plugins
 	go example.PluginStartup(&childsync)
@@ -63,7 +63,7 @@ func main() {
 	go dns.PluginStartup(&childsync)
 
 	// Start REST HTTP daemon
-	go restd.StartRestDaemon()
+	go restd.Startup()
 
 	// Insert netfilter rules
 	updateRules()
@@ -71,15 +71,14 @@ func main() {
 	// Check that all the C services started correctly
 	// This flag is only set on Startup so this only needs to be checked once
 	time.Sleep(1)
-	shutdown := C_GetShutdownFlag()
-	if shutdown != 0 {
+	if CGetShutdownFlag() != 0 {
 		cleanup()
 		os.Exit(0)
 	}
 
 	// Loop forever
 	for {
-		time.Sleep(60)
+		time.Sleep(60 * time.Second)
 		support.LogMessage(support.LogInfo, appname, ".\n")
 	}
 }
@@ -92,6 +91,9 @@ func cleanup() {
 	// Remove netfilter rules
 	removeRules()
 
+	// Stop kernel callbacks
+	CStopCallbacks()
+
 	// Stop all plugins
 	go example.PluginShutdown(&childsync)
 	go classify.PluginShutdown(&childsync)
@@ -101,12 +103,13 @@ func cleanup() {
 
 	// Stop services
 	support.Shutdown()
-
-	// Stop kernel callbacks
-	C_StopCallbacks()
+	reports.Shutdown()
+	settings.Shutdown()
+	restd.Shutdown()
+	conndict.Shutdown()
 
 	// Call C cleanup
-	C_Shutdown()
+	CShutdown()
 
 	// Wait for all plugins to finish
 	childsync.Wait()

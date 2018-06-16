@@ -14,7 +14,15 @@ const pathBase string = "/proc/net/dict"
 var readMutex = &sync.Mutex{}
 var appname = "conndict"
 
-//-----------------------------------------------------------------------------
+// Startup conndict service
+func Startup() {
+
+}
+
+// Shutdown conndict service
+func Shutdown() {
+
+}
 
 // DictPair holds a field value pair of data
 type DictPair struct {
