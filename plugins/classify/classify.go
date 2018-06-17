@@ -81,7 +81,7 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 
 	// if this is the first packet of the session we send a session create command
 	if mess.Session.UpdateCount == 1 {
-		status, err = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.Session.SessionTuple.ClientAddr, mess.Session.SessionTuple.ClientPort, mess.Session.SessionTuple.ServerAddr, mess.Session.SessionTuple.ServerPort)
+		status, err = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.Session.ClientSideTuple.ClientAddr, mess.Session.ClientSideTuple.ClientPort, mess.Session.ClientSideTuple.ServerAddr, mess.Session.ClientSideTuple.ServerPort)
 		if err != nil {
 			support.LogMessage(support.LogErr, appname, "daemonCommand error: %s\n", err.Error())
 			ch <- result
@@ -91,7 +91,7 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 	}
 
 	// send the application payload to the daemon
-	if mess.Session.SessionTuple.ClientAddr.Equal(mess.IPlayer.SrcIP) {
+	if mess.Session.ClientSideTuple.ClientAddr.Equal(mess.IPlayer.SrcIP) {
 		status, err = daemonCommand(mess.Payload, "CLIENT:%d:%d\r\n", ctid, len(mess.Payload))
 	} else {
 		status, err = daemonCommand(mess.Payload, "SERVER:%d:%d\r\n", ctid, len(mess.Payload))

@@ -98,7 +98,8 @@ type SessionEntry struct {
 	SessionID          uint64
 	SessionCreation    time.Time
 	SessionActivity    time.Time
-	SessionTuple       Tuple
+	ClientSideTuple    Tuple
+	ServerSideTuple    Tuple
 	SessionCertificate x509.Certificate
 	UpdateCount        uint64
 	NetfilterSubs      map[string]SubscriptionHolder
@@ -124,7 +125,8 @@ type ConntrackEntry struct {
 	SessionID       uint64
 	SessionCreation time.Time
 	SessionActivity time.Time
-	SessionTuple    Tuple
+	ClientSideTuple Tuple
+	ServerSideTuple Tuple
 	UpdateCount     uint64
 	C2Sbytes        uint64
 	S2Cbytes        uint64

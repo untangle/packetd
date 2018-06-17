@@ -60,6 +60,14 @@ static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrac
 	info.orig_sport = be16toh(nfct_get_attr_u16(ct,ATTR_ORIG_PORT_SRC));
 	info.orig_dport = be16toh(nfct_get_attr_u16(ct,ATTR_ORIG_PORT_DST));
 
+    // get the reply source and destination addresses
+    info.repl_saddr = nfct_get_attr_u32(ct,ATTR_REPL_IPV4_SRC);
+	info.repl_daddr = nfct_get_attr_u32(ct,ATTR_REPL_IPV4_DST);
+
+	// get all of the source and destination ports
+	info.repl_sport = be16toh(nfct_get_attr_u16(ct,ATTR_REPL_PORT_SRC));
+	info.repl_dport = be16toh(nfct_get_attr_u16(ct,ATTR_REPL_PORT_DST));
+    
 	// get the byte counts
 	info.orig_bytes = nfct_get_attr_u64(ct,ATTR_ORIG_COUNTER_BYTES);
 	info.repl_bytes = nfct_get_attr_u64(ct,ATTR_REPL_COUNTER_BYTES);

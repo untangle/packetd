@@ -10,17 +10,11 @@ import (
 	"time"
 )
 
-// SqlOp enum
-const (
-	INSERT = 1
-	UPDATE = 2
-)
-
 // An arbitrary event
 type Event struct {
 	Name            string
 	Table           string
-	SqlOp           int
+	SqlOp           int // 1 - INSERT // 2 - UPDATE
 	Columns         map[string]interface{}
 	ModifiedColumns map[string]interface{}
 }
@@ -92,7 +86,6 @@ func GetData(queryID uint64) (string, error) {
 // Create an Event
 func CreateEvent(name string, table string, sqlOp int, columns map[string]interface{}, modifiedColumns map[string]interface{}) Event {
 	event := Event{Name: name, Table: table, SqlOp: sqlOp, Columns: columns, ModifiedColumns: modifiedColumns}
-
 	return event
 }
 
@@ -103,9 +96,23 @@ func LogEvent(event Event) error {
 }
 
 func eventLogger() {
+	var summary string
 	for {
 		event := <-eventQueue
-		support.LogMessage(support.LogInfo, appname, "Log Event: %s\n", event.Name)
+		summary = event.Name + "|" + event.Table + "|"
+		if event.SqlOp == 1 {
+			str, err := json.Marshal(event.Columns)
+			if err == nil {
+				summary = summary + "INSERT: " + string(str)
+			}
+		}
+		if event.SqlOp == 2 {
+			str, err := json.Marshal(event.ModifiedColumns)
+			if err == nil {
+				summary = summary + "UPDATE: " + string(str)
+			}
+		}
+		support.LogMessage(support.LogInfo, appname, "Log Event: %s\n", summary)
 	}
 }
 
@@ -177,8 +184,8 @@ func createTables() {
                      remote_addr inet,
                      client_addr inet,
                      server_addr inet,
-                     server_port int4,
                      client_port int4,
+                     server_port int4,
                      client_addr_new inet,
                      server_addr_new inet,
                      server_port_new int4,

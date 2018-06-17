@@ -27,6 +27,7 @@
 #include <libnetfilter_log/libnetfilter_log.h>
 #include <libnfnetlink/libnfnetlink.h>
 /*--------------------------------------------------------------------------*/
+// FIXME IPv6
 struct conntrack_info {
 	u_int8_t		msg_type;
 	u_int32_t		conn_id;
@@ -35,6 +36,10 @@ struct conntrack_info {
 	u_int32_t		orig_daddr;
 	u_int16_t		orig_sport;
 	u_int16_t		orig_dport;
+	u_int32_t		repl_saddr;
+	u_int32_t		repl_daddr;
+	u_int16_t		repl_sport;
+	u_int16_t		repl_dport;
 	u_int64_t		orig_bytes;
 	u_int64_t		repl_bytes;
 };
