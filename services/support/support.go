@@ -553,6 +553,7 @@ func initLoggerConfig() {
 	config["dns"] = "INFO"
 	config["example"] = "INFO"
 	config["geoip"] = "INFO"
+	config["kernel"] = "INFO"
 	config["netfilter"] = "INFO"
 	config["netlogger"] = "INFO"
 	config["packetd"] = "INFO"

@@ -1,4 +1,4 @@
-package main
+package kernel
 
 /*
 #include "common.h"
@@ -14,20 +14,24 @@ import (
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/support"
 	"net"
+	"sync"
 	"time"
 	"unsafe"
 )
 
+// To give C child functions access we export go_child_startup and shutdown functions.
+var childsync sync.WaitGroup
+var appname = "kernel"
 var shutdownChannel = make(chan bool)
 
-// CStartup starts C services
-func CStartup() {
+// Startup starts C services
+func Startup() {
 	C.common_startup()
 }
 
-// CStartCallbacks donates threads for all the C services
+// StartCallbacks donates threads for all the C services
 // after this all callbacks will be called using these threads
-func CStartCallbacks() {
+func StartCallbacks() {
 	// Donate threads to kernel hooks
 	go C.netfilter_thread()
 	go C.conntrack_thread()
@@ -37,12 +41,12 @@ func CStartCallbacks() {
 	go periodicTask()
 }
 
-// CStopCallbacks stops all services and callbacks
-func CStopCallbacks() {
+// StopCallbacks stops all services and callbacks
+func StopCallbacks() {
 	// Remove all kernel hooks
-	C.netfilter_shutdown()
-	C.conntrack_shutdown()
-	C.netlogger_shutdown()
+	go C.netfilter_shutdown()
+	go C.conntrack_shutdown()
+	go C.netlogger_shutdown()
 
 	// Send shutdown signal to periodicTask and wait for it to return
 	shutdownChannel <- true
@@ -51,15 +55,18 @@ func CStopCallbacks() {
 	case <-time.After(10 * time.Second):
 		support.LogMessage(support.LogErr, appname, "Failed to properly shutdown periodicTask\n")
 	}
+
+	// wait on above shutdowns
+	childsync.Wait()
 }
 
-// CShutdown all C services
-func CShutdown() {
+// Shutdown all C services
+func Shutdown() {
 	C.common_shutdown()
 }
 
-// CGetShutdownFlag returns the c shutdown flag
-func CGetShutdownFlag() int {
+// GetShutdownFlag returns the c shutdown flag
+func GetShutdownFlag() int {
 	return int(C.get_shutdown_flag())
 }
 

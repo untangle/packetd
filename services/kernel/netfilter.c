@@ -8,7 +8,7 @@
  */
 
 #include "common.h"
-/*--------------------------------------------------------------------------*/
+
 static struct nfq_q_handle		*nfqqh;
 static struct nfq_handle		*nfqh;
 static int						cfg_sock_buffer = 1048576;
@@ -16,7 +16,7 @@ static int						cfg_net_maxlen = 10240;
 static int						cfg_net_buffer = 32768;
 static int						cfg_net_queue = 1818;
 static char                     *appname = "netfilter";
-/*--------------------------------------------------------------------------*/
+
 int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data)
 {
 	*data = (unsigned char *)nfnl_get_pointer_to_data(nfad->data,NFQA_CT,struct nf_conntrack);
@@ -104,7 +104,6 @@ int netfilter_startup(void)
 
 	//open a new netfilter queue handler
 	nfqh = nfq_open();
-
 	if (nfqh == NULL) {
 		logmessage(LOG_ERR,appname,"Error returned from nfq_open()\n");
 		set_shutdown_flag(1);
@@ -113,7 +112,6 @@ int netfilter_startup(void)
 
 	// unbind any existing queue handler
 	ret = nfq_unbind_pf(nfqh,AF_INET);
-
 	if (ret < 0) {
 		logmessage(LOG_ERR,appname,"Error returned from nfq_unbind_pf()\n");
 		set_shutdown_flag(1);
@@ -122,7 +120,6 @@ int netfilter_startup(void)
 
 	// bind the queue handler for AF_INET
 	ret = nfq_bind_pf(nfqh,AF_INET);
-
 	if (ret < 0) {
 		logmessage(LOG_ERR,appname,"Error returned from nfq_bind_pf(lan)\n");
 		set_shutdown_flag(1);
@@ -131,7 +128,6 @@ int netfilter_startup(void)
 
 	// create a new netfilter queue
 	nfqqh = nfq_create_queue(nfqh,cfg_net_queue,netq_callback,NULL);
-
 	if (nfqqh == 0) {
 		logmessage(LOG_ERR,appname,"Error returned from nfq_create_queue(%u)\n",cfg_net_queue);
 		set_shutdown_flag(1);
@@ -140,7 +136,6 @@ int netfilter_startup(void)
 
 	// set the queue length
 	ret = nfq_set_queue_maxlen(nfqqh,cfg_net_maxlen);
-
 	if (ret < 0) {
 		logmessage(LOG_ERR,appname,"Error returned from nfq_set_queue_maxlen(%d)\n",cfg_net_maxlen);
 		set_shutdown_flag(1);
@@ -149,7 +144,6 @@ int netfilter_startup(void)
 
 	// set the queue data copy mode
 	ret = nfq_set_mode(nfqqh,NFQNL_COPY_PACKET,cfg_net_buffer);
-
 	if (ret < 0) {
 		logmessage(LOG_ERR,appname,"Error returned from nfq_set_mode(NFQNL_COPY_PACKET)\n");
 		set_shutdown_flag(1);
@@ -157,8 +151,15 @@ int netfilter_startup(void)
 	}
 
 	// set flag so we also get the conntrack info for each packet
-	ret = nfq_set_queue_flags(nfqqh,NFQA_CFG_F_CONNTRACK,NFQA_CFG_F_CONNTRACK);
+	ret = nfq_set_queue_flags(nfqqh,NFQA_CFG_F_FAIL_OPEN,NFQA_CFG_F_FAIL_OPEN);
+	if (ret < 0) {
+		logmessage(LOG_ERR,appname,"Error returned from nfq_set_queue_flags(NFQA_CFG_F_FAIL_OPEN)\n");
+		set_shutdown_flag(1);
+		return(7);
+	}
 
+	// set flag so we also get the conntrack info for each packet
+	ret = nfq_set_queue_flags(nfqqh,NFQA_CFG_F_CONNTRACK,NFQA_CFG_F_CONNTRACK);
 	if (ret < 0) {
 		logmessage(LOG_ERR,appname,"Error returned from nfq_set_queue_flags(NFQA_CFG_F_CONNTRACK)\n");
 		set_shutdown_flag(1);

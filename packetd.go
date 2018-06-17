@@ -8,6 +8,7 @@ import (
 	"github.com/untangle/packetd/plugins/example"
 	"github.com/untangle/packetd/plugins/geoip"
 	"github.com/untangle/packetd/services/conndict"
+	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/restd"
 	"github.com/untangle/packetd/services/settings"
@@ -23,10 +24,7 @@ import (
 
 // The pluginSync is used to give the main process something to watch while
 // waiting for all of the goroutine children to finish execution and cleanup.
-// To give C child functions access we export go_child_startup and shutdown
-// functions. For children in normal go packages, we pass the WaitGroup
-// directly to the goroutine.
-var childsync sync.WaitGroup
+var pluginSync sync.WaitGroup
 var appname = "packetd"
 var exitLock sync.Mutex
 
@@ -36,8 +34,8 @@ func main() {
 
 	handleSignals()
 
-	// Call C Startup
-	CStartup()
+	// Call Kernel API Startup
+	kernel.Startup()
 
 	// Set system logger to use our logger
 	log.SetOutput(support.NewLogWriter("log"))
@@ -52,14 +50,14 @@ func main() {
 	conndict.Startup()
 
 	// Start all the callbacks
-	CStartCallbacks()
+	kernel.StartCallbacks()
 
 	// Start Plugins
-	go example.PluginStartup(&childsync)
-	go classify.PluginStartup(&childsync, classdPtr)
-	go geoip.PluginStartup(&childsync)
-	go certcache.PluginStartup(&childsync)
-	go dns.PluginStartup(&childsync)
+	go example.PluginStartup(&pluginSync)
+	go classify.PluginStartup(&pluginSync, classdPtr)
+	go geoip.PluginStartup(&pluginSync)
+	go certcache.PluginStartup(&pluginSync)
+	go dns.PluginStartup(&pluginSync)
 
 	// Start REST HTTP daemon
 	go restd.Startup()
@@ -72,7 +70,7 @@ func main() {
 	// Check that all the C services started correctly
 	// This flag is only set on Startup so this only needs to be checked once
 	time.Sleep(1)
-	if CGetShutdownFlag() != 0 {
+	if kernel.GetShutdownFlag() != 0 {
 		cleanup()
 		os.Exit(0)
 	}
@@ -95,18 +93,18 @@ func cleanup() {
 
 	// Stop kernel callbacks
 	support.LogMessage(support.LogInfo, appname, "Removing kernel hooks...\n")
-	CStopCallbacks()
+	kernel.StopCallbacks()
 
 	// Stop all plugins
 	support.LogMessage(support.LogInfo, appname, "Stopping plugins...\n")
-	go example.PluginShutdown(&childsync)
-	go classify.PluginShutdown(&childsync)
-	go geoip.PluginShutdown(&childsync)
-	go certcache.PluginShutdown(&childsync)
-	go dns.PluginShutdown(&childsync)
+	go example.PluginShutdown(&pluginSync)
+	go classify.PluginShutdown(&pluginSync)
+	go geoip.PluginShutdown(&pluginSync)
+	go certcache.PluginShutdown(&pluginSync)
+	go dns.PluginShutdown(&pluginSync)
 
 	support.LogMessage(support.LogInfo, appname, "Waiting on plugins...\n")
-	childsync.Wait()
+	pluginSync.Wait()
 
 	// Stop services
 	support.LogMessage(support.LogInfo, appname, "Shutting down services...\n")
@@ -116,8 +114,8 @@ func cleanup() {
 	restd.Shutdown()
 	conndict.Shutdown()
 
-	// Call C cleanup
-	CShutdown()
+	// Call Kernel cleanup
+	kernel.Shutdown()
 }
 
 // Add signal handlers
