@@ -18,17 +18,22 @@ import (
 	"unsafe"
 )
 
+// ConntrackCallback is a function to handle conntrack events
 type ConntrackCallback func(uint32, uint8, uint8, net.IP, net.IP, uint16, uint16, net.IP, net.IP, uint16, uint16, uint64, uint64)
+
+// NfqueueCallback is a function to handle nfqueue events
 type NfqueueCallback func(uint32, gopacket.Packet, int, uint32) uint32
+
+// NetloggerCallback is a function to handle netlogger events
 type NetloggerCallback func(uint8, uint8, uint16, uint8, uint8, string, string, uint16, uint16, uint32, string)
 
 // To give C child functions access we export go_child_startup and shutdown functions.
 var childsync sync.WaitGroup
 var appname = "kernel"
 var shutdownConntrackTask = make(chan bool)
-var conntrackCallback ConntrackCallback = nil
-var nfqueueCallback NfqueueCallback = nil
-var netloggerCallback NetloggerCallback = nil
+var conntrackCallback ConntrackCallback
+var nfqueueCallback NfqueueCallback
+var netloggerCallback NetloggerCallback
 
 // Startup starts C services
 func Startup() {

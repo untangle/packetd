@@ -10,12 +10,18 @@ import (
 	"time"
 )
 
-// An arbitrary event
+// Event stores an arbitrary event
 type Event struct {
-	Name            string
-	Table           string
-	SqlOp           int // 1 - INSERT // 2 - UPDATE
-	Columns         map[string]interface{}
+	// Name - A human readable name for this event. (ie "session_new" is a new session event)
+	Name string
+	// Table - the DB table that this event modifies (or nil)
+	Table string
+	// SQLOp - the SQL operation needed to serialize the event to the DB
+	// 1 - INSERT // 2 - UPDATE
+	SQLOp int
+	// The columns in the DB this inserts for INSERTS or qualifies if matches for UPDATES
+	Columns map[string]interface{}
+	// The columns to modify for UPDATE events
 	ModifiedColumns map[string]interface{}
 }
 
@@ -31,7 +37,7 @@ var queryID uint64
 var appname = "reports"
 var eventQueue = make(chan Event)
 
-// Initialize creates a connection to the database
+// Startup starts the reports service
 func Startup() {
 	var err error
 	db, err = sql.Open("sqlite3", "/tmp/reports.db")
@@ -46,7 +52,7 @@ func Startup() {
 	}()
 }
 
-// Shutdown reports
+// Shutdown stops the reports service
 func Shutdown() {
 	db.Close()
 }
@@ -86,13 +92,13 @@ func GetData(queryID uint64) (string, error) {
 	return string(jsonData), nil
 }
 
-// Create an Event
+// CreateEvent creates an Event
 func CreateEvent(name string, table string, sqlOp int, columns map[string]interface{}, modifiedColumns map[string]interface{}) Event {
-	event := Event{Name: name, Table: table, SqlOp: sqlOp, Columns: columns, ModifiedColumns: modifiedColumns}
+	event := Event{Name: name, Table: table, SQLOp: sqlOp, Columns: columns, ModifiedColumns: modifiedColumns}
 	return event
 }
 
-// Log an Event
+// LogEvent adds an event to the eventQueue for later logging
 func LogEvent(event Event) error {
 	eventQueue <- event
 	return nil
@@ -103,13 +109,13 @@ func eventLogger() {
 	for {
 		event := <-eventQueue
 		summary = event.Name + "|" + event.Table + "|"
-		if event.SqlOp == 1 {
+		if event.SQLOp == 1 {
 			str, err := json.Marshal(event.Columns)
 			if err == nil {
 				summary = summary + "INSERT: " + string(str)
 			}
 		}
-		if event.SqlOp == 2 {
+		if event.SQLOp == 2 {
 			str, err := json.Marshal(event.ModifiedColumns)
 			if err == nil {
 				summary = summary + "UPDATE: " + string(str)

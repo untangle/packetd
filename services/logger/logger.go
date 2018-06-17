@@ -43,6 +43,7 @@ const LogDebug = 7
 //LogLogic = custom value
 const LogLogic = 8
 
+// Startup starts the logging service
 func Startup() {
 	// capture startup time
 	launchTime = time.Now()
@@ -55,6 +56,7 @@ func Startup() {
 	log.SetOutput(NewLogWriter("log"))
 }
 
+// Shutdown stops the logging service
 func Shutdown() {
 
 }

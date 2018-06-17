@@ -117,6 +117,7 @@ var sessionIndex uint64
 var shutdownCleanerTask = make(chan bool)
 var appname = "events"
 
+// Startup starts the event handling service
 func Startup() {
 	// create the session, conntrack, and certificate tables
 	sessionTable = make(map[uint32]SessionEntry)
@@ -143,6 +144,7 @@ func Startup() {
 	go cleanerTask()
 }
 
+// Shutdown stops the event handling service
 func Shutdown() {
 	// Send shutdown signal to periodicTask and wait for it to return
 	shutdownCleanerTask <- true

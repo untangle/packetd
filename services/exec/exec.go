@@ -15,7 +15,7 @@ func Startup() {
 func Shutdown() {
 }
 
-// Run a system command
+// SystemCommand runs a system command
 func SystemCommand(command string, arguments []string) ([]byte, error) {
 	var result []byte
 	var err error
