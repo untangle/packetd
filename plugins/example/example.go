@@ -2,7 +2,7 @@ package example
 
 import (
 	"encoding/hex"
-	"github.com/untangle/packetd/services/events"
+	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"sync"
 )
@@ -14,9 +14,9 @@ var appname = "example"
 // our shutdown function to return during shutdown.
 func PluginStartup(childsync *sync.WaitGroup) {
 	logger.LogMessage(logger.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
-	events.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
-	events.InsertConntrackSubscription(appname, 1, PluginConntrackHandler)
-	events.InsertNetloggerSubscription(appname, 1, PluginNetloggerHandler)
+	dispatch.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
+	dispatch.InsertConntrackSubscription(appname, 1, PluginConntrackHandler)
+	dispatch.InsertNetloggerSubscription(appname, 1, PluginNetloggerHandler)
 	childsync.Add(1)
 }
 
@@ -32,11 +32,11 @@ func PluginShutdown(childsync *sync.WaitGroup) {
 // We do whatever we like with the data, and when finished, we return an
 // integer via the argumented channel with any bits set that we want added to
 // the packet mark.
-func PluginNfqueueHandler(ch chan<- events.SubscriptionResult, mess events.TrafficMessage, ctid uint) {
+func PluginNfqueueHandler(ch chan<- dispatch.SubscriptionResult, mess dispatch.TrafficMessage, ctid uint) {
 	// our example simply dumps the raw message to the console
 	logger.LogMessage(logger.LogDebug, appname, "NfqueueHandler recived %d BYTES from %s to %s\n%s\n", mess.Length, mess.IPlayer.SrcIP, mess.IPlayer.DstIP, hex.Dump(mess.Packet.Data()))
 
-	var result events.SubscriptionResult
+	var result dispatch.SubscriptionResult
 	result.Owner = appname
 	result.SessionRelease = true
 	result.PacketMark = 0
@@ -45,10 +45,10 @@ func PluginNfqueueHandler(ch chan<- events.SubscriptionResult, mess events.Traff
 	ch <- result
 }
 
-// PluginConntrackHandler receives conntrack events. The message will be one
+// PluginConntrackHandler receives conntrack dispatch. The message will be one
 // of three possible values: N, U, or D for new entry, an update to an existing
 // entry, or delete of an existing entry.
-func PluginConntrackHandler(message int, entry *events.ConntrackEntry) {
+func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
 	logger.LogMessage(logger.LogDebug, appname, "ConntrackHandler MSG:%c ID:%d PROTO:%d SADDR:%s SPORT:%d DADDR:%s DPORT:%d TX:%d RX:%d UC:%d\n",
 		message,
 		entry.ConntrackID,
@@ -62,8 +62,8 @@ func PluginConntrackHandler(message int, entry *events.ConntrackEntry) {
 		entry.UpdateCount)
 }
 
-// PluginNetloggerHandler receives NFLOG events.
-func PluginNetloggerHandler(netlogger *events.NetloggerMessage) {
+// PluginNetloggerHandler receives NFLOG dispatch.
+func PluginNetloggerHandler(netlogger *dispatch.NetloggerMessage) {
 	logger.LogMessage(logger.LogDebug, appname, "NetloggerHandler PROTO:%d ICMP:%d SIF:%d DIF:%d SADR:%s DADR:%s SPORT:%d DPORT:%d MARK:%X PREFIX:%s\n",
 		netlogger.Protocol,
 		netlogger.IcmpType,

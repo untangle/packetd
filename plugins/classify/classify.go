@@ -3,7 +3,7 @@ package classify
 import (
 	"fmt"
 	"github.com/untangle/packetd/services/conndict"
-	"github.com/untangle/packetd/services/events"
+	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/exec"
 	"github.com/untangle/packetd/services/logger"
 	"net"
@@ -41,7 +41,7 @@ func PluginStartup(childsync *sync.WaitGroup, classdPtr *string) {
 		logger.LogMessage(logger.LogErr, appname, "Error calling net.Dial(): %v\n", err)
 	}
 
-	events.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
 	childsync.Add(1)
 }
 
@@ -64,8 +64,8 @@ func PluginShutdown(childsync *sync.WaitGroup) {
 // PluginNfqueueHandler is called for raw nfqueue packets. We pass the
 // packet directly to the Sandvine NAVL library for classification, and
 // push the results to the conntrack dictionary.
-func PluginNfqueueHandler(ch chan<- events.SubscriptionResult, mess events.TrafficMessage, ctid uint) {
-	var result events.SubscriptionResult
+func PluginNfqueueHandler(ch chan<- dispatch.SubscriptionResult, mess dispatch.TrafficMessage, ctid uint) {
+	var result dispatch.SubscriptionResult
 	result.Owner = appname
 	result.PacketMark = 0
 	result.SessionRelease = false

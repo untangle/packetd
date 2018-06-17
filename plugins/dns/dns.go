@@ -2,7 +2,7 @@ package dns
 
 import (
 	"github.com/google/gopacket/layers"
-	"github.com/untangle/packetd/services/events"
+	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"sync"
 )
@@ -16,7 +16,7 @@ var appname = "dns"
 // our shutdown function to return during shutdown.
 func PluginStartup(childsync *sync.WaitGroup) {
 	logger.LogMessage(logger.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
-	events.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
 	childsync.Add(1)
 }
 
@@ -33,8 +33,8 @@ func PluginShutdown(childsync *sync.WaitGroup) {
 
 // PluginNfqueueHandler is called to handle nfqueue packet data. We only
 // look at DNS packets, extracting the QNAME and putting it in conndict.
-func PluginNfqueueHandler(ch chan<- events.SubscriptionResult, mess events.TrafficMessage, ctid uint) {
-	var result events.SubscriptionResult
+func PluginNfqueueHandler(ch chan<- dispatch.SubscriptionResult, mess dispatch.TrafficMessage, ctid uint) {
+	var result dispatch.SubscriptionResult
 	result.Owner = appname
 	result.SessionRelease = true
 	result.PacketMark = 0

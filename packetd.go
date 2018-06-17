@@ -8,7 +8,7 @@ import (
 	"github.com/untangle/packetd/plugins/example"
 	"github.com/untangle/packetd/plugins/geoip"
 	"github.com/untangle/packetd/services/conndict"
-	"github.com/untangle/packetd/services/events"
+	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/exec"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
@@ -38,7 +38,7 @@ func main() {
 	// Start services
 	logger.Startup()
 	kernel.Startup()
-	events.Startup()
+	dispatch.Startup()
 	exec.Startup()
 	settings.Startup()
 	reports.Startup()
@@ -108,7 +108,7 @@ func cleanup() {
 	settings.Shutdown()
 	restd.Shutdown()
 	conndict.Shutdown()
-	events.Shutdown()
+	dispatch.Shutdown()
 	kernel.Shutdown()
 	logger.Shutdown()
 }

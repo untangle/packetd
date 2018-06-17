@@ -4,7 +4,7 @@ import (
 	"compress/gzip"
 	"github.com/oschwald/geoip2-golang"
 	"github.com/untangle/packetd/services/conndict"
-	"github.com/untangle/packetd/services/events"
+	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"io"
 	"net/http"
@@ -50,7 +50,7 @@ func PluginStartup(childsync *sync.WaitGroup) {
 		geodb = db
 	}
 
-	events.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
 	childsync.Add(1)
 }
 
@@ -70,7 +70,7 @@ func PluginShutdown(childsync *sync.WaitGroup) {
 // PluginNfqueueHandler is called to handle nfqueue packet data. We extract
 // the source and destination IP address from the packet, lookup the GeoIP
 // country code for each, and store them in the conntrack dictionary.
-func PluginNfqueueHandler(ch chan<- events.SubscriptionResult, mess events.TrafficMessage, ctid uint) {
+func PluginNfqueueHandler(ch chan<- dispatch.SubscriptionResult, mess dispatch.TrafficMessage, ctid uint) {
 	var SrcCode = "XX"
 	var DstCode = "XX"
 
@@ -89,7 +89,7 @@ func PluginNfqueueHandler(ch chan<- events.SubscriptionResult, mess events.Traff
 	conndict.SetPair("SrcCountry", SrcCode, ctid)
 	conndict.SetPair("DstCountry", DstCode, ctid)
 
-	var result events.SubscriptionResult
+	var result dispatch.SubscriptionResult
 	result.Owner = appname
 	result.PacketMark = 0
 	result.SessionRelease = true

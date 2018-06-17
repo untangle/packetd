@@ -1,4 +1,4 @@
-package events
+package dispatch
 
 import (
 	"crypto/x509"
