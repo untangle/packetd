@@ -85,19 +85,8 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 		support.LogMessage(support.LogDebug, appname, "DST: %s = %s\n", mess.IPlayer.DstIP, DstCode)
 	}
 
-	errc := conndict.SetPair("SrcCountry", SrcCode, ctid)
-	if errc != nil {
-		support.LogMessage(support.LogWarn, appname, "SetPair(client) ERROR: %s\n", errc)
-	} else {
-		support.LogMessage(support.LogDebug, appname, "SetPair(client) %d = %s\n", ctid, SrcCode)
-	}
-
-	errs := conndict.SetPair("DstCountry", DstCode, ctid)
-	if errs != nil {
-		support.LogMessage(support.LogWarn, appname, "SetPair(server) ERROR: %s\n", errs)
-	} else {
-		support.LogMessage(support.LogDebug, appname, "SetPair(server) %d = %s\n", ctid, DstCode)
-	}
+	conndict.SetPair("SrcCountry", SrcCode, ctid)
+	conndict.SetPair("DstCountry", DstCode, ctid)
 
 	var result support.SubscriptionResult
 	result.Owner = appname

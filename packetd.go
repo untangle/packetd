@@ -34,16 +34,11 @@ func main() {
 
 	handleSignals()
 
-	// Call Kernel API Startup
-	kernel.Startup()
-
 	// Set system logger to use our logger
 	log.SetOutput(support.NewLogWriter("log"))
 
-	// Load the conndict module
-	support.SystemCommand("modprobe", []string{"nf_conntrack_dict"})
-
 	// Start services
+	kernel.Startup()
 	support.Startup()
 	settings.Startup()
 	reports.Startup()
@@ -113,19 +108,16 @@ func cleanup() {
 	settings.Shutdown()
 	restd.Shutdown()
 	conndict.Shutdown()
-
-	// Call Kernel cleanup
 	kernel.Shutdown()
 }
 
 // Add signal handlers
 func handleSignals() {
 	ch := make(chan os.Signal)
-	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
-	signal.Notify(ch, os.Interrupt, syscall.SIGINT)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		<-ch
-		support.LogMessage(support.LogInfo, appname, "Received signal. Exiting...\n")
+		sig := <-ch
+		support.LogMessage(support.LogWarn, appname, "Received signal [%v]. Exiting...\n", sig)
 		cleanup()
 		os.Exit(1)
 	}()

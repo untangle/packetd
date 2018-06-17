@@ -163,12 +163,7 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 			continue
 		}
 
-		ret := conndict.SetPair(pairname, pairdata, ctid)
-		if ret != nil {
-			support.LogMessage(support.LogWarn, appname, "SetPair(%s,%s,%d) ERROR: %s\n", pairname, pairdata, ctid, ret)
-		} else {
-			support.LogMessage(support.LogDebug, appname, "SetPair(%s,%s,%d) SUCCESS\n", pairname, pairdata, ctid)
-		}
+		conndict.SetPair(pairname, pairdata, ctid)
 	}
 
 	// use the channel to return our result

@@ -147,12 +147,7 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 
 func setConnDictPair(field string, value string, ctid uint) {
 	output := strings.Replace(value, ",", "-", -1)
-	err := conndict.SetPair(field, output, ctid)
-	if err != nil {
-		support.LogMessage(support.LogWarn, appname, "SetPair(%s,%s,%d) ERROR: %v\n", field, output, ctid, err)
-	} else {
-		support.LogMessage(support.LogDebug, appname, "SetPair(%s,%s,%d) SUCCESS\n", field, output, ctid)
-	}
+	conndict.SetPair(field, output, ctid)
 }
 
 //-----------------------------------------------------------------------------
@@ -174,12 +169,7 @@ func setConnDictList(field string, value []string, ctid uint) {
 
 	output := strings.Replace(buffer, ",", "-", -1)
 
-	err := conndict.SetPair(field, output, ctid)
-	if err != nil {
-		support.LogMessage(support.LogWarn, appname, "SetPair(%s,%s,%d) ERROR: %v\n", field, output, ctid, err)
-	} else {
-		support.LogMessage(support.LogDebug, appname, "SetPair(%s,%s,%d) SUCCESS\n", field, output, ctid)
-	}
+	conndict.SetPair(field, output, ctid)
 }
 
 //-----------------------------------------------------------------------------

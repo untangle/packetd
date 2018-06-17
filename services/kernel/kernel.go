@@ -26,6 +26,9 @@ var shutdownChannel = make(chan bool)
 
 // Startup starts C services
 func Startup() {
+	// Load the conndict module
+	support.SystemCommand("modprobe", []string{"nf_conntrack_dict"})
+
 	C.common_startup()
 }
 

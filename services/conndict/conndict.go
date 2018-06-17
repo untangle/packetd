@@ -50,18 +50,21 @@ func (p DictPair) Print() {
 
 // SetPair sets a field/value pair for the supplied conntrack id
 func SetPair(field string, value string, id uint) error {
-	file, err := os.OpenFile(pathBase+"/write", os.O_WRONLY, 0660)
+	filename := pathBase + "/write"
+	file, err := os.OpenFile(filename, os.O_WRONLY, 0660)
 	setstr := fmt.Sprintf("id=%d,field=%s,value=%s", id, field, value)
 
 	if err != nil {
-		return fmt.Errorf("conndict: SetPair: Failed to open %s", pathBase+"/write")
+		support.LogMessage(support.LogWarn, appname, "SetPair(%s,%s,%d): Failed to open %s\n", field, value, id, filename)
+		return fmt.Errorf("conndict: SetPair: Failed to open %s", filename)
 	}
 
 	defer file.Close()
 
 	_, err = file.WriteString(setstr)
 	if err != nil {
-		return fmt.Errorf("conndict: SetPair: Failed to write %s", setstr)
+		support.LogMessage(support.LogWarn, appname, "SetPair(%s,%s,%d): Failed to write %s\n", field, value, id)
+		return fmt.Errorf("conndict: SetPair: Failed to write %s", filename)
 	}
 
 	file.Sync()
@@ -89,11 +92,12 @@ func SetPairs(pairs []DictPair, id uint) error {
 
 // GetPairs gets all of the field/value pairs for the supplied conntrack id
 func GetPairs(id uint) ([]DictPair, error) {
-	file, err := os.OpenFile(pathBase+"/read", os.O_RDWR, 0660)
+	filename := pathBase + "/read"
+	file, err := os.OpenFile(filename, os.O_RDWR, 0660)
 	setstr := fmt.Sprintf("%d", id)
 
 	if err != nil {
-		return nil, fmt.Errorf("conndict: Get_pairs: Failed to open %s", pathBase+"/read")
+		return nil, fmt.Errorf("conndict: Get_pairs: Failed to open %s", filename)
 	}
 
 	defer file.Close()

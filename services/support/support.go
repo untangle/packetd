@@ -454,7 +454,7 @@ func SystemCommand(command string, arguments []string) ([]byte, error) {
 	if err != nil {
 		LogMessage(LogInfo, appname, "COMMAND:%s | OUTPUT:%s | ERROR:%s\n", command, string(result), err.Error())
 	} else {
-		LogMessage(LogInfo, appname, "COMMAND:%s | OUTPUT:%s\n", command, string(result))
+		LogMessage(LogDebug, appname, "COMMAND:%s | OUTPUT:%s\n", command, string(result))
 	}
 	return result, err
 }
