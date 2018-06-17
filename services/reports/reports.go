@@ -171,7 +171,7 @@ func createTables() {
 	var err error
 
 	_, err = db.Exec(
-		`CREATE TABLE sessions (
+		`CREATE TABLE IF NOT EXISTS sessions (
                      session_id int8 PRIMARY KEY NOT NULL,
                      time_stamp timestamp NOT NULL,
                      end_time timestamp,

@@ -234,17 +234,6 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	ctid = uint32(info.conn_id)
 	session, sessionFound := support.FindSessionEntry(uint32(ctid))
 
-	// The first packet should be captured in nfqueue, which should add the session to the session table
-	// We should not receive a new conntrack event for something that is not in the session table
-	if info.msg_type == 'N' && !sessionFound {
-		// FIXME - this is happening a lot - why?
-		support.LogMessage(support.LogWarn, appname, "Missing session for new conntrack event: %d %v %s:%d-%s:%d \n",
-			ctid, clientSideTuple.Protocol,
-			clientSideTuple.ClientAddr, clientSideTuple.ClientPort,
-			clientSideTuple.ServerAddr, clientSideTuple.ServerPort)
-		return
-	}
-
 	// FIXME, This can be removed if we are sure this never happens.
 	// This is temporary and is used to look for conntrack id's being re-used
 	// unexpectedly. On the first packet, the netfilter handler seems to get
@@ -279,30 +268,36 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 
 	// handle NEW events
 	if info.msg_type == 'N' {
-		var serverSideTuple support.Tuple
-		serverSideTuple.Protocol = uint8(info.orig_proto)
-		// FIXME IPv6
-		serverSideTuple.ClientAddr = make(net.IP, 4)
-		binary.LittleEndian.PutUint32(serverSideTuple.ClientAddr, uint32(info.repl_daddr))
-		serverSideTuple.ClientPort = uint16(info.repl_dport)
-		// FIXME IPv6
-		serverSideTuple.ServerAddr = make(net.IP, 4)
-		binary.LittleEndian.PutUint32(serverSideTuple.ServerAddr, uint32(info.repl_saddr))
-		serverSideTuple.ServerPort = uint16(info.repl_sport)
+		if sessionFound {
+			var serverSideTuple support.Tuple
+			serverSideTuple.Protocol = uint8(info.orig_proto)
+			// FIXME IPv6
+			serverSideTuple.ClientAddr = make(net.IP, 4)
+			binary.LittleEndian.PutUint32(serverSideTuple.ClientAddr, uint32(info.repl_daddr))
+			serverSideTuple.ClientPort = uint16(info.repl_dport)
+			// FIXME IPv6
+			serverSideTuple.ServerAddr = make(net.IP, 4)
+			binary.LittleEndian.PutUint32(serverSideTuple.ServerAddr, uint32(info.repl_saddr))
+			serverSideTuple.ServerPort = uint16(info.repl_sport)
 
-		// Set the server side tuple, this is the first time we've seen the post-NAT data
-		session.ServerSideTuple = serverSideTuple
+			// Set the server side tuple, this is the first time we've seen the post-NAT data
+			session.ServerSideTuple = serverSideTuple
 
-		columns := map[string]interface{}{
-			"session_id": session.SessionID,
+			columns := map[string]interface{}{
+				"session_id": session.SessionID,
+			}
+			modifiedColumns := map[string]interface{}{
+				"client_addr_new": session.ServerSideTuple.ClientAddr,
+				"server_addr_new": session.ServerSideTuple.ServerAddr,
+				"client_port_new": session.ServerSideTuple.ClientPort,
+				"server_port_new": session.ServerSideTuple.ServerPort,
+			}
+			reports.LogEvent(reports.CreateEvent("session_nat", "sessions", 2, columns, modifiedColumns))
+		} else {
+			// We should not receive a new conntrack event for something that is not in the session table
+			// However it happens on local outbound sessions, we should handle these diffently
+			// FIXME log session_new event
 		}
-		modifiedColumns := map[string]interface{}{
-			"client_addr_new": session.ServerSideTuple.ClientAddr,
-			"server_addr_new": session.ServerSideTuple.ServerAddr,
-			"client_port_new": session.ServerSideTuple.ClientPort,
-			"server_port_new": session.ServerSideTuple.ServerPort,
-		}
-		reports.LogEvent(reports.CreateEvent("session_nat", "sessions", 2, columns, modifiedColumns))
 	}
 
 	// handle DELETE events
