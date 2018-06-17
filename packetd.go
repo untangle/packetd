@@ -8,12 +8,12 @@ import (
 	"github.com/untangle/packetd/plugins/example"
 	"github.com/untangle/packetd/plugins/geoip"
 	"github.com/untangle/packetd/services/conndict"
+	"github.com/untangle/packetd/services/exec"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/restd"
 	"github.com/untangle/packetd/services/settings"
-	"github.com/untangle/packetd/services/support"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -37,7 +37,7 @@ func main() {
 	// Start services
 	logger.Startup()
 	kernel.Startup()
-	support.Startup()
+	exec.Startup()
 	settings.Startup()
 	reports.Startup()
 	conndict.Startup()
@@ -101,7 +101,7 @@ func cleanup() {
 
 	// Stop services
 	logger.LogMessage(logger.LogInfo, appname, "Shutting down services...\n")
-	support.Shutdown()
+	exec.Shutdown()
 	reports.Shutdown()
 	settings.Shutdown()
 	restd.Shutdown()
@@ -129,7 +129,7 @@ func updateRules() {
 		logger.LogMessage(logger.LogErr, appname, "Error determining directory: %s\n", err.Error())
 		return
 	}
-	support.SystemCommand(dir+"/packetd_rules", []string{})
+	exec.SystemCommand(dir+"/packetd_rules", []string{})
 }
 
 //remove the netfilter queue rules for packetd
@@ -139,5 +139,5 @@ func removeRules() {
 		logger.LogMessage(logger.LogErr, appname, "Error determining directory: %s\n", err.Error())
 		return
 	}
-	support.SystemCommand(dir+"/packetd_rules", []string{"-r"})
+	exec.SystemCommand(dir+"/packetd_rules", []string{"-r"})
 }

@@ -5,8 +5,8 @@ import (
 	"crypto/x509"
 	"fmt"
 	"github.com/untangle/packetd/services/conndict"
+	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/support"
 	"strings"
 	"sync"
 	"time"
@@ -32,7 +32,7 @@ func PluginStartup(childsync *sync.WaitGroup) {
 	certificateTable = make(map[string]CertificateHolder)
 	go cleanupTask()
 
-	support.InsertNetfilterSubscription(appname, 1, PluginNetfilterHandler)
+	kernel.InsertNetfilterSubscription(appname, 1, PluginNetfilterHandler)
 	childsync.Add(1)
 }
 
@@ -56,8 +56,8 @@ func PluginShutdown(childsync *sync.WaitGroup) {
 // the server certificate from our cache or fetch it from the server and
 // store it in our cache. Once we have the cert, we attach it to the session,
 // extract the interesting subject fields, and put them in the conndict.
-func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.TrafficMessage, ctid uint) {
-	var result support.SubscriptionResult
+func PluginNetfilterHandler(ch chan<- kernel.SubscriptionResult, mess kernel.TrafficMessage, ctid uint) {
+	var result kernel.SubscriptionResult
 	result.Owner = appname
 	result.PacketMark = 0
 	result.SessionRelease = true

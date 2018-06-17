@@ -3,8 +3,9 @@ package classify
 import (
 	"fmt"
 	"github.com/untangle/packetd/services/conndict"
+	"github.com/untangle/packetd/services/exec"
+	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/support"
 	"net"
 	"strings"
 	"sync"
@@ -30,7 +31,7 @@ func PluginStartup(childsync *sync.WaitGroup, classdPtr *string) {
 
 	logger.LogMessage(logger.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
 
-	support.SystemCommand("systemctl", []string{"start", "untangle-classd.service"})
+	exec.SystemCommand("systemctl", []string{"start", "untangle-classd.service"})
 
 	socktime = time.Now()
 	sockspin = 0
@@ -40,7 +41,7 @@ func PluginStartup(childsync *sync.WaitGroup, classdPtr *string) {
 		logger.LogMessage(logger.LogErr, appname, "Error calling net.Dial(): %v\n", err)
 	}
 
-	support.InsertNetfilterSubscription(appname, 1, PluginNetfilterHandler)
+	kernel.InsertNetfilterSubscription(appname, 1, PluginNetfilterHandler)
 	childsync.Add(1)
 }
 
@@ -63,8 +64,8 @@ func PluginShutdown(childsync *sync.WaitGroup) {
 // PluginNetfilterHandler is called for raw netfilter packets. We pass the
 // packet directly to the Sandvine NAVL library for classification, and
 // push the results to the conntrack dictionary.
-func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.TrafficMessage, ctid uint) {
-	var result support.SubscriptionResult
+func PluginNetfilterHandler(ch chan<- kernel.SubscriptionResult, mess kernel.TrafficMessage, ctid uint) {
+	var result kernel.SubscriptionResult
 	result.Owner = appname
 	result.PacketMark = 0
 	result.SessionRelease = false

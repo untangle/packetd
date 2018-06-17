@@ -8,29 +8,153 @@ package kernel
 import "C"
 
 import (
+	"crypto/x509"
 	"encoding/binary"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/untangle/packetd/services/exec"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
-	"github.com/untangle/packetd/services/support"
 	"net"
 	"sync"
 	"time"
 	"unsafe"
 )
 
+//NetfilterHandlerFunction defines a pointer to a netfilter callback function
+type NetfilterHandlerFunction func(chan<- SubscriptionResult, TrafficMessage, uint)
+
+//ConntrackHandlerFunction defines a pointer to a conntrack callback function
+type ConntrackHandlerFunction func(int, *ConntrackEntry)
+
+//NetloggerHandlerFunction defines a pointer to a netlogger callback function
+type NetloggerHandlerFunction func(*NetloggerMessage)
+
+// SubscriptionHolder stores the details of a data callback subscription
+type SubscriptionHolder struct {
+	Owner         string
+	Priority      int
+	NetfilterFunc NetfilterHandlerFunction
+	ConntrackFunc ConntrackHandlerFunction
+	NetloggerFunc NetloggerHandlerFunction
+}
+
+// SubscriptionResult returns status and other information from a subscription handler function
+type SubscriptionResult struct {
+	Owner          string
+	PacketMark     uint32
+	SessionRelease bool
+}
+
+// SessionEntry stores details related to a session
+type SessionEntry struct {
+	SessionID          uint64
+	SessionCreation    time.Time
+	SessionActivity    time.Time
+	ClientSideTuple    Tuple
+	ServerSideTuple    Tuple
+	SessionCertificate x509.Certificate
+	UpdateCount        uint64
+	NetfilterSubs      map[string]SubscriptionHolder
+}
+
+// Tuple represent a session using the protocol and source and destination address and port values.
+type Tuple struct {
+	Protocol   uint8
+	ClientAddr net.IP
+	ClientPort uint16
+	ServerAddr net.IP
+	ServerPort uint16
+}
+
+// ConntrackEntry stores the details of a conntrack entry
+type ConntrackEntry struct {
+	ConntrackID     uint32
+	SessionID       uint64
+	SessionCreation time.Time
+	SessionActivity time.Time
+	ClientSideTuple Tuple
+	ServerSideTuple Tuple
+	UpdateCount     uint64
+	C2Sbytes        uint64
+	S2Cbytes        uint64
+	TotalBytes      uint64
+	C2Srate         float32
+	S2Crate         float32
+	TotalRate       float32
+	PurgeFlag       bool
+}
+
+// TrafficMessage is used to pass netfilter traffic to interested plugins
+type TrafficMessage struct {
+	Session  SessionEntry
+	Tuple    Tuple
+	Packet   gopacket.Packet
+	Length   int
+	IPlayer  *layers.IPv4
+	TCPlayer *layers.TCP
+	UDPlayer *layers.UDP
+	Payload  []byte
+}
+
+// NetloggerMessage is used to pass the details of NFLOG events to interested plugins
+type NetloggerMessage struct {
+	Version  uint8
+	Protocol uint8
+	IcmpType uint16
+	SrcIntf  uint8
+	DstIntf  uint8
+	SrcAddr  string
+	DstAddr  string
+	SrcPort  uint16
+	DstPort  uint16
+	Mark     uint32
+	Prefix   string
+}
+
+var netfilterList map[string]SubscriptionHolder
+var conntrackList map[string]SubscriptionHolder
+var netloggerList map[string]SubscriptionHolder
+var netfilterListMutex sync.Mutex
+var conntrackListMutex sync.Mutex
+var netloggerListMutex sync.Mutex
+var sessionTable map[uint32]SessionEntry
+var conntrackTable map[uint32]ConntrackEntry
+var conntrackMutex sync.Mutex
+var sessionMutex sync.Mutex
+var sessionIndex uint64
+
 // To give C child functions access we export go_child_startup and shutdown functions.
 var childsync sync.WaitGroup
 var appname = "kernel"
-var shutdownChannel = make(chan bool)
+var shutdownConntrackTask = make(chan bool)
+var shutdownCleanTask = make(chan bool)
 
 // Startup starts C services
 func Startup() {
 	// Load the conndict module
-	support.SystemCommand("modprobe", []string{"nf_conntrack_dict"})
+	exec.SystemCommand("modprobe", []string{"nf_conntrack_dict"})
+
+	// create the session, conntrack, and certificate tables
+	sessionTable = make(map[uint32]SessionEntry)
+	conntrackTable = make(map[uint32]ConntrackEntry)
+
+	// create the netfilter, conntrack, and netlogger subscription tables
+	netfilterList = make(map[string]SubscriptionHolder)
+	conntrackList = make(map[string]SubscriptionHolder)
+	netloggerList = make(map[string]SubscriptionHolder)
+
+	// initialize the sessionIndex counter
+	// highest 16 bits are zero
+	// middle  32 bits should be epoch
+	// lowest  16 bits are zero
+	// this means that sessionIndex should be ever increasing despite restarts
+	// (unless there are more than 16 bits or 65k sessions per sec on average)
+	sessionIndex = ((uint64(time.Now().Unix()) & 0xFFFFFFFF) << 16)
 
 	C.common_startup()
+
+	go cleanPeriodicTask()
 }
 
 // StartCallbacks donates threads for all the C services
@@ -42,7 +166,7 @@ func StartCallbacks() {
 	go C.netlogger_thread()
 
 	// start the conntrack 60-second update task
-	go periodicTask()
+	go conntrackPeriodicTask()
 }
 
 // StopCallbacks stops all services and callbacks
@@ -53,11 +177,11 @@ func StopCallbacks() {
 	go C.netlogger_shutdown()
 
 	// Send shutdown signal to periodicTask and wait for it to return
-	shutdownChannel <- true
+	shutdownConntrackTask <- true
 	select {
-	case <-shutdownChannel:
+	case <-shutdownConntrackTask:
 	case <-time.After(10 * time.Second):
-		logger.LogMessage(logger.LogErr, appname, "Failed to properly shutdown periodicTask\n")
+		logger.LogMessage(logger.LogErr, appname, "Failed to properly shutdown conntrackPeriodicTask\n")
 	}
 
 	// wait on above shutdowns
@@ -66,6 +190,14 @@ func StopCallbacks() {
 
 // Shutdown all C services
 func Shutdown() {
+	// Send shutdown signal to periodicTask and wait for it to return
+	shutdownCleanTask <- true
+	select {
+	case <-shutdownCleanTask:
+	case <-time.After(10 * time.Second):
+		logger.LogMessage(logger.LogErr, appname, "Failed to properly shutdown cleanPeriodicTask\n")
+	}
+
 	C.common_shutdown()
 }
 
@@ -74,9 +206,160 @@ func GetShutdownFlag() int {
 	return int(C.get_shutdown_flag())
 }
 
+// NextSessionID returns the next sequential session ID value
+func NextSessionID() uint64 {
+	var value uint64
+	sessionMutex.Lock()
+	value = sessionIndex
+	sessionIndex++
+
+	if sessionIndex == 0 {
+		sessionIndex++
+	}
+
+	sessionMutex.Unlock()
+	return (value)
+}
+
+// FindSessionEntry searches for an entry in the session table
+func FindSessionEntry(finder uint32) (SessionEntry, bool) {
+	sessionMutex.Lock()
+	entry, status := sessionTable[finder]
+	sessionMutex.Unlock()
+	return entry, status
+}
+
+// InsertSessionEntry adds an entry to the session table
+func InsertSessionEntry(finder uint32, entry SessionEntry) {
+	sessionMutex.Lock()
+	sessionTable[finder] = entry
+	sessionMutex.Unlock()
+}
+
+// RemoveSessionEntry removes an entry from the session table
+func RemoveSessionEntry(finder uint32) {
+	sessionMutex.Lock()
+	delete(sessionTable, finder)
+	sessionMutex.Unlock()
+}
+
+// CleanSessionTable cleans the session table by removing stale entries
+func CleanSessionTable() {
+	var counter int
+	nowtime := time.Now()
+
+	for key, val := range sessionTable {
+		if (nowtime.Unix() - val.SessionActivity.Unix()) < 60 {
+			continue
+		}
+		RemoveSessionEntry(key)
+		counter++
+		logger.LogMessage(logger.LogDebug, appname, "SESSION Removing %s from table\n", key)
+	}
+
+	logger.LogMessage(logger.LogDebug, appname, "SESSION REMOVED:%d REMAINING:%d\n", counter, len(sessionTable))
+}
+
+// FindConntrackEntry finds an entry in the conntrack table
+func FindConntrackEntry(finder uint32) (ConntrackEntry, bool) {
+	conntrackMutex.Lock()
+	entry, status := conntrackTable[finder]
+	conntrackMutex.Unlock()
+	return entry, status
+}
+
+// InsertConntrackEntry adds an entry to the conntrack table
+func InsertConntrackEntry(finder uint32, entry ConntrackEntry) {
+	conntrackMutex.Lock()
+	conntrackTable[finder] = entry
+	conntrackMutex.Unlock()
+}
+
+// RemoveConntrackEntry removes an entry from the conntrack table
+func RemoveConntrackEntry(finder uint32) {
+	conntrackMutex.Lock()
+	delete(conntrackTable, finder)
+	conntrackMutex.Unlock()
+}
+
+// CleanConntrackTable cleans the conntrack table by removing stale entries
+func CleanConntrackTable() {
+	var counter int
+	nowtime := time.Now()
+
+	for key, val := range conntrackTable {
+		if val.PurgeFlag == false {
+			continue
+		}
+		if (nowtime.Unix() - val.SessionActivity.Unix()) < 60 {
+			continue
+		}
+		RemoveConntrackEntry(key)
+		counter++
+		logger.LogMessage(logger.LogDebug, appname, "CONNTRACK Removing %d from table\n", key)
+	}
+
+	logger.LogMessage(logger.LogDebug, appname, "CONNTRACK REMOVED:%d REMAINING:%d\n", counter, len(conntrackTable))
+}
+
+// InsertNetfilterSubscription adds a subscription for receiving netfilter messages
+func InsertNetfilterSubscription(owner string, priority int, function NetfilterHandlerFunction) {
+	var holder SubscriptionHolder
+
+	holder.Owner = owner
+	holder.Priority = priority
+	holder.NetfilterFunc = function
+	netfilterListMutex.Lock()
+	netfilterList[owner] = holder
+	netfilterListMutex.Unlock()
+}
+
+// InsertConntrackSubscription adds a subscription for receiving conntrack messages
+func InsertConntrackSubscription(owner string, priority int, function ConntrackHandlerFunction) {
+	var holder SubscriptionHolder
+
+	holder.Owner = owner
+	holder.Priority = priority
+	holder.ConntrackFunc = function
+	conntrackListMutex.Lock()
+	conntrackList[owner] = holder
+	conntrackListMutex.Unlock()
+}
+
+// InsertNetloggerSubscription adds a subscription for receiving netlogger messages
+func InsertNetloggerSubscription(owner string, priority int, function NetloggerHandlerFunction) {
+	var holder SubscriptionHolder
+
+	holder.Owner = owner
+	holder.Priority = priority
+	holder.NetloggerFunc = function
+	netloggerListMutex.Lock()
+	netloggerList[owner] = holder
+	netloggerListMutex.Unlock()
+}
+
+// AttachNetfilterSubscriptions attaches active netfilter subscriptions to the argumented SessionEntry
+func AttachNetfilterSubscriptions(session *SessionEntry) {
+	session.NetfilterSubs = make(map[string]SubscriptionHolder)
+
+	for index, element := range netfilterList {
+		session.NetfilterSubs[index] = element
+	}
+}
+
+// GetConntrackSubscriptions returns the list of active conntrack subscriptions
+func GetConntrackSubscriptions() map[string]SubscriptionHolder {
+	return conntrackList
+}
+
+// GetNetloggerSubscriptions returns the list of active netlogger subscriptions
+func GetNetloggerSubscriptions() map[string]SubscriptionHolder {
+	return netloggerList
+}
+
 //export go_netfilter_callback
 func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) uint32 {
-	var mess support.TrafficMessage
+	var mess TrafficMessage
 
 	// ***** this version creates a Go copy of the buffer = SLOWER
 	// buffer := C.GoBytes(unsafe.Pointer(data),size)
@@ -133,30 +416,30 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 		mess.Payload = appLayer.Payload()
 	}
 
-	var session support.SessionEntry
+	var session SessionEntry
 	var ok bool
 	var newSession = false
 
 	// If we already have a session entry update the existing, otherwise create a new entry for the table.
-	if session, ok = support.FindSessionEntry(uint32(ctid)); ok {
+	if session, ok = FindSessionEntry(uint32(ctid)); ok {
 		logger.LogMessage(logger.LogDebug, appname, "SESSION Found %d in table\n", ctid)
 		session.SessionActivity = time.Now()
 		session.UpdateCount++
 	} else {
 		logger.LogMessage(logger.LogDebug, appname, "SESSION Adding %d to table\n", ctid)
 		newSession = true
-		session.SessionID = support.NextSessionID()
+		session.SessionID = NextSessionID()
 		session.SessionCreation = time.Now()
 		session.SessionActivity = time.Now()
 		session.ClientSideTuple = mess.Tuple
 		session.UpdateCount = 1
-		support.AttachNetfilterSubscriptions(&session)
-		support.InsertSessionEntry(uint32(ctid), session)
+		AttachNetfilterSubscriptions(&session)
+		InsertSessionEntry(uint32(ctid), session)
 	}
 
 	mess.Session = session
 
-	pipe := make(chan support.SubscriptionResult)
+	pipe := make(chan SubscriptionResult)
 
 	// We loop and increment the priority until all subscribtions have been called
 	subtotal := len(session.NetfilterSubs)
@@ -219,7 +502,7 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 
 //export go_conntrack_callback
 func go_conntrack_callback(info *C.struct_conntrack_info) {
-	var clientSideTuple support.Tuple
+	var clientSideTuple Tuple
 	var ctid uint32
 
 	clientSideTuple.Protocol = uint8(info.orig_proto)
@@ -233,7 +516,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	clientSideTuple.ServerPort = uint16(info.orig_dport)
 
 	ctid = uint32(info.conn_id)
-	session, sessionFound := support.FindSessionEntry(uint32(ctid))
+	session, sessionFound := FindSessionEntry(uint32(ctid))
 
 	// FIXME, This can be removed if we are sure this never happens.
 	// This is temporary and is used to look for conntrack id's being re-used
@@ -252,17 +535,17 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	}
 
 	// If we already have a conntrackEntry update the existing, otherwise create a new conntrackEntry for the table.
-	conntrackEntry, conntrackEntryFound := support.FindConntrackEntry(ctid)
+	conntrackEntry, conntrackEntryFound := FindConntrackEntry(ctid)
 	if conntrackEntryFound {
 		logger.LogMessage(logger.LogDebug, appname, "CONNTRACK Found %d in table\n", ctid)
 		conntrackEntry.UpdateCount++
 	} else {
 		conntrackEntry.ConntrackID = ctid
-		conntrackEntry.SessionID = support.NextSessionID()
+		conntrackEntry.SessionID = NextSessionID()
 		conntrackEntry.SessionCreation = time.Now()
 		conntrackEntry.ClientSideTuple = clientSideTuple
 		conntrackEntry.UpdateCount = 1
-		support.InsertConntrackEntry(ctid, conntrackEntry)
+		InsertConntrackEntry(ctid, conntrackEntry)
 	}
 
 	conntrackEntry.SessionActivity = time.Now()
@@ -270,7 +553,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	// handle NEW events
 	if info.msg_type == 'N' {
 		if sessionFound {
-			var serverSideTuple support.Tuple
+			var serverSideTuple Tuple
 			serverSideTuple.Protocol = uint8(info.orig_proto)
 			// FIXME IPv6
 			serverSideTuple.ClientAddr = make(net.IP, 4)
@@ -305,7 +588,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	if info.msg_type == 'D' {
 		conntrackEntry.PurgeFlag = true
 		logger.LogMessage(logger.LogDebug, appname, "SESSION Removing %d from table\n", ctid)
-		support.RemoveSessionEntry(ctid)
+		RemoveSessionEntry(ctid)
 	} else {
 		conntrackEntry.PurgeFlag = false
 	}
@@ -350,7 +633,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	}
 
 	// We loop and increment the priority until all subscribtions have been called
-	sublist := support.GetConntrackSubscriptions()
+	sublist := GetConntrackSubscriptions()
 	subtotal := len(sublist)
 	subcount := 0
 	priority := 0
@@ -373,7 +656,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 
 //export go_netlogger_callback
 func go_netlogger_callback(info *C.struct_netlogger_info) {
-	var netlogger support.NetloggerMessage
+	var netlogger NetloggerMessage
 
 	netlogger.Version = uint8(info.version)
 	netlogger.Protocol = uint8(info.protocol)
@@ -388,7 +671,7 @@ func go_netlogger_callback(info *C.struct_netlogger_info) {
 	netlogger.Prefix = C.GoString(&info.prefix[0])
 
 	// We loop and increment the priority until all subscribtions have been called
-	sublist := support.GetNetloggerSubscriptions()
+	sublist := GetNetloggerSubscriptions()
 	subtotal := len(sublist)
 	subcount := 0
 	priority := 0
@@ -427,19 +710,37 @@ func go_child_message(level C.int, source *C.char, message *C.char) {
 }
 
 //conntrack periodic task
-func periodicTask() {
+func conntrackPeriodicTask() {
 	var counter int
 
 	// FIXME first sleep should be calibrated so it wakes on first second on minute for conntrack_dump
 	for {
 		select {
-		case <-shutdownChannel:
-			shutdownChannel <- true
+		case <-shutdownConntrackTask:
+			shutdownConntrackTask <- true
 			return
 		case <-time.After(60 * time.Second):
 			counter++
 			logger.LogMessage(logger.LogDebug, appname, "Calling periodic conntrack dump %d\n", counter)
 			C.conntrack_dump()
+		}
+	}
+}
+
+// FIXME this should be split into separate tasks in separate services
+func cleanPeriodicTask() {
+	var counter int
+
+	for {
+		select {
+		case <-shutdownCleanTask:
+			shutdownCleanTask <- true
+			return
+		case <-time.After(60 * time.Second):
+			counter++
+			logger.LogMessage(logger.LogDebug, appname, "Calling periodic clean task %d\n", counter)
+			CleanSessionTable()   //FIXME move to session service
+			CleanConntrackTable() //FIXME move to conntrack service
 		}
 	}
 }

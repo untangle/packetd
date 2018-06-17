@@ -4,8 +4,8 @@ import (
 	"compress/gzip"
 	"github.com/oschwald/geoip2-golang"
 	"github.com/untangle/packetd/services/conndict"
+	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/support"
 	"io"
 	"net/http"
 	"os"
@@ -50,7 +50,7 @@ func PluginStartup(childsync *sync.WaitGroup) {
 		geodb = db
 	}
 
-	support.InsertNetfilterSubscription(appname, 1, PluginNetfilterHandler)
+	kernel.InsertNetfilterSubscription(appname, 1, PluginNetfilterHandler)
 	childsync.Add(1)
 }
 
@@ -70,7 +70,7 @@ func PluginShutdown(childsync *sync.WaitGroup) {
 // PluginNetfilterHandler is called to handle netfilter packet data. We extract
 // the source and destination IP address from the packet, lookup the GeoIP
 // country code for each, and store them in the conntrack dictionary.
-func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.TrafficMessage, ctid uint) {
+func PluginNetfilterHandler(ch chan<- kernel.SubscriptionResult, mess kernel.TrafficMessage, ctid uint) {
 	var SrcCode = "XX"
 	var DstCode = "XX"
 
@@ -89,7 +89,7 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 	conndict.SetPair("SrcCountry", SrcCode, ctid)
 	conndict.SetPair("DstCountry", DstCode, ctid)
 
-	var result support.SubscriptionResult
+	var result kernel.SubscriptionResult
 	result.Owner = appname
 	result.PacketMark = 0
 	result.SessionRelease = true
