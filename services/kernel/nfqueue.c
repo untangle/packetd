@@ -1,7 +1,7 @@
 /**
- * netfilter.c
+ * nfqueue.c
  *
- * Handles receiving raw netfilter packets for the Untnagle Packet Daemon
+ * Handles receiving raw netfilter queue packets for the Untnagle Packet Daemon
  *
  * Copyright (c) 2018 Untangle, Inc.
  * All Rights Reserved
@@ -15,7 +15,7 @@ static int						cfg_sock_buffer = 1048576;
 static int						cfg_net_maxlen = 10240;
 static int						cfg_net_buffer = 32768;
 static int						cfg_net_queue = 1818;
-static char                     *appname = "netfilter";
+static char                     *appname = "nfqueue";
 
 int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data)
 {
@@ -25,7 +25,7 @@ int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data)
 	logmessage(LOG_WARNING,appname,"Error calling nfnl_get_pointer_to_data(NFQA_CT)\n");
 	return(-1);
 }
-/*--------------------------------------------------------------------------*/
+
 unsigned int nfq_get_conntrack_id(struct nfq_data *nfad, int l3num)
 {
 	struct nf_conntrack		*ct;
@@ -53,7 +53,7 @@ unsigned int nfq_get_conntrack_id(struct nfq_data *nfad, int l3num)
 	nfct_destroy(ct);
 	return(id);
 }
-/*--------------------------------------------------------------------------*/
+
 int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data *nfad,void *data)
 {
 	struct nfqnl_msg_packet_hdr		*hdr;
@@ -90,15 +90,15 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 	ctid = nfq_get_conntrack_id(nfad,nfmsg->nfgen_family);
 
 	// call the go handler function
-	nmark = go_netfilter_callback(omark,rawpkt,rawlen,ctid);
+	nmark = go_nfqueue_callback(omark,rawpkt,rawlen,ctid);
 
 	// set the verdict and the returned mark
 	nfq_set_verdict2(qh,(hdr ? ntohl(hdr->packet_id) : 0),NF_ACCEPT,nmark,0,NULL);
 
 	return(0);
 }
-/*--------------------------------------------------------------------------*/
-int netfilter_startup(void)
+
+int nfqueue_startup(void)
 {
 	int		ret;
 
@@ -168,8 +168,8 @@ int netfilter_startup(void)
 
 	return(0);
 }
-/*--------------------------------------------------------------------------*/
-void netfilter_close(void)
+
+void nfqueue_close(void)
 {
 	// destroy the netfilter queue
 	nfq_destroy_queue(nfqqh);
@@ -177,24 +177,24 @@ void netfilter_close(void)
 	// shut down the netfilter queue handler
 	nfq_close(nfqh);
 }
-/*--------------------------------------------------------------------------*/
-int netfilter_thread(void)
+
+int nfqueue_thread(void)
 {
 	struct pollfd	network;
 	char			*buffer;
 	int				netsock;
 	int				val,ret;
 
-	logmessage(LOG_INFO,appname,"The netfilter thread is starting\n");
+	logmessage(LOG_INFO,appname,"The nfqueue thread is starting\n");
 
 	// allocate our packet buffer
 	buffer = (char *)malloc(cfg_net_buffer);
 
-	// call our netfilter startup function
-	ret = netfilter_startup();
+	// call our nfqueue startup function
+	ret = nfqueue_startup();
 
 	if (ret != 0) {
-		logmessage(LOG_ERR,appname,"Error %d returned from netfilter_startup()\n",ret);
+		logmessage(LOG_ERR,appname,"Error %d returned from nfqueue_startup()\n",ret);
 		set_shutdown_flag(1);
 		return(1);
 	}
@@ -236,11 +236,11 @@ int netfilter_thread(void)
 		}
 
 		do {
-			// read from the netfilter socket
+			// read from the nfqueue socket
 			ret = recv(netsock,buffer,cfg_net_buffer,MSG_DONTWAIT);
 
 			if (ret == 0) {
-				logmessage(LOG_ERR,appname,"The netfilter socket was unexpectedly closed\n");
+				logmessage(LOG_ERR,appname,"The nfqueue socket was unexpectedly closed\n");
 				set_shutdown_flag(1);
 				break;
 			}
@@ -257,19 +257,19 @@ int netfilter_thread(void)
 		} while (ret > 0);
 	}
 
-	// call our netfilter shutdown function
-	netfilter_close();
+	// call our nfqueue shutdown function
+	nfqueue_close();
 
 	// free our packet buffer memory
 	free(buffer);
 
-	logmessage(LOG_INFO,appname,"The netfilter thread has terminated\n");
+	logmessage(LOG_INFO,appname,"The nfqueue thread has terminated\n");
 	go_child_shutdown();
 	return(0);
 }
-/*--------------------------------------------------------------------------*/
-void netfilter_shutdown(void)
+
+void nfqueue_shutdown(void)
 {
 	set_shutdown_flag(1);
 }
-/*--------------------------------------------------------------------------*/
+

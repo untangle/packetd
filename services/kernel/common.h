@@ -26,7 +26,7 @@
 #include <libnetfilter_queue/libnetfilter_queue.h>
 #include <libnetfilter_log/libnetfilter_log.h>
 #include <libnfnetlink/libnfnetlink.h>
-/*--------------------------------------------------------------------------*/
+
 // FIXME IPv6
 struct conntrack_info {
 	u_int8_t		msg_type;
@@ -43,7 +43,7 @@ struct conntrack_info {
 	u_int64_t		orig_bytes;
 	u_int64_t		repl_bytes;
 };
-/*--------------------------------------------------------------------------*/
+
 struct netlogger_info {
 	u_int8_t		version;
 	u_int8_t		protocol;
@@ -57,18 +57,18 @@ struct netlogger_info {
 	u_int32_t		mark;
 	char			prefix[64];
 };
-/*--------------------------------------------------------------------------*/
+
 struct nfq_data {
 	struct nfattr	**data;
 };
-/*--------------------------------------------------------------------------*/
-extern unsigned int go_netfilter_callback(unsigned int mark,unsigned char* data,int len,unsigned int ctid);
+
+extern u_int32_t go_nfqueue_callback(unsigned int mark,unsigned char* data,int len,unsigned int ctid);
 extern void go_netlogger_callback(struct netlogger_info* info);
 extern void go_conntrack_callback(struct conntrack_info* info);
 extern void go_child_startup(void);
 extern void go_child_shutdown(void);
 extern void go_child_message(int level,char *source,char *message);
-/*--------------------------------------------------------------------------*/
+
 void common_startup(void);
 void common_shutdown(void);
 char* itolevel(int value,char *dest);
@@ -77,24 +77,24 @@ void logmessage(int priority,const char *source,const char *format,...);
 void hexmessage(int priority,const char *source,const void *buffer,int size);
 int get_shutdown_flag(void);
 void set_shutdown_flag(int value);
-/*--------------------------------------------------------------------------*/
+
 int conntrack_startup(void);
 void conntrack_shutdown(void);
 int conntrack_thread(void);
 void conntrack_shutdown(void);
 void conntrack_dump(void);
-/*--------------------------------------------------------------------------*/
+
 int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data);
 unsigned int nfq_get_conntrack_id(struct nfq_data *nfad, int l3num);
 int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data *nfad,void *data);
-int netfilter_startup(void);
-void netfilter_shutdown(void);
-int netfilter_thread(void);
-void netfilter_shutdown(void);
-/*--------------------------------------------------------------------------*/
+int nfqueue_startup(void);
+void nfqueue_shutdown(void);
+int nfqueue_thread(void);
+void nfqueue_shutdown(void);
+
 int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct nflog_data *nfa,void *data);
 int netlogger_startup(void);
 void netlogger_shutdown(void);
 int netlogger_thread(void);
 void netlogger_shutdown(void);
-/*--------------------------------------------------------------------------*/
+

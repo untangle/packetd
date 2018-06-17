@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"github.com/untangle/packetd/services/conndict"
-	"github.com/untangle/packetd/services/kernel"
+	"github.com/untangle/packetd/services/events"
 	"github.com/untangle/packetd/services/logger"
 	"strings"
 	"sync"
@@ -32,7 +32,7 @@ func PluginStartup(childsync *sync.WaitGroup) {
 	certificateTable = make(map[string]CertificateHolder)
 	go cleanupTask()
 
-	kernel.InsertNetfilterSubscription(appname, 1, PluginNetfilterHandler)
+	events.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
 	childsync.Add(1)
 }
 
@@ -51,13 +51,13 @@ func PluginShutdown(childsync *sync.WaitGroup) {
 	childsync.Done()
 }
 
-// PluginNetfilterHandler is called to handle netfilter packet data. We only
+// PluginNfqueueHandler is called to handle nfqueue packet data. We only
 // look at traffic with port 443 as destination. When detected, we load
 // the server certificate from our cache or fetch it from the server and
 // store it in our cache. Once we have the cert, we attach it to the session,
 // extract the interesting subject fields, and put them in the conndict.
-func PluginNetfilterHandler(ch chan<- kernel.SubscriptionResult, mess kernel.TrafficMessage, ctid uint) {
-	var result kernel.SubscriptionResult
+func PluginNfqueueHandler(ch chan<- events.SubscriptionResult, mess events.TrafficMessage, ctid uint) {
+	var result events.SubscriptionResult
 	result.Owner = appname
 	result.PacketMark = 0
 	result.SessionRelease = true

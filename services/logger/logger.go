@@ -202,15 +202,16 @@ func initLoggerConfig() {
 	config["conntrack"] = "INFO"
 	config["dns"] = "INFO"
 	config["example"] = "INFO"
+	config["events"] = "INFO"
 	config["geoip"] = "INFO"
 	config["kernel"] = "INFO"
-	config["netfilter"] = "INFO"
+	config["logger"] = "INFO"
+	config["nfqueue"] = "INFO"
 	config["netlogger"] = "INFO"
 	config["packetd"] = "INFO"
 	config["reports"] = "INFO"
 	config["restd"] = "INFO"
 	config["settings"] = "INFO"
-	config["support"] = "INFO"
 
 	// convert the config map to a json object
 	jstr, err := json.MarshalIndent(config, "", "")

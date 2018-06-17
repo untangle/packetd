@@ -40,7 +40,10 @@ func Startup() {
 		logger.LogMessage(logger.LogErr, appname, "Failed to open database: %s\n", err.Error())
 	}
 
-	go createTables()
+	go func() {
+		createTables()
+		eventLogger()
+	}()
 }
 
 // Shutdown reports
@@ -202,12 +205,4 @@ func createTables() {
 	if err != nil {
 		logger.LogMessage(logger.LogErr, appname, "Failed to create table: %s\n", err.Error())
 	}
-
-	//test REMOVE ME
-	_, err = db.Exec("INSERT INTO sessions (time_stamp, session_id) VALUES (DATETIME('now'),1)")
-	if err != nil {
-		logger.LogMessage(logger.LogErr, appname, "Failed to insert: %s\n", err.Error())
-	}
-
-	eventLogger()
 }

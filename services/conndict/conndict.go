@@ -3,6 +3,7 @@ package conndict
 import (
 	"bufio"
 	"fmt"
+	"github.com/untangle/packetd/services/exec"
 	"github.com/untangle/packetd/services/logger"
 	"os"
 	"strings"
@@ -16,7 +17,8 @@ var appname = "conndict"
 
 // Startup conndict service
 func Startup() {
-
+	// Load the conndict module
+	exec.SystemCommand("modprobe", []string{"nf_conntrack_dict"})
 }
 
 // Shutdown conndict service
