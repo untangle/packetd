@@ -3,7 +3,7 @@ package conndict
 import (
 	"bufio"
 	"fmt"
-	"github.com/untangle/packetd/services/support"
+	"github.com/untangle/packetd/services/logger"
 	"os"
 	"strings"
 	"sync"
@@ -43,7 +43,7 @@ func parsePair(line string) DictPair {
 
 // Print a pair's field and value
 func (p DictPair) Print() {
-	support.LogMessage(support.LogInfo, appname, "Field: %s Value: %s\n", p.Field, p.Value)
+	logger.LogMessage(logger.LogInfo, appname, "Field: %s Value: %s\n", p.Field, p.Value)
 }
 
 //-----------------------------------------------------------------------------
@@ -55,7 +55,7 @@ func SetPair(field string, value string, id uint) error {
 	setstr := fmt.Sprintf("id=%d,field=%s,value=%s", id, field, value)
 
 	if err != nil {
-		support.LogMessage(support.LogWarn, appname, "SetPair(%s,%s,%d): Failed to open %s\n", field, value, id, filename)
+		logger.LogMessage(logger.LogWarn, appname, "SetPair(%s,%s,%d): Failed to open %s\n", field, value, id, filename)
 		return fmt.Errorf("conndict: SetPair: Failed to open %s", filename)
 	}
 
@@ -63,7 +63,7 @@ func SetPair(field string, value string, id uint) error {
 
 	_, err = file.WriteString(setstr)
 	if err != nil {
-		support.LogMessage(support.LogWarn, appname, "SetPair(%s,%s,%d): Failed to write %s\n", field, value, id)
+		logger.LogMessage(logger.LogWarn, appname, "SetPair(%s,%s,%d): Failed to write %s\n", field, value, id)
 		return fmt.Errorf("conndict: SetPair: Failed to write %s", filename)
 	}
 
@@ -80,7 +80,7 @@ func SetPairs(pairs []DictPair, id uint) error {
 		err := SetPair(p.Field, p.Value, id)
 
 		if err != nil {
-			support.LogMessage(support.LogErr, appname, "SetPairs failed on setting %s:%s for %d\n", p.Field, p.Value, id)
+			logger.LogMessage(logger.LogErr, appname, "SetPairs failed on setting %s:%s for %d\n", p.Field, p.Value, id)
 			return (err)
 		}
 	}

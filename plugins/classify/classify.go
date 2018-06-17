@@ -3,6 +3,7 @@ package classify
 import (
 	"fmt"
 	"github.com/untangle/packetd/services/conndict"
+	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/support"
 	"net"
 	"strings"
@@ -27,7 +28,7 @@ func PluginStartup(childsync *sync.WaitGroup, classdPtr *string) {
 
 	classdHostPort = *classdPtr
 
-	support.LogMessage(support.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
+	logger.LogMessage(logger.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
 
 	support.SystemCommand("systemctl", []string{"start", "untangle-classd.service"})
 
@@ -36,7 +37,7 @@ func PluginStartup(childsync *sync.WaitGroup, classdPtr *string) {
 	daemon, err = net.Dial("tcp", classdHostPort)
 
 	if err != nil {
-		support.LogMessage(support.LogErr, appname, "Error calling net.Dial(): %v\n", err)
+		logger.LogMessage(logger.LogErr, appname, "Error calling net.Dial(): %v\n", err)
 	}
 
 	support.InsertNetfilterSubscription(appname, 1, PluginNetfilterHandler)
@@ -48,7 +49,7 @@ func PluginStartup(childsync *sync.WaitGroup, classdPtr *string) {
 // PluginShutdown is called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
 func PluginShutdown(childsync *sync.WaitGroup) {
-	support.LogMessage(support.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
+	logger.LogMessage(logger.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
 
 	if daemon != nil {
 		daemon.Close()
@@ -83,11 +84,11 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 	if mess.Session.UpdateCount == 1 {
 		status, err = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.Session.ClientSideTuple.ClientAddr, mess.Session.ClientSideTuple.ClientPort, mess.Session.ClientSideTuple.ServerAddr, mess.Session.ClientSideTuple.ServerPort)
 		if err != nil {
-			support.LogMessage(support.LogErr, appname, "daemonCommand error: %s\n", err.Error())
+			logger.LogMessage(logger.LogErr, appname, "daemonCommand error: %s\n", err.Error())
 			ch <- result
 			return
 		}
-		support.LogMessage(support.LogLogic, appname, "daemonCommand result: %s\n", status)
+		logger.LogMessage(logger.LogLogic, appname, "daemonCommand result: %s\n", status)
 	}
 
 	// send the application payload to the daemon
@@ -98,12 +99,12 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 	}
 
 	if err != nil {
-		support.LogMessage(support.LogErr, appname, "daemonCommand error: %s\n", err.Error())
+		logger.LogMessage(logger.LogErr, appname, "daemonCommand error: %s\n", err.Error())
 		ch <- result
 		return
 	}
 
-	support.LogMessage(support.LogLogic, appname, "daemonCommand result: %s\n", status)
+	logger.LogMessage(logger.LogLogic, appname, "daemonCommand result: %s\n", status)
 
 	// Parse the output from classd to get the classification details
 	var pairname string

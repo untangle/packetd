@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"github.com/oschwald/geoip2-golang"
 	"github.com/untangle/packetd/services/conndict"
+	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/support"
 	"io"
 	"net/http"
@@ -22,7 +23,7 @@ var geodb *geoip2.Reader
 // argumented WaitGroup so the main process can wait for our shutdown function
 // to return during shutdown.
 func PluginStartup(childsync *sync.WaitGroup) {
-	support.LogMessage(support.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
+	logger.LogMessage(logger.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
 
 	var filename string
 
@@ -43,9 +44,9 @@ func PluginStartup(childsync *sync.WaitGroup) {
 
 	db, err := geoip2.Open(filename)
 	if err != nil {
-		support.LogMessage(support.LogWarn, appname, "Unable to load GeoIP Database: %s\n", err)
+		logger.LogMessage(logger.LogWarn, appname, "Unable to load GeoIP Database: %s\n", err)
 	} else {
-		support.LogMessage(support.LogInfo, appname, "Loading GeoIP Database: %s\n", filename)
+		logger.LogMessage(logger.LogInfo, appname, "Loading GeoIP Database: %s\n", filename)
 		geodb = db
 	}
 
@@ -59,7 +60,7 @@ func PluginStartup(childsync *sync.WaitGroup) {
 // GeoIP engine and call done for the argumented WaitGroup to let the main
 // process know we're finished.
 func PluginShutdown(childsync *sync.WaitGroup) {
-	support.LogMessage(support.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
+	logger.LogMessage(logger.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
 	geodb.Close()
 	childsync.Done()
 }
@@ -76,13 +77,13 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 	SrcRecord, err := geodb.City(mess.IPlayer.SrcIP)
 	if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
 		SrcCode = SrcRecord.Country.IsoCode
-		support.LogMessage(support.LogDebug, appname, "SRC: %s = %s\n", mess.IPlayer.SrcIP, SrcCode)
+		logger.LogMessage(logger.LogDebug, appname, "SRC: %s = %s\n", mess.IPlayer.SrcIP, SrcCode)
 	}
 
 	DstRecord, err := geodb.City(mess.IPlayer.DstIP)
 	if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
 		DstCode = DstRecord.Country.IsoCode
-		support.LogMessage(support.LogDebug, appname, "DST: %s = %s\n", mess.IPlayer.DstIP, DstCode)
+		logger.LogMessage(logger.LogDebug, appname, "DST: %s = %s\n", mess.IPlayer.DstIP, DstCode)
 	}
 
 	conndict.SetPair("SrcCountry", SrcCode, ctid)
@@ -98,7 +99,7 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 //-----------------------------------------------------------------------------
 
 func databaseDownload(filename string) {
-	support.LogMessage(support.LogInfo, appname, "Downloading GeoIP Database\n")
+	logger.LogMessage(logger.LogInfo, appname, "Downloading GeoIP Database\n")
 
 	// Get the GeoIP database from MaxMind
 	resp, err := http.Get("http://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.mmdb.gz")
@@ -109,7 +110,7 @@ func databaseDownload(filename string) {
 
 	// Check server response
 	if resp.StatusCode != http.StatusOK {
-		support.LogMessage(support.LogWarn, appname, "Download failure: %s\n", resp.Status)
+		logger.LogMessage(logger.LogWarn, appname, "Download failure: %s\n", resp.Status)
 		return
 	}
 

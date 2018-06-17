@@ -11,6 +11,7 @@ import (
 	"encoding/binary"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/support"
 	"net"
@@ -56,7 +57,7 @@ func StopCallbacks() {
 	select {
 	case <-shutdownChannel:
 	case <-time.After(10 * time.Second):
-		support.LogMessage(support.LogErr, appname, "Failed to properly shutdown periodicTask\n")
+		logger.LogMessage(logger.LogErr, appname, "Failed to properly shutdown periodicTask\n")
 	}
 
 	// wait on above shutdowns
@@ -138,11 +139,11 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 
 	// If we already have a session entry update the existing, otherwise create a new entry for the table.
 	if session, ok = support.FindSessionEntry(uint32(ctid)); ok {
-		support.LogMessage(support.LogDebug, appname, "SESSION Found %d in table\n", ctid)
+		logger.LogMessage(logger.LogDebug, appname, "SESSION Found %d in table\n", ctid)
 		session.SessionActivity = time.Now()
 		session.UpdateCount++
 	} else {
-		support.LogMessage(support.LogDebug, appname, "SESSION Adding %d to table\n", ctid)
+		logger.LogMessage(logger.LogDebug, appname, "SESSION Adding %d to table\n", ctid)
 		newSession = true
 		session.SessionID = support.NextSessionID()
 		session.SessionCreation = time.Now()
@@ -172,7 +173,7 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 			if val.Priority != priority {
 				continue
 			}
-			support.LogMessage(support.LogDebug, appname, "Calling netfilter APP:%s PRIORITY:%d\n", key, priority)
+			logger.LogMessage(logger.LogDebug, appname, "Calling netfilter APP:%s PRIORITY:%d\n", key, priority)
 			go val.NetfilterFunc(pipe, mess, connid)
 			hitcount++
 			subcount++
@@ -185,7 +186,7 @@ func go_netfilter_callback(mark C.uint, data *C.uchar, size C.int, ctid C.uint) 
 			case result := <-pipe:
 				pmark |= result.PacketMark
 				if result.SessionRelease {
-					support.LogMessage(support.LogDebug, appname, "Removing %s session netfilter subscription for %d\n", result.Owner, uint32(ctid))
+					logger.LogMessage(logger.LogDebug, appname, "Removing %s session netfilter subscription for %d\n", result.Owner, uint32(ctid))
 					delete(session.NetfilterSubs, result.Owner)
 				}
 			}
@@ -246,14 +247,14 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	if info.msg_type == 'N' && sessionFound && session.UpdateCount != 1 {
 		// FIXME, I suspect on a multi-core machine, it is possible to process 2 packets before conntrack NEW
 		// in this case, this would fire, but not be a reused conntrack ID - dmorris
-		support.LogMessage(support.LogWarn, appname, "Unexperted update Count %d for Session %d\n", session.UpdateCount, ctid)
+		logger.LogMessage(logger.LogWarn, appname, "Unexperted update Count %d for Session %d\n", session.UpdateCount, ctid)
 		panic("CONNTRACK ID RE-USE DETECTED")
 	}
 
 	// If we already have a conntrackEntry update the existing, otherwise create a new conntrackEntry for the table.
 	conntrackEntry, conntrackEntryFound := support.FindConntrackEntry(ctid)
 	if conntrackEntryFound {
-		support.LogMessage(support.LogDebug, appname, "CONNTRACK Found %d in table\n", ctid)
+		logger.LogMessage(logger.LogDebug, appname, "CONNTRACK Found %d in table\n", ctid)
 		conntrackEntry.UpdateCount++
 	} else {
 		conntrackEntry.ConntrackID = ctid
@@ -303,7 +304,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	// handle DELETE events
 	if info.msg_type == 'D' {
 		conntrackEntry.PurgeFlag = true
-		support.LogMessage(support.LogDebug, appname, "SESSION Removing %d from table\n", ctid)
+		logger.LogMessage(logger.LogDebug, appname, "SESSION Removing %d from table\n", ctid)
 		support.RemoveSessionEntry(ctid)
 	} else {
 		conntrackEntry.PurgeFlag = false
@@ -360,7 +361,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 			if val.Priority != priority {
 				continue
 			}
-			support.LogMessage(support.LogDebug, appname, "Calling conntrack APP:%s PRIORITY:%d\n", key, priority)
+			logger.LogMessage(logger.LogDebug, appname, "Calling conntrack APP:%s PRIORITY:%d\n", key, priority)
 			go val.ConntrackFunc(int(info.msg_type), &conntrackEntry)
 			subcount++
 		}
@@ -372,19 +373,19 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 
 //export go_netlogger_callback
 func go_netlogger_callback(info *C.struct_netlogger_info) {
-	var logger support.NetloggerMessage
+	var netlogger support.NetloggerMessage
 
-	logger.Version = uint8(info.version)
-	logger.Protocol = uint8(info.protocol)
-	logger.IcmpType = uint16(info.icmp_type)
-	logger.SrcIntf = uint8(info.src_intf)
-	logger.DstIntf = uint8(info.dst_intf)
-	logger.SrcAddr = C.GoString(&info.src_addr[0])
-	logger.DstAddr = C.GoString(&info.dst_addr[0])
-	logger.SrcPort = uint16(info.src_port)
-	logger.DstPort = uint16(info.dst_port)
-	logger.Mark = uint32(info.mark)
-	logger.Prefix = C.GoString(&info.prefix[0])
+	netlogger.Version = uint8(info.version)
+	netlogger.Protocol = uint8(info.protocol)
+	netlogger.IcmpType = uint16(info.icmp_type)
+	netlogger.SrcIntf = uint8(info.src_intf)
+	netlogger.DstIntf = uint8(info.dst_intf)
+	netlogger.SrcAddr = C.GoString(&info.src_addr[0])
+	netlogger.DstAddr = C.GoString(&info.dst_addr[0])
+	netlogger.SrcPort = uint16(info.src_port)
+	netlogger.DstPort = uint16(info.dst_port)
+	netlogger.Mark = uint32(info.mark)
+	netlogger.Prefix = C.GoString(&info.prefix[0])
 
 	// We loop and increment the priority until all subscribtions have been called
 	sublist := support.GetNetloggerSubscriptions()
@@ -398,8 +399,8 @@ func go_netlogger_callback(info *C.struct_netlogger_info) {
 			if val.Priority != priority {
 				continue
 			}
-			support.LogMessage(support.LogDebug, appname, "Calling netlogger APP:%s PRIORITY:%d\n", key, priority)
-			go val.NetloggerFunc(&logger)
+			logger.LogMessage(logger.LogDebug, appname, "Calling netlogger APP:%s PRIORITY:%d\n", key, priority)
+			go val.NetloggerFunc(&netlogger)
 			subcount++
 		}
 
@@ -422,7 +423,7 @@ func go_child_shutdown() {
 func go_child_message(level C.int, source *C.char, message *C.char) {
 	lsrc := C.GoString(source)
 	lmsg := C.GoString(message)
-	support.LogMessage(int(level), lsrc, lmsg)
+	logger.LogMessage(int(level), lsrc, lmsg)
 }
 
 //conntrack periodic task
@@ -437,7 +438,7 @@ func periodicTask() {
 			return
 		case <-time.After(60 * time.Second):
 			counter++
-			support.LogMessage(support.LogDebug, appname, "Calling periodic conntrack dump %d\n", counter)
+			logger.LogMessage(logger.LogDebug, appname, "Calling periodic conntrack dump %d\n", counter)
 			C.conntrack_dump()
 		}
 	}

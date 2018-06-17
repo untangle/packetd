@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"github.com/untangle/packetd/services/conndict"
+	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/support"
 	"strings"
 	"sync"
@@ -27,7 +28,7 @@ var localMutex sync.Mutex
 // increment the argumented WaitGroup so the main process can wait for
 // our shutdown function to return during shutdown.
 func PluginStartup(childsync *sync.WaitGroup) {
-	support.LogMessage(support.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
+	logger.LogMessage(logger.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
 	certificateTable = make(map[string]CertificateHolder)
 	go cleanupTask()
 
@@ -43,10 +44,10 @@ func PluginShutdown(childsync *sync.WaitGroup) {
 	select {
 	case <-shutdownChannel:
 	case <-time.After(10 * time.Second):
-		support.LogMessage(support.LogErr, appname, "Failed to properly shutdown cleanupTask\n")
+		logger.LogMessage(logger.LogErr, appname, "Failed to properly shutdown cleanupTask\n")
 	}
 
-	support.LogMessage(support.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
+	logger.LogMessage(logger.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
 	childsync.Done()
 }
 
@@ -81,9 +82,9 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 	localMutex.Lock()
 
 	if cert, ok = findCertificate(client); ok {
-		support.LogMessage(support.LogInfo, appname, "Loading certificate for %s\n", mess.Tuple.ServerAddr)
+		logger.LogMessage(logger.LogInfo, appname, "Loading certificate for %s\n", mess.Tuple.ServerAddr)
 	} else {
-		support.LogMessage(support.LogInfo, appname, "Fetching certificate for %s\n", mess.Tuple.ServerAddr)
+		logger.LogMessage(logger.LogInfo, appname, "Fetching certificate for %s\n", mess.Tuple.ServerAddr)
 
 		conf := &tls.Config{
 			InsecureSkipVerify: true,
@@ -94,13 +95,13 @@ func PluginNetfilterHandler(ch chan<- support.SubscriptionResult, mess support.T
 		defer conn.Close()
 
 		if err != nil {
-			support.LogMessage(support.LogWarn, appname, "TLS ERROR: %s\n", err)
+			logger.LogMessage(logger.LogWarn, appname, "TLS ERROR: %s\n", err)
 			ch <- result
 			return
 		}
 
 		if len(conn.ConnectionState().PeerCertificates) < 1 {
-			support.LogMessage(support.LogWarn, appname, "Could not fetch certificate from %s\n", mess.Tuple.ServerAddr)
+			logger.LogMessage(logger.LogWarn, appname, "Could not fetch certificate from %s\n", mess.Tuple.ServerAddr)
 			ch <- result
 			return
 		}
@@ -183,7 +184,7 @@ func extractSNIhostname(b []byte) string {
 	current++
 
 	if handshakeType != 0x1 {
-		support.LogMessage(support.LogDebug, appname, "Packet does not contain a TLS ClientHello message\n")
+		logger.LogMessage(logger.LogDebug, appname, "Packet does not contain a TLS ClientHello message\n")
 		return ""
 	}
 
@@ -209,7 +210,7 @@ func extractSNIhostname(b []byte) string {
 	current += compressionMethodLength
 
 	if current > len(rest) {
-		support.LogMessage(support.LogDebug, appname, "Packet does not contain TLS extensions\n")
+		logger.LogMessage(logger.LogDebug, appname, "Packet does not contain TLS extensions\n")
 		return ""
 	}
 
@@ -231,7 +232,7 @@ func extractSNIhostname(b []byte) string {
 			nameType := rest[current]
 			current++
 			if nameType != 0 {
-				support.LogMessage(support.LogDebug, appname, "Extension is not a hostname\n")
+				logger.LogMessage(logger.LogDebug, appname, "Extension is not a hostname\n")
 				return ""
 			}
 			nameLen := (int(rest[current]) << 8) + int(rest[current+1])
@@ -243,7 +244,7 @@ func extractSNIhostname(b []byte) string {
 	}
 
 	if hostname == "" {
-		support.LogMessage(support.LogDebug, appname, "No SNI hostname detected\n")
+		logger.LogMessage(logger.LogDebug, appname, "No SNI hostname detected\n")
 		return ""
 	}
 
@@ -286,10 +287,10 @@ func cleanCertificateTable() {
 		}
 		removeCertificate(key)
 		counter++
-		support.LogMessage(support.LogDebug, appname, "CERTIFICATE Removing %s from table\n", key)
+		logger.LogMessage(logger.LogDebug, appname, "CERTIFICATE Removing %s from table\n", key)
 	}
 
-	support.LogMessage(support.LogDebug, appname, "CERTIFICATE REMOVED:%d REMAINING:%d\n", counter, len(certificateTable))
+	logger.LogMessage(logger.LogDebug, appname, "CERTIFICATE REMOVED:%d REMAINING:%d\n", counter, len(certificateTable))
 }
 
 // periodic task to clean the certificate table

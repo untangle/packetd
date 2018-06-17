@@ -9,11 +9,11 @@ import (
 	"github.com/untangle/packetd/plugins/geoip"
 	"github.com/untangle/packetd/services/conndict"
 	"github.com/untangle/packetd/services/kernel"
+	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/restd"
 	"github.com/untangle/packetd/services/settings"
 	"github.com/untangle/packetd/services/support"
-	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -34,10 +34,8 @@ func main() {
 
 	handleSignals()
 
-	// Set system logger to use our logger
-	log.SetOutput(support.NewLogWriter("log"))
-
 	// Start services
+	logger.Startup()
 	kernel.Startup()
 	support.Startup()
 	settings.Startup()
@@ -60,7 +58,7 @@ func main() {
 	// Insert netfilter rules
 	updateRules()
 
-	support.LogMessage(support.LogInfo, appname, "Untangle Packet Daemon Version %s\n", "1.00")
+	logger.LogMessage(logger.LogInfo, appname, "Untangle Packet Daemon Version %s\n", "1.00")
 
 	// Check that all the C services started correctly
 	// This flag is only set on Startup so this only needs to be checked once
@@ -73,7 +71,7 @@ func main() {
 	// Loop forever
 	for {
 		time.Sleep(60 * time.Second)
-		support.LogMessage(support.LogInfo, appname, ".\n")
+		logger.LogMessage(logger.LogInfo, appname, ".\n")
 	}
 }
 
@@ -83,32 +81,33 @@ func cleanup() {
 	exitLock.Lock()
 
 	// Remove netfilter rules
-	support.LogMessage(support.LogInfo, appname, "Removing netfilter rules...\n")
+	logger.LogMessage(logger.LogInfo, appname, "Removing netfilter rules...\n")
 	removeRules()
 
 	// Stop kernel callbacks
-	support.LogMessage(support.LogInfo, appname, "Removing kernel hooks...\n")
+	logger.LogMessage(logger.LogInfo, appname, "Removing kernel hooks...\n")
 	kernel.StopCallbacks()
 
 	// Stop all plugins
-	support.LogMessage(support.LogInfo, appname, "Stopping plugins...\n")
+	logger.LogMessage(logger.LogInfo, appname, "Stopping plugins...\n")
 	go example.PluginShutdown(&pluginSync)
 	go classify.PluginShutdown(&pluginSync)
 	go geoip.PluginShutdown(&pluginSync)
 	go certcache.PluginShutdown(&pluginSync)
 	go dns.PluginShutdown(&pluginSync)
 
-	support.LogMessage(support.LogInfo, appname, "Waiting on plugins...\n")
+	logger.LogMessage(logger.LogInfo, appname, "Waiting on plugins...\n")
 	pluginSync.Wait()
 
 	// Stop services
-	support.LogMessage(support.LogInfo, appname, "Shutting down services...\n")
+	logger.LogMessage(logger.LogInfo, appname, "Shutting down services...\n")
 	support.Shutdown()
 	reports.Shutdown()
 	settings.Shutdown()
 	restd.Shutdown()
 	conndict.Shutdown()
 	kernel.Shutdown()
+	logger.Shutdown()
 }
 
 // Add signal handlers
@@ -117,7 +116,7 @@ func handleSignals() {
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-ch
-		support.LogMessage(support.LogWarn, appname, "Received signal [%v]. Exiting...\n", sig)
+		logger.LogMessage(logger.LogWarn, appname, "Received signal [%v]. Exiting...\n", sig)
 		cleanup()
 		os.Exit(1)
 	}()
@@ -127,7 +126,7 @@ func handleSignals() {
 func updateRules() {
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
-		support.LogMessage(support.LogErr, appname, "Error determining directory: %s\n", err.Error())
+		logger.LogMessage(logger.LogErr, appname, "Error determining directory: %s\n", err.Error())
 		return
 	}
 	support.SystemCommand(dir+"/packetd_rules", []string{})
@@ -137,7 +136,7 @@ func updateRules() {
 func removeRules() {
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
-		support.LogMessage(support.LogErr, appname, "Error determining directory: %s\n", err.Error())
+		logger.LogMessage(logger.LogErr, appname, "Error determining directory: %s\n", err.Error())
 		return
 	}
 	support.SystemCommand(dir+"/packetd_rules", []string{"-r"})

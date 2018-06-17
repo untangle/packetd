@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	_ "github.com/mattn/go-sqlite3" // blank import required for runtime binding
-	"github.com/untangle/packetd/services/support"
+	"github.com/untangle/packetd/services/logger"
 	"sync/atomic"
 	"time"
 )
@@ -37,7 +37,7 @@ func Startup() {
 	db, err = sql.Open("sqlite3", "/tmp/reports.db")
 
 	if err != nil {
-		support.LogMessage(support.LogErr, appname, "Failed to open database: %s\n", err.Error())
+		logger.LogMessage(logger.LogErr, appname, "Failed to open database: %s\n", err.Error())
 	}
 
 	go createTables()
@@ -52,7 +52,7 @@ func Shutdown() {
 func CreateQuery(reportEntry string) (*Query, error) {
 	rows, err := db.Query("SELECT * FROM sessions LIMIT 5")
 	if err != nil {
-		support.LogMessage(support.LogErr, appname, "db.Query error: %s\n", err)
+		logger.LogMessage(logger.LogErr, appname, "db.Query error: %s\n", err)
 		return nil, err
 	}
 	q := new(Query)
@@ -68,7 +68,7 @@ func CreateQuery(reportEntry string) (*Query, error) {
 func GetData(queryID uint64) (string, error) {
 	q := queries[queryID]
 	if q == nil {
-		support.LogMessage(support.LogWarn, appname, "Query not found: %d\n", queryID)
+		logger.LogMessage(logger.LogWarn, appname, "Query not found: %d\n", queryID)
 		return "", errors.New("Query ID not found")
 	}
 	result, err := getRows(q.Rows, 1000)
@@ -112,7 +112,7 @@ func eventLogger() {
 				summary = summary + "UPDATE: " + string(str)
 			}
 		}
-		support.LogMessage(support.LogInfo, appname, "Log Event: %s\n", summary)
+		logger.LogMessage(logger.LogInfo, appname, "Log Event: %s\n", summary)
 	}
 }
 
@@ -158,13 +158,13 @@ func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
 }
 
 func cleanupQuery(query *Query) {
-	support.LogMessage(support.LogDebug, appname, "cleanupQuery(%d) launched\n", query.ID)
+	logger.LogMessage(logger.LogDebug, appname, "cleanupQuery(%d) launched\n", query.ID)
 	time.Sleep(30 * time.Second)
 	delete(queries, query.ID)
 	if query.Rows != nil {
 		query.Rows.Close()
 	}
-	support.LogMessage(support.LogDebug, appname, "cleanupQuery(%d) finished\n", query.ID)
+	logger.LogMessage(logger.LogDebug, appname, "cleanupQuery(%d) finished\n", query.ID)
 }
 
 func createTables() {
@@ -200,13 +200,13 @@ func createTables() {
                      s2c_bytes int8 default 0)`)
 
 	if err != nil {
-		support.LogMessage(support.LogErr, appname, "Failed to create table: %s\n", err.Error())
+		logger.LogMessage(logger.LogErr, appname, "Failed to create table: %s\n", err.Error())
 	}
 
 	//test REMOVE ME
 	_, err = db.Exec("INSERT INTO sessions (time_stamp, session_id) VALUES (DATETIME('now'),1)")
 	if err != nil {
-		support.LogMessage(support.LogErr, appname, "Failed to insert: %s\n", err.Error())
+		logger.LogMessage(logger.LogErr, appname, "Failed to insert: %s\n", err.Error())
 	}
 
 	eventLogger()
