@@ -469,12 +469,6 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		mess.Tuple.ServerPort = uint16(mess.UDPlayer.DstPort)
 	}
 
-	// right now we only care about TCP and UDP
-	// FIXME do we really?
-	if (tcpLayer == nil) && (udpLayer == nil) {
-		return (pmark)
-	}
-
 	// get the Application layer
 	appLayer := mess.Packet.ApplicationLayer()
 	if appLayer != nil {

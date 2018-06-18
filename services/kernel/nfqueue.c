@@ -80,11 +80,10 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 	// use the iphdr structure for parsing
 	iphead = (struct iphdr *)rawpkt;
 
-	// ignore everything except IPv4
-	if (iphead->version != 4) return(0);
+	if (iphead->version != 4 && iphead->version != 6) return(0);
 
 	// we only care about TCP and UDP
-	if ((iphead->protocol != IPPROTO_TCP) && (iphead->protocol != IPPROTO_UDP))	return(0);
+	// if ((iphead->protocol != IPPROTO_TCP) && (iphead->protocol != IPPROTO_UDP))	return(0);
 
 	// get the conntrack ID
 	ctid = nfq_get_conntrack_id(nfad,nfmsg->nfgen_family);
@@ -97,7 +96,7 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 
 int nfqueue_set_verdict(uint32_t nfid, uint32_t verdict, uint32_t mark)
 {
-    if (nfqh == NULL)
+    if (nfqqh == NULL)
         return -1;
 
 	return nfq_set_verdict2(nfqqh,nfid,verdict,mark,0,NULL);
@@ -176,11 +175,17 @@ int nfqueue_startup(void)
 
 void nfqueue_close(void)
 {
-	// destroy the netfilter queue
-	nfq_destroy_queue(nfqqh);
+    struct nfq_q_handle* qh = nfqqh;
+    struct nfq_handle* h = nfqh;
+
+    nfqqh = NULL;
+    nfqh = NULL;
+
+    // destroy the netfilter queue
+	nfq_destroy_queue(qh);
 
 	// shut down the netfilter queue handler
-	nfq_close(nfqh);
+	nfq_close(h);
 }
 
 int nfqueue_thread(void)

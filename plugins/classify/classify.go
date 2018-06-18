@@ -43,8 +43,10 @@ func PluginStartup() {
 func PluginShutdown() {
 	logger.LogMessage(logger.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
 
-	if daemon != nil {
-		daemon.Close()
+	var d net.Conn = daemon
+	daemon = nil
+	if d != nil {
+		d.Close()
 	}
 }
 
@@ -237,7 +239,9 @@ func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, 
 	tot, err = daemon.Read(buffer)
 
 	if err != nil {
-		daemon.Close()
+		if daemon != nil {
+			daemon.Close()
+		}
 		daemon = nil
 		return string(buffer), err
 	}
