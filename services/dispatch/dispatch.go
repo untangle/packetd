@@ -244,12 +244,14 @@ func nextSessionID() uint64 {
 func findSessionEntry(finder uint32) (*SessionEntry, bool) {
 	sessionMutex.Lock()
 	entry, status := sessionTable[finder]
+	logger.LogMessage(logger.LogTrace, appname, "Lookup session ctid %d -> %v\n", finder, status)
 	sessionMutex.Unlock()
 	return entry, status
 }
 
 // insertSessionEntry adds an entry to the session table
 func insertSessionEntry(finder uint32, entry *SessionEntry) {
+	logger.LogMessage(logger.LogTrace, appname, "Insert session ctid %d -> session_id:%d\n", finder, entry.SessionID)
 	sessionMutex.Lock()
 	sessionTable[finder] = entry
 	sessionMutex.Unlock()
@@ -480,12 +482,12 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 	var newSession = false
 
 	// If we already have a session entry update the existing, otherwise create a new entry for the table.
-	if session, ok = findSessionEntry(uint32(ctid)); ok {
-		logger.LogMessage(logger.LogDebug, appname, "SESSION Found %d in table\n", ctid)
+	if session, ok = findSessionEntry(ctid); ok {
+		logger.LogMessage(logger.LogTrace, appname, "Session Found %d in table\n", ctid)
 		session.SessionActivity = time.Now()
 		session.UpdateCount++
 	} else {
-		logger.LogMessage(logger.LogDebug, appname, "SESSION Adding %d to table\n", ctid)
+		logger.LogMessage(logger.LogTrace, appname, "Session Adding %d to table\n", ctid)
 		newSession = true
 		session = new(SessionEntry)
 		session.SessionID = nextSessionID()
@@ -494,7 +496,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		session.ClientSideTuple = mess.Tuple
 		session.UpdateCount = 1
 		AttachNfqueueSubscriptions(session)
-		insertSessionEntry(uint32(ctid), session)
+		insertSessionEntry(ctid, session)
 	}
 
 	mess.Session = session

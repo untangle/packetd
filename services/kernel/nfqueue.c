@@ -182,10 +182,12 @@ void nfqueue_close(void)
     nfqh = NULL;
 
     // destroy the netfilter queue
-	nfq_destroy_queue(qh);
+    if (qh != NULL)
+        nfq_destroy_queue(qh);
 
 	// shut down the netfilter queue handler
-	nfq_close(h);
+    if (h != NULL)
+        nfq_close(h);
 }
 
 int nfqueue_thread(void)
