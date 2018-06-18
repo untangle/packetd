@@ -70,9 +70,18 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 
 	if mess.UDPlayer != nil {
 		proto = "UDP"
-	}
-	if mess.TCPlayer != nil {
+	} else if mess.TCPlayer != nil {
 		proto = "TCP"
+	} else {
+		//FIXME unsupported protocol
+		//We need to support any IP-based protocol in packetd
+		if mess.Session != nil {
+			logger.LogMessage(logger.LogErr, appname, "Unsupported protocol: %v\n", mess.Session.ClientSideTuple.Protocol)
+		} else {
+			logger.LogMessage(logger.LogErr, appname, "Unsupported protocol\n")
+		}
+
+		return result
 	}
 
 	// if this is the first packet of the session we send a session create command
