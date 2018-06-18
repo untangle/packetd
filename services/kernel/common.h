@@ -62,7 +62,7 @@ struct nfq_data {
 	struct nfattr	**data;
 };
 
-extern u_int32_t go_nfqueue_callback(unsigned int mark,unsigned char* data,int len,unsigned int ctid);
+extern void go_nfqueue_callback(uint32_t mark,unsigned char* data,int len,uint32_t ctid,uint32_t nfid);
 extern void go_netlogger_callback(struct netlogger_info* info);
 extern void go_conntrack_callback(struct conntrack_info* info);
 extern void go_child_startup(void);
@@ -85,8 +85,9 @@ void conntrack_shutdown(void);
 void conntrack_dump(void);
 
 int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data);
-unsigned int nfq_get_conntrack_id(struct nfq_data *nfad, int l3num);
+uint32_t nfq_get_conntrack_id(struct nfq_data *nfad, int l3num);
 int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data *nfad,void *data);
+int nfqueue_set_verdict(uint32_t nfid, uint32_t verdict, uint32_t mark);
 int nfqueue_startup(void);
 void nfqueue_shutdown(void);
 int nfqueue_thread(void);

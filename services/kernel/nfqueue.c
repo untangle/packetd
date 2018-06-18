@@ -58,8 +58,8 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 {
 	struct nfqnl_msg_packet_hdr		*hdr;
 	unsigned char					*rawpkt;
-    unsigned int                    omark,nmark;
-	unsigned int					ctid;
+    uint32_t                        omark,nmark;
+	uint32_t    					ctid;
 	struct iphdr					*iphead;
 	int								rawlen;
 
@@ -90,12 +90,17 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 	ctid = nfq_get_conntrack_id(nfad,nfmsg->nfgen_family);
 
 	// call the go handler function
-	nmark = go_nfqueue_callback(omark,rawpkt,rawlen,ctid);
-
-	// set the verdict and the returned mark
-	nfq_set_verdict2(qh,(hdr ? ntohl(hdr->packet_id) : 0),NF_ACCEPT,nmark,0,NULL);
+	go_nfqueue_callback(omark,rawpkt,rawlen,ctid,(hdr ? ntohl(hdr->packet_id) : 0));
 
 	return(0);
+}
+
+int nfqueue_set_verdict(uint32_t nfid, uint32_t verdict, uint32_t mark)
+{
+    if (nfqh == NULL)
+        return -1;
+
+	return nfq_set_verdict2(nfqqh,nfid,verdict,mark,0,NULL);
 }
 
 int nfqueue_startup(void)
