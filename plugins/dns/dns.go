@@ -24,7 +24,7 @@ func PluginShutdown() {
 
 // PluginNfqueueHandler is called to handle nfqueue packet data. We only
 // look at DNS packets, extracting the QNAME and putting it in conndict.
-func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.TrafficMessage, ctid uint, newSession bool) {
+func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
 	result.Owner = appname
 	result.SessionRelease = true
@@ -33,20 +33,18 @@ func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.Traffi
 	// get the DNS layer
 	dnsLayer := mess.Packet.Layer(layers.LayerTypeDNS)
 	if dnsLayer == nil {
-		ch <- result
-		return
+		return result
 	}
 
 	dns := dnsLayer.(*layers.DNS)
 
 	if dns.QDCount < 1 {
-		ch <- result
-		return
+		return result
 	}
 
 	query := dns.Questions[0]
 	logger.LogMessage(logger.LogInfo, appname, "DNS QUERY DETECTED NAME:%s TYPE:%d CLASS:%d\n", query.Name, query.Type, query.Class)
 
 	// use the channel to return our result
-	ch <- result
+	return result
 }

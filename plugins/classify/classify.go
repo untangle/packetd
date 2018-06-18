@@ -56,7 +56,7 @@ func SetHostPort(value string) {
 // PluginNfqueueHandler is called for raw nfqueue packets. We pass the
 // packet directly to the Sandvine NAVL library for classification, and
 // push the results to the conntrack dictionary.
-func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.TrafficMessage, ctid uint, newSession bool) {
+func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
 	result.Owner = appname
 	result.PacketMark = 0
@@ -78,8 +78,7 @@ func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.Traffi
 		status, err = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.Session.ClientSideTuple.ClientAddr, mess.Session.ClientSideTuple.ClientPort, mess.Session.ClientSideTuple.ServerAddr, mess.Session.ClientSideTuple.ServerPort)
 		if err != nil {
 			logger.LogMessage(logger.LogErr, appname, "daemonCommand error: %s\n", err.Error())
-			ch <- result
-			return
+			return result
 		}
 		logger.LogMessage(logger.LogTrace, appname, "daemonCommand result: %s\n", status)
 	}
@@ -93,8 +92,7 @@ func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.Traffi
 
 	if err != nil {
 		logger.LogMessage(logger.LogErr, appname, "daemonCommand error: %s\n", err.Error())
-		ch <- result
-		return
+		return result
 	}
 
 	logger.LogMessage(logger.LogTrace, appname, "daemonCommand result: %s\n", status)
@@ -160,8 +158,7 @@ func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.Traffi
 		conndict.SetPair(pairname, pairdata, ctid)
 	}
 
-	// use the channel to return our result
-	ch <- result
+	return result
 }
 
 // daemonCommand will send a command to the untangle-classd daemon and return the result message

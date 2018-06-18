@@ -54,7 +54,7 @@ func PluginShutdown() {
 // the server certificate from our cache or fetch it from the server and
 // store it in our cache. Once we have the cert, we attach it to the session,
 // extract the interesting subject fields, and put them in the conndict.
-func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.TrafficMessage, ctid uint, newSession bool) {
+func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
 	result.Owner = appname
 	result.PacketMark = 0
@@ -62,17 +62,10 @@ func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.Traffi
 
 	// we only need to fetch certs for TCP traffic going to port 443
 	if mess.TCPlayer == nil || mess.Tuple.ServerPort != 443 {
-		ch <- result
-		return
+		return result
 	}
 
 	client := fmt.Sprintf("%s", mess.Tuple.ClientAddr)
-
-	// TODO - remove this hack once we can ignore locally generated traffic
-	if client == "192.168.222.20" {
-		ch <- result
-		return
-	}
 
 	var cert x509.Certificate
 	var ok bool
@@ -94,14 +87,12 @@ func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.Traffi
 
 		if err != nil {
 			logger.LogMessage(logger.LogWarn, appname, "TLS ERROR: %s\n", err)
-			ch <- result
-			return
+			return result
 		}
 
 		if len(conn.ConnectionState().PeerCertificates) < 1 {
 			logger.LogMessage(logger.LogWarn, appname, "Could not fetch certificate from %s\n", mess.Tuple.ServerAddr)
-			ch <- result
-			return
+			return result
 		}
 
 		cert = *conn.ConnectionState().PeerCertificates[0]
@@ -139,7 +130,7 @@ func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.Traffi
 		setConnDictPair("ClientSNI", hostname, ctid)
 	}
 
-	ch <- result
+	return result
 }
 
 func setConnDictPair(field string, value string, ctid uint) {

@@ -19,7 +19,7 @@ import (
 )
 
 //NfqueueHandlerFunction defines a pointer to a nfqueue callback function
-type NfqueueHandlerFunction func(chan<- NfqueueResult, TrafficMessage, uint, bool)
+type NfqueueHandlerFunction func(TrafficMessage, uint, bool) NfqueueResult
 
 //ConntrackHandlerFunction defines a pointer to a conntrack callback function
 type ConntrackHandlerFunction func(int, *ConntrackEntry)
@@ -523,7 +523,10 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 				continue
 			}
 			logger.LogMessage(logger.LogDebug, appname, "Calling nfqueue APP:%s PRIORITY:%d\n", key, priority)
-			go val.NfqueueFunc(pipe, mess, uint(ctid), newSession)
+			go func(key string, val SubscriptionHolder) {
+				var result NfqueueResult = val.NfqueueFunc(mess, uint(ctid), newSession)
+				pipe <- result
+			}(key, val)
 			hitcount++
 			subcount++
 		}
@@ -603,6 +606,10 @@ func netloggerCallback(version uint8,
 
 // cleanConntrackTable cleans the conntrack table by removing stale entries
 func cleanConntrackTable() {
+	// FIXME this task is now unnecessary
+	// We can just remove it from the table when we get a delete event
+	// we coludn't do that in NGFW because we had session threads at layer-7 that still referenced it
+
 	var counter int
 	nowtime := time.Now()
 

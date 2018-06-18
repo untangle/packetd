@@ -28,22 +28,17 @@ func PluginShutdown() {
 // We do whatever we like with the data, and when finished, we return an
 // integer via the argumented channel with any bits set that we want added to
 // the packet mark.
-func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.TrafficMessage, ctid uint, newSession bool) {
-	defer func() {
-		var result dispatch.NfqueueResult
-		result.Owner = appname
-		result.SessionRelease = true
-		result.PacketMark = 0
-
-		// use the channel to return our result
-		ch <- result
-	}()
+func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bool) dispatch.NfqueueResult {
+	var result dispatch.NfqueueResult
+	result.Owner = appname
+	result.SessionRelease = true
+	result.PacketMark = 0
 
 	if newSession {
 		var session *dispatch.SessionEntry = mess.Session
 		if session == nil {
 			logger.LogMessage(logger.LogErr, appname, "Missing session on NFQueue packet!")
-			return
+			return result
 		}
 
 		// FIXME time_stamp
@@ -62,6 +57,8 @@ func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.Traffi
 		// FIXME move to logger plugin
 		reports.LogEvent(reports.CreateEvent("session_new", "sessions", 1, columns, nil))
 	}
+
+	return result
 }
 
 // PluginConntrackHandler receives conntrack events

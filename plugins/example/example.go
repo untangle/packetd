@@ -29,7 +29,7 @@ func PluginShutdown() {
 // We do whatever we like with the data, and when finished, we return an
 // integer via the argumented channel with any bits set that we want added to
 // the packet mark.
-func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.TrafficMessage, ctid uint, newSession bool) {
+func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bool) dispatch.NfqueueResult {
 	// our example simply dumps the raw message to the console
 	logger.LogMessage(logger.LogDebug, appname, "NfqueueHandler recived %d BYTES from %s to %s\n%s\n", mess.Length, mess.IPlayer.SrcIP, mess.IPlayer.DstIP, hex.Dump(mess.Packet.Data()))
 
@@ -38,8 +38,7 @@ func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.Traffi
 	result.SessionRelease = true
 	result.PacketMark = 0
 
-	// use the channel to return our result
-	ch <- result
+	return result
 }
 
 // PluginConntrackHandler receives conntrack dispatch. The message will be one
