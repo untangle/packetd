@@ -1,3 +1,10 @@
+// Package dispatch provides dispatching of network/kernel events to various subscribers
+// It provides an API for plugins to subscribe to for 3 types of network events
+// 1) NFqueue (netfilter queue) packets
+// 2) Conntrack events (New, Update, Destroy)
+// 3) Netlogger events (from NFLOG target)
+// The dispatch will register global callbacks with the kernel package
+// and then dispatch events to subscribers accordingly
 package dispatch
 
 import (

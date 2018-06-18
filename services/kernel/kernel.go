@@ -223,9 +223,9 @@ func conntrackTask() {
 // timeUntilNextMin provides the exact duration until the start of the next minute
 func timeUntilNextMin() time.Duration {
 	t := time.Now()
-	var secondsToWait int = 59 - t.Second()
-	var millisecondsToWait int = 1000 - (t.Nanosecond() / 1000000)
-	var duration time.Duration = (time.Duration(secondsToWait) * time.Second) + (time.Duration(millisecondsToWait) * time.Millisecond)
+	var secondsToWait = 59 - t.Second()
+	var millisecondsToWait = 1000 - (t.Nanosecond() / 1000000)
+	var duration = (time.Duration(secondsToWait) * time.Second) + (time.Duration(millisecondsToWait) * time.Millisecond)
 
 	return duration
 }

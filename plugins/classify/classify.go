@@ -15,8 +15,7 @@ var socktime time.Time
 var sockspin int64
 var appname = "classify"
 var daemon net.Conn
-
-var classdHostPort string = "127.0.0.1:8123"
+var classdHostPort = "127.0.0.1:8123"
 
 // PluginStartup is called to allow plugin specific initialization. We
 // increment the argumented WaitGroup so the main process can wait for
@@ -49,7 +48,7 @@ func PluginShutdown() {
 	}
 }
 
-// Set the address for the classdDaemon
+// SetHostPort sets the address for the classdDaemon. Default is "127.0.0.1:8123"
 func SetHostPort(value string) {
 	classdHostPort = value
 }
