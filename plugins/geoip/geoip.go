@@ -47,7 +47,7 @@ func PluginStartup() {
 		geodb = db
 	}
 
-	dispatch.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(appname, 2, PluginNfqueueHandler)
 }
 
 // PluginShutdown is called when the daemon is shutting down. We close our

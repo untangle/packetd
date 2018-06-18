@@ -115,7 +115,7 @@ var conntrackMutex sync.Mutex
 var sessionMutex sync.Mutex
 var sessionIndex uint64
 var shutdownCleanerTask = make(chan bool)
-var appname = "events"
+var appname = "dispatch"
 
 // Startup starts the event handling service
 func Startup() {
@@ -217,6 +217,7 @@ func RemoveConntrackEntry(finder uint32) {
 // InsertNfqueueSubscription adds a subscription for receiving nfqueue messages
 func InsertNfqueueSubscription(owner string, priority int, function NfqueueHandlerFunction) {
 	var holder SubscriptionHolder
+	logger.LogMessage(logger.LogInfo, appname, "Adding NFQueue Event Subscription (%s, %d)\n", owner, priority)
 
 	holder.Owner = owner
 	holder.Priority = priority
@@ -229,6 +230,7 @@ func InsertNfqueueSubscription(owner string, priority int, function NfqueueHandl
 // InsertConntrackSubscription adds a subscription for receiving conntrack messages
 func InsertConntrackSubscription(owner string, priority int, function ConntrackHandlerFunction) {
 	var holder SubscriptionHolder
+	logger.LogMessage(logger.LogInfo, appname, "Adding Conntrack Event Subscription (%s, %d)\n", owner, priority)
 
 	holder.Owner = owner
 	holder.Priority = priority
@@ -241,6 +243,7 @@ func InsertConntrackSubscription(owner string, priority int, function ConntrackH
 // InsertNetloggerSubscription adds a subscription for receiving netlogger messages
 func InsertNetloggerSubscription(owner string, priority int, function NetloggerHandlerFunction) {
 	var holder SubscriptionHolder
+	logger.LogMessage(logger.LogInfo, appname, "Adding Netlogger Event Subscription (%s, %d)\n", owner, priority)
 
 	holder.Owner = owner
 	holder.Priority = priority

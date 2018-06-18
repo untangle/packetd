@@ -72,10 +72,14 @@ func main() {
 // parseArguments parses the command line arguments
 func parseArguments() {
 	classdAddressStringPtr := flag.String("classd", "127.0.0.1:8123", "host:port for classd daemon")
+	disableConndictPtr := flag.Bool("disable-conndict", false, "disable conndict")
 
 	flag.Parse()
 
 	classify.SetHostPort(*classdAddressStringPtr)
+	if *disableConndictPtr {
+		conndict.Disable()
+	}
 }
 
 // Cleanup packetd and exit

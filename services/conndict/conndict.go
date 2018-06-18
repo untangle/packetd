@@ -14,9 +14,14 @@ const pathBase string = "/proc/net/dict"
 
 var readMutex = &sync.Mutex{}
 var appname = "conndict"
+var disabled = false
 
 // Startup conndict service
 func Startup() {
+	if disabled {
+		return
+	}
+
 	// Load the conndict module
 	exec.SystemCommand("modprobe", []string{"nf_conntrack_dict"})
 }
@@ -26,17 +31,15 @@ func Shutdown() {
 
 }
 
+// Disable disable conndict writing
+func Disable() {
+	disabled = true
+}
+
 // DictPair holds a field value pair of data
 type DictPair struct {
 	Field string
 	Value string
-}
-
-// Create a field/value pair from a line of output from /proc/net/dict/*
-func parsePair(line string) DictPair {
-	slices := strings.SplitN(line, ": ", 2)
-	pair := DictPair{Field: slices[0], Value: slices[1]}
-	return pair
 }
 
 // Print a pair's field and value
@@ -46,6 +49,10 @@ func (p DictPair) Print() {
 
 // SetPair sets a field/value pair for the supplied conntrack id
 func SetPair(field string, value string, id uint) error {
+	if disabled {
+		logger.LogMessage(logger.LogInfo, appname, "SetPair(%s,%s,%d)\n", field, value, id)
+		return nil
+	}
 	logger.LogMessage(logger.LogLogic, appname, "SetPair(%s,%s,%d)\n", field, value, id)
 	filename := pathBase + "/write"
 	file, err := os.OpenFile(filename, os.O_WRONLY, 0660)
@@ -85,6 +92,9 @@ func SetPairs(pairs []DictPair, id uint) error {
 
 // GetPairs gets all of the field/value pairs for the supplied conntrack id
 func GetPairs(id uint) ([]DictPair, error) {
+	if disabled {
+		return nil, nil
+	}
 	filename := pathBase + "/read"
 	file, err := os.OpenFile(filename, os.O_RDWR, 0660)
 	setstr := fmt.Sprintf("%d", id)
@@ -116,6 +126,9 @@ func GetPairs(id uint) ([]DictPair, error) {
 
 // GetAll gets all of the field/value pairs for all known conntrack entries
 func GetAll() ([]DictPair, error) {
+	if disabled {
+		return nil, nil
+	}
 	file, err := os.OpenFile(pathBase+"/all", os.O_RDWR, 0660)
 
 	if err != nil {
@@ -131,4 +144,11 @@ func GetAll() ([]DictPair, error) {
 		pairs = append(pairs, parsePair(scanner.Text()))
 	}
 	return pairs, err
+}
+
+// Create a field/value pair from a line of output from /proc/net/dict/*
+func parsePair(line string) DictPair {
+	slices := strings.SplitN(line, ": ", 2)
+	pair := DictPair{Field: slices[0], Value: slices[1]}
+	return pair
 }

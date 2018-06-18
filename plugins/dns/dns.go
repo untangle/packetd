@@ -13,7 +13,7 @@ var appname = "dns"
 // our shutdown function to return during shutdown.
 func PluginStartup() {
 	logger.LogMessage(logger.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
-	dispatch.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(appname, 2, PluginNfqueueHandler)
 }
 
 // PluginShutdown function called when the daemon is shutting down. We call Done

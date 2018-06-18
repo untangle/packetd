@@ -36,7 +36,7 @@ func PluginStartup() {
 		logger.LogMessage(logger.LogErr, appname, "Error calling net.Dial(): %v\n", err)
 	}
 
-	dispatch.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(appname, 2, PluginNfqueueHandler)
 }
 
 // PluginShutdown is called when the daemon is shutting down. We call Done

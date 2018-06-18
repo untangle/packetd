@@ -32,7 +32,7 @@ func PluginStartup() {
 	certificateTable = make(map[string]CertificateHolder)
 	go cleanupTask()
 
-	dispatch.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(appname, 2, PluginNfqueueHandler)
 }
 
 // PluginShutdown function called when the daemon is shutting down. We call Done
