@@ -23,17 +23,12 @@ import (
 	"time"
 )
 
-// The pluginSync is used to give the main process something to watch while
-// waiting for all of the goroutine children to finish execution and cleanup.
-var pluginSync sync.WaitGroup
 var appname = "packetd"
 var exitLock sync.Mutex
 
 func main() {
-	var classdPtr = flag.String("classd", "127.0.0.1:8123", "host:port for classd daemon")
-	flag.Parse()
-
 	handleSignals()
+	parseArguments()
 
 	// Start services
 	logger.Startup()
@@ -47,12 +42,8 @@ func main() {
 	// Start all the callbacks
 	kernel.StartCallbacks()
 
-	// Start Plugins
-	go example.PluginStartup(&pluginSync)
-	go classify.PluginStartup(&pluginSync, classdPtr)
-	go geoip.PluginStartup(&pluginSync)
-	go certcache.PluginStartup(&pluginSync)
-	go dns.PluginStartup(&pluginSync)
+	// Start the plugins
+	startPlugins()
 
 	// Start REST HTTP daemon
 	go restd.Startup()
@@ -60,6 +51,7 @@ func main() {
 	// Insert netfilter rules
 	updateRules()
 
+	// Startup Complete
 	logger.LogMessage(logger.LogInfo, appname, "Untangle Packet Daemon Version %s\n", "1.00")
 
 	// Check that all the C services started correctly
@@ -77,6 +69,15 @@ func main() {
 	}
 }
 
+// parseArguments parses the command line arguments
+func parseArguments() {
+	classdAddressStringPtr := flag.String("classd", "127.0.0.1:8123", "host:port for classd daemon")
+
+	flag.Parse()
+
+	classify.SetHostPort(*classdAddressStringPtr)
+}
+
 // Cleanup packetd and exit
 func cleanup() {
 	// Prevent further calls
@@ -91,15 +92,7 @@ func cleanup() {
 	kernel.StopCallbacks()
 
 	// Stop all plugins
-	logger.LogMessage(logger.LogInfo, appname, "Stopping plugins...\n")
-	go example.PluginShutdown(&pluginSync)
-	go classify.PluginShutdown(&pluginSync)
-	go geoip.PluginShutdown(&pluginSync)
-	go certcache.PluginShutdown(&pluginSync)
-	go dns.PluginShutdown(&pluginSync)
-
-	logger.LogMessage(logger.LogInfo, appname, "Waiting on plugins...\n")
-	pluginSync.Wait()
+	stopPlugins()
 
 	// Stop services
 	logger.LogMessage(logger.LogInfo, appname, "Shutting down services...\n")
@@ -111,6 +104,49 @@ func cleanup() {
 	dispatch.Shutdown()
 	kernel.Shutdown()
 	logger.Shutdown()
+}
+
+// startPlugins starts all the plugins (in parallel)
+func startPlugins() {
+	var wg sync.WaitGroup
+
+	// Start Plugins
+	startups := []func(){
+		example.PluginStartup,
+		classify.PluginStartup,
+		geoip.PluginStartup,
+		certcache.PluginStartup,
+		dns.PluginStartup}
+	for _, f := range startups {
+		wg.Add(1)
+		go func(f func()) {
+			f()
+			wg.Done()
+		}(f)
+	}
+
+	wg.Wait()
+}
+
+// stopPlugins stops all the plugins (in parallel)
+func stopPlugins() {
+	var wg sync.WaitGroup
+
+	shutdowns := []func(){
+		example.PluginShutdown,
+		classify.PluginShutdown,
+		geoip.PluginShutdown,
+		certcache.PluginShutdown,
+		dns.PluginShutdown}
+	for _, f := range shutdowns {
+		wg.Add(1)
+		go func(f func()) {
+			f()
+			wg.Done()
+		}(f)
+	}
+
+	wg.Wait()
 }
 
 // Add signal handlers

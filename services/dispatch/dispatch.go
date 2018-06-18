@@ -389,15 +389,24 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 	priority := 0
 
 	for subcount != subtotal {
+		var wg sync.WaitGroup
+
 		// Call all of the subscribed handlers for the current priority
 		for key, val := range sublist {
 			if val.Priority != priority {
 				continue
 			}
 			logger.LogMessage(logger.LogDebug, appname, "Calling conntrack APP:%s PRIORITY:%d\n", key, priority)
-			go val.ConntrackFunc(int(eventType), &conntrackEntry)
+			wg.Add(1)
+			go func(val SubscriptionHolder) {
+				val.ConntrackFunc(int(eventType), &conntrackEntry)
+				wg.Done()
+			}(val)
 			subcount++
 		}
+
+		// Wait on all of this priority to finish
+		wg.Wait()
 
 		// Increment the priority and keep looping until we've called all subscribers
 		priority++
@@ -573,15 +582,25 @@ func netloggerCallback(version uint8,
 	priority := 0
 
 	for subcount != subtotal {
+		var wg sync.WaitGroup
+
 		// Call all of the subscribed handlers for the current priority
 		for key, val := range sublist {
 			if val.Priority != priority {
 				continue
 			}
 			logger.LogMessage(logger.LogDebug, appname, "Calling netlogger APP:%s PRIORITY:%d\n", key, priority)
-			go val.NetloggerFunc(&netlogger)
+			wg.Add(1)
+			go func(val SubscriptionHolder) {
+				val.NetloggerFunc(&netlogger)
+				wg.Done()
+			}(val)
 			subcount++
+
 		}
+
+		// Wait on all of this priority to finish
+		wg.Wait()
 
 		// Increment the priority and keep looping until we've called all subscribers
 		priority++

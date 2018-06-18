@@ -27,18 +27,17 @@ var localMutex sync.Mutex
 // PluginStartup function is called to allow plugin specific initialization. We
 // increment the argumented WaitGroup so the main process can wait for
 // our shutdown function to return during shutdown.
-func PluginStartup(childsync *sync.WaitGroup) {
+func PluginStartup() {
 	logger.LogMessage(logger.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
 	certificateTable = make(map[string]CertificateHolder)
 	go cleanupTask()
 
 	dispatch.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
-	childsync.Add(1)
 }
 
 // PluginShutdown function called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
-func PluginShutdown(childsync *sync.WaitGroup) {
+func PluginShutdown() {
 	// Send shutdown signal to cleanupTask and wait for it to return
 	shutdownChannel <- true
 	select {
@@ -48,7 +47,6 @@ func PluginShutdown(childsync *sync.WaitGroup) {
 	}
 
 	logger.LogMessage(logger.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
-	childsync.Done()
 }
 
 // PluginNfqueueHandler is called to handle nfqueue packet data. We only
@@ -144,14 +142,10 @@ func PluginNfqueueHandler(ch chan<- dispatch.SubscriptionResult, mess dispatch.T
 	ch <- result
 }
 
-//-----------------------------------------------------------------------------
-
 func setConnDictPair(field string, value string, ctid uint) {
 	output := strings.Replace(value, ",", "-", -1)
 	conndict.SetPair(field, output, ctid)
 }
-
-//-----------------------------------------------------------------------------
 
 func setConnDictList(field string, value []string, ctid uint) {
 
@@ -173,10 +167,7 @@ func setConnDictList(field string, value []string, ctid uint) {
 	conndict.SetPair(field, output, ctid)
 }
 
-//-----------------------------------------------------------------------------
-
 // This was pulled from https://github.com/polvi/sni/sni.go
-
 func extractSNIhostname(b []byte) string {
 	rest := b[5:]
 	current := 0

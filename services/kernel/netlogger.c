@@ -8,12 +8,12 @@
  */
 
 #include "common.h"
-/*--------------------------------------------------------------------------*/
+
 static struct nflog_handle      *l_log_handle;
 static struct nflog_g_handle    *l_grp_handle;
 static int                      l_logsock;
 static char                     *appname = "netlogger";
-/*--------------------------------------------------------------------------*/
+
 int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct nflog_data *nfa,void *data)
 {
 	struct netlogger_info   info;
@@ -95,7 +95,7 @@ int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct n
 
 	return(0);
 }
-/*--------------------------------------------------------------------------*/
+
 int netlogger_startup(void)
 {
 	int     ret;
@@ -155,7 +155,7 @@ int netlogger_startup(void)
 
 	return(0);
 }
-/*--------------------------------------------------------------------------*/
+
 void netlogger_close(void)
 {
 	int     ret;
@@ -172,7 +172,7 @@ void netlogger_close(void)
 		if (ret < 0) logmessage(LOG_ERR,appname,"Error %d returned from nflog_close()\n",errno);
 	}
 }
-/*--------------------------------------------------------------------------*/
+
 int netlogger_thread(void)
 {
 	struct timeval  tv;
@@ -236,9 +236,9 @@ int netlogger_thread(void)
 	go_child_shutdown();
 	return(0);
 }
-/*--------------------------------------------------------------------------*/
+
 void netlogger_shutdown(void)
 {
 	set_shutdown_flag(1);
 }
-/*--------------------------------------------------------------------------*/
+

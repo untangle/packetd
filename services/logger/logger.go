@@ -93,14 +93,10 @@ type LogWriter struct {
 	buffer []byte
 }
 
-//-----------------------------------------------------------------------------
-
 // NewLogWriter creates an io Writer to steam output to the LogMessage facility
 func NewLogWriter(source string) *LogWriter {
 	return (&LogWriter{source, make([]byte, 256)})
 }
-
-//-----------------------------------------------------------------------------
 
 // Write takes written data and stores it in a buffer and writes to the log when a line feed is detected
 func (w *LogWriter) Write(p []byte) (int, error) {

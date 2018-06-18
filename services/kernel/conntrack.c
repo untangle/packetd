@@ -8,12 +8,12 @@
  */
 
 #include "common.h"
-/*--------------------------------------------------------------------------*/
+
 static struct nfct_handle	*nfcth;
 static u_int64_t			tracker_error;
 static u_int64_t			tracker_unknown;
 static char                 *appname = "conntrack";
-/*--------------------------------------------------------------------------*/
+
 static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrack *ct,void *data)
 {
 	struct conntrack_info	info;
@@ -76,7 +76,7 @@ static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrac
 
 	return(NFCT_CB_CONTINUE);
 }
-/*--------------------------------------------------------------------------*/
+
 int conntrack_startup(void)
 {
 	int		ret;
@@ -103,7 +103,7 @@ int conntrack_startup(void)
 
 	return(0);
 }
-/*--------------------------------------------------------------------------*/
+
 void conntrack_unregister(void)
 {
 	if (nfcth == NULL) return;
@@ -117,7 +117,7 @@ void conntrack_unregister(void)
 	// clear our conntrack handle
 	nfcth = NULL;
 }
-/*--------------------------------------------------------------------------*/
+
 int conntrack_thread(void)
 {
 	int		ret;
@@ -148,7 +148,7 @@ int conntrack_thread(void)
 	go_child_shutdown();
 	return(0);
 }
-/*--------------------------------------------------------------------------*/
+
 void conntrack_shutdown(void)
 {
 	u_int32_t	family;
@@ -160,7 +160,7 @@ void conntrack_shutdown(void)
 	family = AF_INET;
 	nfct_send(nfcth,NFCT_Q_DUMP,&family);
 }
-/*--------------------------------------------------------------------------*/
+
 void conntrack_dump(void)
 {
 	u_int32_t	family;
@@ -172,4 +172,4 @@ void conntrack_dump(void)
 	ret = nfct_send(nfcth,NFCT_Q_DUMP,&family);
 	logmessage(LOG_DEBUG,appname,"nfct_send() result = %d\n",ret);
 }
-/*--------------------------------------------------------------------------*/
+

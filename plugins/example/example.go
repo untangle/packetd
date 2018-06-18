@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
-	"sync"
 )
 
 var appname = "example"
@@ -12,19 +11,17 @@ var appname = "example"
 // PluginStartup function is called to allow plugin specific initialization. We
 // increment the argumented WaitGroup so the main process can wait for
 // our shutdown function to return during shutdown.
-func PluginStartup(childsync *sync.WaitGroup) {
+func PluginStartup() {
 	logger.LogMessage(logger.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
 	dispatch.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
 	dispatch.InsertConntrackSubscription(appname, 1, PluginConntrackHandler)
 	dispatch.InsertNetloggerSubscription(appname, 1, PluginNetloggerHandler)
-	childsync.Add(1)
 }
 
 // PluginShutdown function called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
-func PluginShutdown(childsync *sync.WaitGroup) {
+func PluginShutdown() {
 	logger.LogMessage(logger.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
-	childsync.Done()
 }
 
 // PluginNfqueueHandler receives a TrafficMessage which includes a Tuple and

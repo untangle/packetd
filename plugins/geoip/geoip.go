@@ -9,20 +9,17 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"sync"
 )
 
 var appname = "geoip"
 var geodb *geoip2.Reader
-
-//-----------------------------------------------------------------------------
 
 // PluginStartup is called to allow plugin specific initialization.
 // We initialize an instance of the GeoIP engine using any existing
 // database we can find, or we download if needed. We increment the
 // argumented WaitGroup so the main process can wait for our shutdown function
 // to return during shutdown.
-func PluginStartup(childsync *sync.WaitGroup) {
+func PluginStartup() {
 	logger.LogMessage(logger.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
 
 	var filename string
@@ -51,21 +48,15 @@ func PluginStartup(childsync *sync.WaitGroup) {
 	}
 
 	dispatch.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
-	childsync.Add(1)
 }
-
-//-----------------------------------------------------------------------------
 
 // PluginShutdown is called when the daemon is shutting down. We close our
 // GeoIP engine and call done for the argumented WaitGroup to let the main
 // process know we're finished.
-func PluginShutdown(childsync *sync.WaitGroup) {
+func PluginShutdown() {
 	logger.LogMessage(logger.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
 	geodb.Close()
-	childsync.Done()
 }
-
-//-----------------------------------------------------------------------------
 
 // PluginNfqueueHandler is called to handle nfqueue packet data. We extract
 // the source and destination IP address from the packet, lookup the GeoIP
@@ -95,8 +86,6 @@ func PluginNfqueueHandler(ch chan<- dispatch.SubscriptionResult, mess dispatch.T
 	result.SessionRelease = true
 	ch <- result
 }
-
-//-----------------------------------------------------------------------------
 
 func databaseDownload(filename string) {
 	logger.LogMessage(logger.LogInfo, appname, "Downloading GeoIP Database\n")
@@ -131,5 +120,3 @@ func databaseDownload(filename string) {
 	// Write the uncompressed database to the file
 	io.Copy(writer, reader)
 }
-
-//-----------------------------------------------------------------------------

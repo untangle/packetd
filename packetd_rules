@@ -72,6 +72,10 @@ insert_packetd_iptables_rules()
     ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -s 127.0.0.0/8 -j RETURN
     ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -d 127.0.0.0/8 -j RETURN
 
+    # we don't care about traffic to a local address
+    # ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -m addrtype --dst-type local -j RETURN
+    # ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -m addrtype --dst-type local -j RETURN
+
     # special hook to allow bypass of a development machine or network
     if [ ! -z ${PACKETD_DEV_NETWORK} ]; then
         ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -s ${PACKETD_DEV_NETWORK} -j RETURN

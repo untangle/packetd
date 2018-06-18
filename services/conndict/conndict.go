@@ -32,8 +32,6 @@ type DictPair struct {
 	Value string
 }
 
-//-----------------------------------------------------------------------------
-
 // Create a field/value pair from a line of output from /proc/net/dict/*
 func parsePair(line string) DictPair {
 	slices := strings.SplitN(line, ": ", 2)
@@ -41,17 +39,14 @@ func parsePair(line string) DictPair {
 	return pair
 }
 
-//-----------------------------------------------------------------------------
-
 // Print a pair's field and value
 func (p DictPair) Print() {
 	logger.LogMessage(logger.LogInfo, appname, "Field: %s Value: %s\n", p.Field, p.Value)
 }
 
-//-----------------------------------------------------------------------------
-
 // SetPair sets a field/value pair for the supplied conntrack id
 func SetPair(field string, value string, id uint) error {
+	logger.LogMessage(logger.LogLogic, appname, "SetPair(%s,%s,%d)\n", field, value, id)
 	filename := pathBase + "/write"
 	file, err := os.OpenFile(filename, os.O_WRONLY, 0660)
 	setstr := fmt.Sprintf("id=%d,field=%s,value=%s", id, field, value)
@@ -74,8 +69,6 @@ func SetPair(field string, value string, id uint) error {
 	return err
 }
 
-//-----------------------------------------------------------------------------
-
 // SetPairs sets a slice of field/value pairs for the supplied conntrack id
 func SetPairs(pairs []DictPair, id uint) error {
 	for _, p := range pairs {
@@ -89,8 +82,6 @@ func SetPairs(pairs []DictPair, id uint) error {
 
 	return nil
 }
-
-//-----------------------------------------------------------------------------
 
 // GetPairs gets all of the field/value pairs for the supplied conntrack id
 func GetPairs(id uint) ([]DictPair, error) {
@@ -123,8 +114,6 @@ func GetPairs(id uint) ([]DictPair, error) {
 	return pairs, err
 }
 
-//-----------------------------------------------------------------------------
-
 // GetAll gets all of the field/value pairs for all known conntrack entries
 func GetAll() ([]DictPair, error) {
 	file, err := os.OpenFile(pathBase+"/all", os.O_RDWR, 0660)
@@ -143,5 +132,3 @@ func GetAll() ([]DictPair, error) {
 	}
 	return pairs, err
 }
-
-//-----------------------------------------------------------------------------

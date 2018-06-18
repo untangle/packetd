@@ -8,20 +8,20 @@
 */
 
 #include "common.h"
-/*--------------------------------------------------------------------------*/
+
 static int		g_shutdown;
 static int		g_debug;
-/*--------------------------------------------------------------------------*/
+
 void common_startup(void)
 {
 	g_shutdown = 0;
 	g_debug = 1;
 }
-/*--------------------------------------------------------------------------*/
+
 void common_shutdown(void)
 {
 }
-/*--------------------------------------------------------------------------*/
+
 char* itolevel(int value,char *dest)
 {
 	if (value == LOG_EMERG)		return(strcpy(dest,"EMERGENCY"));
@@ -36,13 +36,13 @@ char* itolevel(int value,char *dest)
 	sprintf(dest,"LOG_%d",value);
 	return(dest);
 }
-/*--------------------------------------------------------------------------*/
+
 void rawmessage(int priority,const char *source,const char *message)
 {
 	if ((priority == LOG_DEBUG) && (g_debug == 0)) return;
 	go_child_message(priority,(char *)source,(char *)message);
 }
-/*--------------------------------------------------------------------------*/
+
 void logmessage(int priority,const char *source,const char *format,...)
 {
 	va_list		args;
@@ -56,7 +56,7 @@ void logmessage(int priority,const char *source,const char *format,...)
 
 	rawmessage(priority,source,message);
 }
-/*--------------------------------------------------------------------------*/
+
 void hexmessage(int priority,const char *source,const void *buffer,int size)
 {
 	const unsigned char		*data;
@@ -80,14 +80,14 @@ void hexmessage(int priority,const char *source,const void *buffer,int size)
 	rawmessage(priority,source,message);
 	free(message);
 }
-/*--------------------------------------------------------------------------*/
+
 int get_shutdown_flag(void)
 {
 	return(g_shutdown);
 }
-/*--------------------------------------------------------------------------*/
+
 void set_shutdown_flag(int value)
 {
 	g_shutdown = value;
 }
-/*--------------------------------------------------------------------------*/
+

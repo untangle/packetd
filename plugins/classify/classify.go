@@ -8,7 +8,6 @@ import (
 	"github.com/untangle/packetd/services/logger"
 	"net"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -17,17 +16,13 @@ var sockspin int64
 var appname = "classify"
 var daemon net.Conn
 
-var classdHostPort string
-
-//-----------------------------------------------------------------------------
+var classdHostPort string = "127.0.0.1:8123"
 
 // PluginStartup is called to allow plugin specific initialization. We
 // increment the argumented WaitGroup so the main process can wait for
 // our shutdown function to return during shutdown.
-func PluginStartup(childsync *sync.WaitGroup, classdPtr *string) {
+func PluginStartup() {
 	var err error
-
-	classdHostPort = *classdPtr
 
 	logger.LogMessage(logger.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
 
@@ -42,24 +37,22 @@ func PluginStartup(childsync *sync.WaitGroup, classdPtr *string) {
 	}
 
 	dispatch.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
-	childsync.Add(1)
 }
-
-//-----------------------------------------------------------------------------
 
 // PluginShutdown is called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
-func PluginShutdown(childsync *sync.WaitGroup) {
+func PluginShutdown() {
 	logger.LogMessage(logger.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
 
 	if daemon != nil {
 		daemon.Close()
 	}
-
-	childsync.Done()
 }
 
-//-----------------------------------------------------------------------------
+// Set the address for the classdDaemon
+func SetHostPort(value string) {
+	classdHostPort = value
+}
 
 // PluginNfqueueHandler is called for raw nfqueue packets. We pass the
 // packet directly to the Sandvine NAVL library for classification, and
@@ -172,8 +165,6 @@ func PluginNfqueueHandler(ch chan<- dispatch.SubscriptionResult, mess dispatch.T
 	ch <- result
 }
 
-//-----------------------------------------------------------------------------
-
 // daemonCommand will send a command to the untangle-classd daemon and return the result message
 func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, error) {
 	buffer := make([]byte, 1024)
@@ -257,5 +248,3 @@ func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, 
 
 	return string(buffer), nil
 }
-
-//-----------------------------------------------------------------------------
