@@ -49,11 +49,11 @@ func (p DictPair) Print() {
 
 // SetPair sets a field/value pair for the supplied conntrack id
 func SetPair(field string, value string, id uint) error {
+	logger.LogMessage(logger.LogDebug, appname, "SetPair(%s,%s,%d)\n", field, value, id)
 	if disabled {
-		logger.LogMessage(logger.LogInfo, appname, "SetPair(%s,%s,%d)\n", field, value, id)
 		return nil
 	}
-	logger.LogMessage(logger.LogLogic, appname, "SetPair(%s,%s,%d)\n", field, value, id)
+
 	filename := pathBase + "/write"
 	file, err := os.OpenFile(filename, os.O_WRONLY, 0660)
 	setstr := fmt.Sprintf("id=%d,field=%s,value=%s", id, field, value)

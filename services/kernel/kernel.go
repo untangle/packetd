@@ -207,16 +207,25 @@ func go_child_message(level C.int, source *C.char, message *C.char) {
 func conntrackTask() {
 	var counter int
 
-	// FIXME first sleep should be calibrated so it wakes on first second on minute for conntrack_dump
 	for {
 		select {
 		case <-shutdownConntrackTask:
 			shutdownConntrackTask <- true
 			return
-		case <-time.After(60 * time.Second):
+		case <-time.After(timeUntilNextMin()):
 			counter++
 			logger.LogMessage(logger.LogDebug, appname, "Calling conntrack dump %d\n", counter)
 			C.conntrack_dump()
 		}
 	}
+}
+
+// timeUntilNextMin provides the exact duration until the start of the next minute
+func timeUntilNextMin() time.Duration {
+	t := time.Now()
+	var secondsToWait int = 59 - t.Second()
+	var millisecondsToWait int = 1000 - (t.Nanosecond() / 1000000)
+	var duration time.Duration = (time.Duration(secondsToWait) * time.Second) + (time.Duration(millisecondsToWait) * time.Millisecond)
+
+	return duration
 }

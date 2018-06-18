@@ -40,8 +40,8 @@ const LogInfo = 6
 //LogDebug = stdlog.h/LOG_DEBUG
 const LogDebug = 7
 
-//LogLogic = custom value
-const LogLogic = 8
+//LogTrace = custom value
+const LogTrace = 8
 
 // Startup starts the logging service
 func Startup() {
@@ -194,14 +194,19 @@ func initLoggerConfig() {
 	// make a map and fill it with a default log level for every application
 	config := make(map[string]string)
 	config["_ValidLevels_"] = comment
+
+	// plugins
 	config["certcache"] = "INFO"
 	config["classify"] = "INFO"
+	config["dns"] = "INFO"
+	config["geoip"] = "INFO"
+	config["example"] = "INFO"
+
+	// services
 	config["conndict"] = "INFO"
 	config["conntrack"] = "INFO"
 	config["dispatch"] = "INFO"
-	config["dns"] = "INFO"
-	config["example"] = "INFO"
-	config["geoip"] = "INFO"
+	config["exec"] = "INFO"
 	config["kernel"] = "INFO"
 	config["logger"] = "INFO"
 	config["nfqueue"] = "INFO"

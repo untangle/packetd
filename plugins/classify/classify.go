@@ -82,7 +82,7 @@ func PluginNfqueueHandler(ch chan<- dispatch.SubscriptionResult, mess dispatch.T
 			ch <- result
 			return
 		}
-		logger.LogMessage(logger.LogLogic, appname, "daemonCommand result: %s\n", status)
+		logger.LogMessage(logger.LogTrace, appname, "daemonCommand result: %s\n", status)
 	}
 
 	// send the application payload to the daemon
@@ -98,7 +98,7 @@ func PluginNfqueueHandler(ch chan<- dispatch.SubscriptionResult, mess dispatch.T
 		return
 	}
 
-	logger.LogMessage(logger.LogLogic, appname, "daemonCommand result: %s\n", status)
+	logger.LogMessage(logger.LogTrace, appname, "daemonCommand result: %s\n", status)
 
 	// Parse the output from classd to get the classification details
 	var pairname string
