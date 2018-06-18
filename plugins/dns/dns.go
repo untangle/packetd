@@ -24,8 +24,8 @@ func PluginShutdown() {
 
 // PluginNfqueueHandler is called to handle nfqueue packet data. We only
 // look at DNS packets, extracting the QNAME and putting it in conndict.
-func PluginNfqueueHandler(ch chan<- dispatch.SubscriptionResult, mess dispatch.TrafficMessage, ctid uint) {
-	var result dispatch.SubscriptionResult
+func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.TrafficMessage, ctid uint, newSession bool) {
+	var result dispatch.NfqueueResult
 	result.Owner = appname
 	result.SessionRelease = true
 	result.PacketMark = 0

@@ -3,6 +3,7 @@ package exec
 import (
 	"github.com/untangle/packetd/services/logger"
 	"os/exec"
+	"strings"
 )
 
 var appname = "exec"
@@ -22,7 +23,7 @@ func SystemCommand(command string, arguments []string) ([]byte, error) {
 
 	result, err = exec.Command(command, arguments...).CombinedOutput()
 	if err != nil {
-		logger.LogMessage(logger.LogInfo, appname, "COMMAND:%s | OUTPUT:%s | ERROR:%s\n", command, string(result), err.Error())
+		logger.LogMessage(logger.LogInfo, appname, "COMMAND:%s | OUTPUT:%s | ERROR:%s\n", command, strings.TrimSpace(string(result)), err.Error())
 	} else {
 		logger.LogMessage(logger.LogDebug, appname, "COMMAND:%s | OUTPUT:%s\n", command, string(result))
 	}

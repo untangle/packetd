@@ -61,7 +61,7 @@ func PluginShutdown() {
 // PluginNfqueueHandler is called to handle nfqueue packet data. We extract
 // the source and destination IP address from the packet, lookup the GeoIP
 // country code for each, and store them in the conntrack dictionary.
-func PluginNfqueueHandler(ch chan<- dispatch.SubscriptionResult, mess dispatch.TrafficMessage, ctid uint) {
+func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.TrafficMessage, ctid uint, newSession bool) {
 	var SrcCode = "XX"
 	var DstCode = "XX"
 
@@ -80,7 +80,7 @@ func PluginNfqueueHandler(ch chan<- dispatch.SubscriptionResult, mess dispatch.T
 	conndict.SetPair("SrcCountry", SrcCode, ctid)
 	conndict.SetPair("DstCountry", DstCode, ctid)
 
-	var result dispatch.SubscriptionResult
+	var result dispatch.NfqueueResult
 	result.Owner = appname
 	result.PacketMark = 0
 	result.SessionRelease = true

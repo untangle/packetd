@@ -201,6 +201,7 @@ func initLoggerConfig() {
 	config["dns"] = "INFO"
 	config["geoip"] = "INFO"
 	config["example"] = "INFO"
+	config["reporter"] = "INFO"
 
 	// services
 	config["conndict"] = "INFO"

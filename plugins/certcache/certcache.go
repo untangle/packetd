@@ -54,8 +54,8 @@ func PluginShutdown() {
 // the server certificate from our cache or fetch it from the server and
 // store it in our cache. Once we have the cert, we attach it to the session,
 // extract the interesting subject fields, and put them in the conndict.
-func PluginNfqueueHandler(ch chan<- dispatch.SubscriptionResult, mess dispatch.TrafficMessage, ctid uint) {
-	var result dispatch.SubscriptionResult
+func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.TrafficMessage, ctid uint, newSession bool) {
+	var result dispatch.NfqueueResult
 	result.Owner = appname
 	result.PacketMark = 0
 	result.SessionRelease = true

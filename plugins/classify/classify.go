@@ -57,8 +57,8 @@ func SetHostPort(value string) {
 // PluginNfqueueHandler is called for raw nfqueue packets. We pass the
 // packet directly to the Sandvine NAVL library for classification, and
 // push the results to the conntrack dictionary.
-func PluginNfqueueHandler(ch chan<- dispatch.SubscriptionResult, mess dispatch.TrafficMessage, ctid uint) {
-	var result dispatch.SubscriptionResult
+func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.TrafficMessage, ctid uint, newSession bool) {
+	var result dispatch.NfqueueResult
 	result.Owner = appname
 	result.PacketMark = 0
 	result.SessionRelease = false

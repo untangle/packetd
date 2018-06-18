@@ -1,0 +1,100 @@
+// Package reporter provides the "reporter" plugin
+// The reporter plugin listens to networking events and writes them to the database
+package reporter
+
+import (
+	"github.com/untangle/packetd/services/dispatch"
+	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/reports"
+)
+
+var appname = "reporter"
+
+// PluginStartup starts the reporter
+func PluginStartup() {
+	logger.LogMessage(logger.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
+	dispatch.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
+	dispatch.InsertConntrackSubscription(appname, 1, PluginConntrackHandler)
+	dispatch.InsertNetloggerSubscription(appname, 1, PluginNetloggerHandler)
+}
+
+// PluginShutdown stops the reporter
+func PluginShutdown() {
+	logger.LogMessage(logger.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
+}
+
+// PluginNfqueueHandler receives a TrafficMessage which includes a Tuple and
+// a gopacket.Packet, along with the IP and TCP or UDP layer already extracted.
+// We do whatever we like with the data, and when finished, we return an
+// integer via the argumented channel with any bits set that we want added to
+// the packet mark.
+func PluginNfqueueHandler(ch chan<- dispatch.NfqueueResult, mess dispatch.TrafficMessage, ctid uint, newSession bool) {
+	defer func() {
+		var result dispatch.NfqueueResult
+		result.Owner = appname
+		result.SessionRelease = true
+		result.PacketMark = 0
+
+		// use the channel to return our result
+		ch <- result
+	}()
+
+	if newSession {
+		var session *dispatch.SessionEntry = mess.Session
+		if session == nil {
+			logger.LogMessage(logger.LogErr, appname, "Missing session on NFQueue packet!")
+			return
+		}
+
+		// FIXME time_stamp
+		// FIXME local_addr
+		// FIXME remote_addr
+		// FIXME client_intf
+		// FIXME server_intf
+		columns := map[string]interface{}{
+			"session_id":  session.SessionID,
+			"ip_protocol": session.ClientSideTuple.Protocol,
+			"client_addr": session.ClientSideTuple.ClientAddr,
+			"server_addr": session.ClientSideTuple.ServerAddr,
+			"client_port": session.ClientSideTuple.ClientPort,
+			"server_port": session.ClientSideTuple.ServerPort,
+		}
+		// FIXME move to logger plugin
+		reports.LogEvent(reports.CreateEvent("session_new", "sessions", 1, columns, nil))
+	}
+}
+
+// PluginConntrackHandler receives conntrack events
+func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
+	if message == 'N' {
+		var session *dispatch.SessionEntry = entry.Session
+
+		if session != nil {
+			columns := map[string]interface{}{
+				"session_id": session.SessionID,
+			}
+			modifiedColumns := map[string]interface{}{
+				"client_addr_new": session.ServerSideTuple.ClientAddr,
+				"server_addr_new": session.ServerSideTuple.ServerAddr,
+				"client_port_new": session.ServerSideTuple.ClientPort,
+				"server_port_new": session.ServerSideTuple.ServerPort,
+			}
+			// FIXME move to logger plugin
+			reports.LogEvent(reports.CreateEvent("session_nat", "sessions", 2, columns, modifiedColumns))
+		} else {
+			// We should not receive a new conntrack event for something that is not in the session table
+			// However it happens on local outbound sessions, we should handle these diffently
+			// FIXME log session_new event (bypassed sessions in NGFW)
+		}
+	}
+
+	if message == 'U' {
+		// FIXME log session_minutes event
+	}
+}
+
+// PluginNetloggerHandler receives NFLOG events
+func PluginNetloggerHandler(netlogger *dispatch.NetloggerMessage) {
+	// FIXME
+	// IMPLEMENT ME
+}
