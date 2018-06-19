@@ -14,7 +14,7 @@ before_install:
 - cd "${DIR}/packetd"
 script:
 - docker-compose -f docker-compose.build.yml up --build $TARGET
-- file ./packetd | $TEST
+- file ./packetd-does-not-exist | $TEST
 notifications:
   email: false
   slack:
