@@ -1,24 +1,24 @@
 sudo: required
-
 env:
   global:
-    - GOPATH="${HOME}/go"
-    - DIR="${GOPATH}/src/github.com/untangle"
+  - GOPATH="${HOME}/go"
+  - DIR="${GOPATH}/src/github.com/untangle"
   matrix:
-    - TARGET=libc TEST="grep -q GNU/Linux"
-    - TARGET=musl TEST="grep -q -v GNU/Linux"
-
+  - TARGET=libc TEST="grep -q GNU/Linux"
+  - TARGET=musl TEST="grep -q -v GNU/Linux"
 services:
-  - docker
-
+- docker
 before_install:
-  - mkdir -p "$DIR"
-  - mv "$TRAVIS_BUILD_DIR" "${DIR}/packetd"
-  - cd "${DIR}/packetd"
-
+- mkdir -p "$DIR"
+- mv "$TRAVIS_BUILD_DIR" "${DIR}/packetd"
+- cd "${DIR}/packetd"
 script:
-  - docker-compose -f docker-compose.build.yml up --build $TARGET
-  - file ./packetd | $TEST
-
+- docker-compose -f docker-compose.build.yml up --build $TARGET
+- file ./packetd | $TEST
 notifications:
   email: false
+  slack:
+    rooms:
+      secure: HhKVxkCcDT6XDSjprcjuDXDXw404hJIHLM+05ywp3dolvi3+ENxW4cinsNXByZlRfvnaUyNC3gqvi6JDGC9WUb8hhGyWA8s5KBmhlUc6wJc7vM5z1/Z662Du8/Gd/49nyG8vJ9e1zlIbXJ0aG5xLUdXun1l0RsgmyHekaAKUDHYafMk/SI/VzrdcMh614gb15RWA/sXeGk5NtpSjusTysiSEO0SI7+m61S6JT0bTP/yJr5OSV5DH+Asp+jqe3kj0UDKz6dB99EfgcK3ZUF65emZ/PWngnwHCa5yshtAdlzgqGZYxsnaS53oDIVvRbZEKIgQoXnJDA5SkUiBgoI9qpVa0tHMh47LniaMazMGbxzb9/s8aK21pKaUQBj9W75P7xX6oiUphIex0XhW3Wz5XU7DafnHbfmcqdyzsdB9JBvBINkGWNlmf4Jx2uC1JoH1yLKySO3EPaxgjx0bB+uxCzgYHgVPlBglje7DENzdboUprfQNEv2HHrt5xNaU6lDpRtA/Q72TH8OWJRQ073p8MQ28OY58YVCXXl40p6ic2yvgB6JAfHQnYGSSXpbtInpJrQ+9VyTfIfUtoiXkLxL4wPnlLaWYJUsSmnCoNRJZUAVzXlzYYtFzX+RQlDLLP6R88MwTm2yDNiAJqaV/s6rtTW961A3iOqCKMGcJJzCgZgOg=
+    on_success: change
+    on_failure: always
