@@ -62,6 +62,7 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 	var result dispatch.NfqueueResult
 	result.Owner = appname
 	result.PacketMark = 0
+	// FIXME it should release once it reaches so set number of packets or full categorization
 	result.SessionRelease = false
 
 	var status string
@@ -81,6 +82,7 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 			logger.LogMessage(logger.LogErr, appname, "Unsupported protocol\n")
 		}
 
+		result.SessionRelease = true
 		return result
 	}
 
