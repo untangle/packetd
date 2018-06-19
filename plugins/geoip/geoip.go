@@ -77,8 +77,8 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 		logger.LogMessage(logger.LogDebug, appname, "DST: %s = %s\n", mess.IPlayer.DstIP, DstCode)
 	}
 
-	conndict.SetPair("SrcCountry", SrcCode, ctid)
-	conndict.SetPair("DstCountry", DstCode, ctid)
+	conndict.SetPair("ClientCountry", SrcCode, ctid)
+	conndict.SetPair("ServerCountry", DstCode, ctid)
 
 	var result dispatch.NfqueueResult
 	result.Owner = appname
