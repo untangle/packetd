@@ -53,7 +53,7 @@ func PluginShutdown() {
 // look at traffic with port 443 as destination. When detected, we load
 // the server certificate from our cache or fetch it from the server and
 // store it in our cache. Once we have the cert, we attach it to the session,
-// extract the interesting subject fields, and put them in the dict.
+// extract the interesting subject fields, and put them in the session table.
 func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
 	result.Owner = logsrc
@@ -103,36 +103,36 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 
 	localMutex.Unlock()
 
-	setConnDictPair("SubjectCN", cert.Subject.CommonName, ctid)
-	setConnDictPair("SubjectSN", cert.Subject.SerialNumber, ctid)
-	setConnDictList("SubjectC", cert.Subject.Country, ctid)
-	setConnDictList("SubjectO", cert.Subject.Organization, ctid)
-	setConnDictList("SubjectOU", cert.Subject.OrganizationalUnit, ctid)
-	setConnDictList("SubjectL", cert.Subject.Locality, ctid)
-	setConnDictList("SubjectP", cert.Subject.Province, ctid)
-	setConnDictList("SubjectSA", cert.Subject.StreetAddress, ctid)
-	setConnDictList("SubjectPC", cert.Subject.PostalCode, ctid)
-	setConnDictList("SubjectSAN", cert.DNSNames, ctid)
+	setSessionEntry("SubjectCN", cert.Subject.CommonName, ctid)
+	setSessionEntry("SubjectSN", cert.Subject.SerialNumber, ctid)
+	setSessionList("SubjectC", cert.Subject.Country, ctid)
+	setSessionList("SubjectO", cert.Subject.Organization, ctid)
+	setSessionList("SubjectOU", cert.Subject.OrganizationalUnit, ctid)
+	setSessionList("SubjectL", cert.Subject.Locality, ctid)
+	setSessionList("SubjectP", cert.Subject.Province, ctid)
+	setSessionList("SubjectSA", cert.Subject.StreetAddress, ctid)
+	setSessionList("SubjectPC", cert.Subject.PostalCode, ctid)
+	setSessionList("SubjectSAN", cert.DNSNames, ctid)
 
-	setConnDictPair("IssuerCN", cert.Issuer.CommonName, ctid)
-	setConnDictPair("IssuerSN", cert.Issuer.SerialNumber, ctid)
-	setConnDictList("IssuerC", cert.Issuer.Country, ctid)
-	setConnDictList("IssuerO", cert.Issuer.Organization, ctid)
-	setConnDictList("IssuerOU", cert.Issuer.OrganizationalUnit, ctid)
-	setConnDictList("IssuerL", cert.Issuer.Locality, ctid)
-	setConnDictList("IssuerP", cert.Issuer.Province, ctid)
-	setConnDictList("IssuerSA", cert.Issuer.StreetAddress, ctid)
-	setConnDictList("IssuerPC", cert.Issuer.PostalCode, ctid)
+	setSessionEntry("IssuerCN", cert.Issuer.CommonName, ctid)
+	setSessionEntry("IssuerSN", cert.Issuer.SerialNumber, ctid)
+	setSessionList("IssuerC", cert.Issuer.Country, ctid)
+	setSessionList("IssuerO", cert.Issuer.Organization, ctid)
+	setSessionList("IssuerOU", cert.Issuer.OrganizationalUnit, ctid)
+	setSessionList("IssuerL", cert.Issuer.Locality, ctid)
+	setSessionList("IssuerP", cert.Issuer.Province, ctid)
+	setSessionList("IssuerSA", cert.Issuer.StreetAddress, ctid)
+	setSessionList("IssuerPC", cert.Issuer.PostalCode, ctid)
 
 	return result
 }
 
-func setConnDictPair(field string, value string, ctid uint) {
+func setSessionEntry(field string, value string, ctid uint) {
 	output := strings.Replace(value, ",", "-", -1)
 	dict.AddSessionEntry(ctid, field, output)
 }
 
-func setConnDictList(field string, value []string, ctid uint) {
+func setSessionList(field string, value []string, ctid uint) {
 
 	if len(value) == 0 {
 		return
