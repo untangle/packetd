@@ -210,21 +210,6 @@ func AttachNfqueueSubscriptions(session *SessionEntry) {
 	}
 }
 
-// GetConntrackSubscriptions returns the list of active conntrack subscriptions
-func GetConntrackSubscriptions() map[string]SubscriptionHolder {
-	return conntrackList
-}
-
-// GetNetloggerSubscriptions returns the list of active netlogger subscriptions
-func GetNetloggerSubscriptions() map[string]SubscriptionHolder {
-	return netloggerList
-}
-
-// GetNfqueueSubscriptions returns the list of active netlogger subscriptions
-func GetNfqueueSubscriptions() map[string]SubscriptionHolder {
-	return nfqueueList
-}
-
 // nextSessionID returns the next sequential session ID value
 func nextSessionID() uint64 {
 	var value uint64
@@ -395,7 +380,7 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 	}
 
 	// We loop and increment the priority until all subscribtions have been called
-	sublist := GetConntrackSubscriptions()
+	sublist := conntrackList
 	subtotal := len(sublist)
 	subcount := 0
 	priority := 0
@@ -520,8 +505,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			}
 			logger.LogMessage(logger.LogDebug, appname, "Calling nfqueue APP:%s PRIORITY:%d\n", key, priority)
 			go func(key string, val SubscriptionHolder) {
-				var result NfqueueResult = val.NfqueueFunc(mess, uint(ctid), newSession)
-				pipe <- result
+				pipe <- val.NfqueueFunc(mess, uint(ctid), newSession)
 			}(key, val)
 			hitcount++
 			subcount++
@@ -568,7 +552,7 @@ func netloggerCallback(version uint8,
 	netlogger.Prefix = prefix
 
 	// We loop and increment the priority until all subscribtions have been called
-	sublist := GetNetloggerSubscriptions()
+	sublist := netloggerList
 	subtotal := len(sublist)
 	subcount := 0
 	priority := 0

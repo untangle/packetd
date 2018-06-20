@@ -1,3 +1,7 @@
+// Package classify classifies sessions as certain applications
+// each packet gets sent to a classd daemon (the categorization engine)
+// the classd daemon returns the classification information and classify
+// attaches the information to the session
 package classify
 
 import (
@@ -8,6 +12,7 @@ import (
 	"github.com/untangle/packetd/services/logger"
 	"net"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -16,6 +21,7 @@ var sockspin int64
 var appname = "classify"
 var daemon net.Conn
 var classdHostPort = "127.0.0.1:8123"
+var classdMutex sync.Mutex
 
 // PluginStartup is called to allow plugin specific initialization. We
 // increment the argumented WaitGroup so the main process can wait for
@@ -43,7 +49,7 @@ func PluginStartup() {
 func PluginShutdown() {
 	logger.LogMessage(logger.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
 
-	var d net.Conn = daemon
+	var d = daemon
 	daemon = nil
 	if d != nil {
 		d.Close()
@@ -176,6 +182,9 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 
 // daemonCommand will send a command to the untangle-classd daemon and return the result message
 func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, error) {
+	classdMutex.Lock()
+	defer classdMutex.Unlock()
+
 	buffer := make([]byte, 1024)
 	var command string
 	var err error
