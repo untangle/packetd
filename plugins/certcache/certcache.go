@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"github.com/untangle/packetd/services/conndict"
+	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"strings"
@@ -53,7 +53,7 @@ func PluginShutdown() {
 // look at traffic with port 443 as destination. When detected, we load
 // the server certificate from our cache or fetch it from the server and
 // store it in our cache. Once we have the cert, we attach it to the session,
-// extract the interesting subject fields, and put them in the conndict.
+// extract the interesting subject fields, and put them in the dict.
 func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
 	result.Owner = logsrc
@@ -129,7 +129,7 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 
 func setConnDictPair(field string, value string, ctid uint) {
 	output := strings.Replace(value, ",", "-", -1)
-	conndict.SetPair(field, output, ctid)
+	dict.SetPair(field, output, ctid)
 }
 
 func setConnDictList(field string, value []string, ctid uint) {
@@ -149,7 +149,7 @@ func setConnDictList(field string, value []string, ctid uint) {
 
 	output := strings.Replace(buffer, ",", "-", -1)
 
-	conndict.SetPair(field, output, ctid)
+	dict.SetPair(field, output, ctid)
 }
 
 // findCertificate fetches the cached certificate for the argumented address.

@@ -250,7 +250,7 @@ func initLoggerConfig() {
 	config["sni"] = "INFO"
 
 	// services
-	config["conndict"] = "INFO"
+	config["dict"] = "INFO"
 	config["conntrack"] = "INFO"
 	config["dispatch"] = "INFO"
 	config["exec"] = "INFO"

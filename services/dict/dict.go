@@ -1,4 +1,4 @@
-package conndict
+package dict
 
 import (
 	"bufio"
@@ -13,25 +13,25 @@ import (
 const pathBase string = "/proc/net/dict"
 
 var readMutex = &sync.Mutex{}
-var logsrc = "conndict"
+var logsrc = "dict"
 var disabled = false
 
-// Startup conndict service
+// Startup dict service
 func Startup() {
 	if disabled {
 		return
 	}
 
-	// Load the conndict module
+	// Load the dict module
 	exec.SystemCommand("modprobe", []string{"nf_conntrack_dict"})
 }
 
-// Shutdown conndict service
+// Shutdown dict service
 func Shutdown() {
 
 }
 
-// Disable disable conndict writing
+// Disable disable dict writing
 func Disable() {
 	disabled = true
 }
@@ -60,7 +60,7 @@ func SetPair(field string, value string, id uint) error {
 
 	if err != nil {
 		logger.LogWarn(logsrc, "SetPair(%s,%s,%d): Failed to open %s\n", field, value, id, filename)
-		return fmt.Errorf("conndict: SetPair: Failed to open %s", filename)
+		return fmt.Errorf("dict: SetPair: Failed to open %s", filename)
 	}
 
 	defer file.Close()
@@ -68,7 +68,7 @@ func SetPair(field string, value string, id uint) error {
 	_, err = file.WriteString(setstr)
 	if err != nil {
 		logger.LogWarn(logsrc, "SetPair(%s,%s,%d): Failed to write %s\n", field, value, id)
-		return fmt.Errorf("conndict: SetPair: Failed to write %s", filename)
+		return fmt.Errorf("dict: SetPair: Failed to write %s", filename)
 	}
 
 	file.Sync()
@@ -100,7 +100,7 @@ func GetPairs(id uint) ([]DictPair, error) {
 	setstr := fmt.Sprintf("%d", id)
 
 	if err != nil {
-		return nil, fmt.Errorf("conndict: Get_pairs: Failed to open %s", filename)
+		return nil, fmt.Errorf("dict: Get_pairs: Failed to open %s", filename)
 	}
 
 	defer file.Close()
@@ -109,7 +109,7 @@ func GetPairs(id uint) ([]DictPair, error) {
 	_, err = file.WriteString(setstr)
 
 	if err != nil {
-		return nil, fmt.Errorf("conndict: GetPair: Failed to write %s", setstr)
+		return nil, fmt.Errorf("dict: GetPair: Failed to write %s", setstr)
 	}
 
 	file.Sync()
@@ -132,7 +132,7 @@ func GetAll() ([]DictPair, error) {
 	file, err := os.OpenFile(pathBase+"/all", os.O_RDWR, 0660)
 
 	if err != nil {
-		return nil, fmt.Errorf("conndict: Get_pairs: Failed to open %s", pathBase+"/all")
+		return nil, fmt.Errorf("dict: Get_pairs: Failed to open %s", pathBase+"/all")
 	}
 
 	defer file.Close()

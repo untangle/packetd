@@ -9,7 +9,7 @@ import (
 	"github.com/untangle/packetd/plugins/geoip"
 	"github.com/untangle/packetd/plugins/reporter"
 	"github.com/untangle/packetd/plugins/sni"
-	"github.com/untangle/packetd/services/conndict"
+	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/exec"
 	"github.com/untangle/packetd/services/kernel"
@@ -40,7 +40,7 @@ func main() {
 	exec.Startup()
 	settings.Startup()
 	reports.Startup()
-	conndict.Startup()
+	dict.Startup()
 
 	// Start all the callbacks
 	kernel.StartCallbacks()
@@ -83,13 +83,13 @@ func main() {
 // parseArguments parses the command line arguments
 func parseArguments() {
 	classdAddressStringPtr := flag.String("classd", "127.0.0.1:8123", "host:port for classd daemon")
-	disableConndictPtr := flag.Bool("disable-conndict", false, "disable conndict")
+	disableConndictPtr := flag.Bool("disable-dict", false, "disable dict")
 
 	flag.Parse()
 
 	classify.SetHostPort(*classdAddressStringPtr)
 	if *disableConndictPtr {
-		conndict.Disable()
+		dict.Disable()
 	}
 }
 
@@ -115,7 +115,7 @@ func cleanup() {
 	reports.Shutdown()
 	settings.Shutdown()
 	restd.Shutdown()
-	conndict.Shutdown()
+	dict.Shutdown()
 	dispatch.Shutdown()
 	kernel.Shutdown()
 	logger.Shutdown()

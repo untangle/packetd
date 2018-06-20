@@ -6,7 +6,7 @@ package classify
 
 import (
 	"fmt"
-	"github.com/untangle/packetd/services/conndict"
+	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/exec"
 	"github.com/untangle/packetd/services/logger"
@@ -188,7 +188,7 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 			continue
 		}
 
-		conndict.SetPair(pairname, pairdata, ctid)
+		dict.SetPair(pairname, pairdata, ctid)
 	}
 
 	// FIXME we should not log this on every packet, only when:

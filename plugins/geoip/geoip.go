@@ -3,7 +3,7 @@ package geoip
 import (
 	"compress/gzip"
 	"github.com/oschwald/geoip2-golang"
-	"github.com/untangle/packetd/services/conndict"
+	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"io"
@@ -77,8 +77,8 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 		logger.LogDebug(logsrc, "DST: %s = %s\n", mess.IPlayer.DstIP, DstCode)
 	}
 
-	conndict.SetPair("ClientCountry", SrcCode, ctid)
-	conndict.SetPair("ServerCountry", DstCode, ctid)
+	dict.SetPair("ClientCountry", SrcCode, ctid)
+	dict.SetPair("ServerCountry", DstCode, ctid)
 
 	var result dispatch.NfqueueResult
 	result.Owner = logsrc

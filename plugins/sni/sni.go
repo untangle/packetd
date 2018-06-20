@@ -1,7 +1,7 @@
 package sni
 
 import (
-	"github.com/untangle/packetd/services/conndict"
+	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 )
@@ -26,7 +26,7 @@ func PluginShutdown() {
 // look at traffic with port 443 as destination. When detected, we load
 // the server certificate from our cache or fetch it from the server and
 // store it in our cache. Once we have the cert, we attach it to the session,
-// extract the interesting subject fields, and put them in the conndict.
+// extract the interesting subject fields, and put them in the dict.
 func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
 	result.Owner = logsrc
@@ -43,7 +43,7 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 	hostname := extractSNIhostname(mess.Payload)
 	if hostname != "" {
 		logger.LogDebug(logsrc, "Extracted SNI %s for %d\n", hostname, ctid)
-		conndict.SetPair("ClientSNI", hostname, ctid)
+		dict.SetPair("ClientSNI", hostname, ctid)
 		result.SessionRelease = true
 		return result
 	}
