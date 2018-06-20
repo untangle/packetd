@@ -24,7 +24,7 @@ import (
 	"time"
 )
 
-var appname = "packetd"
+var logsrc = "packetd"
 var exitLock sync.Mutex
 
 func main() {
@@ -53,7 +53,7 @@ func main() {
 	updateRules()
 
 	// Startup Complete
-	logger.LogMessage(logger.LogInfo, appname, "Untangle Packet Daemon Version %s\n", "1.00")
+	logger.LogMessage(logger.LogInfo, logsrc, "Untangle Packet Daemon Version %s\n", "1.00")
 
 	// Check that all the C services started correctly
 	// This flag is only set on Startup so this only needs to be checked once
@@ -66,7 +66,7 @@ func main() {
 	// Loop forever
 	for {
 		time.Sleep(60 * time.Second)
-		logger.LogMessage(logger.LogInfo, appname, ".\n")
+		logger.LogMessage(logger.LogInfo, logsrc, ".\n")
 	}
 }
 
@@ -89,18 +89,18 @@ func cleanup() {
 	exitLock.Lock()
 
 	// Remove netfilter rules
-	logger.LogMessage(logger.LogInfo, appname, "Removing netfilter rules...\n")
+	logger.LogMessage(logger.LogInfo, logsrc, "Removing netfilter rules...\n")
 	removeRules()
 
 	// Stop kernel callbacks
-	logger.LogMessage(logger.LogInfo, appname, "Removing kernel hooks...\n")
+	logger.LogMessage(logger.LogInfo, logsrc, "Removing kernel hooks...\n")
 	kernel.StopCallbacks()
 
 	// Stop all plugins
 	stopPlugins()
 
 	// Stop services
-	logger.LogMessage(logger.LogInfo, appname, "Shutting down services...\n")
+	logger.LogMessage(logger.LogInfo, logsrc, "Shutting down services...\n")
 	exec.Shutdown()
 	reports.Shutdown()
 	settings.Shutdown()
@@ -162,7 +162,7 @@ func handleSignals() {
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-ch
-		logger.LogMessage(logger.LogWarn, appname, "Received signal [%v]. Exiting...\n", sig)
+		logger.LogMessage(logger.LogWarn, logsrc, "Received signal [%v]. Exiting...\n", sig)
 		cleanup()
 		os.Exit(1)
 	}()
@@ -172,7 +172,7 @@ func handleSignals() {
 func updateRules() {
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
-		logger.LogMessage(logger.LogErr, appname, "Error determining directory: %s\n", err.Error())
+		logger.LogMessage(logger.LogErr, logsrc, "Error determining directory: %s\n", err.Error())
 		return
 	}
 	exec.SystemCommand(dir+"/packetd_rules", []string{})
@@ -182,7 +182,7 @@ func updateRules() {
 func removeRules() {
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
-		logger.LogMessage(logger.LogErr, appname, "Error determining directory: %s\n", err.Error())
+		logger.LogMessage(logger.LogErr, logsrc, "Error determining directory: %s\n", err.Error())
 		return
 	}
 	exec.SystemCommand(dir+"/packetd_rules", []string{"-r"})

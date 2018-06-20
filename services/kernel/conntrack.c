@@ -12,7 +12,7 @@
 static struct nfct_handle	*nfcth;
 static u_int64_t			tracker_error;
 static u_int64_t			tracker_unknown;
-static char                 *appname = "conntrack";
+static char                 *logsrc = "conntrack";
 
 static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrack *ct,void *data)
 {
@@ -87,7 +87,7 @@ int conntrack_startup(void)
 	nfcth = nfct_open(CONNTRACK,NF_NETLINK_CONNTRACK_NEW | NF_NETLINK_CONNTRACK_DESTROY);
 
 	if (nfcth == NULL) {
-		logmessage(LOG_ERR,appname,"Error %d returned from nfct_open()\n",errno);
+		logmessage(LOG_ERR,logsrc,"Error %d returned from nfct_open()\n",errno);
 		set_shutdown_flag(1);
 		return(1);
 	}
@@ -96,7 +96,7 @@ int conntrack_startup(void)
 	ret = nfct_callback_register(nfcth,NFCT_T_ALL,conntrack_callback,NULL);
 
 	if (ret != 0) {
-		logmessage(LOG_ERR,appname,"Error %d returned from nfct_callback_register()\n",errno);
+		logmessage(LOG_ERR,logsrc,"Error %d returned from nfct_callback_register()\n",errno);
 		set_shutdown_flag(1);
 		return(2);
 	}
@@ -122,13 +122,13 @@ int conntrack_thread(void)
 {
 	int		ret;
 
-	logmessage(LOG_INFO,appname,"The conntrack thread is starting\n");
+	logmessage(LOG_INFO,logsrc,"The conntrack thread is starting\n");
 
 	// call our conntrack startup function
 	ret = conntrack_startup();
 
 	if (ret != 0) {
-		logmessage(LOG_ERR,appname,"Error %d returned from conntrack_startup()\n",ret);
+		logmessage(LOG_ERR,logsrc,"Error %d returned from conntrack_startup()\n",ret);
 		set_shutdown_flag(1);
 		return(1);
 	}
@@ -144,7 +144,7 @@ int conntrack_thread(void)
 	// call our conntrack shutdown function
 	conntrack_unregister();
 
-	logmessage(LOG_INFO,appname,"The conntrack thread has terminated\n");
+	logmessage(LOG_INFO,logsrc,"The conntrack thread has terminated\n");
 	go_child_shutdown();
 	return(0);
 }
@@ -170,6 +170,6 @@ void conntrack_dump(void)
 
 	family = AF_INET;
 	ret = nfct_send(nfcth,NFCT_Q_DUMP,&family);
-	logmessage(LOG_DEBUG,appname,"nfct_send() result = %d\n",ret);
+	logmessage(LOG_DEBUG,logsrc,"nfct_send() result = %d\n",ret);
 }
 

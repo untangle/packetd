@@ -12,7 +12,7 @@
 static struct nflog_handle      *l_log_handle;
 static struct nflog_g_handle    *l_grp_handle;
 static int                      l_logsock;
-static char                     *appname = "netlogger";
+static char                     *logsrc = "netlogger";
 
 int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct nflog_data *nfa,void *data)
 {
@@ -104,7 +104,7 @@ int netlogger_startup(void)
 	l_log_handle = nflog_open();
 
 	if (l_log_handle == NULL) {
-		logmessage(LOG_ERR,appname,"Error %d returned from nflog_open()\n",errno);
+		logmessage(LOG_ERR,logsrc,"Error %d returned from nflog_open()\n",errno);
 		return(1);
 	}
 
@@ -112,7 +112,7 @@ int netlogger_startup(void)
 	ret = nflog_unbind_pf(l_log_handle,AF_INET);
 
 	if (ret < 0) {
-		logmessage(LOG_ERR,appname,"Error %d returned from nflog_unbind_pf()\n",errno);
+		logmessage(LOG_ERR,logsrc,"Error %d returned from nflog_unbind_pf()\n",errno);
 		return(2);
 	}
 
@@ -120,7 +120,7 @@ int netlogger_startup(void)
 	ret = nflog_bind_pf(l_log_handle,AF_INET);
 
 	if (ret < 0) {
-		logmessage(LOG_ERR,appname,"Error %d returned from nflog_bind_pf()\n",errno);
+		logmessage(LOG_ERR,logsrc,"Error %d returned from nflog_bind_pf()\n",errno);
 		return(3);
 	}
 
@@ -128,14 +128,14 @@ int netlogger_startup(void)
 	l_grp_handle = nflog_bind_group(l_log_handle,0);
 
 	if (l_grp_handle == NULL) {
-		logmessage(LOG_ERR,appname,"Error %d returned from nflog_bind_group()\n",errno);
+		logmessage(LOG_ERR,logsrc,"Error %d returned from nflog_bind_group()\n",errno);
 		return(4);
 	}
 
 	// give the log plenty of buffer space
 	ret = nflog_set_nlbufsiz(l_grp_handle,0x8000);
 	if (ret < 0) {
-		logmessage(LOG_ERR,appname,"Error %d returned from nflog_set_nlbufsiz()\n",errno);
+		logmessage(LOG_ERR,logsrc,"Error %d returned from nflog_set_nlbufsiz()\n",errno);
 		return(5);
 	}
 
@@ -143,7 +143,7 @@ int netlogger_startup(void)
 	ret = nflog_set_mode(l_grp_handle,NFULNL_COPY_PACKET,256);
 
 	if (ret < 0) {
-		logmessage(LOG_ERR,appname,"Error %d returned from nflog_set_mode()\n",errno);
+		logmessage(LOG_ERR,logsrc,"Error %d returned from nflog_set_mode()\n",errno);
 		return(6);
 	}
 
@@ -163,13 +163,13 @@ void netlogger_close(void)
 	// unbind from our group
 	if (l_grp_handle != NULL) {
 		ret = nflog_unbind_group(l_grp_handle);
-		if (ret < 0) logmessage(LOG_ERR,appname,"Error %d returned from nflog_unbind_group()\n",errno);
+		if (ret < 0) logmessage(LOG_ERR,logsrc,"Error %d returned from nflog_unbind_group()\n",errno);
 	}
 
 	// close our log handle
 	if (l_log_handle != NULL) {
 		ret = nflog_close(l_log_handle);
-		if (ret < 0) logmessage(LOG_ERR,appname,"Error %d returned from nflog_close()\n",errno);
+		if (ret < 0) logmessage(LOG_ERR,logsrc,"Error %d returned from nflog_close()\n",errno);
 	}
 }
 
@@ -180,14 +180,14 @@ int netlogger_thread(void)
 	char            buffer[4096];
 	int             ret;
 
-	logmessage(LOG_INFO,appname,"The netlogger thread is starting\n");
+	logmessage(LOG_INFO,logsrc,"The netlogger thread is starting\n");
 
 	// call our logger startup function
 	ret = netlogger_startup();
 
 	// if there were any startup errors set the shutdown flag
 	if (ret != 0) {
-		logmessage(LOG_ERR,appname,"Error %d returned from netlogger_startup(init)\n",ret);
+		logmessage(LOG_ERR,logsrc,"Error %d returned from netlogger_startup(init)\n",ret);
 		set_shutdown_flag(1);
 	}
 
@@ -210,14 +210,14 @@ int netlogger_thread(void)
 
 		// recycle connection on error
 		if (ret < 0) {
-			logmessage(LOG_ERR,appname,"Error %d returned from recv() - Recycling nflog connection\n",errno);
+			logmessage(LOG_ERR,logsrc,"Error %d returned from recv() - Recycling nflog connection\n",errno);
 			netlogger_close();
 			sleep(1000);
 			ret = netlogger_startup();
 
 			// if startup failed log the error and set the shutdown flag
 			if (ret != 0) {
-				logmessage(LOG_ERR,appname,"Error %d returned from netlogger_startup(loop)\n",ret);
+				logmessage(LOG_ERR,logsrc,"Error %d returned from netlogger_startup(loop)\n",ret);
 				set_shutdown_flag(1);
 				break;
 			}
@@ -232,7 +232,7 @@ int netlogger_thread(void)
 	// call our logger shutdown function
 	netlogger_close();
 
-	logmessage(LOG_INFO,appname,"The netlogger thread has terminated\n");
+	logmessage(LOG_INFO,logsrc,"The netlogger thread has terminated\n");
 	go_child_shutdown();
 	return(0);
 }

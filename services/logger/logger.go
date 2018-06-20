@@ -14,7 +14,7 @@ const logConfigFile = "/tmp/logconfig.js"
 var logLevelName = [...]string{"EMERG", "ALERT", "CRIT", "ERROR", "WARN", "NOTICE", "INFO", "DEBUG", "LOGIC"}
 var appLogLevel map[string]int
 var launchTime time.Time
-var appname = "logger"
+var logsrc = "logger"
 
 //LogEmerg = stdlog.h/LOG_EMERG
 const LogEmerg = 0
@@ -126,7 +126,7 @@ func loadLoggerConfig() {
 
 		// if there is still an error we are out of options
 		if err != nil {
-			LogMessage(LogErr, appname, "Unable to load LogMessage configuration file: %s\n", logConfigFile)
+			LogMessage(LogErr, logsrc, "Unable to load LogMessage configuration file: %s\n", logConfigFile)
 			return
 		}
 	}
@@ -137,7 +137,7 @@ func loadLoggerConfig() {
 	// get the file status
 	info, err = file.Stat()
 	if err != nil {
-		LogMessage(LogErr, appname, "Unable to query file information\n")
+		LogMessage(LogErr, logsrc, "Unable to query file information\n")
 		return
 	}
 
@@ -147,14 +147,14 @@ func loadLoggerConfig() {
 	len, err := file.Read(data)
 
 	if (err != nil) || (len < 1) {
-		LogMessage(LogErr, appname, "Unable to read LogMessage configuration\n")
+		LogMessage(LogErr, logsrc, "Unable to read LogMessage configuration\n")
 		return
 	}
 
 	// unmarshal the configuration into a map
 	err = json.Unmarshal(data, &config)
 	if err != nil {
-		LogMessage(LogErr, appname, "Unable to parse LogMessage configuration\n")
+		LogMessage(LogErr, logsrc, "Unable to parse LogMessage configuration\n")
 		return
 	}
 
@@ -174,13 +174,13 @@ func loadLoggerConfig() {
 			}
 		}
 		if found == false {
-			LogMessage(LogWarn, appname, "Invalid LogMessage configuration entry: %s=%s\n", cfgname, cfglevel)
+			LogMessage(LogWarn, logsrc, "Invalid LogMessage configuration entry: %s=%s\n", cfgname, cfglevel)
 		}
 	}
 }
 
 func initLoggerConfig() {
-	LogMessage(LogAlert, appname, "LogMessage configuration not found. Creating default file: %s\n", logConfigFile)
+	LogMessage(LogAlert, logsrc, "LogMessage configuration not found. Creating default file: %s\n", logConfigFile)
 
 	// create a comment that shows all valid log level names
 	var comment string
@@ -220,7 +220,7 @@ func initLoggerConfig() {
 	// convert the config map to a json object
 	jstr, err := json.MarshalIndent(config, "", "")
 	if err != nil {
-		LogMessage(LogAlert, appname, "LogMessage failure creating default configuration: %s\n", err.Error())
+		LogMessage(LogAlert, logsrc, "LogMessage failure creating default configuration: %s\n", err.Error())
 		return
 	}
 

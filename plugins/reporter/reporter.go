@@ -8,19 +8,19 @@ import (
 	"github.com/untangle/packetd/services/reports"
 )
 
-var appname = "reporter"
+var logsrc = "reporter"
 
 // PluginStartup starts the reporter
 func PluginStartup() {
-	logger.LogMessage(logger.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
-	dispatch.InsertNfqueueSubscription(appname, 1, PluginNfqueueHandler)
-	dispatch.InsertConntrackSubscription(appname, 1, PluginConntrackHandler)
-	dispatch.InsertNetloggerSubscription(appname, 1, PluginNetloggerHandler)
+	logger.LogMessage(logger.LogInfo, logsrc, "PluginStartup(%s) has been called\n", logsrc)
+	dispatch.InsertNfqueueSubscription(logsrc, 1, PluginNfqueueHandler)
+	dispatch.InsertConntrackSubscription(logsrc, 1, PluginConntrackHandler)
+	dispatch.InsertNetloggerSubscription(logsrc, 1, PluginNetloggerHandler)
 }
 
 // PluginShutdown stops the reporter
 func PluginShutdown() {
-	logger.LogMessage(logger.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
+	logger.LogMessage(logger.LogInfo, logsrc, "PluginShutdown(%s) has been called\n", logsrc)
 }
 
 // PluginNfqueueHandler receives a TrafficMessage which includes a Tuple and
@@ -30,14 +30,14 @@ func PluginShutdown() {
 // the packet mark.
 func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	result.Owner = appname
+	result.Owner = logsrc
 	result.SessionRelease = true
 	result.PacketMark = 0
 
 	if newSession {
 		var session *dispatch.SessionEntry = mess.Session
 		if session == nil {
-			logger.LogMessage(logger.LogErr, appname, "Missing session on NFQueue packet!")
+			logger.LogMessage(logger.LogErr, logsrc, "Missing session on NFQueue packet!")
 			return result
 		}
 

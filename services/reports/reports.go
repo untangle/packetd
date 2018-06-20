@@ -34,7 +34,7 @@ type Query struct {
 var db *sql.DB
 var queries = make(map[uint64]*Query)
 var queryID uint64
-var appname = "reports"
+var logsrc = "reports"
 var eventQueue = make(chan Event)
 
 // Startup starts the reports service
@@ -43,7 +43,7 @@ func Startup() {
 	db, err = sql.Open("sqlite3", "/tmp/reports.db")
 
 	if err != nil {
-		logger.LogMessage(logger.LogErr, appname, "Failed to open database: %s\n", err.Error())
+		logger.LogMessage(logger.LogErr, logsrc, "Failed to open database: %s\n", err.Error())
 	}
 
 	go func() {
@@ -61,7 +61,7 @@ func Shutdown() {
 func CreateQuery(reportEntry string) (*Query, error) {
 	rows, err := db.Query("SELECT * FROM sessions LIMIT 5")
 	if err != nil {
-		logger.LogMessage(logger.LogErr, appname, "db.Query error: %s\n", err)
+		logger.LogMessage(logger.LogErr, logsrc, "db.Query error: %s\n", err)
 		return nil, err
 	}
 	q := new(Query)
@@ -77,7 +77,7 @@ func CreateQuery(reportEntry string) (*Query, error) {
 func GetData(queryID uint64) (string, error) {
 	q := queries[queryID]
 	if q == nil {
-		logger.LogMessage(logger.LogWarn, appname, "Query not found: %d\n", queryID)
+		logger.LogMessage(logger.LogWarn, logsrc, "Query not found: %d\n", queryID)
 		return "", errors.New("Query ID not found")
 	}
 	result, err := getRows(q.Rows, 1000)
@@ -121,7 +121,7 @@ func eventLogger() {
 				summary = summary + "UPDATE: " + string(str)
 			}
 		}
-		logger.LogMessage(logger.LogInfo, appname, "Log Event: %s\n", summary)
+		logger.LogMessage(logger.LogInfo, logsrc, "Log Event: %s\n", summary)
 	}
 }
 
@@ -167,13 +167,13 @@ func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
 }
 
 func cleanupQuery(query *Query) {
-	logger.LogMessage(logger.LogDebug, appname, "cleanupQuery(%d) launched\n", query.ID)
+	logger.LogMessage(logger.LogDebug, logsrc, "cleanupQuery(%d) launched\n", query.ID)
 	time.Sleep(30 * time.Second)
 	delete(queries, query.ID)
 	if query.Rows != nil {
 		query.Rows.Close()
 	}
-	logger.LogMessage(logger.LogDebug, appname, "cleanupQuery(%d) finished\n", query.ID)
+	logger.LogMessage(logger.LogDebug, logsrc, "cleanupQuery(%d) finished\n", query.ID)
 }
 
 func createTables() {
@@ -209,6 +209,6 @@ func createTables() {
                      s2c_bytes int8 default 0)`)
 
 	if err != nil {
-		logger.LogMessage(logger.LogErr, appname, "Failed to create table: %s\n", err.Error())
+		logger.LogMessage(logger.LogErr, logsrc, "Failed to create table: %s\n", err.Error())
 	}
 }

@@ -15,14 +15,14 @@ static int						cfg_sock_buffer = 1048576;
 static int						cfg_net_maxlen = 10240;
 static int						cfg_net_buffer = 32768;
 static int						cfg_net_queue = 1818;
-static char                     *appname = "nfqueue";
+static char                     *logsrc = "nfqueue";
 
 int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data)
 {
 	*data = (unsigned char *)nfnl_get_pointer_to_data(nfad->data,NFQA_CT,struct nf_conntrack);
 	if (*data) return NFA_PAYLOAD(nfad->data[NFQA_CT-1]);
 
-	logmessage(LOG_WARNING,appname,"Error calling nfnl_get_pointer_to_data(NFQA_CT)\n");
+	logmessage(LOG_WARNING,logsrc,"Error calling nfnl_get_pointer_to_data(NFQA_CT)\n");
 	return(-1);
 }
 
@@ -39,13 +39,13 @@ unsigned int nfq_get_conntrack_id(struct nfq_data *nfad, int l3num)
 	ct = nfct_new();
 
 	if (ct == NULL) {
-		logmessage(LOG_WARNING,appname,"Error calling nfct_new()\n");
+		logmessage(LOG_WARNING,logsrc,"Error calling nfct_new()\n");
 		return(0);
 	}
 
 	if (nfct_payload_parse((void *)ct_data,ct_len,l3num,ct ) < 0) {
 		nfct_destroy(ct);
-		logmessage(LOG_WARNING,appname,"Error calling nfq_payload_parse()\n" );
+		logmessage(LOG_WARNING,logsrc,"Error calling nfq_payload_parse()\n" );
 		return(0);
 	}
 
@@ -73,7 +73,7 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 	// ignore packets with invalid length
 	if (rawlen < (int)sizeof(struct iphdr)) {
 		nfq_set_verdict(qh,(hdr ? ntohl(hdr->packet_id) : 0),NF_ACCEPT,0,NULL);
-		logmessage(LOG_WARNING,appname,"Invalid length %d received\n",rawlen);
+		logmessage(LOG_WARNING,logsrc,"Invalid length %d received\n",rawlen);
 		return(0);
 	}
 
@@ -109,7 +109,7 @@ int nfqueue_startup(void)
 	//open a new netfilter queue handler
 	nfqh = nfq_open();
 	if (nfqh == NULL) {
-		logmessage(LOG_ERR,appname,"Error returned from nfq_open()\n");
+		logmessage(LOG_ERR,logsrc,"Error returned from nfq_open()\n");
 		set_shutdown_flag(1);
 		return(1);
 	}
@@ -117,7 +117,7 @@ int nfqueue_startup(void)
 	// unbind any existing queue handler
 	ret = nfq_unbind_pf(nfqh,AF_INET);
 	if (ret < 0) {
-		logmessage(LOG_ERR,appname,"Error returned from nfq_unbind_pf()\n");
+		logmessage(LOG_ERR,logsrc,"Error returned from nfq_unbind_pf()\n");
 		set_shutdown_flag(1);
 		return(2);
 	}
@@ -125,7 +125,7 @@ int nfqueue_startup(void)
 	// bind the queue handler for AF_INET
 	ret = nfq_bind_pf(nfqh,AF_INET);
 	if (ret < 0) {
-		logmessage(LOG_ERR,appname,"Error returned from nfq_bind_pf(lan)\n");
+		logmessage(LOG_ERR,logsrc,"Error returned from nfq_bind_pf(lan)\n");
 		set_shutdown_flag(1);
 		return(3);
 	}
@@ -133,7 +133,7 @@ int nfqueue_startup(void)
 	// create a new netfilter queue
 	nfqqh = nfq_create_queue(nfqh,cfg_net_queue,netq_callback,NULL);
 	if (nfqqh == 0) {
-		logmessage(LOG_ERR,appname,"Error returned from nfq_create_queue(%u)\n",cfg_net_queue);
+		logmessage(LOG_ERR,logsrc,"Error returned from nfq_create_queue(%u)\n",cfg_net_queue);
 		set_shutdown_flag(1);
 		return(4);
 	}
@@ -141,7 +141,7 @@ int nfqueue_startup(void)
 	// set the queue length
 	ret = nfq_set_queue_maxlen(nfqqh,cfg_net_maxlen);
 	if (ret < 0) {
-		logmessage(LOG_ERR,appname,"Error returned from nfq_set_queue_maxlen(%d)\n",cfg_net_maxlen);
+		logmessage(LOG_ERR,logsrc,"Error returned from nfq_set_queue_maxlen(%d)\n",cfg_net_maxlen);
 		set_shutdown_flag(1);
 		return(5);
 	}
@@ -149,7 +149,7 @@ int nfqueue_startup(void)
 	// set the queue data copy mode
 	ret = nfq_set_mode(nfqqh,NFQNL_COPY_PACKET,cfg_net_buffer);
 	if (ret < 0) {
-		logmessage(LOG_ERR,appname,"Error returned from nfq_set_mode(NFQNL_COPY_PACKET)\n");
+		logmessage(LOG_ERR,logsrc,"Error returned from nfq_set_mode(NFQNL_COPY_PACKET)\n");
 		set_shutdown_flag(1);
 		return(6);
 	}
@@ -157,7 +157,7 @@ int nfqueue_startup(void)
 	// set flag so we also get the conntrack info for each packet
 	ret = nfq_set_queue_flags(nfqqh,NFQA_CFG_F_FAIL_OPEN,NFQA_CFG_F_FAIL_OPEN);
 	if (ret < 0) {
-		logmessage(LOG_ERR,appname,"Error returned from nfq_set_queue_flags(NFQA_CFG_F_FAIL_OPEN)\n");
+		logmessage(LOG_ERR,logsrc,"Error returned from nfq_set_queue_flags(NFQA_CFG_F_FAIL_OPEN)\n");
 		set_shutdown_flag(1);
 		return(7);
 	}
@@ -165,7 +165,7 @@ int nfqueue_startup(void)
 	// set flag so we also get the conntrack info for each packet
 	ret = nfq_set_queue_flags(nfqqh,NFQA_CFG_F_CONNTRACK,NFQA_CFG_F_CONNTRACK);
 	if (ret < 0) {
-		logmessage(LOG_ERR,appname,"Error returned from nfq_set_queue_flags(NFQA_CFG_F_CONNTRACK)\n");
+		logmessage(LOG_ERR,logsrc,"Error returned from nfq_set_queue_flags(NFQA_CFG_F_CONNTRACK)\n");
 		set_shutdown_flag(1);
 		return(7);
 	}
@@ -197,7 +197,7 @@ int nfqueue_thread(void)
 	int				netsock;
 	int				val,ret;
 
-	logmessage(LOG_INFO,appname,"The nfqueue thread is starting\n");
+	logmessage(LOG_INFO,logsrc,"The nfqueue thread is starting\n");
 
 	// allocate our packet buffer
 	buffer = (char *)malloc(cfg_net_buffer);
@@ -206,7 +206,7 @@ int nfqueue_thread(void)
 	ret = nfqueue_startup();
 
 	if (ret != 0) {
-		logmessage(LOG_ERR,appname,"Error %d returned from nfqueue_startup()\n",ret);
+		logmessage(LOG_ERR,logsrc,"Error %d returned from nfqueue_startup()\n",ret);
 		set_shutdown_flag(1);
 		return(1);
 	}
@@ -220,7 +220,7 @@ int nfqueue_thread(void)
 		ret = setsockopt(netsock,SOL_SOCKET,SO_RCVBUF,&val,sizeof(val));
 
 		if (ret != 0) {
-			logmessage(LOG_ERR,appname,"Error %d returned from setsockopt(SO_RCVBUF)\n",errno);
+			logmessage(LOG_ERR,logsrc,"Error %d returned from setsockopt(SO_RCVBUF)\n",errno);
 			set_shutdown_flag(1);
 			return(1);
 		}
@@ -243,7 +243,7 @@ int nfqueue_thread(void)
 		// handle poll errors
 		if (ret < 0) {
 			if (errno == EINTR)	continue;
-			logmessage(LOG_ERR,appname,"Error %d (%s) returned from poll()\n",errno,strerror(errno));
+			logmessage(LOG_ERR,logsrc,"Error %d (%s) returned from poll()\n",errno,strerror(errno));
 			break;
 		}
 
@@ -252,14 +252,14 @@ int nfqueue_thread(void)
 			ret = recv(netsock,buffer,cfg_net_buffer,MSG_DONTWAIT);
 
 			if (ret == 0) {
-				logmessage(LOG_ERR,appname,"The nfqueue socket was unexpectedly closed\n");
+				logmessage(LOG_ERR,logsrc,"The nfqueue socket was unexpectedly closed\n");
 				set_shutdown_flag(1);
 				break;
 			}
 
 			if (ret < 0) {
 				if ((errno == EAGAIN) || (errno == EINTR) || (errno == ENOBUFS)) break;
-				logmessage(LOG_ERR,appname,"Error %d (%s) returned from recv()\n",errno,strerror(errno));
+				logmessage(LOG_ERR,logsrc,"Error %d (%s) returned from recv()\n",errno,strerror(errno));
 				set_shutdown_flag(1);
 				break;
 			}
@@ -275,7 +275,7 @@ int nfqueue_thread(void)
 	// free our packet buffer memory
 	free(buffer);
 
-	logmessage(LOG_INFO,appname,"The nfqueue thread has terminated\n");
+	logmessage(LOG_INFO,logsrc,"The nfqueue thread has terminated\n");
 	go_child_shutdown();
 	return(0);
 }

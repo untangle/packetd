@@ -18,7 +18,7 @@ import (
 
 var socktime time.Time
 var sockspin int64
-var appname = "classify"
+var logsrc = "classify"
 var daemon net.Conn
 var classdHostPort = "127.0.0.1:8123"
 var classdMutex sync.Mutex
@@ -29,7 +29,7 @@ var classdMutex sync.Mutex
 func PluginStartup() {
 	var err error
 
-	logger.LogMessage(logger.LogInfo, appname, "PluginStartup(%s) has been called\n", appname)
+	logger.LogMessage(logger.LogInfo, logsrc, "PluginStartup(%s) has been called\n", logsrc)
 
 	exec.SystemCommand("systemctl", []string{"start", "untangle-classd.service"})
 
@@ -38,16 +38,16 @@ func PluginStartup() {
 	daemon, err = net.Dial("tcp", classdHostPort)
 
 	if err != nil {
-		logger.LogMessage(logger.LogErr, appname, "Error calling net.Dial(): %v\n", err)
+		logger.LogMessage(logger.LogErr, logsrc, "Error calling net.Dial(): %v\n", err)
 	}
 
-	dispatch.InsertNfqueueSubscription(appname, 2, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(logsrc, 2, PluginNfqueueHandler)
 }
 
 // PluginShutdown is called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
 func PluginShutdown() {
-	logger.LogMessage(logger.LogInfo, appname, "PluginShutdown(%s) has been called\n", appname)
+	logger.LogMessage(logger.LogInfo, logsrc, "PluginShutdown(%s) has been called\n", logsrc)
 
 	var d = daemon
 	daemon = nil
@@ -66,7 +66,7 @@ func SetHostPort(value string) {
 // push the results to the conntrack dictionary.
 func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	result.Owner = appname
+	result.Owner = logsrc
 	result.PacketMark = 0
 	// FIXME it should release once it reaches so set number of packets or full categorization
 	result.SessionRelease = false
@@ -83,9 +83,9 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 		//FIXME unsupported protocol
 		//We need to support any IP-based protocol in packetd
 		if mess.Session != nil {
-			logger.LogMessage(logger.LogErr, appname, "Unsupported protocol: %v\n", mess.Session.ClientSideTuple.Protocol)
+			logger.LogMessage(logger.LogErr, logsrc, "Unsupported protocol: %v\n", mess.Session.ClientSideTuple.Protocol)
 		} else {
-			logger.LogMessage(logger.LogErr, appname, "Unsupported protocol\n")
+			logger.LogMessage(logger.LogErr, logsrc, "Unsupported protocol\n")
 		}
 
 		result.SessionRelease = true
@@ -93,13 +93,13 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 	}
 
 	// if this is the first packet of the session we send a session create command
-	if mess.Session.UpdateCount == 1 {
+	if mess.Session.EventCount == 1 {
 		status, err = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.Session.ClientSideTuple.ClientAddr, mess.Session.ClientSideTuple.ClientPort, mess.Session.ClientSideTuple.ServerAddr, mess.Session.ClientSideTuple.ServerPort)
 		if err != nil {
-			logger.LogMessage(logger.LogErr, appname, "daemonCommand error: %s\n", err.Error())
+			logger.LogMessage(logger.LogErr, logsrc, "daemonCommand error: %s\n", err.Error())
 			return result
 		}
-		logger.LogMessage(logger.LogTrace, appname, "daemonCommand result: %s\n", status)
+		logger.LogMessage(logger.LogTrace, logsrc, "daemonCommand result: %s\n", status)
 	}
 
 	// send the application payload to the daemon
@@ -110,11 +110,11 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 	}
 
 	if err != nil {
-		logger.LogMessage(logger.LogErr, appname, "daemonCommand error: %s\n", err.Error())
+		logger.LogMessage(logger.LogErr, logsrc, "daemonCommand error: %s\n", err.Error())
 		return result
 	}
 
-	logger.LogMessage(logger.LogTrace, appname, "daemonCommand result: %s\n", status)
+	logger.LogMessage(logger.LogTrace, logsrc, "daemonCommand result: %s\n", status)
 
 	// Parse the output from classd to get the classification details
 	var pairname string

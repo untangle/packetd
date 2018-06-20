@@ -29,7 +29,7 @@ type NetloggerCallback func(uint8, uint8, uint16, uint8, uint8, string, string, 
 
 // To give C child functions access we export go_child_startup and shutdown functions.
 var childsync sync.WaitGroup
-var appname = "kernel"
+var logsrc = "kernel"
 var shutdownConntrackTask = make(chan bool)
 var conntrackCallback ConntrackCallback
 var nfqueueCallback NfqueueCallback
@@ -64,7 +64,7 @@ func StopCallbacks() {
 	select {
 	case <-shutdownConntrackTask:
 	case <-time.After(10 * time.Second):
-		logger.LogMessage(logger.LogErr, appname, "Failed to properly shutdown conntrackPeriodicTask\n")
+		logger.LogMessage(logger.LogErr, logsrc, "Failed to properly shutdown conntrackPeriodicTask\n")
 	}
 
 	// wait on above shutdowns
@@ -99,24 +99,29 @@ func RegisterNetloggerCallback(cb NetloggerCallback) {
 //export go_nfqueue_callback
 func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t) {
 	if nfqueueCallback == nil {
-		logger.LogMessage(logger.LogWarn, appname, "No queue callback registered. Ignoring packet.\n")
+		logger.LogMessage(logger.LogWarn, logsrc, "No queue callback registered. Ignoring packet.\n")
 		C.nfqueue_set_verdict(nfid, C.NF_ACCEPT, mark)
 		return
 	}
 
-	go func(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t) {
-		var packet gopacket.Packet
-		var packetLength int
-		var conntrackID uint32 = uint32(C.int(ctid))
-		var pmark uint32 = uint32(C.int(mark))
+	// netfilter queue is a share queue so we cant launch this async without copying contents out of buffer
+	// XXX
 
-		buffer := (*[0xFFFF]byte)(unsafe.Pointer(data))[:int(size):int(size)]
-		packet = gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
-		packetLength = int(size)
+	// go func(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t) {
 
-		newMark := nfqueueCallback(conntrackID, packet, packetLength, pmark)
-		C.nfqueue_set_verdict(nfid, C.NF_ACCEPT, C.uint32_t(newMark))
-	}(mark, data, size, ctid, nfid)
+	var packet gopacket.Packet
+	var packetLength int
+	var conntrackID uint32 = uint32(C.int(ctid))
+	var pmark uint32 = uint32(C.int(mark))
+
+	buffer := (*[0xFFFF]byte)(unsafe.Pointer(data))[:int(size):int(size)]
+	packet = gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
+	packetLength = int(size)
+
+	newMark := nfqueueCallback(conntrackID, packet, packetLength, pmark)
+	C.nfqueue_set_verdict(nfid, C.NF_ACCEPT, C.uint32_t(newMark))
+
+	// }(mark, data, size, ctid, nfid)
 
 	return
 }
@@ -138,7 +143,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	var serverPortNew uint16
 
 	if conntrackCallback == nil {
-		logger.LogMessage(logger.LogWarn, appname, "No conntrack callback registered. Ignoring event.\n")
+		logger.LogMessage(logger.LogWarn, logsrc, "No conntrack callback registered. Ignoring event.\n")
 		return
 	}
 
@@ -185,7 +190,7 @@ func go_netlogger_callback(info *C.struct_netlogger_info) {
 	var prefix string = C.GoString(&info.prefix[0])
 
 	if netloggerCallback == nil {
-		logger.LogMessage(logger.LogWarn, appname, "No conntrack callback registered. Ignoring event.\n")
+		logger.LogMessage(logger.LogWarn, logsrc, "No conntrack callback registered. Ignoring event.\n")
 		return
 	}
 
@@ -220,7 +225,7 @@ func conntrackTask() {
 			return
 		case <-time.After(timeUntilNextMin()):
 			counter++
-			logger.LogMessage(logger.LogDebug, appname, "Calling conntrack dump %d\n", counter)
+			logger.LogMessage(logger.LogDebug, logsrc, "Calling conntrack dump %d\n", counter)
 			C.conntrack_dump()
 		}
 	}
