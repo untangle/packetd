@@ -54,7 +54,7 @@ func PluginShutdown() {
 // the server certificate from our cache or fetch it from the server and
 // store it in our cache. Once we have the cert, we attach it to the session,
 // extract the interesting subject fields, and put them in the session table.
-func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bool) dispatch.NfqueueResult {
+func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
 	result.Owner = logsrc
 	result.PacketMark = 0
@@ -127,12 +127,12 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 	return result
 }
 
-func setSessionEntry(field string, value string, ctid uint) {
+func setSessionEntry(field string, value string, ctid uint32) {
 	output := strings.Replace(value, ",", "-", -1)
 	dict.AddSessionEntry(ctid, field, output)
 }
 
-func setSessionList(field string, value []string, ctid uint) {
+func setSessionList(field string, value []string, ctid uint32) {
 
 	if len(value) == 0 {
 		return

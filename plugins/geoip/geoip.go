@@ -61,7 +61,7 @@ func PluginShutdown() {
 // PluginNfqueueHandler is called to handle nfqueue packet data. We extract
 // the source and destination IP address from the packet, lookup the GeoIP
 // country code for each, and store them in the conntrack dictionary.
-func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bool) dispatch.NfqueueResult {
+func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var SrcCode = "XX"
 	var DstCode = "XX"
 

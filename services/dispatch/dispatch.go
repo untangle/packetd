@@ -19,7 +19,7 @@ import (
 )
 
 //NfqueueHandlerFunction defines a pointer to a nfqueue callback function
-type NfqueueHandlerFunction func(TrafficMessage, uint, bool) NfqueueResult
+type NfqueueHandlerFunction func(TrafficMessage, uint32, bool) NfqueueResult
 
 //ConntrackHandlerFunction defines a pointer to a conntrack callback function
 type ConntrackHandlerFunction func(int, *ConntrackEntry)
@@ -562,7 +562,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			}
 			logger.LogDebug(logsrc, "Calling nfqueue APP:%s PRIORITY:%d\n", key, priority)
 			go func(key string, val SubscriptionHolder) {
-				pipe <- val.NfqueueFunc(mess, uint(ctid), newSession)
+				pipe <- val.NfqueueFunc(mess, ctid, newSession)
 				logger.LogDebug(logsrc, "Finished nfqueue APP:%s PRIORITY:%d\n", key, priority)
 			}(key, val)
 			hitcount++
