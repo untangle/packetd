@@ -10,6 +10,7 @@ package dispatch
 import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 	"net"
@@ -240,6 +241,7 @@ func insertSessionEntry(finder uint32, entry *SessionEntry) {
 	logger.LogTrace(logsrc, "Insert session ctid %d -> %v\n", finder, entry.ClientSideTuple)
 	sessionMutex.Lock()
 	sessionTable[finder] = entry
+	dict.AddSessionEntry(finder, "SessionID", entry.SessionID)
 	sessionMutex.Unlock()
 }
 
@@ -247,6 +249,7 @@ func insertSessionEntry(finder uint32, entry *SessionEntry) {
 func removeSessionEntry(finder uint32) {
 	logger.LogTrace(logsrc, "Remove session ctid %d\n", finder)
 	sessionMutex.Lock()
+	dict.DeleteSession(finder)
 	delete(sessionTable, finder)
 	sessionMutex.Unlock()
 }
