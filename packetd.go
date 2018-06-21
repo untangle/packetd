@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -67,6 +68,14 @@ func main() {
 	for {
 		time.Sleep(60 * time.Second)
 		logger.LogMessage(logger.LogInfo, logsrc, ".\n")
+
+		var mem runtime.MemStats
+		runtime.ReadMemStats(&mem)
+		logger.LogMessage(logger.LogDebug, logsrc, "Memory Stats:\n")
+		logger.LogMessage(logger.LogDebug, logsrc, "Memory Alloc: %d\n", mem.Alloc)
+		logger.LogMessage(logger.LogDebug, logsrc, "Memory TotalAlloc: %d\n", mem.TotalAlloc)
+		logger.LogMessage(logger.LogDebug, logsrc, "Memory HeapAlloc: %d\n", mem.HeapAlloc)
+		logger.LogMessage(logger.LogDebug, logsrc, "Memory HeapSys: %d\n", mem.HeapSys)
 	}
 }
 

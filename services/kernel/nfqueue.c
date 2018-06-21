@@ -16,6 +16,7 @@ static int						cfg_net_maxlen = 10240;
 static int						cfg_net_buffer = 32768;
 static int						cfg_net_queue = 1818;
 static char                     *logsrc = "nfqueue";
+static char*			        buffer;
 
 int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data)
 {
@@ -65,6 +66,7 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 
 	// get the packet header and mark
 	hdr = nfq_get_msg_packet_hdr(nfad);
+
 	omark = nfq_get_nfmark(nfad);
 
 	// get the packet length and data
@@ -74,13 +76,17 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 	if (rawlen < (int)sizeof(struct iphdr)) {
 		nfq_set_verdict(qh,(hdr ? ntohl(hdr->packet_id) : 0),NF_ACCEPT,0,NULL);
 		logmessage(LOG_WARNING,logsrc,"Invalid length %d received\n",rawlen);
+        nfqueue_free_buffer(buffer);
 		return(0);
 	}
 
 	// use the iphdr structure for parsing
 	iphead = (struct iphdr *)rawpkt;
 
-	if (iphead->version != 4 && iphead->version != 6) return(0);
+	if (iphead->version != 4 && iphead->version != 6) {
+        nfqueue_free_buffer(buffer);
+        return(0);
+    }
 
 	// we only care about TCP and UDP
 	// if ((iphead->protocol != IPPROTO_TCP) && (iphead->protocol != IPPROTO_UDP))	return(0);
@@ -89,7 +95,8 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 	ctid = nfq_get_conntrack_id(nfad,nfmsg->nfgen_family);
 
 	// call the go handler function
-	go_nfqueue_callback(omark,rawpkt,rawlen,ctid,(hdr ? ntohl(hdr->packet_id) : 0));
+    // the go handler will call nfqueue_free_buffer(buffer) when done
+	go_nfqueue_callback(omark,rawpkt,rawlen,ctid,(hdr ? ntohl(hdr->packet_id) : 0),buffer);
 
 	return(0);
 }
@@ -193,14 +200,10 @@ void nfqueue_close(void)
 int nfqueue_thread(void)
 {
 	struct pollfd	network;
-	char			*buffer;
 	int				netsock;
 	int				val,ret;
 
 	logmessage(LOG_INFO,logsrc,"The nfqueue thread is starting\n");
-
-	// allocate our packet buffer
-	buffer = (char *)malloc(cfg_net_buffer);
 
 	// call our nfqueue startup function
 	ret = nfqueue_startup();
@@ -247,33 +250,33 @@ int nfqueue_thread(void)
 			break;
 		}
 
-		do {
-			// read from the nfqueue socket
-			ret = recv(netsock,buffer,cfg_net_buffer,MSG_DONTWAIT);
+        // allocate our packet buffer
+        buffer = (char *)malloc(cfg_net_buffer);
 
-			if (ret == 0) {
-				logmessage(LOG_ERR,logsrc,"The nfqueue socket was unexpectedly closed\n");
-				set_shutdown_flag(1);
-				break;
-			}
+        // read from the nfqueue socket
+        ret = recv(netsock,buffer,cfg_net_buffer,MSG_DONTWAIT);
 
-			if (ret < 0) {
-				if ((errno == EAGAIN) || (errno == EINTR) || (errno == ENOBUFS)) break;
-				logmessage(LOG_ERR,logsrc,"Error %d (%s) returned from recv()\n",errno,strerror(errno));
-				set_shutdown_flag(1);
-				break;
-			}
+        if (ret == 0) {
+            logmessage(LOG_ERR,logsrc,"The nfqueue socket was unexpectedly closed\n");
+            set_shutdown_flag(1);
+            nfqueue_free_buffer(buffer);
+            break;
+        }
 
-			// pass the data to the packet handler
-			nfq_handle_packet(nfqh,buffer,ret);
-		} while (ret > 0);
+        if (ret < 0) {
+            if ((errno == EAGAIN) || (errno == EINTR) || (errno == ENOBUFS)) break;
+            logmessage(LOG_ERR,logsrc,"Error %d (%s) returned from recv()\n",errno,strerror(errno));
+            set_shutdown_flag(1);
+            nfqueue_free_buffer(buffer);
+            break;
+        }
+
+        // pass the data to the packet handler
+        nfq_handle_packet(nfqh,buffer,ret);
 	}
 
 	// call our nfqueue shutdown function
 	nfqueue_close();
-
-	// free our packet buffer memory
-	free(buffer);
 
 	logmessage(LOG_INFO,logsrc,"The nfqueue thread has terminated\n");
 	go_child_shutdown();
@@ -285,3 +288,10 @@ void nfqueue_shutdown(void)
 	set_shutdown_flag(1);
 }
 
+void nfqueue_free_buffer(unsigned char* buffer)
+{
+    if (!buffer)
+        logmessage(LOG_ERR,logsrc,"nfqueue_free_buffer call with NULL\n");
+    else
+        free(buffer);
+}
