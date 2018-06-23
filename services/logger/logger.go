@@ -11,7 +11,7 @@ import (
 
 const logConfigFile = "/tmp/logconfig.js"
 
-var logLevelName = [...]string{"EMERG", "ALERT", "CRIT", "ERROR", "WARN", "NOTICE", "INFO", "DEBUG", "LOGIC"}
+var logLevelName = [...]string{"EMERG", "ALERT", "CRIT", "ERROR", "WARN", "NOTICE", "INFO", "DEBUG", "TRACE"}
 var appLogLevel map[string]int
 var launchTime time.Time
 var logsrc = "logger"
