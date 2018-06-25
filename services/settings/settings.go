@@ -145,7 +145,7 @@ func SetSettings(segments []string, jsonNewSettings interface{}) interface{} {
 		}
 	}
 
-	ok, err = writeSettingsFileJSON(jsonSettings)
+	_, err = writeSettingsFileJSON(jsonSettings)
 	if err != nil {
 		return createJSONErrorObject(err)
 	}
@@ -200,7 +200,7 @@ func TrimSettings(segments []string) interface{} {
 		}
 	}
 
-	ok, err = writeSettingsFileJSON(jsonSettings)
+	_, err = writeSettingsFileJSON(jsonSettings)
 	if err != nil {
 		return createJSONErrorObject(err)
 	}

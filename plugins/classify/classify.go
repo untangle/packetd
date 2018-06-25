@@ -256,7 +256,7 @@ func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, 
 	}
 
 	// read the response from the daemon
-	tot, err = daemon.Read(buffer)
+	_, err = daemon.Read(buffer)
 
 	if err != nil {
 		if daemon != nil {

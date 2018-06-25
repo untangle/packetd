@@ -413,7 +413,7 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 		conntrackEntry.TotalRate = totalRate
 	}
 
-	// We loop and increment the priority until all subscribtions have been called
+	// We loop and increment the priority until all subscriptions have been called
 	sublist := conntrackList
 	subtotal := len(sublist)
 	subcount := 0
@@ -544,7 +544,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 	pipe := make(chan NfqueueResult)
 
-	// We loop and increment the priority until all subscribtions have been called
+	// We loop and increment the priority until all subscriptions have been called
 	subtotal := len(session.Subs)
 	subcount := 0
 	priority := 0
@@ -609,7 +609,7 @@ func netloggerCallback(version uint8,
 
 	logger.LogMessage(logger.LogTrace, logsrc, "netlogger event: %v \n", netlogger)
 
-	// We loop and increment the priority until all subscribtions have been called
+	// We loop and increment the priority until all subscriptions have been called
 	sublist := netloggerList
 	subtotal := len(sublist)
 	subcount := 0
