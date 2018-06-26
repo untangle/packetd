@@ -34,38 +34,44 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 	result.SessionRelease = true
 	result.PacketMark = 0
 
-	if newSession {
-		var session *dispatch.SessionEntry = mess.Session
-		if session == nil {
-			logger.LogMessage(logger.LogErr, logsrc, "Missing session on NFQueue packet!")
-			return result
-		}
-
-		// FIXME time_stamp
-		// FIXME local_addr
-		// FIXME remote_addr
-		// FIXME client_intf
-		// FIXME server_intf
-		columns := map[string]interface{}{
-			"session_id":  session.SessionID,
-			"ip_protocol": session.ClientSideTuple.Protocol,
-			"client_addr": session.ClientSideTuple.ClientAddr,
-			"server_addr": session.ClientSideTuple.ServerAddr,
-			"client_port": session.ClientSideTuple.ClientPort,
-			"server_port": session.ClientSideTuple.ServerPort,
-		}
-		// FIXME move to logger plugin
-		reports.LogEvent(reports.CreateEvent("session_new", "sessions", 1, columns, nil))
+	// We only care about new sessions
+	if !newSession {
+		return result
 	}
+
+	var session *dispatch.SessionEntry
+
+	session = mess.Session
+	if session == nil {
+		logger.LogMessage(logger.LogErr, logsrc, "Missing session on NFQueue packet!")
+		return result
+	}
+
+	// FIXME time_stamp
+	// FIXME local_addr
+	// FIXME remote_addr
+	// FIXME client_intf
+	// FIXME server_intf
+	columns := map[string]interface{}{
+		"session_id":  session.SessionID,
+		"ip_protocol": session.ClientSideTuple.Protocol,
+		"client_addr": session.ClientSideTuple.ClientAddr,
+		"server_addr": session.ClientSideTuple.ServerAddr,
+		"client_port": session.ClientSideTuple.ClientPort,
+		"server_port": session.ClientSideTuple.ServerPort,
+	}
+	// FIXME move to logger plugin
+	reports.LogEvent(reports.CreateEvent("session_new", "sessions", 1, columns, nil))
 
 	return result
 }
 
 // PluginConntrackHandler receives conntrack events
 func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
-	if message == 'N' {
-		var session *dispatch.SessionEntry = entry.Session
+	var session *dispatch.SessionEntry
 
+	session = entry.Session
+	if message == 'N' {
 		if session != nil {
 			columns := map[string]interface{}{
 				"session_id": session.SessionID,
