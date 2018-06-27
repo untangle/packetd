@@ -160,6 +160,11 @@ func setConnDictList(field string, value []string, ctid uint) {
 
 // This was pulled from https://github.com/polvi/sni/sni.go
 func extractSNIhostname(b []byte) string {
+	if len(b) < 48 {
+		logger.Log(logger.LogDebug, logsrc, "Packet is too short (%d bytes) for ClientHello\n", len(b))
+		return ""
+	}
+
 	rest := b[5:]
 	current := 0
 	handshakeType := rest[0]

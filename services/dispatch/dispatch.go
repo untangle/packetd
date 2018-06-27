@@ -432,6 +432,7 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 			go func(val SubscriptionHolder) {
 				val.ConntrackFunc(int(eventType), conntrackEntry)
 				wg.Done()
+				logger.Log(logger.LogDebug, logsrc, "Finished conntrack APP:%s PRIORITY:%d\n", key, priority)
 			}(val)
 			subcount++
 		}
@@ -562,6 +563,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			logger.Log(logger.LogDebug, logsrc, "Calling nfqueue APP:%s PRIORITY:%d\n", key, priority)
 			go func(key string, val SubscriptionHolder) {
 				pipe <- val.NfqueueFunc(mess, uint(ctid), newSession)
+				logger.Log(logger.LogDebug, logsrc, "Finished nfqueue APP:%s PRIORITY:%d\n", key, priority)
 			}(key, val)
 			hitcount++
 			subcount++
@@ -628,6 +630,7 @@ func netloggerCallback(version uint8,
 			go func(val SubscriptionHolder) {
 				val.NetloggerFunc(&netlogger)
 				wg.Done()
+				logger.Log(logger.LogDebug, logsrc, "Finished netlogger APP:%s PRIORITY:%d\n", key, priority)
 			}(val)
 			subcount++
 
