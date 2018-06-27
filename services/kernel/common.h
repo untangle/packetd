@@ -27,23 +27,40 @@
 #include <libnetfilter_log/libnetfilter_log.h>
 #include <libnfnetlink/libnfnetlink.h>
 
-// FIXME IPv6
+/*
+ * We have variables for IPv4 and IPv6 address and our
+ * conntrack callback handler will fill the appropriate
+ * vars based on the value of family (AF_INET or AF_INET6)
+ */
 struct conntrack_info {
 	u_int8_t		msg_type;
+	u_int8_t		family;
 	u_int32_t		conn_id;
 	u_int8_t		orig_proto;
-	u_int32_t		orig_saddr;
-	u_int32_t		orig_daddr;
+	struct in_addr	orig_4saddr;
+	struct in_addr	orig_4daddr;
+	struct in6_addr	orig_6saddr;
+	struct in6_addr	orig_6daddr;
 	u_int16_t		orig_sport;
 	u_int16_t		orig_dport;
-	u_int32_t		repl_saddr;
-	u_int32_t		repl_daddr;
+	struct in_addr	repl_4saddr;
+	struct in_addr	repl_4daddr;
+	struct in6_addr	repl_6saddr;
+	struct in6_addr	repl_6daddr;
 	u_int16_t		repl_sport;
 	u_int16_t		repl_dport;
 	u_int64_t		orig_bytes;
 	u_int64_t		repl_bytes;
 };
 
+/*
+ * The src_addr and dst_addr fields are large enough to
+ * hold either an IPv4 or IPv6 address in human readable
+ * format, rounded up to a nice even value. Note that
+ * an IPv6 address could be as long as 45 characters in
+ * the case of IPv4-mapped IPv6 address (45 characters):
+ * ABCD:ABCD:ABCD:ABCD:ABCD:ABCD:101.102.103.104
+ */
 struct netlogger_info {
 	u_int8_t		version;
 	u_int8_t		protocol;
@@ -99,4 +116,3 @@ int netlogger_startup(void);
 void netlogger_shutdown(void);
 int netlogger_thread(void);
 void netlogger_shutdown(void);
-

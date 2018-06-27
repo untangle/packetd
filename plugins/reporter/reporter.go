@@ -33,55 +33,61 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 	result.SessionRelease = true
 	result.PacketMark = 0
 
-	if newSession {
-		var session *dispatch.SessionEntry = mess.Session
-		if session == nil {
-			logger.LogMessage(logger.LogErr, logsrc, "Missing session on NFQueue packet!")
-			return result
-		}
-
-		// this is the first packet so source interface = client interface
-		var clientInterface uint8 = uint8((result.PacketMark & 0x000000FF))
-		var serverInterface uint8 = uint8((result.PacketMark & 0x0000FF00) >> 8)
-
-		var clientIsOnLan bool = ((result.PacketMark & 0x01000000) == 0)
-		var localAddress net.IP
-		var remoteAddress net.IP
-
-		if clientIsOnLan {
-			localAddress = session.ClientSideTuple.ClientAddr
-			// the server may not actually be on a WAN, but we consider it remote if the client is on a LAN
-			remoteAddress = session.ClientSideTuple.ServerAddr
-		} else {
-			remoteAddress = session.ClientSideTuple.ClientAddr
-			// the server could in theory be on another WAN (WAN1 -> WAN2 traffic) but it is very unlikely so we consider
-			// the local address to be the server
-			localAddress = session.ClientSideTuple.ServerAddr
-		}
-		columns := map[string]interface{}{
-			"time_stamp":       time.Now(),
-			"session_id":       session.SessionID,
-			"ip_protocol":      session.ClientSideTuple.Protocol,
-			"client_interface": clientInterface,
-			"server_interface": serverInterface,
-			"local_address":    localAddress.String(),
-			"remote_address":   remoteAddress.String(),
-			"client_address":   session.ClientSideTuple.ClientAddr.String(),
-			"server_address":   session.ClientSideTuple.ServerAddr.String(),
-			"client_port":      session.ClientSideTuple.ClientPort,
-			"server_port":      session.ClientSideTuple.ServerPort,
-		}
-		reports.LogEvent(reports.CreateEvent("session_new", "sessions", 1, columns, nil))
+	// We only care about new sessions
+	if !newSession {
+		return result
 	}
+
+	var session *dispatch.SessionEntry
+
+	session = mess.Session
+	if session == nil {
+		logger.LogMessage(logger.LogErr, logsrc, "Missing session on NFQueue packet!")
+		return result
+	}
+
+	// this is the first packet so source interface = client interface
+	var clientInterface uint8 = uint8((result.PacketMark & 0x000000FF))
+	var serverInterface uint8 = uint8((result.PacketMark & 0x0000FF00) >> 8)
+
+	var clientIsOnLan bool = ((result.PacketMark & 0x01000000) == 0)
+	var localAddress net.IP
+	var remoteAddress net.IP
+
+	if clientIsOnLan {
+		localAddress = session.ClientSideTuple.ClientAddr
+		// the server may not actually be on a WAN, but we consider it remote if the client is on a LAN
+		remoteAddress = session.ClientSideTuple.ServerAddr
+	} else {
+		remoteAddress = session.ClientSideTuple.ClientAddr
+		// the server could in theory be on another WAN (WAN1 -> WAN2 traffic) but it is very unlikely so we consider
+		// the local address to be the server
+		localAddress = session.ClientSideTuple.ServerAddr
+	}
+	columns := map[string]interface{}{
+		"time_stamp":       time.Now(),
+		"session_id":       session.SessionID,
+		"ip_protocol":      session.ClientSideTuple.Protocol,
+		"client_interface": clientInterface,
+		"server_interface": serverInterface,
+		"local_address":    localAddress.String(),
+		"remote_address":   remoteAddress.String(),
+		"client_address":   session.ClientSideTuple.ClientAddr.String(),
+		"server_address":   session.ClientSideTuple.ServerAddr.String(),
+		"client_port":      session.ClientSideTuple.ClientPort,
+		"server_port":      session.ClientSideTuple.ServerPort,
+	}
+	reports.LogEvent(reports.CreateEvent("session_new", "sessions", 1, columns, nil))
 
 	return result
 }
 
 // PluginConntrackHandler receives conntrack events
 func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
-	if message == 'N' {
-		var session *dispatch.SessionEntry = entry.Session
+	var session *dispatch.SessionEntry
 
+	session = entry.Session
+	if message == 'N' {
 		if session != nil {
 			columns := map[string]interface{}{
 				"session_id": session.SessionID,

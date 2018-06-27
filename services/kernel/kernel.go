@@ -154,13 +154,13 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 
 	client = make(net.IP, 4) // FIXME IPv6
 	server = make(net.IP, 4) // FIXME IPv6
-	binary.LittleEndian.PutUint32(client, uint32(info.orig_saddr))
-	binary.LittleEndian.PutUint32(server, uint32(info.orig_daddr))
+	binary.LittleEndian.PutUint32(client, uint32(info.orig_4saddr.s_addr))
+	binary.LittleEndian.PutUint32(server, uint32(info.orig_4daddr.s_addr))
 
 	clientNew = make(net.IP, 4) // FIXME IPv6
 	serverNew = make(net.IP, 4) // FIXME IPv6
-	binary.LittleEndian.PutUint32(clientNew, uint32(info.repl_daddr))
-	binary.LittleEndian.PutUint32(serverNew, uint32(info.repl_saddr))
+	binary.LittleEndian.PutUint32(clientNew, uint32(info.repl_4daddr.s_addr))
+	binary.LittleEndian.PutUint32(serverNew, uint32(info.repl_4saddr.s_addr))
 
 	clientPort = uint16(info.orig_sport)
 	serverPort = uint16(info.orig_dport)
