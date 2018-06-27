@@ -133,8 +133,8 @@ func eventLogger() {
 }
 
 func logInsertEvent(event Event) {
-	var sqlStr string = "INSERT INTO " + event.Table + "("
-	var valueStr string = "("
+	var sqlStr = "INSERT INTO " + event.Table + "("
+	var valueStr = "("
 
 	var first = true
 	var values []interface{}

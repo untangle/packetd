@@ -25,8 +25,8 @@ func PluginShutdown() {
 	logger.LogMessage(logger.LogInfo, logsrc, "PluginShutdown(%s) has been called\n", logsrc)
 }
 
-// Handle the first packet of a session
-// Logs a new session
+// PluginNfqueueHandler handles the first packet of a session
+// Logs a new session_new event
 func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
 	result.Owner = logsrc
