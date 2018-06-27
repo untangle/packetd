@@ -28,7 +28,7 @@ var localMutex sync.Mutex
 // increment the argumented WaitGroup so the main process can wait for
 // our shutdown function to return during shutdown.
 func PluginStartup() {
-	logger.Log(logger.LogInfo, logsrc, "PluginStartup(%s) has been called\n", logsrc)
+	logger.LogInfo(logsrc, "PluginStartup(%s) has been called\n", logsrc)
 	certificateTable = make(map[string]CertificateHolder)
 	go cleanupTask()
 
@@ -43,10 +43,10 @@ func PluginShutdown() {
 	select {
 	case <-shutdownChannel:
 	case <-time.After(10 * time.Second):
-		logger.Log(logger.LogErr, logsrc, "Failed to properly shutdown cleanupTask\n")
+		logger.LogErr(logsrc, "Failed to properly shutdown cleanupTask\n")
 	}
 
-	logger.Log(logger.LogInfo, logsrc, "PluginShutdown(%s) has been called\n", logsrc)
+	logger.LogInfo(logsrc, "PluginShutdown(%s) has been called\n", logsrc)
 }
 
 // PluginNfqueueHandler is called to handle nfqueue packet data. We only
@@ -73,9 +73,9 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 	localMutex.Lock()
 
 	if cert, ok = findCertificate(client); ok {
-		logger.Log(logger.LogInfo, logsrc, "Loading certificate for %s\n", mess.Tuple.ServerAddress)
+		logger.LogInfo(logsrc, "Loading certificate for %s\n", mess.Tuple.ServerAddress)
 	} else {
-		logger.Log(logger.LogInfo, logsrc, "Fetching certificate for %s\n", mess.Tuple.ServerAddress)
+		logger.LogInfo(logsrc, "Fetching certificate for %s\n", mess.Tuple.ServerAddress)
 
 		conf := &tls.Config{
 			InsecureSkipVerify: true,
@@ -86,12 +86,12 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 		defer conn.Close()
 
 		if err != nil {
-			logger.Log(logger.LogWarn, logsrc, "TLS ERROR: %s\n", err)
+			logger.LogWarn(logsrc, "TLS ERROR: %s\n", err)
 			return result
 		}
 
 		if len(conn.ConnectionState().PeerCertificates) < 1 {
-			logger.Log(logger.LogWarn, logsrc, "Could not fetch certificate from %s\n", mess.Tuple.ServerAddress)
+			logger.LogWarn(logsrc, "Could not fetch certificate from %s\n", mess.Tuple.ServerAddress)
 			return result
 		}
 
@@ -161,7 +161,7 @@ func setConnDictList(field string, value []string, ctid uint) {
 // This was pulled from https://github.com/polvi/sni/sni.go
 func extractSNIhostname(b []byte) string {
 	if len(b) < 48 {
-		logger.Log(logger.LogDebug, logsrc, "Packet is too short (%d bytes) for ClientHello\n", len(b))
+		logger.LogDebug(logsrc, "Packet is too short (%d bytes) for ClientHello\n", len(b))
 		return ""
 	}
 
@@ -171,7 +171,7 @@ func extractSNIhostname(b []byte) string {
 	current++
 
 	if handshakeType != 0x1 {
-		logger.Log(logger.LogDebug, logsrc, "Packet does not contain a TLS ClientHello message\n")
+		logger.LogDebug(logsrc, "Packet does not contain a TLS ClientHello message\n")
 		return ""
 	}
 
@@ -197,7 +197,7 @@ func extractSNIhostname(b []byte) string {
 	current += compressionMethodLength
 
 	if current > len(rest) {
-		logger.Log(logger.LogDebug, logsrc, "Packet does not contain TLS extensions\n")
+		logger.LogDebug(logsrc, "Packet does not contain TLS extensions\n")
 		return ""
 	}
 
@@ -219,7 +219,7 @@ func extractSNIhostname(b []byte) string {
 			nameType := rest[current]
 			current++
 			if nameType != 0 {
-				logger.Log(logger.LogDebug, logsrc, "Extension is not a hostname\n")
+				logger.LogDebug(logsrc, "Extension is not a hostname\n")
 				return ""
 			}
 			nameLen := (int(rest[current]) << 8) + int(rest[current+1])
@@ -231,7 +231,7 @@ func extractSNIhostname(b []byte) string {
 	}
 
 	if hostname == "" {
-		logger.Log(logger.LogDebug, logsrc, "No SNI hostname detected\n")
+		logger.LogDebug(logsrc, "No SNI hostname detected\n")
 		return ""
 	}
 
@@ -274,10 +274,10 @@ func cleanCertificateTable() {
 		}
 		removeCertificate(key)
 		counter++
-		logger.Log(logger.LogDebug, logsrc, "CERTIFICATE Removing %s from table\n", key)
+		logger.LogDebug(logsrc, "CERTIFICATE Removing %s from table\n", key)
 	}
 
-	logger.Log(logger.LogDebug, logsrc, "CERTIFICATE REMOVED:%d REMAINING:%d\n", counter, len(certificateTable))
+	logger.LogDebug(logsrc, "CERTIFICATE REMOVED:%d REMAINING:%d\n", counter, len(certificateTable))
 }
 
 // periodic task to clean the certificate table

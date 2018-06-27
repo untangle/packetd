@@ -19,25 +19,25 @@ func Startup() {
 	var err error
 	settings, err = readSettingsFileJSON()
 	if err != nil {
-		logger.Log(logger.LogWarn, logsrc, "Error reading settings file: %s\n", err.Error())
+		logger.LogWarn(logsrc, "Error reading settings file: %s\n", err.Error())
 	}
 
 	if settings == nil {
 		settings, err = createNewSettings()
 	}
 	if err != nil {
-		logger.Log(logger.LogErr, logsrc, "Failed to create/read settings file: %s\n", err.Error())
+		logger.LogErr(logsrc, "Failed to create/read settings file: %s\n", err.Error())
 		//FIXME abort / exit
 	} else if settings == nil {
-		logger.Log(logger.LogErr, logsrc, "Failed to create/read settings file.\n")
+		logger.LogErr(logsrc, "Failed to create/read settings file.\n")
 		//FIXME abort / exit
 	}
 
 	// jsonString, err := json.MarshalIndent(settings, "", "  ")
 	// if err != nil {
-	// logger.Log(logger.LogWarn, logsrc, "Error reading settings file: %s\n", err.Error())
+	// logger.LogWarn(logsrc, "Error reading settings file: %s\n", err.Error())
 	// } else {
-	// logger.Log(logger.LogDebug, logsrc, "settings: %s\n", jsonString)
+	// logger.LogDebug(logsrc, "settings: %s\n", jsonString)
 	// }
 }
 
@@ -263,20 +263,20 @@ func createJSONErrorString(str string) map[string]interface{} {
 
 // createNewSettings creates a new settings file
 func createNewSettings() (map[string]interface{}, error) {
-	logger.Log(logger.LogInfo, logsrc, "Initializing new settings...\n")
+	logger.LogInfo(logsrc, "Initializing new settings...\n")
 	cmd := exec.Command("sh", "-c", "/usr/bin/sync-settings -c -f /etc/config/settings.json")
 	stdoutStderr, err := cmd.CombinedOutput()
 	if err != nil {
-		logger.Log(logger.LogWarn, logsrc, "Error creating new settings file: %s\n", err.Error())
+		logger.LogWarn(logsrc, "Error creating new settings file: %s\n", err.Error())
 		return nil, err
 	}
 	for _, line := range strings.Split(strings.TrimSpace(string(stdoutStderr)), "\n") {
-		logger.Log(logger.LogInfo, logsrc, "sync-settings: %s\n", line)
+		logger.LogInfo(logsrc, "sync-settings: %s\n", line)
 	}
 
 	settings, err = readSettingsFileJSON()
 	if err != nil {
-		logger.Log(logger.LogWarn, logsrc, "Error reading settings file: %s\n", err.Error())
+		logger.LogWarn(logsrc, "Error reading settings file: %s\n", err.Error())
 	}
 	return settings, err
 }

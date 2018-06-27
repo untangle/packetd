@@ -23,9 +23,9 @@ func SystemCommand(command string, arguments []string) ([]byte, error) {
 
 	result, err = exec.Command(command, arguments...).CombinedOutput()
 	if err != nil {
-		logger.Log(logger.LogInfo, logsrc, "COMMAND:%s | OUTPUT:%s | ERROR:%s\n", command, strings.TrimSpace(string(result)), err.Error())
+		logger.LogInfo(logsrc, "COMMAND:%s | OUTPUT:%s | ERROR:%s\n", command, strings.TrimSpace(string(result)), err.Error())
 	} else {
-		logger.Log(logger.LogDebug, logsrc, "COMMAND:%s | OUTPUT:%s\n", command, string(result))
+		logger.LogDebug(logsrc, "COMMAND:%s | OUTPUT:%s\n", command, string(result))
 	}
 	return result, err
 }

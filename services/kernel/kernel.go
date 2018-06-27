@@ -64,7 +64,7 @@ func StopCallbacks() {
 	select {
 	case <-shutdownConntrackTask:
 	case <-time.After(10 * time.Second):
-		logger.Log(logger.LogErr, logsrc, "Failed to properly shutdown conntrackPeriodicTask\n")
+		logger.LogErr(logsrc, "Failed to properly shutdown conntrackPeriodicTask\n")
 	}
 
 	// wait on above shutdowns
@@ -99,7 +99,7 @@ func RegisterNetloggerCallback(cb NetloggerCallback) {
 //export go_nfqueue_callback
 func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.uchar) {
 	if nfqueueCallback == nil {
-		logger.Log(logger.LogWarn, logsrc, "No queue callback registered. Ignoring packet.\n")
+		logger.LogWarn(logsrc, "No queue callback registered. Ignoring packet.\n")
 		C.nfqueue_set_verdict(nfid, C.NF_ACCEPT, mark)
 		return
 	}
@@ -141,7 +141,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	var serverPortNew uint16
 
 	if conntrackCallback == nil {
-		logger.Log(logger.LogWarn, logsrc, "No conntrack callback registered. Ignoring event.\n")
+		logger.LogWarn(logsrc, "No conntrack callback registered. Ignoring event.\n")
 		return
 	}
 
@@ -188,7 +188,7 @@ func go_netlogger_callback(info *C.struct_netlogger_info) {
 	var prefix string = C.GoString(&info.prefix[0])
 
 	if netloggerCallback == nil {
-		logger.Log(logger.LogWarn, logsrc, "No conntrack callback registered. Ignoring event.\n")
+		logger.LogWarn(logsrc, "No conntrack callback registered. Ignoring event.\n")
 		return
 	}
 
@@ -209,7 +209,7 @@ func go_child_shutdown() {
 func go_child_message(level C.int, source *C.char, message *C.char) {
 	lsrc := C.GoString(source)
 	lmsg := C.GoString(message)
-	logger.Log(int(level), lsrc, lmsg)
+	logger.LogMessage(int(level), lsrc, lmsg)
 }
 
 //conntrack periodic task
@@ -223,7 +223,7 @@ func conntrackTask() {
 			return
 		case <-time.After(timeUntilNextMin()):
 			counter++
-			logger.Log(logger.LogDebug, logsrc, "Calling conntrack dump %d\n", counter)
+			logger.LogDebug(logsrc, "Calling conntrack dump %d\n", counter)
 			C.conntrack_dump()
 		}
 	}

@@ -160,14 +160,14 @@ func Shutdown() {
 	select {
 	case <-shutdownCleanerTask:
 	case <-time.After(10 * time.Second):
-		logger.Log(logger.LogErr, logsrc, "Failed to properly shutdown cleanerTask\n")
+		logger.LogErr(logsrc, "Failed to properly shutdown cleanerTask\n")
 	}
 }
 
 // InsertNfqueueSubscription adds a subscription for receiving nfqueue messages
 func InsertNfqueueSubscription(owner string, priority int, function NfqueueHandlerFunction) {
 	var holder SubscriptionHolder
-	logger.Log(logger.LogInfo, logsrc, "Adding NFQueue Event Subscription (%s, %d)\n", owner, priority)
+	logger.LogInfo(logsrc, "Adding NFQueue Event Subscription (%s, %d)\n", owner, priority)
 
 	holder.Owner = owner
 	holder.Priority = priority
@@ -180,7 +180,7 @@ func InsertNfqueueSubscription(owner string, priority int, function NfqueueHandl
 // InsertConntrackSubscription adds a subscription for receiving conntrack messages
 func InsertConntrackSubscription(owner string, priority int, function ConntrackHandlerFunction) {
 	var holder SubscriptionHolder
-	logger.Log(logger.LogInfo, logsrc, "Adding Conntrack Event Subscription (%s, %d)\n", owner, priority)
+	logger.LogInfo(logsrc, "Adding Conntrack Event Subscription (%s, %d)\n", owner, priority)
 
 	holder.Owner = owner
 	holder.Priority = priority
@@ -193,7 +193,7 @@ func InsertConntrackSubscription(owner string, priority int, function ConntrackH
 // InsertNetloggerSubscription adds a subscription for receiving netlogger messages
 func InsertNetloggerSubscription(owner string, priority int, function NetloggerHandlerFunction) {
 	var holder SubscriptionHolder
-	logger.Log(logger.LogInfo, logsrc, "Adding Netlogger Event Subscription (%s, %d)\n", owner, priority)
+	logger.LogInfo(logsrc, "Adding Netlogger Event Subscription (%s, %d)\n", owner, priority)
 
 	holder.Owner = owner
 	holder.Priority = priority
@@ -231,14 +231,14 @@ func nextSessionID() uint64 {
 func findSessionEntry(finder uint32) (*SessionEntry, bool) {
 	sessionMutex.Lock()
 	entry, status := sessionTable[finder]
-	logger.Log(logger.LogTrace, logsrc, "Lookup session ctid %d -> %v\n", finder, status)
+	logger.LogTrace(logsrc, "Lookup session ctid %d -> %v\n", finder, status)
 	sessionMutex.Unlock()
 	return entry, status
 }
 
 // insertSessionEntry adds an entry to the session table
 func insertSessionEntry(finder uint32, entry *SessionEntry) {
-	logger.Log(logger.LogTrace, logsrc, "Insert session ctid %d -> %v\n", finder, entry.ClientSideTuple)
+	logger.LogTrace(logsrc, "Insert session ctid %d -> %v\n", finder, entry.ClientSideTuple)
 	sessionMutex.Lock()
 	sessionTable[finder] = entry
 	sessionMutex.Unlock()
@@ -246,7 +246,7 @@ func insertSessionEntry(finder uint32, entry *SessionEntry) {
 
 // removeSessionEntry removes an entry from the session table
 func removeSessionEntry(finder uint32) {
-	logger.Log(logger.LogTrace, logsrc, "Remove session ctid %d\n", finder)
+	logger.LogTrace(logsrc, "Remove session ctid %d\n", finder)
 	sessionMutex.Lock()
 	delete(sessionTable, finder)
 	sessionMutex.Unlock()
@@ -269,7 +269,7 @@ func insertConntrackEntry(finder uint32, entry *ConntrackEntry) {
 
 // removeConntrackEntry removes an entry from the conntrack table
 func removeConntrackEntry(finder uint32) {
-	logger.Log(logger.LogTrace, logsrc, "Remove conntrack ctid %d\n", finder)
+	logger.LogTrace(logsrc, "Remove conntrack ctid %d\n", finder)
 	conntrackMutex.Lock()
 	delete(conntrackTable, finder)
 	conntrackMutex.Unlock()
@@ -308,7 +308,7 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 
 	if conntrackEntryFound {
 		conntrackEntry.EventCount++
-		logger.Log(logger.LogTrace, logsrc, "conntrack event[%d,%c]: %v \n", ctid, eventType, conntrackEntry.ClientSideTuple)
+		logger.LogTrace(logsrc, "conntrack event[%d,%c]: %v \n", ctid, eventType, conntrackEntry.ClientSideTuple)
 	} else {
 		conntrackEntry = new(ConntrackEntry)
 		conntrackEntry.ConntrackID = ctid
@@ -326,7 +326,7 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 		conntrackEntry.ServerSideTuple.ServerPort = serverPortNew
 		conntrackEntry.EventCount = 1
 
-		logger.Log(logger.LogTrace, logsrc, "conntrack event[%d,%c]: %v \n", ctid, eventType, conntrackEntry.ClientSideTuple)
+		logger.LogTrace(logsrc, "conntrack event[%d,%c]: %v \n", ctid, eventType, conntrackEntry.ClientSideTuple)
 
 		session, _ := findSessionEntry(uint32(ctid))
 		if session != nil {
@@ -345,7 +345,7 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 				//however, if this was conntrack confirmed - something is very wrong
 				//and we seem to be re-using conntrack IDs when not expected!
 
-				logger.Log(logger.LogInfo, logsrc, "Conntrack ID Mismatch! %d conntrack:%v session:%v\n",
+				logger.LogInfo(logsrc, "Conntrack ID Mismatch! %d conntrack:%v session:%v\n",
 					ctid,
 					conntrackEntry.ClientSideTuple,
 					session.ClientSideTuple)
@@ -353,7 +353,7 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 				if session.ConntrackConfirmed {
 					panic("CONNTRACK ID RE-USE DETECTED")
 				} else {
-					logger.Log(logger.LogInfo, logsrc, "Removing stale session %d %v\n", ctid, session.ClientSideTuple)
+					logger.LogInfo(logsrc, "Removing stale session %d %v\n", ctid, session.ClientSideTuple)
 					removeSessionEntry(ctid)
 					session = nil
 				}
@@ -427,12 +427,12 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 			if val.Priority != priority {
 				continue
 			}
-			logger.Log(logger.LogDebug, logsrc, "Calling conntrack APP:%s PRIORITY:%d\n", key, priority)
+			logger.LogDebug(logsrc, "Calling conntrack APP:%s PRIORITY:%d\n", key, priority)
 			wg.Add(1)
 			go func(val SubscriptionHolder) {
 				val.ConntrackFunc(int(eventType), conntrackEntry)
 				wg.Done()
-				logger.Log(logger.LogDebug, logsrc, "Finished conntrack APP:%s PRIORITY:%d\n", key, priority)
+				logger.LogDebug(logsrc, "Finished conntrack APP:%s PRIORITY:%d\n", key, priority)
 			}(val)
 			subcount++
 		}
@@ -498,7 +498,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		mess.Payload = appLayer.Payload()
 	}
 
-	logger.Log(logger.LogTrace, logsrc, "nfqueue event[%d]: %v \n", ctid, mess.Tuple)
+	logger.LogTrace(logsrc, "nfqueue event[%d]: %v \n", ctid, mess.Tuple)
 
 	var session *SessionEntry
 	var ok bool
@@ -506,19 +506,19 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 	// If we already have a session entry update the existing, otherwise create a new entry for the table.
 	if session, ok = findSessionEntry(ctid); ok {
-		logger.Log(logger.LogTrace, logsrc, "Session Found %d in table\n", ctid)
+		logger.LogTrace(logsrc, "Session Found %d in table\n", ctid)
 		session.LastActivityTime = time.Now()
 		session.EventCount++
 		if !session.ClientSideTuple.Equal(mess.Tuple) {
 
-			logger.Log(logger.LogInfo, logsrc, "Conntrack ID Mismatch! %d nfqueue:%v session:%v\n",
+			logger.LogInfo(logsrc, "Conntrack ID Mismatch! %d nfqueue:%v session:%v\n",
 				ctid,
 				mess.Tuple,
 				session.ClientSideTuple)
 			if session.ConntrackConfirmed {
 				panic("CONNTRACK ID RE-USE DETECTED")
 			} else {
-				logger.Log(logger.LogInfo, logsrc, "Removing stale session %d %v\n", ctid, session.ClientSideTuple)
+				logger.LogInfo(logsrc, "Removing stale session %d %v\n", ctid, session.ClientSideTuple)
 				removeSessionEntry(ctid)
 				session = nil
 			}
@@ -528,7 +528,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 	// create a new session object
 	if session == nil {
-		logger.Log(logger.LogTrace, logsrc, "Session Adding %d to table\n", ctid)
+		logger.LogTrace(logsrc, "Session Adding %d to table\n", ctid)
 		newSession = true
 		session = new(SessionEntry)
 		session.SessionID = nextSessionID()
@@ -560,10 +560,10 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			if val.Priority != priority {
 				continue
 			}
-			logger.Log(logger.LogDebug, logsrc, "Calling nfqueue APP:%s PRIORITY:%d\n", key, priority)
+			logger.LogDebug(logsrc, "Calling nfqueue APP:%s PRIORITY:%d\n", key, priority)
 			go func(key string, val SubscriptionHolder) {
 				pipe <- val.NfqueueFunc(mess, uint(ctid), newSession)
-				logger.Log(logger.LogDebug, logsrc, "Finished nfqueue APP:%s PRIORITY:%d\n", key, priority)
+				logger.LogDebug(logsrc, "Finished nfqueue APP:%s PRIORITY:%d\n", key, priority)
 			}(key, val)
 			hitcount++
 			subcount++
@@ -576,7 +576,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			case result := <-pipe:
 				pmark |= result.PacketMark
 				if result.SessionRelease {
-					logger.Log(logger.LogDebug, logsrc, "Removing %s session nfqueue subscription for %d\n", result.Owner, uint32(ctid))
+					logger.LogDebug(logsrc, "Removing %s session nfqueue subscription for %d\n", result.Owner, uint32(ctid))
 					delete(session.Subs, result.Owner)
 				}
 			}
@@ -609,7 +609,7 @@ func netloggerCallback(version uint8,
 	netlogger.Mark = mark
 	netlogger.Prefix = prefix
 
-	logger.Log(logger.LogTrace, logsrc, "netlogger event: %v \n", netlogger)
+	logger.LogTrace(logsrc, "netlogger event: %v \n", netlogger)
 
 	// We loop and increment the priority until all subscriptions have been called
 	sublist := netloggerList
@@ -625,12 +625,12 @@ func netloggerCallback(version uint8,
 			if val.Priority != priority {
 				continue
 			}
-			logger.Log(logger.LogDebug, logsrc, "Calling netlogger APP:%s PRIORITY:%d\n", key, priority)
+			logger.LogDebug(logsrc, "Calling netlogger APP:%s PRIORITY:%d\n", key, priority)
 			wg.Add(1)
 			go func(val SubscriptionHolder) {
 				val.NetloggerFunc(&netlogger)
 				wg.Done()
-				logger.Log(logger.LogDebug, logsrc, "Finished netlogger APP:%s PRIORITY:%d\n", key, priority)
+				logger.LogDebug(logsrc, "Finished netlogger APP:%s PRIORITY:%d\n", key, priority)
 			}(val)
 			subcount++
 
@@ -658,7 +658,7 @@ func cleanConntrackTable() {
 		}
 		removeConntrackEntry(key)
 		// this should never happen, so warn
-		logger.Log(logger.LogErr, logsrc, "Removing stale conntrack entry %d %v\n", key, val.ClientSideTuple)
+		logger.LogErr(logsrc, "Removing stale conntrack entry %d %v\n", key, val.ClientSideTuple)
 	}
 }
 
@@ -671,7 +671,7 @@ func cleanSessionTable() {
 			continue
 		}
 		removeSessionEntry(key)
-		logger.Log(logger.LogErr, logsrc, "Removing stale session entry %d %v\n", key, val.ClientSideTuple)
+		logger.LogErr(logsrc, "Removing stale session entry %d %v\n", key, val.ClientSideTuple)
 	}
 }
 
@@ -686,7 +686,7 @@ func cleanerTask() {
 			return
 		case <-time.After(60 * time.Second):
 			counter++
-			logger.Log(logger.LogDebug, logsrc, "Calling cleaner task %d\n", counter)
+			logger.LogDebug(logsrc, "Calling cleaner task %d\n", counter)
 			cleanSessionTable()
 			cleanConntrackTable()
 		}
@@ -697,7 +697,7 @@ func printSessionTable() {
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
 	for k, v := range sessionTable {
-		logger.Log(logger.LogDebug, logsrc, "Session[%d] = %s\n", k, v.ClientSideTuple.String())
+		logger.LogDebug(logsrc, "Session[%d] = %s\n", k, v.ClientSideTuple.String())
 	}
 }
 

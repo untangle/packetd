@@ -14,7 +14,7 @@ var logsrc = "reporter"
 
 // PluginStartup starts the reporter
 func PluginStartup() {
-	logger.Log(logger.LogInfo, logsrc, "PluginStartup(%s) has been called\n", logsrc)
+	logger.LogInfo(logsrc, "PluginStartup(%s) has been called\n", logsrc)
 	dispatch.InsertNfqueueSubscription(logsrc, 1, PluginNfqueueHandler)
 	dispatch.InsertConntrackSubscription(logsrc, 1, PluginConntrackHandler)
 	dispatch.InsertNetloggerSubscription(logsrc, 1, PluginNetloggerHandler)
@@ -22,7 +22,7 @@ func PluginStartup() {
 
 // PluginShutdown stops the reporter
 func PluginShutdown() {
-	logger.Log(logger.LogInfo, logsrc, "PluginShutdown(%s) has been called\n", logsrc)
+	logger.LogInfo(logsrc, "PluginShutdown(%s) has been called\n", logsrc)
 }
 
 // PluginNfqueueHandler handles the first packet of a session
@@ -35,14 +35,14 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 
 	// We only care about new sessions
 	if !newSession {
-		logger.Log(logger.LogErr, logsrc, "Unexpected event received!")
+		logger.LogErr(logsrc, "Unexpected event received!")
 		return result
 	}
 
 	var session *dispatch.SessionEntry
 	session = mess.Session
 	if session == nil {
-		logger.Log(logger.LogErr, logsrc, "Missing session on NFQueue packet!")
+		logger.LogErr(logsrc, "Missing session on NFQueue packet!")
 		return result
 	}
 
