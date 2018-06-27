@@ -1,7 +1,7 @@
 /**
  * conntrack.c
  *
- * Handles receiving conntrack updates for the Untnagle Packet Daemon
+ * Handles receiving conntrack updates for the Untangle Packet Daemon
  *
  * Copyright (c) 2018 Untangle, Inc.
  * All Rights Reserved
@@ -12,6 +12,7 @@
 static struct nfct_handle	*nfcth;
 static u_int64_t			tracker_error;
 static u_int64_t			tracker_unknown;
+static u_int64_t			tracker_garbage;
 static char                 *logsrc = "conntrack";
 
 static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrack *ct,void *data)
@@ -39,6 +40,7 @@ static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrac
 		return(NFCT_CB_CONTINUE);
 	}
 
+	info.family = nfct_get_attr_u8(ct,ATTR_ORIG_L3PROTO);
 	info.orig_proto = nfct_get_attr_u8(ct,ATTR_ORIG_L4PROTO);
 
 	// ignore everything except TCP and UDP
@@ -47,27 +49,35 @@ static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrac
 	// get the conntrack ID
 	info.conn_id = nfct_get_attr_u32(ct, ATTR_ID);
 
-	// get the source and destination addresses
-	info.orig_saddr = nfct_get_attr_u32(ct,ATTR_ORIG_IPV4_SRC);
-	info.orig_daddr = nfct_get_attr_u32(ct,ATTR_ORIG_IPV4_DST);
+	// get the orig and repl source and destination addresses
+	if (info.family == AF_INET) {
+		memcpy(&info.orig_4saddr,nfct_get_attr(ct,ATTR_ORIG_IPV4_SRC),sizeof(info.orig_4saddr));
+		memcpy(&info.orig_4daddr,nfct_get_attr(ct,ATTR_ORIG_IPV4_DST),sizeof(info.orig_4daddr));
+		memcpy(&info.repl_4saddr,nfct_get_attr(ct,ATTR_REPL_IPV4_SRC),sizeof(info.repl_4saddr));
+		memcpy(&info.repl_4daddr,nfct_get_attr(ct,ATTR_REPL_IPV4_DST),sizeof(info.repl_4daddr));
+	} else if (info.family == AF_INET6) {
+		memcpy(&info.orig_6saddr,nfct_get_attr(ct,ATTR_ORIG_IPV6_SRC),sizeof(info.orig_6saddr));
+		memcpy(&info.orig_6daddr,nfct_get_attr(ct,ATTR_ORIG_IPV6_DST),sizeof(info.orig_6daddr));
+		memcpy(&info.repl_6saddr,nfct_get_attr(ct,ATTR_REPL_IPV4_SRC),sizeof(info.repl_6saddr));
+		memcpy(&info.repl_6daddr,nfct_get_attr(ct,ATTR_REPL_IPV4_DST),sizeof(info.repl_6daddr));
+	} else {
+		tracker_garbage++;
+		return(NFCT_CB_CONTINUE);
+	}
 
 	// ignore anything on the loopback interface by looking at the least
 	// significant byte because these values are in network byte order
-	if ((info.orig_saddr & 0x000000FF) == 0x0000007F) return(NFCT_CB_CONTINUE);
-	if ((info.orig_daddr & 0x000000FF) == 0x0000007F) return(NFCT_CB_CONTINUE);
+	if ((info.orig_4saddr.s_addr & 0x000000FF) == 0x0000007F) return(NFCT_CB_CONTINUE);
+	if ((info.orig_4daddr.s_addr & 0x000000FF) == 0x0000007F) return(NFCT_CB_CONTINUE);
 
 	// get all of the source and destination ports
 	info.orig_sport = be16toh(nfct_get_attr_u16(ct,ATTR_ORIG_PORT_SRC));
 	info.orig_dport = be16toh(nfct_get_attr_u16(ct,ATTR_ORIG_PORT_DST));
 
-    // get the reply source and destination addresses
-    info.repl_saddr = nfct_get_attr_u32(ct,ATTR_REPL_IPV4_SRC);
-	info.repl_daddr = nfct_get_attr_u32(ct,ATTR_REPL_IPV4_DST);
-
 	// get all of the source and destination ports
 	info.repl_sport = be16toh(nfct_get_attr_u16(ct,ATTR_REPL_PORT_SRC));
 	info.repl_dport = be16toh(nfct_get_attr_u16(ct,ATTR_REPL_PORT_DST));
-    
+
 	// get the byte counts
 	info.orig_bytes = nfct_get_attr_u64(ct,ATTR_ORIG_COUNTER_BYTES);
 	info.repl_bytes = nfct_get_attr_u64(ct,ATTR_REPL_COUNTER_BYTES);
@@ -172,4 +182,3 @@ void conntrack_dump(void)
 	ret = nfct_send(nfcth,NFCT_Q_DUMP,&family);
 	logmessage(LOG_DEBUG,logsrc,"nfct_send() result = %d\n",ret);
 }
-

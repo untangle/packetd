@@ -1,5 +1,7 @@
 #!/bin/dash
 
+# FIXME - Things go haywire if there is more than a single line in /proc/net/netfilter/nfnetlink_queue
+
 PACKETD_QUEUE_NUM=1818
 
 IPTABLES=${IPTABLES:-iptables}
@@ -94,7 +96,7 @@ usage() {
     echo "optional options: "
     echo " -r              (force removal only)"
     echo " -i              (force insert only)"
-    echo " -i              (help)"
+    echo " -h              (help)"
     echo
 }
 
