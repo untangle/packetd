@@ -35,11 +35,11 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 
 	// We only care about new sessions
 	if !newSession {
+		logger.Log(logger.LogErr, logsrc, "Unexpected event received!")
 		return result
 	}
 
 	var session *dispatch.SessionEntry
-
 	session = mess.Session
 	if session == nil {
 		logger.Log(logger.LogErr, logsrc, "Missing session on NFQueue packet!")
@@ -93,8 +93,8 @@ func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
 				"session_id": session.SessionID,
 			}
 			modifiedColumns := map[string]interface{}{
-				"client_address_new": session.ServerSideTuple.ClientAddress,
-				"server_address_new": session.ServerSideTuple.ServerAddress,
+				"client_address_new": session.ServerSideTuple.ClientAddress.String(),
+				"server_address_new": session.ServerSideTuple.ServerAddress.String(),
 				"client_port_new":    session.ServerSideTuple.ClientPort,
 				"server_port_new":    session.ServerSideTuple.ServerPort,
 			}

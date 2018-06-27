@@ -151,8 +151,8 @@ func logInsertEvent(event Event) {
 	sqlStr += ")"
 	valueStr += ")"
 	sqlStr += " VALUES " + valueStr
-	logger.Log(logger.LogDebug, logsrc, "SQL: %s\n", sqlStr)
 
+	logger.Log(logger.LogDebug, logsrc, "SQL: %s\n", sqlStr)
 	stmt, err := db.Prepare(sqlStr)
 	if err != nil {
 		logger.Log(logger.LogWarn, logsrc, "Failed to prepare statement: %s %s\n", err.Error(), sqlStr)
@@ -166,7 +166,43 @@ func logInsertEvent(event Event) {
 }
 
 func logUpdateEvent(event Event) {
-	// FIXME TODO
+	var sqlStr = "UPDATE " + event.Table + " SET"
+
+	var first = true
+	var values []interface{}
+	for k, v := range event.ModifiedColumns {
+		if !first {
+			sqlStr += ","
+		}
+
+		sqlStr += " " + k + " = ?"
+		values = append(values, v)
+		first = false
+	}
+
+	sqlStr += " WHERE "
+	first = true
+	for k, v := range event.Columns {
+		if !first {
+			sqlStr += " AND "
+		}
+
+		sqlStr += " " + k + " = ?"
+		values = append(values, v)
+		first = false
+	}
+
+	logger.Log(logger.LogDebug, logsrc, "SQL: %s\n", sqlStr)
+	stmt, err := db.Prepare(sqlStr)
+	if err != nil {
+		logger.Log(logger.LogWarn, logsrc, "Failed to prepare statement: %s %s\n", err.Error(), sqlStr)
+		return
+	}
+	_, err = stmt.Exec(values...)
+	if err != nil {
+		logger.Log(logger.LogWarn, logsrc, "Failed to exec statement: %s %s\n", err.Error(), sqlStr)
+		return
+	}
 	return
 }
 
