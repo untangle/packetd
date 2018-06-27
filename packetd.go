@@ -54,7 +54,7 @@ func main() {
 	updateRules()
 
 	// Startup Complete
-	logger.LogMessage(logger.LogInfo, logsrc, "Untangle Packet Daemon Version %s\n", "1.00")
+	logger.Log(logger.LogInfo, logsrc, "Untangle Packet Daemon Version %s\n", "1.00")
 
 	// Check that all the C services started correctly
 	// This flag is only set on Startup so this only needs to be checked once
@@ -67,15 +67,15 @@ func main() {
 	// Loop forever
 	for {
 		time.Sleep(60 * time.Second)
-		logger.LogMessage(logger.LogInfo, logsrc, ".\n")
+		logger.Log(logger.LogInfo, logsrc, ".\n")
 
 		var mem runtime.MemStats
 		runtime.ReadMemStats(&mem)
-		logger.LogMessage(logger.LogDebug, logsrc, "Memory Stats:\n")
-		logger.LogMessage(logger.LogDebug, logsrc, "Memory Alloc: %d\n", mem.Alloc)
-		logger.LogMessage(logger.LogDebug, logsrc, "Memory TotalAlloc: %d\n", mem.TotalAlloc)
-		logger.LogMessage(logger.LogDebug, logsrc, "Memory HeapAlloc: %d\n", mem.HeapAlloc)
-		logger.LogMessage(logger.LogDebug, logsrc, "Memory HeapSys: %d\n", mem.HeapSys)
+		logger.Log(logger.LogDebug, logsrc, "Memory Stats:\n")
+		logger.Log(logger.LogDebug, logsrc, "Memory Alloc: %d\n", mem.Alloc)
+		logger.Log(logger.LogDebug, logsrc, "Memory TotalAlloc: %d\n", mem.TotalAlloc)
+		logger.Log(logger.LogDebug, logsrc, "Memory HeapAlloc: %d\n", mem.HeapAlloc)
+		logger.Log(logger.LogDebug, logsrc, "Memory HeapSys: %d\n", mem.HeapSys)
 	}
 }
 
@@ -98,18 +98,18 @@ func cleanup() {
 	exitLock.Lock()
 
 	// Remove netfilter rules
-	logger.LogMessage(logger.LogInfo, logsrc, "Removing netfilter rules...\n")
+	logger.Log(logger.LogInfo, logsrc, "Removing netfilter rules...\n")
 	removeRules()
 
 	// Stop kernel callbacks
-	logger.LogMessage(logger.LogInfo, logsrc, "Removing kernel hooks...\n")
+	logger.Log(logger.LogInfo, logsrc, "Removing kernel hooks...\n")
 	kernel.StopCallbacks()
 
 	// Stop all plugins
 	stopPlugins()
 
 	// Stop services
-	logger.LogMessage(logger.LogInfo, logsrc, "Shutting down services...\n")
+	logger.Log(logger.LogInfo, logsrc, "Shutting down services...\n")
 	exec.Shutdown()
 	reports.Shutdown()
 	settings.Shutdown()
@@ -171,7 +171,7 @@ func handleSignals() {
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-ch
-		logger.LogMessage(logger.LogWarn, logsrc, "Received signal [%v]. Exiting...\n", sig)
+		logger.Log(logger.LogWarn, logsrc, "Received signal [%v]. Exiting...\n", sig)
 		cleanup()
 		os.Exit(1)
 	}()
@@ -181,7 +181,7 @@ func handleSignals() {
 func updateRules() {
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
-		logger.LogMessage(logger.LogErr, logsrc, "Error determining directory: %s\n", err.Error())
+		logger.Log(logger.LogErr, logsrc, "Error determining directory: %s\n", err.Error())
 		return
 	}
 	exec.SystemCommand(dir+"/packetd_rules", []string{})
@@ -191,7 +191,7 @@ func updateRules() {
 func removeRules() {
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
-		logger.LogMessage(logger.LogErr, logsrc, "Error determining directory: %s\n", err.Error())
+		logger.Log(logger.LogErr, logsrc, "Error determining directory: %s\n", err.Error())
 		return
 	}
 	exec.SystemCommand(dir+"/packetd_rules", []string{"-r"})

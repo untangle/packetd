@@ -48,7 +48,7 @@ func Startup() {
 	// capture startup time
 	launchTime = time.Now()
 
-	// create the map and load the LogMessage configuration
+	// create the map and load the Log configuration
 	appLogLevel = make(map[string]int)
 	loadLoggerConfig()
 
@@ -61,8 +61,8 @@ func Shutdown() {
 
 }
 
-// LogMessage is called to write messages to the system log
-func LogMessage(level int, source string, format string, args ...interface{}) {
+// Log is called to write messages to the system log
+func Log(level int, source string, format string, args ...interface{}) {
 	var ignore bool
 
 	item, stat := appLogLevel[source]
@@ -87,13 +87,13 @@ func LogMessage(level int, source string, format string, args ...interface{}) {
 	}
 }
 
-// LogWriter is used to send an output stream to the LogMessage facility
+// LogWriter is used to send an output stream to the Log facility
 type LogWriter struct {
 	source string
 	buffer []byte
 }
 
-// NewLogWriter creates an io Writer to steam output to the LogMessage facility
+// NewLogWriter creates an io Writer to steam output to the Log facility
 func NewLogWriter(source string) *LogWriter {
 	return (&LogWriter{source, make([]byte, 256)})
 }
@@ -103,7 +103,7 @@ func (w *LogWriter) Write(p []byte) (int, error) {
 	for _, b := range p {
 		w.buffer = append(w.buffer, b)
 		if b == '\n' {
-			LogMessage(LogInfo, w.source, string(w.buffer))
+			Log(LogInfo, w.source, string(w.buffer))
 			w.buffer = make([]byte, 256)
 		}
 	}
@@ -126,7 +126,7 @@ func loadLoggerConfig() {
 
 		// if there is still an error we are out of options
 		if err != nil {
-			LogMessage(LogErr, logsrc, "Unable to load LogMessage configuration file: %s\n", logConfigFile)
+			Log(LogErr, logsrc, "Unable to load Log configuration file: %s\n", logConfigFile)
 			return
 		}
 	}
@@ -137,7 +137,7 @@ func loadLoggerConfig() {
 	// get the file status
 	info, err = file.Stat()
 	if err != nil {
-		LogMessage(LogErr, logsrc, "Unable to query file information\n")
+		Log(LogErr, logsrc, "Unable to query file information\n")
 		return
 	}
 
@@ -147,18 +147,18 @@ func loadLoggerConfig() {
 	len, err := file.Read(data)
 
 	if (err != nil) || (len < 1) {
-		LogMessage(LogErr, logsrc, "Unable to read LogMessage configuration\n")
+		Log(LogErr, logsrc, "Unable to read Log configuration\n")
 		return
 	}
 
 	// unmarshal the configuration into a map
 	err = json.Unmarshal(data, &config)
 	if err != nil {
-		LogMessage(LogErr, logsrc, "Unable to parse LogMessage configuration\n")
+		Log(LogErr, logsrc, "Unable to parse Log configuration\n")
 		return
 	}
 
-	// put the name/string pairs from the file into the name/int lookup map we us in the LogMessage function
+	// put the name/string pairs from the file into the name/int lookup map we us in the Log function
 	for cfgname, cfglevel := range config {
 		// ignore any comment strings that start and end with underscore
 		if strings.HasPrefix(cfgname, "_") && strings.HasSuffix(cfgname, "_") {
@@ -174,13 +174,13 @@ func loadLoggerConfig() {
 			}
 		}
 		if found == false {
-			LogMessage(LogWarn, logsrc, "Invalid LogMessage configuration entry: %s=%s\n", cfgname, cfglevel)
+			Log(LogWarn, logsrc, "Invalid Log configuration entry: %s=%s\n", cfgname, cfglevel)
 		}
 	}
 }
 
 func initLoggerConfig() {
-	LogMessage(LogAlert, logsrc, "LogMessage configuration not found. Creating default file: %s\n", logConfigFile)
+	Log(LogAlert, logsrc, "Log configuration not found. Creating default file: %s\n", logConfigFile)
 
 	// create a comment that shows all valid log level names
 	var comment string
@@ -220,7 +220,7 @@ func initLoggerConfig() {
 	// convert the config map to a json object
 	jstr, err := json.MarshalIndent(config, "", "")
 	if err != nil {
-		LogMessage(LogAlert, logsrc, "LogMessage failure creating default configuration: %s\n", err.Error())
+		Log(LogAlert, logsrc, "Log failure creating default configuration: %s\n", err.Error())
 		return
 	}
 

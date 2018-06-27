@@ -64,7 +64,7 @@ func StopCallbacks() {
 	select {
 	case <-shutdownConntrackTask:
 	case <-time.After(10 * time.Second):
-		logger.LogMessage(logger.LogErr, logsrc, "Failed to properly shutdown conntrackPeriodicTask\n")
+		logger.Log(logger.LogErr, logsrc, "Failed to properly shutdown conntrackPeriodicTask\n")
 	}
 
 	// wait on above shutdowns
@@ -99,7 +99,7 @@ func RegisterNetloggerCallback(cb NetloggerCallback) {
 //export go_nfqueue_callback
 func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.uchar) {
 	if nfqueueCallback == nil {
-		logger.LogMessage(logger.LogWarn, logsrc, "No queue callback registered. Ignoring packet.\n")
+		logger.Log(logger.LogWarn, logsrc, "No queue callback registered. Ignoring packet.\n")
 		C.nfqueue_set_verdict(nfid, C.NF_ACCEPT, mark)
 		return
 	}
@@ -141,7 +141,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	var serverPortNew uint16
 
 	if conntrackCallback == nil {
-		logger.LogMessage(logger.LogWarn, logsrc, "No conntrack callback registered. Ignoring event.\n")
+		logger.Log(logger.LogWarn, logsrc, "No conntrack callback registered. Ignoring event.\n")
 		return
 	}
 
@@ -178,21 +178,21 @@ func go_netlogger_callback(info *C.struct_netlogger_info) {
 	var version uint8 = uint8(info.version)
 	var protocol uint8 = uint8(info.protocol)
 	var icmpType uint16 = uint16(info.icmp_type)
-	var srcIntf uint8 = uint8(info.src_intf)
-	var dstIntf uint8 = uint8(info.dst_intf)
-	var srcAddr string = C.GoString(&info.src_addr[0])
-	var dstAddr string = C.GoString(&info.dst_addr[0])
+	var srcInterface uint8 = uint8(info.src_intf)
+	var dstInterface uint8 = uint8(info.dst_intf)
+	var srcAddress string = C.GoString(&info.src_addr[0])
+	var dstAddress string = C.GoString(&info.dst_addr[0])
 	var srcPort uint16 = uint16(info.src_port)
 	var dstPort uint16 = uint16(info.dst_port)
 	var mark uint32 = uint32(info.mark)
 	var prefix string = C.GoString(&info.prefix[0])
 
 	if netloggerCallback == nil {
-		logger.LogMessage(logger.LogWarn, logsrc, "No conntrack callback registered. Ignoring event.\n")
+		logger.Log(logger.LogWarn, logsrc, "No conntrack callback registered. Ignoring event.\n")
 		return
 	}
 
-	netloggerCallback(version, protocol, icmpType, srcIntf, dstIntf, srcAddr, dstAddr, srcPort, dstPort, mark, prefix)
+	netloggerCallback(version, protocol, icmpType, srcInterface, dstInterface, srcAddress, dstAddress, srcPort, dstPort, mark, prefix)
 }
 
 //export go_child_startup
@@ -209,7 +209,7 @@ func go_child_shutdown() {
 func go_child_message(level C.int, source *C.char, message *C.char) {
 	lsrc := C.GoString(source)
 	lmsg := C.GoString(message)
-	logger.LogMessage(int(level), lsrc, lmsg)
+	logger.Log(int(level), lsrc, lmsg)
 }
 
 //conntrack periodic task
@@ -223,7 +223,7 @@ func conntrackTask() {
 			return
 		case <-time.After(timeUntilNextMin()):
 			counter++
-			logger.LogMessage(logger.LogDebug, logsrc, "Calling conntrack dump %d\n", counter)
+			logger.Log(logger.LogDebug, logsrc, "Calling conntrack dump %d\n", counter)
 			C.conntrack_dump()
 		}
 	}

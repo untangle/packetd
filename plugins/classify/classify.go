@@ -29,7 +29,7 @@ var classdMutex sync.Mutex
 func PluginStartup() {
 	var err error
 
-	logger.LogMessage(logger.LogInfo, logsrc, "PluginStartup(%s) has been called\n", logsrc)
+	logger.Log(logger.LogInfo, logsrc, "PluginStartup(%s) has been called\n", logsrc)
 
 	exec.SystemCommand("systemctl", []string{"start", "untangle-classd.service"})
 
@@ -38,7 +38,7 @@ func PluginStartup() {
 	daemon, err = net.Dial("tcp", classdHostPort)
 
 	if err != nil {
-		logger.LogMessage(logger.LogErr, logsrc, "Error calling net.Dial(): %v\n", err)
+		logger.Log(logger.LogErr, logsrc, "Error calling net.Dial(): %v\n", err)
 	}
 
 	dispatch.InsertNfqueueSubscription(logsrc, 2, PluginNfqueueHandler)
@@ -47,7 +47,7 @@ func PluginStartup() {
 // PluginShutdown is called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
 func PluginShutdown() {
-	logger.LogMessage(logger.LogInfo, logsrc, "PluginShutdown(%s) has been called\n", logsrc)
+	logger.Log(logger.LogInfo, logsrc, "PluginShutdown(%s) has been called\n", logsrc)
 
 	var d = daemon
 	daemon = nil
@@ -83,9 +83,9 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 		//FIXME unsupported protocol
 		//We need to support any IP-based protocol in packetd
 		if mess.Session != nil {
-			logger.LogMessage(logger.LogErr, logsrc, "Unsupported protocol: %v\n", mess.Session.ClientSideTuple.Protocol)
+			logger.Log(logger.LogErr, logsrc, "Unsupported protocol: %v\n", mess.Session.ClientSideTuple.Protocol)
 		} else {
-			logger.LogMessage(logger.LogErr, logsrc, "Unsupported protocol\n")
+			logger.Log(logger.LogErr, logsrc, "Unsupported protocol\n")
 		}
 
 		result.SessionRelease = true
@@ -94,27 +94,27 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 
 	// if this is the first packet of the session we send a session create command
 	if mess.Session.EventCount == 1 {
-		status, err = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.Session.ClientSideTuple.ClientAddr, mess.Session.ClientSideTuple.ClientPort, mess.Session.ClientSideTuple.ServerAddr, mess.Session.ClientSideTuple.ServerPort)
+		status, err = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.Session.ClientSideTuple.ClientAddress, mess.Session.ClientSideTuple.ClientPort, mess.Session.ClientSideTuple.ServerAddress, mess.Session.ClientSideTuple.ServerPort)
 		if err != nil {
-			logger.LogMessage(logger.LogErr, logsrc, "daemonCommand error: %s\n", err.Error())
+			logger.Log(logger.LogErr, logsrc, "daemonCommand error: %s\n", err.Error())
 			return result
 		}
-		logger.LogMessage(logger.LogTrace, logsrc, "daemonCommand result: %s\n", status)
+		logger.Log(logger.LogTrace, logsrc, "daemonCommand result: %s\n", status)
 	}
 
 	// send the application payload to the daemon
-	if mess.Session.ClientSideTuple.ClientAddr.Equal(mess.IPlayer.SrcIP) {
+	if mess.Session.ClientSideTuple.ClientAddress.Equal(mess.IPlayer.SrcIP) {
 		status, err = daemonCommand(mess.Payload, "CLIENT:%d:%d\r\n", ctid, len(mess.Payload))
 	} else {
 		status, err = daemonCommand(mess.Payload, "SERVER:%d:%d\r\n", ctid, len(mess.Payload))
 	}
 
 	if err != nil {
-		logger.LogMessage(logger.LogErr, logsrc, "daemonCommand error: %s\n", err.Error())
+		logger.Log(logger.LogErr, logsrc, "daemonCommand error: %s\n", err.Error())
 		return result
 	}
 
-	logger.LogMessage(logger.LogTrace, logsrc, "daemonCommand result: %s\n", status)
+	logger.Log(logger.LogTrace, logsrc, "daemonCommand result: %s\n", status)
 
 	// Parse the output from classd to get the classification details
 	var pairname string

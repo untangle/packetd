@@ -14,7 +14,7 @@ var logsrc = "reporter"
 
 // PluginStartup starts the reporter
 func PluginStartup() {
-	logger.LogMessage(logger.LogInfo, logsrc, "PluginStartup(%s) has been called\n", logsrc)
+	logger.Log(logger.LogInfo, logsrc, "PluginStartup(%s) has been called\n", logsrc)
 	dispatch.InsertNfqueueSubscription(logsrc, 1, PluginNfqueueHandler)
 	dispatch.InsertConntrackSubscription(logsrc, 1, PluginConntrackHandler)
 	dispatch.InsertNetloggerSubscription(logsrc, 1, PluginNetloggerHandler)
@@ -22,7 +22,7 @@ func PluginStartup() {
 
 // PluginShutdown stops the reporter
 func PluginShutdown() {
-	logger.LogMessage(logger.LogInfo, logsrc, "PluginShutdown(%s) has been called\n", logsrc)
+	logger.Log(logger.LogInfo, logsrc, "PluginShutdown(%s) has been called\n", logsrc)
 }
 
 // PluginNfqueueHandler handles the first packet of a session
@@ -42,7 +42,7 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 
 	session = mess.Session
 	if session == nil {
-		logger.LogMessage(logger.LogErr, logsrc, "Missing session on NFQueue packet!")
+		logger.Log(logger.LogErr, logsrc, "Missing session on NFQueue packet!")
 		return result
 	}
 
@@ -55,14 +55,14 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 	var remoteAddress net.IP
 
 	if clientIsOnLan {
-		localAddress = session.ClientSideTuple.ClientAddr
+		localAddress = session.ClientSideTuple.ClientAddress
 		// the server may not actually be on a WAN, but we consider it remote if the client is on a LAN
-		remoteAddress = session.ClientSideTuple.ServerAddr
+		remoteAddress = session.ClientSideTuple.ServerAddress
 	} else {
-		remoteAddress = session.ClientSideTuple.ClientAddr
+		remoteAddress = session.ClientSideTuple.ClientAddress
 		// the server could in theory be on another WAN (WAN1 -> WAN2 traffic) but it is very unlikely so we consider
 		// the local address to be the server
-		localAddress = session.ClientSideTuple.ServerAddr
+		localAddress = session.ClientSideTuple.ServerAddress
 	}
 	columns := map[string]interface{}{
 		"time_stamp":       time.Now(),
@@ -72,8 +72,8 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 		"server_interface": serverInterface,
 		"local_address":    localAddress.String(),
 		"remote_address":   remoteAddress.String(),
-		"client_address":   session.ClientSideTuple.ClientAddr.String(),
-		"server_address":   session.ClientSideTuple.ServerAddr.String(),
+		"client_address":   session.ClientSideTuple.ClientAddress.String(),
+		"server_address":   session.ClientSideTuple.ServerAddress.String(),
 		"client_port":      session.ClientSideTuple.ClientPort,
 		"server_port":      session.ClientSideTuple.ServerPort,
 	}
@@ -93,8 +93,8 @@ func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
 				"session_id": session.SessionID,
 			}
 			modifiedColumns := map[string]interface{}{
-				"client_address_new": session.ServerSideTuple.ClientAddr,
-				"server_address_new": session.ServerSideTuple.ServerAddr,
+				"client_address_new": session.ServerSideTuple.ClientAddress,
+				"server_address_new": session.ServerSideTuple.ServerAddress,
 				"client_port_new":    session.ServerSideTuple.ClientPort,
 				"server_port_new":    session.ServerSideTuple.ServerPort,
 			}

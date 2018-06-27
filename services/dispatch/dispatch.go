@@ -59,11 +59,11 @@ type SessionEntry struct {
 
 // Tuple represent a session using the protocol and source and destination address and port values.
 type Tuple struct {
-	Protocol   uint8
-	ClientAddr net.IP
-	ClientPort uint16
-	ServerAddr net.IP
-	ServerPort uint16
+	Protocol      uint8
+	ClientAddress net.IP
+	ClientPort    uint16
+	ServerAddress net.IP
+	ServerPort    uint16
 }
 
 // ConntrackEntry stores the details of a conntrack entry
@@ -99,17 +99,17 @@ type TrafficMessage struct {
 
 // NetloggerMessage is used to pass the details of NFLOG events to interested plugins
 type NetloggerMessage struct {
-	Version  uint8
-	Protocol uint8
-	IcmpType uint16
-	SrcIntf  uint8
-	DstIntf  uint8
-	SrcAddr  string
-	DstAddr  string
-	SrcPort  uint16
-	DstPort  uint16
-	Mark     uint32
-	Prefix   string
+	Version      uint8
+	Protocol     uint8
+	IcmpType     uint16
+	SrcInterface uint8
+	DstInterface uint8
+	SrcAddress   string
+	DstAddress   string
+	SrcPort      uint16
+	DstPort      uint16
+	Mark         uint32
+	Prefix       string
 }
 
 var nfqueueList map[string]SubscriptionHolder
@@ -160,14 +160,14 @@ func Shutdown() {
 	select {
 	case <-shutdownCleanerTask:
 	case <-time.After(10 * time.Second):
-		logger.LogMessage(logger.LogErr, logsrc, "Failed to properly shutdown cleanerTask\n")
+		logger.Log(logger.LogErr, logsrc, "Failed to properly shutdown cleanerTask\n")
 	}
 }
 
 // InsertNfqueueSubscription adds a subscription for receiving nfqueue messages
 func InsertNfqueueSubscription(owner string, priority int, function NfqueueHandlerFunction) {
 	var holder SubscriptionHolder
-	logger.LogMessage(logger.LogInfo, logsrc, "Adding NFQueue Event Subscription (%s, %d)\n", owner, priority)
+	logger.Log(logger.LogInfo, logsrc, "Adding NFQueue Event Subscription (%s, %d)\n", owner, priority)
 
 	holder.Owner = owner
 	holder.Priority = priority
@@ -180,7 +180,7 @@ func InsertNfqueueSubscription(owner string, priority int, function NfqueueHandl
 // InsertConntrackSubscription adds a subscription for receiving conntrack messages
 func InsertConntrackSubscription(owner string, priority int, function ConntrackHandlerFunction) {
 	var holder SubscriptionHolder
-	logger.LogMessage(logger.LogInfo, logsrc, "Adding Conntrack Event Subscription (%s, %d)\n", owner, priority)
+	logger.Log(logger.LogInfo, logsrc, "Adding Conntrack Event Subscription (%s, %d)\n", owner, priority)
 
 	holder.Owner = owner
 	holder.Priority = priority
@@ -193,7 +193,7 @@ func InsertConntrackSubscription(owner string, priority int, function ConntrackH
 // InsertNetloggerSubscription adds a subscription for receiving netlogger messages
 func InsertNetloggerSubscription(owner string, priority int, function NetloggerHandlerFunction) {
 	var holder SubscriptionHolder
-	logger.LogMessage(logger.LogInfo, logsrc, "Adding Netlogger Event Subscription (%s, %d)\n", owner, priority)
+	logger.Log(logger.LogInfo, logsrc, "Adding Netlogger Event Subscription (%s, %d)\n", owner, priority)
 
 	holder.Owner = owner
 	holder.Priority = priority
@@ -231,14 +231,14 @@ func nextSessionID() uint64 {
 func findSessionEntry(finder uint32) (*SessionEntry, bool) {
 	sessionMutex.Lock()
 	entry, status := sessionTable[finder]
-	logger.LogMessage(logger.LogTrace, logsrc, "Lookup session ctid %d -> %v\n", finder, status)
+	logger.Log(logger.LogTrace, logsrc, "Lookup session ctid %d -> %v\n", finder, status)
 	sessionMutex.Unlock()
 	return entry, status
 }
 
 // insertSessionEntry adds an entry to the session table
 func insertSessionEntry(finder uint32, entry *SessionEntry) {
-	logger.LogMessage(logger.LogTrace, logsrc, "Insert session ctid %d -> %v\n", finder, entry.ClientSideTuple)
+	logger.Log(logger.LogTrace, logsrc, "Insert session ctid %d -> %v\n", finder, entry.ClientSideTuple)
 	sessionMutex.Lock()
 	sessionTable[finder] = entry
 	sessionMutex.Unlock()
@@ -246,7 +246,7 @@ func insertSessionEntry(finder uint32, entry *SessionEntry) {
 
 // removeSessionEntry removes an entry from the session table
 func removeSessionEntry(finder uint32) {
-	logger.LogMessage(logger.LogTrace, logsrc, "Remove session ctid %d\n", finder)
+	logger.Log(logger.LogTrace, logsrc, "Remove session ctid %d\n", finder)
 	sessionMutex.Lock()
 	delete(sessionTable, finder)
 	sessionMutex.Unlock()
@@ -269,7 +269,7 @@ func insertConntrackEntry(finder uint32, entry *ConntrackEntry) {
 
 // removeConntrackEntry removes an entry from the conntrack table
 func removeConntrackEntry(finder uint32) {
-	logger.LogMessage(logger.LogTrace, logsrc, "Remove conntrack ctid %d\n", finder)
+	logger.Log(logger.LogTrace, logsrc, "Remove conntrack ctid %d\n", finder)
 	conntrackMutex.Lock()
 	delete(conntrackTable, finder)
 	conntrackMutex.Unlock()
@@ -278,15 +278,15 @@ func removeConntrackEntry(finder uint32) {
 // String returns string representation of tuple
 // FIXME move to another file
 func (t Tuple) String() string {
-	return strconv.Itoa(int(t.Protocol)) + "|" + t.ClientAddr.String() + ":" + strconv.Itoa(int(t.ClientPort)) + "->" + t.ServerAddr.String() + ":" + strconv.Itoa(int(t.ServerPort))
+	return strconv.Itoa(int(t.Protocol)) + "|" + t.ClientAddress.String() + ":" + strconv.Itoa(int(t.ClientPort)) + "->" + t.ServerAddress.String() + ":" + strconv.Itoa(int(t.ServerPort))
 }
 
 // Equal returns true if two Tuples are equal, false otherwise
 // FIXME move to another fileq
 func (t Tuple) Equal(o Tuple) bool {
 	if t.Protocol != o.Protocol ||
-		!t.ClientAddr.Equal(o.ClientAddr) ||
-		!t.ServerAddr.Equal(o.ServerAddr) ||
+		!t.ClientAddress.Equal(o.ClientAddress) ||
+		!t.ServerAddress.Equal(o.ServerAddress) ||
 		t.ClientPort != o.ClientPort ||
 		t.ServerPort != o.ServerPort {
 		return false
@@ -308,33 +308,33 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 
 	if conntrackEntryFound {
 		conntrackEntry.EventCount++
-		logger.LogMessage(logger.LogTrace, logsrc, "conntrack event[%d,%c]: %v \n", ctid, eventType, conntrackEntry.ClientSideTuple)
+		logger.Log(logger.LogTrace, logsrc, "conntrack event[%d,%c]: %v \n", ctid, eventType, conntrackEntry.ClientSideTuple)
 	} else {
 		conntrackEntry = new(ConntrackEntry)
 		conntrackEntry.ConntrackID = ctid
 		conntrackEntry.SessionID = nextSessionID()
 		conntrackEntry.CreationTime = time.Now()
 		conntrackEntry.ClientSideTuple.Protocol = protocol
-		conntrackEntry.ClientSideTuple.ClientAddr = dupIP(client)
+		conntrackEntry.ClientSideTuple.ClientAddress = dupIP(client)
 		conntrackEntry.ClientSideTuple.ClientPort = clientPort
-		conntrackEntry.ClientSideTuple.ServerAddr = dupIP(server)
+		conntrackEntry.ClientSideTuple.ServerAddress = dupIP(server)
 		conntrackEntry.ClientSideTuple.ServerPort = serverPort
 		conntrackEntry.ServerSideTuple.Protocol = protocol
-		conntrackEntry.ServerSideTuple.ClientAddr = dupIP(clientNew)
+		conntrackEntry.ServerSideTuple.ClientAddress = dupIP(clientNew)
 		conntrackEntry.ServerSideTuple.ClientPort = clientPortNew
-		conntrackEntry.ServerSideTuple.ServerAddr = dupIP(serverNew)
+		conntrackEntry.ServerSideTuple.ServerAddress = dupIP(serverNew)
 		conntrackEntry.ServerSideTuple.ServerPort = serverPortNew
 		conntrackEntry.EventCount = 1
 
-		logger.LogMessage(logger.LogTrace, logsrc, "conntrack event[%d,%c]: %v \n", ctid, eventType, conntrackEntry.ClientSideTuple)
+		logger.Log(logger.LogTrace, logsrc, "conntrack event[%d,%c]: %v \n", ctid, eventType, conntrackEntry.ClientSideTuple)
 
 		session, _ := findSessionEntry(uint32(ctid))
 		if session != nil {
 			if session.ClientSideTuple.Equal(conntrackEntry.ClientSideTuple) {
 				session.ServerSideTuple.Protocol = protocol
-				session.ServerSideTuple.ClientAddr = dupIP(clientNew)
+				session.ServerSideTuple.ClientAddress = dupIP(clientNew)
 				session.ServerSideTuple.ClientPort = clientPortNew
-				session.ServerSideTuple.ServerAddr = dupIP(serverNew)
+				session.ServerSideTuple.ServerAddress = dupIP(serverNew)
 				session.ServerSideTuple.ServerPort = serverPortNew
 				session.ConntrackConfirmed = true
 				conntrackEntry.Session = session
@@ -345,7 +345,7 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 				//however, if this was conntrack confirmed - something is very wrong
 				//and we seem to be re-using conntrack IDs when not expected!
 
-				logger.LogMessage(logger.LogInfo, logsrc, "Conntrack ID Mismatch! %d conntrack:%v session:%v\n",
+				logger.Log(logger.LogInfo, logsrc, "Conntrack ID Mismatch! %d conntrack:%v session:%v\n",
 					ctid,
 					conntrackEntry.ClientSideTuple,
 					session.ClientSideTuple)
@@ -353,7 +353,7 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 				if session.ConntrackConfirmed {
 					panic("CONNTRACK ID RE-USE DETECTED")
 				} else {
-					logger.LogMessage(logger.LogInfo, logsrc, "Removing stale session %d %v\n", ctid, session.ClientSideTuple)
+					logger.Log(logger.LogInfo, logsrc, "Removing stale session %d %v\n", ctid, session.ClientSideTuple)
 					removeSessionEntry(ctid)
 					session = nil
 				}
@@ -427,7 +427,7 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 			if val.Priority != priority {
 				continue
 			}
-			logger.LogMessage(logger.LogDebug, logsrc, "Calling conntrack APP:%s PRIORITY:%d\n", key, priority)
+			logger.Log(logger.LogDebug, logsrc, "Calling conntrack APP:%s PRIORITY:%d\n", key, priority)
 			wg.Add(1)
 			go func(val SubscriptionHolder) {
 				val.ConntrackFunc(int(eventType), conntrackEntry)
@@ -472,8 +472,8 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 	mess.IPlayer = ipLayer.(*layers.IPv4)
 
 	mess.Tuple.Protocol = uint8(mess.IPlayer.Protocol)
-	mess.Tuple.ClientAddr = dupIP(mess.IPlayer.SrcIP)
-	mess.Tuple.ServerAddr = dupIP(mess.IPlayer.DstIP)
+	mess.Tuple.ClientAddress = dupIP(mess.IPlayer.SrcIP)
+	mess.Tuple.ServerAddress = dupIP(mess.IPlayer.DstIP)
 
 	// get the TCP layer
 	tcpLayer := mess.Packet.Layer(layers.LayerTypeTCP)
@@ -497,7 +497,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		mess.Payload = appLayer.Payload()
 	}
 
-	logger.LogMessage(logger.LogTrace, logsrc, "nfqueue event[%d]: %v \n", ctid, mess.Tuple)
+	logger.Log(logger.LogTrace, logsrc, "nfqueue event[%d]: %v \n", ctid, mess.Tuple)
 
 	var session *SessionEntry
 	var ok bool
@@ -505,19 +505,19 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 	// If we already have a session entry update the existing, otherwise create a new entry for the table.
 	if session, ok = findSessionEntry(ctid); ok {
-		logger.LogMessage(logger.LogTrace, logsrc, "Session Found %d in table\n", ctid)
+		logger.Log(logger.LogTrace, logsrc, "Session Found %d in table\n", ctid)
 		session.LastActivityTime = time.Now()
 		session.EventCount++
 		if !session.ClientSideTuple.Equal(mess.Tuple) {
 
-			logger.LogMessage(logger.LogInfo, logsrc, "Conntrack ID Mismatch! %d nfqueue:%v session:%v\n",
+			logger.Log(logger.LogInfo, logsrc, "Conntrack ID Mismatch! %d nfqueue:%v session:%v\n",
 				ctid,
 				mess.Tuple,
 				session.ClientSideTuple)
 			if session.ConntrackConfirmed {
 				panic("CONNTRACK ID RE-USE DETECTED")
 			} else {
-				logger.LogMessage(logger.LogInfo, logsrc, "Removing stale session %d %v\n", ctid, session.ClientSideTuple)
+				logger.Log(logger.LogInfo, logsrc, "Removing stale session %d %v\n", ctid, session.ClientSideTuple)
 				removeSessionEntry(ctid)
 				session = nil
 			}
@@ -527,7 +527,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 	// create a new session object
 	if session == nil {
-		logger.LogMessage(logger.LogTrace, logsrc, "Session Adding %d to table\n", ctid)
+		logger.Log(logger.LogTrace, logsrc, "Session Adding %d to table\n", ctid)
 		newSession = true
 		session = new(SessionEntry)
 		session.SessionID = nextSessionID()
@@ -559,7 +559,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			if val.Priority != priority {
 				continue
 			}
-			logger.LogMessage(logger.LogDebug, logsrc, "Calling nfqueue APP:%s PRIORITY:%d\n", key, priority)
+			logger.Log(logger.LogDebug, logsrc, "Calling nfqueue APP:%s PRIORITY:%d\n", key, priority)
 			go func(key string, val SubscriptionHolder) {
 				pipe <- val.NfqueueFunc(mess, uint(ctid), newSession)
 			}(key, val)
@@ -574,7 +574,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			case result := <-pipe:
 				pmark |= result.PacketMark
 				if result.SessionRelease {
-					logger.LogMessage(logger.LogDebug, logsrc, "Removing %s session nfqueue subscription for %d\n", result.Owner, uint32(ctid))
+					logger.Log(logger.LogDebug, logsrc, "Removing %s session nfqueue subscription for %d\n", result.Owner, uint32(ctid))
 					delete(session.Subs, result.Owner)
 				}
 			}
@@ -590,24 +590,24 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 func netloggerCallback(version uint8,
 	protocol uint8, icmpType uint16,
-	srcIntf uint8, dstIntf uint8,
-	srcAddr string, dstAddr string,
+	srcInterface uint8, dstInterface uint8,
+	srcAddress string, dstAddress string,
 	srcPort uint16, dstPort uint16, mark uint32, prefix string) {
 	var netlogger NetloggerMessage
 
 	netlogger.Version = version
 	netlogger.Protocol = protocol
 	netlogger.IcmpType = icmpType
-	netlogger.SrcIntf = srcIntf
-	netlogger.DstIntf = dstIntf
-	netlogger.SrcAddr = srcAddr
-	netlogger.DstAddr = dstAddr
+	netlogger.SrcInterface = srcInterface
+	netlogger.DstInterface = dstInterface
+	netlogger.SrcAddress = srcAddress
+	netlogger.DstAddress = dstAddress
 	netlogger.SrcPort = srcPort
 	netlogger.DstPort = dstPort
 	netlogger.Mark = mark
 	netlogger.Prefix = prefix
 
-	logger.LogMessage(logger.LogTrace, logsrc, "netlogger event: %v \n", netlogger)
+	logger.Log(logger.LogTrace, logsrc, "netlogger event: %v \n", netlogger)
 
 	// We loop and increment the priority until all subscriptions have been called
 	sublist := netloggerList
@@ -623,7 +623,7 @@ func netloggerCallback(version uint8,
 			if val.Priority != priority {
 				continue
 			}
-			logger.LogMessage(logger.LogDebug, logsrc, "Calling netlogger APP:%s PRIORITY:%d\n", key, priority)
+			logger.Log(logger.LogDebug, logsrc, "Calling netlogger APP:%s PRIORITY:%d\n", key, priority)
 			wg.Add(1)
 			go func(val SubscriptionHolder) {
 				val.NetloggerFunc(&netlogger)
@@ -655,7 +655,7 @@ func cleanConntrackTable() {
 		}
 		removeConntrackEntry(key)
 		// this should never happen, so warn
-		logger.LogMessage(logger.LogErr, logsrc, "Removing stale conntrack entry %d %v\n", key, val.ClientSideTuple)
+		logger.Log(logger.LogErr, logsrc, "Removing stale conntrack entry %d %v\n", key, val.ClientSideTuple)
 	}
 }
 
@@ -668,7 +668,7 @@ func cleanSessionTable() {
 			continue
 		}
 		removeSessionEntry(key)
-		logger.LogMessage(logger.LogErr, logsrc, "Removing stale session entry %d %v\n", key, val.ClientSideTuple)
+		logger.Log(logger.LogErr, logsrc, "Removing stale session entry %d %v\n", key, val.ClientSideTuple)
 	}
 }
 
@@ -683,7 +683,7 @@ func cleanerTask() {
 			return
 		case <-time.After(60 * time.Second):
 			counter++
-			logger.LogMessage(logger.LogDebug, logsrc, "Calling cleaner task %d\n", counter)
+			logger.Log(logger.LogDebug, logsrc, "Calling cleaner task %d\n", counter)
 			cleanSessionTable()
 			cleanConntrackTable()
 		}
@@ -694,7 +694,7 @@ func printSessionTable() {
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
 	for k, v := range sessionTable {
-		logger.LogMessage(logger.LogDebug, logsrc, "Session[%d] = %s\n", k, v.ClientSideTuple.String())
+		logger.Log(logger.LogDebug, logsrc, "Session[%d] = %s\n", k, v.ClientSideTuple.String())
 	}
 }
 

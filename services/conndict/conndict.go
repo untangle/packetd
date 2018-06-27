@@ -44,12 +44,12 @@ type DictPair struct {
 
 // Print a pair's field and value
 func (p DictPair) Print() {
-	logger.LogMessage(logger.LogInfo, logsrc, "Field: %s Value: %s\n", p.Field, p.Value)
+	logger.Log(logger.LogInfo, logsrc, "Field: %s Value: %s\n", p.Field, p.Value)
 }
 
 // SetPair sets a field/value pair for the supplied conntrack id
 func SetPair(field string, value string, id uint) error {
-	logger.LogMessage(logger.LogDebug, logsrc, "SetPair(%s,%s,%d)\n", field, value, id)
+	logger.Log(logger.LogDebug, logsrc, "SetPair(%s,%s,%d)\n", field, value, id)
 	if disabled {
 		return nil
 	}
@@ -59,7 +59,7 @@ func SetPair(field string, value string, id uint) error {
 	setstr := fmt.Sprintf("id=%d,field=%s,value=%s", id, field, value)
 
 	if err != nil {
-		logger.LogMessage(logger.LogWarn, logsrc, "SetPair(%s,%s,%d): Failed to open %s\n", field, value, id, filename)
+		logger.Log(logger.LogWarn, logsrc, "SetPair(%s,%s,%d): Failed to open %s\n", field, value, id, filename)
 		return fmt.Errorf("conndict: SetPair: Failed to open %s", filename)
 	}
 
@@ -67,7 +67,7 @@ func SetPair(field string, value string, id uint) error {
 
 	_, err = file.WriteString(setstr)
 	if err != nil {
-		logger.LogMessage(logger.LogWarn, logsrc, "SetPair(%s,%s,%d): Failed to write %s\n", field, value, id)
+		logger.Log(logger.LogWarn, logsrc, "SetPair(%s,%s,%d): Failed to write %s\n", field, value, id)
 		return fmt.Errorf("conndict: SetPair: Failed to write %s", filename)
 	}
 
@@ -82,7 +82,7 @@ func SetPairs(pairs []DictPair, id uint) error {
 		err := SetPair(p.Field, p.Value, id)
 
 		if err != nil {
-			logger.LogMessage(logger.LogErr, logsrc, "SetPairs failed on setting %s:%s for %d\n", p.Field, p.Value, id)
+			logger.Log(logger.LogErr, logsrc, "SetPairs failed on setting %s:%s for %d\n", p.Field, p.Value, id)
 			return (err)
 		}
 	}

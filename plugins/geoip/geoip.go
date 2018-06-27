@@ -20,7 +20,7 @@ var geodb *geoip2.Reader
 // argumented WaitGroup so the main process can wait for our shutdown function
 // to return during shutdown.
 func PluginStartup() {
-	logger.LogMessage(logger.LogInfo, logsrc, "PluginStartup(%s) has been called\n", logsrc)
+	logger.Log(logger.LogInfo, logsrc, "PluginStartup(%s) has been called\n", logsrc)
 
 	var filename string
 
@@ -41,9 +41,9 @@ func PluginStartup() {
 
 	db, err := geoip2.Open(filename)
 	if err != nil {
-		logger.LogMessage(logger.LogWarn, logsrc, "Unable to load GeoIP Database: %s\n", err)
+		logger.Log(logger.LogWarn, logsrc, "Unable to load GeoIP Database: %s\n", err)
 	} else {
-		logger.LogMessage(logger.LogInfo, logsrc, "Loading GeoIP Database: %s\n", filename)
+		logger.Log(logger.LogInfo, logsrc, "Loading GeoIP Database: %s\n", filename)
 		geodb = db
 	}
 
@@ -54,7 +54,7 @@ func PluginStartup() {
 // GeoIP engine and call done for the argumented WaitGroup to let the main
 // process know we're finished.
 func PluginShutdown() {
-	logger.LogMessage(logger.LogInfo, logsrc, "PluginShutdown(%s) has been called\n", logsrc)
+	logger.Log(logger.LogInfo, logsrc, "PluginShutdown(%s) has been called\n", logsrc)
 	geodb.Close()
 }
 
@@ -68,13 +68,13 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 	SrcRecord, err := geodb.City(mess.IPlayer.SrcIP)
 	if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
 		SrcCode = SrcRecord.Country.IsoCode
-		logger.LogMessage(logger.LogDebug, logsrc, "SRC: %s = %s\n", mess.IPlayer.SrcIP, SrcCode)
+		logger.Log(logger.LogDebug, logsrc, "SRC: %s = %s\n", mess.IPlayer.SrcIP, SrcCode)
 	}
 
 	DstRecord, err := geodb.City(mess.IPlayer.DstIP)
 	if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
 		DstCode = DstRecord.Country.IsoCode
-		logger.LogMessage(logger.LogDebug, logsrc, "DST: %s = %s\n", mess.IPlayer.DstIP, DstCode)
+		logger.Log(logger.LogDebug, logsrc, "DST: %s = %s\n", mess.IPlayer.DstIP, DstCode)
 	}
 
 	conndict.SetPair("ClientCountry", SrcCode, ctid)
@@ -88,7 +88,7 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 }
 
 func databaseDownload(filename string) {
-	logger.LogMessage(logger.LogInfo, logsrc, "Downloading GeoIP Database\n")
+	logger.Log(logger.LogInfo, logsrc, "Downloading GeoIP Database\n")
 
 	// Get the GeoIP database from MaxMind
 	resp, err := http.Get("http://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.mmdb.gz")
@@ -99,7 +99,7 @@ func databaseDownload(filename string) {
 
 	// Check server response
 	if resp.StatusCode != http.StatusOK {
-		logger.LogMessage(logger.LogWarn, logsrc, "Download failure: %s\n", resp.Status)
+		logger.Log(logger.LogWarn, logsrc, "Download failure: %s\n", resp.Status)
 		return
 	}
 
