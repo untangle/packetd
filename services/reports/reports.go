@@ -122,7 +122,52 @@ func eventLogger() {
 			}
 		}
 		logger.LogMessage(logger.LogInfo, logsrc, "Log Event: %s\n", summary)
+
+		if event.SQLOp == 1 {
+			logInsertEvent(event)
+		}
+		if event.SQLOp == 2 {
+			logUpdateEvent(event)
+		}
 	}
+}
+
+func logInsertEvent(event Event) {
+	var sqlStr string = "INSERT INTO " + event.Table + "("
+	var valueStr string = "("
+
+	var first = true
+	var values []interface{}
+	for k, v := range event.Columns {
+		if !first {
+			sqlStr += ","
+			valueStr += ","
+		}
+		sqlStr += k
+		valueStr += "?"
+		first = false
+		values = append(values, v)
+	}
+	sqlStr += ")"
+	valueStr += ")"
+	sqlStr += " VALUES " + valueStr
+
+	logger.LogMessage(logger.LogInfo, logsrc, "SQL: %s\n", sqlStr)
+
+	stmt, err := db.Prepare(sqlStr)
+	if err != nil {
+		logger.LogMessage(logger.LogWarn, logsrc, "Failed to prepare statement: %s %s\n", err.Error(), sqlStr)
+		return
+	}
+	_, err = stmt.Exec(values...)
+	if err != nil {
+		logger.LogMessage(logger.LogWarn, logsrc, "Failed to exec statement: %s %s\n", err.Error(), sqlStr)
+		return
+	}
+}
+
+func logUpdateEvent(event Event) {
+	return
 }
 
 func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
@@ -182,23 +227,23 @@ func createTables() {
 	_, err = db.Exec(
 		`CREATE TABLE IF NOT EXISTS sessions (
                      session_id int8 PRIMARY KEY NOT NULL,
-                     time_stamp timestamp NOT NULL,
-                     end_time timestamp,
-                     ip_protocol int2,
+                     time_stamp datetime NOT NULL,
+                     end_time datetime,
+                     ip_protocol int,
                      hostname text,
                      username text,
-                     client_intf int2,
-                     server_intf int2,
-                     local_addr inet,
-                     remote_addr inet,
-                     client_addr inet,
-                     server_addr inet,
-                     client_port int4,
-                     server_port int4,
-                     client_addr_new inet,
-                     server_addr_new inet,
-                     server_port_new int4,
-                     client_port_new int4,
+                     client_interface int,
+                     server_interface int,
+                     local_address  inet,
+                     remote_address inet,
+                     client_address inet,
+                     server_address inet,
+                     client_port int2,
+                     server_port int2,
+                     client_address_new inet,
+                     server_address_new inet,
+                     server_port_new int2,
+                     client_port_new int2,
                      client_country text,
                      client_latitude real,
                      client_longitude real,

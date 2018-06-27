@@ -6,6 +6,8 @@ import (
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
+	"net"
+	"time"
 )
 
 var logsrc = "reporter"
@@ -23,11 +25,8 @@ func PluginShutdown() {
 	logger.LogMessage(logger.LogInfo, logsrc, "PluginShutdown(%s) has been called\n", logsrc)
 }
 
-// PluginNfqueueHandler receives a TrafficMessage which includes a Tuple and
-// a gopacket.Packet, along with the IP and TCP or UDP layer already extracted.
-// We do whatever we like with the data, and when finished, we return an
-// integer via the argumented channel with any bits set that we want added to
-// the packet mark.
+// Handle the first packet of a session
+// Logs a new session
 func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
 	result.Owner = logsrc
@@ -41,20 +40,37 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 			return result
 		}
 
-		// FIXME time_stamp
-		// FIXME local_addr
-		// FIXME remote_addr
-		// FIXME client_intf
-		// FIXME server_intf
-		columns := map[string]interface{}{
-			"session_id":  session.SessionID,
-			"ip_protocol": session.ClientSideTuple.Protocol,
-			"client_addr": session.ClientSideTuple.ClientAddr,
-			"server_addr": session.ClientSideTuple.ServerAddr,
-			"client_port": session.ClientSideTuple.ClientPort,
-			"server_port": session.ClientSideTuple.ServerPort,
+		// this is the first packet so source interface = client interface
+		var clientInterface uint8 = uint8((result.PacketMark & 0x000000FF))
+		var serverInterface uint8 = uint8((result.PacketMark & 0x0000FF00) >> 8)
+
+		var clientIsOnLan bool = ((result.PacketMark & 0x01000000) == 0)
+		var localAddress net.IP
+		var remoteAddress net.IP
+
+		if clientIsOnLan {
+			localAddress = session.ClientSideTuple.ClientAddr
+			// the server may not actually be on a WAN, but we consider it remote if the client is on a LAN
+			remoteAddress = session.ClientSideTuple.ServerAddr
+		} else {
+			remoteAddress = session.ClientSideTuple.ClientAddr
+			// the server could in theory be on another WAN (WAN1 -> WAN2 traffic) but it is very unlikely so we consider
+			// the local address to be the server
+			localAddress = session.ClientSideTuple.ServerAddr
 		}
-		// FIXME move to logger plugin
+		columns := map[string]interface{}{
+			"time_stamp":       time.Now(),
+			"session_id":       session.SessionID,
+			"ip_protocol":      session.ClientSideTuple.Protocol,
+			"client_interface": clientInterface,
+			"server_interface": serverInterface,
+			"local_address":    localAddress.String(),
+			"remote_address":   remoteAddress.String(),
+			"client_address":   session.ClientSideTuple.ClientAddr.String(),
+			"server_address":   session.ClientSideTuple.ServerAddr.String(),
+			"client_port":      session.ClientSideTuple.ClientPort,
+			"server_port":      session.ClientSideTuple.ServerPort,
+		}
 		reports.LogEvent(reports.CreateEvent("session_new", "sessions", 1, columns, nil))
 	}
 
@@ -71,12 +87,11 @@ func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
 				"session_id": session.SessionID,
 			}
 			modifiedColumns := map[string]interface{}{
-				"client_addr_new": session.ServerSideTuple.ClientAddr,
-				"server_addr_new": session.ServerSideTuple.ServerAddr,
-				"client_port_new": session.ServerSideTuple.ClientPort,
-				"server_port_new": session.ServerSideTuple.ServerPort,
+				"client_address_new": session.ServerSideTuple.ClientAddr,
+				"server_address_new": session.ServerSideTuple.ServerAddr,
+				"client_port_new":    session.ServerSideTuple.ClientPort,
+				"server_port_new":    session.ServerSideTuple.ServerPort,
 			}
-			// FIXME move to logger plugin
 			reports.LogEvent(reports.CreateEvent("session_nat", "sessions", 2, columns, modifiedColumns))
 		} else {
 			// We should not receive a new conntrack event for something that is not in the session table
