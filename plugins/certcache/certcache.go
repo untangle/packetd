@@ -99,7 +99,7 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 		insertCertificate(client, cert)
 	}
 
-	mess.Session.SessionCertificate = cert
+	mess.Session.Attachments["certificate"] = cert
 
 	localMutex.Unlock()
 

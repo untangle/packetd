@@ -23,6 +23,8 @@ type Event struct {
 	Columns map[string]interface{}
 	// The columns to modify for UPDATE events
 	ModifiedColumns map[string]interface{}
+	// Other objects
+	Related map[string]interface{}
 }
 
 // Query holds the results of a database query operation
@@ -93,8 +95,8 @@ func GetData(queryID uint64) (string, error) {
 }
 
 // CreateEvent creates an Event
-func CreateEvent(name string, table string, sqlOp int, columns map[string]interface{}, modifiedColumns map[string]interface{}) Event {
-	event := Event{Name: name, Table: table, SQLOp: sqlOp, Columns: columns, ModifiedColumns: modifiedColumns}
+func CreateEvent(name string, table string, sqlOp int, columns map[string]interface{}, modifiedColumns map[string]interface{}, related map[string]interface{}) Event {
+	event := Event{Name: name, Table: table, SQLOp: sqlOp, Columns: columns, ModifiedColumns: modifiedColumns, Related: related}
 	return event
 }
 
@@ -119,9 +121,11 @@ func eventLogger() {
 			str, err := json.Marshal(event.ModifiedColumns)
 			if err == nil {
 				summary = summary + "UPDATE: " + string(str)
+			} else {
+				logger.LogWarn(logsrc, "ERROR: %s\n", err.Error())
 			}
 		}
-		logger.LogInfo(logsrc, "Log Event: %s\n", summary)
+		logger.LogInfo(logsrc, "Log Event: %s %v\n", summary, event.SQLOp)
 
 		if event.SQLOp == 1 {
 			logInsertEvent(event)

@@ -8,7 +8,6 @@
 package dispatch
 
 import (
-	"crypto/x509"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/untangle/packetd/services/kernel"
@@ -51,10 +50,10 @@ type SessionEntry struct {
 	LastActivityTime   time.Time
 	ClientSideTuple    Tuple
 	ServerSideTuple    Tuple
-	SessionCertificate x509.Certificate
 	ConntrackConfirmed bool
 	EventCount         uint64
 	Subs               map[string]SubscriptionHolder
+	Attachments        map[string]interface{}
 }
 
 // Tuple represent a session using the protocol and source and destination address and port values.
@@ -282,7 +281,7 @@ func (t Tuple) String() string {
 }
 
 // Equal returns true if two Tuples are equal, false otherwise
-// FIXME move to another fileq
+// FIXME move to another file
 func (t Tuple) Equal(o Tuple) bool {
 	if t.Protocol != o.Protocol ||
 		!t.ClientAddress.Equal(o.ClientAddress) ||
@@ -537,6 +536,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		session.ClientSideTuple = mess.Tuple
 		session.EventCount = 1
 		session.ConntrackConfirmed = false
+		session.Attachments = make(map[string]interface{})
 		AttachNfqueueSubscriptions(session)
 		insertSessionEntry(ctid, session)
 	}
