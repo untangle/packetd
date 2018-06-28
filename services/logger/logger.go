@@ -247,6 +247,7 @@ func initLoggerConfig() {
 	config["geoip"] = "INFO"
 	config["example"] = "INFO"
 	config["reporter"] = "INFO"
+	config["sni"] = "INFO"
 
 	// services
 	config["conndict"] = "INFO"
