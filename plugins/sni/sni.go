@@ -83,27 +83,27 @@ func extractSNIhostname(buffer []byte) (bool, string) {
 
 	// if the packet is too short to hold a ClientHello just return
 	if maxlen < 48 {
-		return false,hostname
+		return false, hostname
 	}
 
 	// check for the TLS handshake protocol
 	if buffer[0] != 0x16 {
-		return false,hostname
+		return false, hostname
 	}
 
 	// check for SSLv3
 	if buffer[1] != 0x03 {
-		return false,hostname
+		return false, hostname
 	}
 
 	// check for TLS 1.0 or greater
 	if buffer[2] < 0x01 {
-		return false,hostname
+		return false, hostname
 	}
 
 	// check for ClientHello message type
 	if buffer[5] != 0x01 {
-		return false,hostname
+		return false, hostname
 	}
 
 	// adjust the offset to the session ID length field
@@ -119,7 +119,7 @@ func extractSNIhostname(buffer []byte) (bool, string) {
 	current++
 	current += sessionIDLength
 	if current >= maxlen {
-		return true,hostname
+		return true, hostname
 	}
 
 	// skip over the cipher suites
@@ -127,7 +127,7 @@ func extractSNIhostname(buffer []byte) (bool, string) {
 	current += 2
 	current += cipherSuiteLength
 	if current >= maxlen {
-		return true,hostname
+		return true, hostname
 	}
 
 	// skip over the compression methods
@@ -135,7 +135,7 @@ func extractSNIhostname(buffer []byte) (bool, string) {
 	current++
 	current += compressionMethodLength
 	if current >= maxlen {
-		return true,hostname
+		return true, hostname
 	}
 
 	// get the length of all extensions
@@ -143,7 +143,7 @@ func extractSNIhostname(buffer []byte) (bool, string) {
 	current += 2
 
 	if extensionsLength == 0 {
-		return true,hostname
+		return true, hostname
 	}
 
 	for current < len(buffer) {
@@ -180,5 +180,5 @@ func extractSNIhostname(buffer []byte) (bool, string) {
 		current += extensionDataLength
 	}
 
-	return true,hostname
+	return true, hostname
 }
