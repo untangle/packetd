@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"github.com/untangle/packetd/services/exec"
 	"github.com/untangle/packetd/services/logger"
+	"net"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
-	"net"
-	"strconv"
 )
 
 const pathBase string = "/proc/net/dict"
@@ -46,7 +46,7 @@ func Disable() {
 // Entry holds a dictionary entry
 type Entry struct {
 	Table string
-	Key interface{}
+	Key   interface{}
 	Field string
 	Value interface{}
 }
@@ -190,14 +190,14 @@ func formatField(field string) string {
 func formatKey(key interface{}) string {
 
 	switch key.(type) {
-		case string:
-			return fmt.Sprintf("Key: %s", key.(string))
-		case uint32:
-			return fmt.Sprintf("Key: %d", key.(uint32))
-		case net.HardwareAddr:
-			return fmt.Sprintf("Key: %s", key.(net.HardwareAddr).String())
-		case net.IP:
-			return fmt.Sprintf("Key: %s", key.(net.IP).String())
+	case string:
+		return fmt.Sprintf("Key: %s", key.(string))
+	case uint32:
+		return fmt.Sprintf("Key: %d", key.(uint32))
+	case net.HardwareAddr:
+		return fmt.Sprintf("Key: %s", key.(net.HardwareAddr).String())
+	case net.IP:
+		return fmt.Sprintf("Key: %s", key.(net.IP).String())
 	}
 
 	return ""
@@ -209,18 +209,18 @@ func formatKey(key interface{}) string {
 func formatValue(value interface{}) string {
 
 	switch value.(type) {
-		case string:
-			return fmt.Sprintf("Value: %s", value.(string))
-		case uint32:
-			return fmt.Sprintf("Value: %d", value.(uint32))
-		case uint64:
-			return fmt.Sprintf("Value: %d", value.(uint64))
-		case net.HardwareAddr:
-			return fmt.Sprintf("Value: %s", value.(net.HardwareAddr).String())
-		case net.IP:
-			return fmt.Sprintf("Value: %s", value.(net.IP).String())
-		case bool:
-			return fmt.Sprintf("Value: %s", strconv.FormatBool(value.(bool)))
+	case string:
+		return fmt.Sprintf("Value: %s", value.(string))
+	case uint32:
+		return fmt.Sprintf("Value: %d", value.(uint32))
+	case uint64:
+		return fmt.Sprintf("Value: %d", value.(uint64))
+	case net.HardwareAddr:
+		return fmt.Sprintf("Value: %s", value.(net.HardwareAddr).String())
+	case net.IP:
+		return fmt.Sprintf("Value: %s", value.(net.IP).String())
+	case bool:
+		return fmt.Sprintf("Value: %s", strconv.FormatBool(value.(bool)))
 	}
 
 	return ""
@@ -246,10 +246,10 @@ func (p Entry) GetValue() interface{} {
 func (p Entry) GetString() (string, error) {
 
 	switch p.Value.(type) {
-		case string:
-			return p.Value.(string), nil
-		default:
-			return "", fmt.Errorf("GetString: Requested value is not a string")
+	case string:
+		return p.Value.(string), nil
+	default:
+		return "", fmt.Errorf("GetString: Requested value is not a string")
 	}
 }
 
@@ -259,10 +259,10 @@ func (p Entry) GetString() (string, error) {
 func (p Entry) GetInt() (uint32, error) {
 
 	switch p.Value.(type) {
-		case uint32:
-			return p.Value.(uint32), nil
-		default:
-			return 0, fmt.Errorf("GetInt: Requested value is not an integer")
+	case uint32:
+		return p.Value.(uint32), nil
+	default:
+		return 0, fmt.Errorf("GetInt: Requested value is not an integer")
 	}
 }
 
@@ -272,10 +272,10 @@ func (p Entry) GetInt() (uint32, error) {
 func (p Entry) GetInt64() (uint64, error) {
 
 	switch p.Value.(type) {
-		case uint64:
-			return p.Value.(uint64), nil
-		default:
-			return 0, fmt.Errorf("GetInt64: Requested value is not a 64 bit integer")
+	case uint64:
+		return p.Value.(uint64), nil
+	default:
+		return 0, fmt.Errorf("GetInt64: Requested value is not a 64 bit integer")
 	}
 }
 
@@ -285,11 +285,11 @@ func (p Entry) GetInt64() (uint64, error) {
 func (p Entry) GetMac() (net.HardwareAddr, error) {
 
 	switch p.Value.(type) {
-		case net.HardwareAddr:
-			return p.Value.(net.HardwareAddr), nil
-		default:
-			var x net.HardwareAddr
-			return x, fmt.Errorf("GetMac: Requested value is not a MAC address")
+	case net.HardwareAddr:
+		return p.Value.(net.HardwareAddr), nil
+	default:
+		var x net.HardwareAddr
+		return x, fmt.Errorf("GetMac: Requested value is not a MAC address")
 	}
 }
 
@@ -299,11 +299,11 @@ func (p Entry) GetMac() (net.HardwareAddr, error) {
 func (p Entry) GetIP() (net.IP, error) {
 
 	switch p.Value.(type) {
-		case net.IP:
-			return p.Value.(net.IP), nil
-		default:
-			var x net.IP
-			return x, fmt.Errorf("GetIP: Requested value is not an IP address")
+	case net.IP:
+		return p.Value.(net.IP), nil
+	default:
+		var x net.IP
+		return x, fmt.Errorf("GetIP: Requested value is not an IP address")
 	}
 }
 
@@ -313,10 +313,10 @@ func (p Entry) GetIP() (net.IP, error) {
 func (p Entry) GetBool() (bool, error) {
 
 	switch p.Value.(type) {
-		case bool:
-			return p.Value.(bool), nil
-		default:
-			return false, fmt.Errorf("GetBool: Requested value is not a bool")
+	case bool:
+		return p.Value.(bool), nil
+	default:
+		return false, fmt.Errorf("GetBool: Requested value is not a bool")
 	}
 }
 
@@ -436,24 +436,24 @@ func generateIP6(value net.IP) string {
 // generateValue sets a field/value entry for the supplied key in the supplied table
 func generateValue(value interface{}) string {
 	switch value.(type) {
-		case string:
-			return generateString(value.(string))
-		case net.HardwareAddr:
-			return generateMac(value.(net.HardwareAddr))
-		case net.IP:
-			if value.(net.IP).To4() != nil {
-				return generateIP(value.(net.IP))
-			}
+	case string:
+		return generateString(value.(string))
+	case net.HardwareAddr:
+		return generateMac(value.(net.HardwareAddr))
+	case net.IP:
+		if value.(net.IP).To4() != nil {
+			return generateIP(value.(net.IP))
+		}
 
-			return generateIP6(value.(net.IP))
-		case bool:
-			return generateBool(value.(bool))
-		case uint32:
-			return generateInt(value.(uint32))
-		case uint64:
-			return generateInt64(value.(uint64))
-		default:
-			return ""
+		return generateIP6(value.(net.IP))
+	case bool:
+		return generateBool(value.(bool))
+	case uint32:
+		return generateInt(value.(uint32))
+	case uint64:
+		return generateInt64(value.(uint64))
+	default:
+		return ""
 	}
 }
 
@@ -497,20 +497,20 @@ func generateKeyMac(key net.HardwareAddr) string {
 // generateKey sets a field/value entry for the supplied key in the supplied table
 func generateKey(key interface{}) string {
 	switch key.(type) {
-		case string:
-			return generateKeyString(key.(string))
-		case net.HardwareAddr:
-			return generateKeyMac(key.(net.HardwareAddr))
-		case net.IP:
-			if key.(net.IP).To4() != nil {
-				return generateKeyIP(key.(net.IP))
-			}
+	case string:
+		return generateKeyString(key.(string))
+	case net.HardwareAddr:
+		return generateKeyMac(key.(net.HardwareAddr))
+	case net.IP:
+		if key.(net.IP).To4() != nil {
+			return generateKeyIP(key.(net.IP))
+		}
 
-			return generateKeyIP6(key.(net.IP))
-		case uint32:
-			return generateKeyInt(key.(uint32))
-		default:
-			return ""
+		return generateKeyIP6(key.(net.IP))
+	case uint32:
+		return generateKeyInt(key.(uint32))
+	default:
+		return ""
 	}
 }
 
@@ -534,28 +534,28 @@ func AddEntry(table string, key interface{}, field string, value interface{}) er
 
 // AddHostEntry sets a field/value entry for the supplied ip key in the host table
 func AddHostEntry(key net.IP, field string, value interface{}) error {
-	return AddEntry("host", key, field, value);
+	return AddEntry("host", key, field, value)
 }
 
 //-----------------------------------------------------------------------------
 
 // AddUserEntry sets a field/value entry for the supplied string key in the user table
 func AddUserEntry(key string, field string, value interface{}) error {
-	return AddEntry("user", key, field, value);
+	return AddEntry("user", key, field, value)
 }
 
 //-----------------------------------------------------------------------------
 
 // AddDeviceEntry sets a field/value entry for the supplied mac key in the device table
 func AddDeviceEntry(key net.HardwareAddr, field string, value interface{}) error {
-	return AddEntry("device", key, field, value);
+	return AddEntry("device", key, field, value)
 }
 
 //-----------------------------------------------------------------------------
 
 // AddSessionEntry sets a field/value entry for the supplied int key in the session table
 func AddSessionEntry(key uint32, field string, value interface{}) error {
-	return AddEntry("session", key, field, value);
+	return AddEntry("session", key, field, value)
 }
 
 //-----------------------------------------------------------------------------
@@ -578,28 +578,28 @@ func DeleteDictionary(table string, key interface{}) error {
 
 // DeleteHost removes a dictionary from the host table
 func DeleteHost(key net.IP) error {
-	return DeleteDictionary("host", key);
+	return DeleteDictionary("host", key)
 }
 
 //-----------------------------------------------------------------------------
 
 // DeleteUser removes a dictionary from the user table
 func DeleteUser(key string) error {
-	return DeleteDictionary("user", key);
+	return DeleteDictionary("user", key)
 }
 
 //-----------------------------------------------------------------------------
 
 // DeleteDevice removes a dictionary from the device table
 func DeleteDevice(key net.HardwareAddr) error {
-	return DeleteDictionary("device", key);
+	return DeleteDictionary("device", key)
 }
 
 //-----------------------------------------------------------------------------
 
 // DeleteSession removes a dictionary from the session table
 func DeleteSession(key uint32) error {
-	return DeleteDictionary("session", key);
+	return DeleteDictionary("session", key)
 }
 
 //-----------------------------------------------------------------------------
@@ -668,28 +668,28 @@ func GetEntry(table string, key interface{}, field string) (Entry, error) {
 
 // GetHostEntry gets the dictionary entry from the host table with the specified key and field
 func GetHostEntry(key net.IP, field string) (Entry, error) {
-	return GetEntry("host", key, field);
+	return GetEntry("host", key, field)
 }
 
 //-----------------------------------------------------------------------------
 
 // GetUserEntry gets the dictionary entry from the user table with the specified key and field
 func GetUserEntry(key string, field string) (Entry, error) {
-	return GetEntry("user", key, field);
+	return GetEntry("user", key, field)
 }
 
 //-----------------------------------------------------------------------------
 
 // GetDeviceEntry gets the dictionary entry from the device table with the specified key and field
 func GetDeviceEntry(key net.HardwareAddr, field string) (Entry, error) {
-	return GetEntry("device", key, field);
+	return GetEntry("device", key, field)
 }
 
 //-----------------------------------------------------------------------------
 
 // GetSessionEntry gets the dictionary entry from the session table with the specified key and field
 func GetSessionEntry(key uint32, field string) (Entry, error) {
-	return GetEntry("session", key, field);
+	return GetEntry("session", key, field)
 }
 
 //-----------------------------------------------------------------------------
@@ -713,4 +713,3 @@ func GetAllEntries() ([]Entry, error) {
 	}
 	return entries, err
 }
-
