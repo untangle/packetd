@@ -33,6 +33,7 @@ func PluginStartup() {
 
 	logger.LogInfo(logsrc, "PluginStartup(%s) has been called\n", logsrc)
 
+	// FIXME just launch classd - openwrt has no systemd
 	exec.SystemCommand("systemctl", []string{"start", "untangle-classd.service"})
 
 	socktime = time.Now()
@@ -50,6 +51,8 @@ func PluginStartup() {
 // for the argumented WaitGroup to let the main process know we're finished.
 func PluginShutdown() {
 	logger.LogInfo(logsrc, "PluginShutdown(%s) has been called\n", logsrc)
+
+	// FIXME kill classd
 
 	var d = daemon
 	daemon = nil
