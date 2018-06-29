@@ -16,6 +16,7 @@ static int						cfg_net_maxlen = 10240;
 static int						cfg_net_buffer = 32768;
 static int						cfg_net_queue = 1818;
 static char                     *logsrc = "nfqueue";
+static char						*buffer;
 
 int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data)
 {
@@ -75,6 +76,7 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 	if (rawlen < (int)sizeof(struct iphdr)) {
 		nfq_set_verdict(qh,(hdr ? ntohl(hdr->packet_id) : 0),NF_ACCEPT,0,NULL);
 		logmessage(LOG_WARNING,logsrc,"Invalid length %d received\n",rawlen);
+		nfqueue_free_buffer(buffer);
 		return(0);
 	}
 
@@ -82,6 +84,7 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 	iphead = (struct iphdr *)rawpkt;
 
 	if (iphead->version != 4 && iphead->version != 6) {
+		nfqueue_free_buffer(buffer);
         return(0);
     }
 
@@ -91,8 +94,8 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 	// get the conntrack ID
 	ctid = nfq_get_conntrack_id(nfad,nfmsg->nfgen_family);
 
-	// call the go handler function
-    go_nfqueue_callback(omark,rawpkt,rawlen,ctid,(hdr ? ntohl(hdr->packet_id) : 0));
+	// call the go handler function which will call nfqueue_free_buffer(buffer) when finished
+    go_nfqueue_callback(omark,rawpkt,rawlen,ctid,(hdr ? ntohl(hdr->packet_id) : 0),buffer);
 
 	return(0);
 }
@@ -196,7 +199,6 @@ void nfqueue_close(void)
 int nfqueue_thread(void)
 {
 	struct pollfd	network;
-	char			*buffer;
 	int				netsock;
 	int				val,ret;
 
@@ -226,9 +228,6 @@ int nfqueue_thread(void)
 		}
 	}
 
-	// allocate our packet buffer
-	buffer = (char *)malloc(cfg_net_buffer);
-
 	// set up the network poll structure
 	network.fd = netsock;
 	network.events = POLLIN;
@@ -250,19 +249,24 @@ int nfqueue_thread(void)
 			break;
 		}
 
+		// allocate a buffer to hold the packet
+		buffer = (char *)malloc(cfg_net_buffer);
+
         // read from the nfqueue socket
         ret = recv(netsock,buffer,cfg_net_buffer,MSG_DONTWAIT);
 
         if (ret == 0) {
             logmessage(LOG_ERR,logsrc,"The nfqueue socket was unexpectedly closed\n");
-            set_shutdown_flag(1);
+			set_shutdown_flag(1);
+			nfqueue_free_buffer(buffer);
             break;
         }
 
         if (ret < 0) {
             if ((errno == EAGAIN) || (errno == EINTR) || (errno == ENOBUFS)) break;
             logmessage(LOG_ERR,logsrc,"Error %d (%s) returned from recv()\n",errno,strerror(errno));
-            set_shutdown_flag(1);
+			set_shutdown_flag(1);
+			nfqueue_free_buffer(buffer);
             break;
         }
 
@@ -273,9 +277,6 @@ int nfqueue_thread(void)
 	// call our nfqueue shutdown function
 	nfqueue_close();
 
-	// free our packet buffer memory
-	free(buffer);
-
 	logmessage(LOG_INFO,logsrc,"The nfqueue thread has terminated\n");
 	go_child_shutdown();
 	return(0);
@@ -284,4 +285,12 @@ int nfqueue_thread(void)
 void nfqueue_shutdown(void)
 {
 	set_shutdown_flag(1);
+}
+
+void nfqueue_free_buffer(char *buffer)
+{
+	if (!buffer)
+		logmessage(LOG_ERR,logsrc,"nfqueue_free_buffer call with NULL\n");
+	else
+		free(buffer);
 }

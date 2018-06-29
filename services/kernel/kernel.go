@@ -97,30 +97,30 @@ func RegisterNetloggerCallback(cb NetloggerCallback) {
 }
 
 //export go_nfqueue_callback
-func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t) {
+func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.char) {
 	if nfqueueCallback == nil {
 		logger.LogWarn(logsrc, "No queue callback registered. Ignoring packet.\n")
 		C.nfqueue_set_verdict(nfid, C.NF_ACCEPT, mark)
 		return
 	}
 
-	// create a Go copy of the buffer since it will be reused by the nfqueue callback when we return
-	buffer := C.GoBytes(unsafe.Pointer(data), size)
-
-	go func(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t) {
+	go func(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.char) {
 
 		var packet gopacket.Packet
 		var packetLength int
 		var conntrackID uint32 = uint32(C.int(ctid))
 		var pmark uint32 = uint32(C.int(mark))
 
-		packet = gopacket.NewPacket(buffer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
+		// create a Go pointer and gopacket from the packet data
+		pointer := (*[0xFFFF]byte)(unsafe.Pointer(data))[:int(size):int(size)]
+		packet = gopacket.NewPacket(pointer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
 		packetLength = int(size)
 
 		newMark := nfqueueCallback(conntrackID, packet, packetLength, pmark)
 		C.nfqueue_set_verdict(nfid, C.NF_ACCEPT, C.uint32_t(newMark))
+		C.nfqueue_free_buffer(buffer)
 
-	}(mark, data, size, ctid, nfid)
+	}(mark, data, size, ctid, nfid, buffer)
 
 	return
 }
