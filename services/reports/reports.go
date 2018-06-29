@@ -291,7 +291,22 @@ func createTables() {
                      server_latitude real,
                      server_longitude real,
                      c2s_bytes int8 default 0,
-                     s2c_bytes int8 default 0)`)
+                     s2c_bytes int8 default 0,
+                     application text,
+                     application_protochain text,
+                     application_category text,
+                     application_blocked boolean,
+                     application_flagged boolean,
+                     application_confidence integer,
+                     application_detail text,
+                     dns_prediction text,
+                     dns_prediction_category text)`)
+
+	// FIXME add cert info
+	// FIXME add SNI
+	// FIXME add domain_prediction (SNI + dns_prediction + cert_prediction)
+	// FIXME add domain_category
+	// FIXME add web_domain (for HTTP host header)
 
 	if err != nil {
 		logger.LogErr(logsrc, "Failed to create table: %s\n", err.Error())

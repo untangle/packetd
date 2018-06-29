@@ -10,7 +10,9 @@ import (
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/exec"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/reports"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -123,6 +125,11 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 
 	catinfo := strings.Split(status, "\r\n")
 
+	var reportsApplication string
+	var reportsProtochain string
+	var reportsDetail string
+	var reportsConfidence uint64
+
 	for i := 0; i < len(catinfo); i++ {
 		if len(catinfo[i]) < 3 {
 			continue
@@ -138,24 +145,31 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 			pairname = "ClassifyApplication"
 			pairdata = catpair[1]
 			pairflag = true
+			reportsApplication = pairdata
 		}
 
 		if catpair[0] == "PROTOCHAIN: " {
 			pairname = "ClassifyProtochain"
 			pairdata = catpair[1]
 			pairflag = true
+			reportsProtochain = pairdata
 		}
 
 		if catpair[0] == "DETAIL: " {
 			pairname = "ClassifyDetail"
 			pairdata = catpair[1]
 			pairflag = true
+			reportsDetail = pairdata
 		}
 
 		if catpair[0] == "CONFIDENCE: " {
 			pairname = "ClassifyConfidence"
 			pairdata = catpair[1]
 			pairflag = true
+			reportsConfidence, err = strconv.ParseUint(pairdata, 10, 64)
+			if err != nil {
+				reportsConfidence = 0
+			}
 		}
 
 		if catpair[0] == "STATE: " {
@@ -177,7 +191,29 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint, newSession bo
 		conndict.SetPair(pairname, pairdata, ctid)
 	}
 
+	// FIXME we should not log this on every packet, only when:
+	// 1) the classification is complete
+	// 2) the session reaches a pre-defined depth (X packets or Y bytes)
+	// 3) the session ends
+	// FIXME add application_category as last argument
+	logEvent(mess.Session, reportsApplication, reportsProtochain, reportsDetail, reportsConfidence, "")
+
 	return result
+}
+
+func logEvent(session *dispatch.SessionEntry, application string, protochain string, detail string, confidence uint64, category string) {
+	columns := map[string]interface{}{
+		"session_id": session.SessionID,
+	}
+	modifiedColumns := map[string]interface{}{
+		"application":            application,
+		"application_protochain": protochain,
+		"application_detail":     detail,
+		"application_category":   category,
+		"application_confidence": confidence,
+	}
+	reports.LogEvent(reports.CreateEvent("session_classify", "sessions", 2, columns, modifiedColumns, session.Attachments))
+	session.Attachments["session_classify"] = modifiedColumns
 }
 
 // daemonCommand will send a command to the untangle-classd daemon and return the result message
