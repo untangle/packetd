@@ -125,7 +125,7 @@ func eventLogger() {
 				logger.LogWarn(logsrc, "ERROR: %s\n", err.Error())
 			}
 		}
-		logger.LogInfo(logsrc, "Log Event: %s %v\n", summary, event.SQLOp)
+		logger.LogDebug(logsrc, "Log Event: %s %v\n", summary, event.SQLOp)
 
 		if event.SQLOp == 1 {
 			logInsertEvent(event)
