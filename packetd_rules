@@ -1,4 +1,4 @@
-#!/bin/dash
+#!/bin/sh
 
 # FIXME - Things go haywire if there is more than a single line in /proc/net/netfilter/nfnetlink_queue
 
