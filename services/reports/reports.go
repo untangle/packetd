@@ -37,7 +37,7 @@ var db *sql.DB
 var queries = make(map[uint64]*Query)
 var queryID uint64
 var logsrc = "reports"
-var eventQueue = make(chan Event)
+var eventQueue = make(chan Event, 1000)
 
 // Startup starts the reports service
 func Startup() {
