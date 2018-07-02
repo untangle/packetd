@@ -1,7 +1,7 @@
 // Package classify classifies sessions as certain applications
 // each packet gets sent to a classd daemon (the categorization engine)
 // the classd daemon returns the classification information and classify
-// attaches the information to the session
+// attaches the information to the session.
 package classify
 
 import (
@@ -17,6 +17,11 @@ import (
 	"sync"
 	"time"
 )
+
+const navlStateTerminated = 0 // Indicates the connection has been terminated
+const navlStateInspecting = 1 // Indicates the connection is under inspection
+const navlStateMonitoring = 2 // Indicates the connection is under monitoring
+const navlStateClassified = 3 // Indicates the connection is fully classified
 
 var socktime time.Time
 var sockspin int64
@@ -87,9 +92,9 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint32, newSession 
 	var result dispatch.NfqueueResult
 	result.Owner = logsrc
 	result.PacketMark = 0
-	// FIXME it should release once it reaches so set number of packets or full categorization
 	result.SessionRelease = false
 
+	var stateval int
 	var status string
 	var proto string
 	var err error
@@ -193,6 +198,10 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint32, newSession 
 			pairname = "ClassifyState"
 			pairdata = catpair[1]
 			pairflag = true
+			stateval, err = strconv.Atoi(pairdata)
+			if err != nil {
+				stateval = 0
+			}
 		}
 
 		// continue if the tag is something we don't want
@@ -205,14 +214,33 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint32, newSession 
 			continue
 		}
 
+		// if the session doesn't have this attachment yet we add it and write to the dictionary
+		if mess.Session.Attachments[pairname] == nil {
+			mess.Session.Attachments[pairname] = pairdata
+			dict.AddSessionEntry(ctid, pairname, pairdata)
+			logger.LogDebug(logsrc, "Setting classification detail %s = %s\n", pairname, pairdata)
+			continue
+		}
+
+		// if the session has the attachment and it has not change just continue
+		if strings.Compare(mess.Session.Attachments[pairname].(string), pairdata) == 0 {
+			continue
+		}
+
+		// at this point the session has the attachment but the data has changed so we update the session and the dictionary
+		mess.Session.Attachments[pairname] = pairdata
 		dict.AddSessionEntry(ctid, pairname, pairdata)
+		logger.LogDebug(logsrc, "Updating classification detail %s = %s\n", pairname, pairdata)
 	}
 
-	// FIXME we should not log this on every packet, only when:
-	// 1) the classification is complete
-	// 2) the session reaches a pre-defined depth (X packets or Y bytes)
-	// 3) the session ends
-	// FIXME add application_category as last argument
+	// if the daemon says the session is fully classified or terminated, or after we have seen 10 packets or 256k of data, we log an event and release
+	if stateval == navlStateClassified || stateval == navlStateTerminated || mess.Session.PacketCount > 10 || mess.Session.ByteCount > 0x40000 {
+		// FIXME add application_category as last argument
+		// FIXME need to detect and log when a session ends before it meets the criteria for logging here
+		logEvent(mess.Session, reportsApplication, reportsProtochain, reportsDetail, reportsConfidence, "")
+		result.SessionRelease = true
+	}
+
 	logEvent(mess.Session, reportsApplication, reportsProtochain, reportsDetail, reportsConfidence, "")
 
 	return result
