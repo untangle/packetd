@@ -1,4 +1,4 @@
-package exec
+package syscmd
 
 import (
 	"github.com/untangle/packetd/services/logger"

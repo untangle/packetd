@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
-	"github.com/untangle/packetd/services/exec"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
 	"net"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,25 +21,33 @@ import (
 var socktime time.Time
 var sockspin int64
 var logsrc = "classify"
-var daemon net.Conn
+var daemonProcess *exec.Cmd
+var daemonConnection net.Conn
 var classdHostPort = "127.0.0.1:8123"
 var classdMutex sync.Mutex
 
-// PluginStartup is called to allow plugin specific initialization. We
-// increment the argumented WaitGroup so the main process can wait for
-// our shutdown function to return during shutdown.
+// PluginStartup is called to allow plugin specific initialization
 func PluginStartup() {
 	var err error
 
 	logger.LogInfo(logsrc, "PluginStartup(%s) has been called\n", logsrc)
 
-	// FIXME just launch classd - openwrt has no systemd
-	exec.SystemCommand("systemctl", []string{"start", "untangle-classd.service"})
+	// start the classd daemon
+	daemonProcess = exec.Command("/usr/bin/classd", "-f")
+	err = daemonProcess.Start();
+	if (err != nil) {
+		logger.LogErr(logsrc, "Error starting classd daemon: %v\n", err);
+	} else {
+		logger.LogInfo(logsrc, "The classd daemon has been started\n");
+	}
 
+	// give the daemon a second to open the socket
+	time.Sleep(time.Second)
+
+	// establish our connection to the daemon
 	socktime = time.Now()
 	sockspin = 0
-	daemon, err = net.Dial("tcp", classdHostPort)
-
+	daemonConnection, err = net.Dial("tcp", classdHostPort)
 	if err != nil {
 		logger.LogErr(logsrc, "Error calling net.Dial(): %v\n", err)
 	}
@@ -47,17 +55,23 @@ func PluginStartup() {
 	dispatch.InsertNfqueueSubscription(logsrc, 2, PluginNfqueueHandler)
 }
 
-// PluginShutdown is called when the daemon is shutting down. We call Done
-// for the argumented WaitGroup to let the main process know we're finished.
+// PluginShutdown is called when the daemon is shutting down
 func PluginShutdown() {
 	logger.LogInfo(logsrc, "PluginShutdown(%s) has been called\n", logsrc)
 
-	// FIXME kill classd
+	// if we have a connection to the daemon close it
+	if daemonConnection != nil {
+		daemonConnection.Close()
+	}
 
-	var d = daemon
-	daemon = nil
-	if d != nil {
-		d.Close()
+	daemonConnection = nil
+
+	// terminate the classd daemon
+	err := daemonProcess.Process.Kill()
+	if (err != nil) {
+		logger.LogErr(logsrc, "Error stopping classd daemon: %v\n", err)
+	} else {
+		logger.LogInfo(logsrc, "The classd daemon has been stopped\n")
 	}
 }
 
@@ -230,7 +244,7 @@ func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, 
 	var tot int
 
 	// if daemon not connected we do throttled reconnect attempts
-	if daemon == nil {
+	if daemonConnection == nil {
 		nowtime := time.Now()
 
 		// if not time for another attempt return lost connection error
@@ -240,7 +254,7 @@ func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, 
 
 		// update socktime and try to connect to the daemon
 		socktime = time.Now()
-		daemon, err = net.Dial("tcp", classdHostPort)
+		daemonConnection, err = net.Dial("tcp", classdHostPort)
 		if err != nil {
 			// if the connection failed update the throttle counter and return the error
 			if sockspin < 10 {
@@ -262,46 +276,46 @@ func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, 
 	}
 
 	// write the command to the daemon socket
-	tot, err = daemon.Write([]byte(command))
+	tot, err = daemonConnection.Write([]byte(command))
 
 	if err != nil {
-		daemon.Close()
-		daemon = nil
+		daemonConnection.Close()
+		daemonConnection = nil
 		return string(buffer), err
 	}
 
 	if tot != len(command) {
-		daemon.Close()
-		daemon = nil
+		daemonConnection.Close()
+		daemonConnection = nil
 		return string(buffer), fmt.Errorf("Underrun %d of %d calling daemon.Write(%s)", tot, len(command), command)
 	}
 
 	// if we have raw payload data send to the daemon socket after the command
 	if rawdata != nil {
-		tot, err = daemon.Write(rawdata)
+		tot, err = daemonConnection.Write(rawdata)
 
 		if err != nil {
-			daemon.Close()
-			daemon = nil
+			daemonConnection.Close()
+			daemonConnection = nil
 			return string(buffer), err
 		}
 
 		if tot != len(rawdata) {
-			daemon.Close()
-			daemon = nil
+			daemonConnection.Close()
+			daemonConnection = nil
 			return string(buffer), fmt.Errorf("Underrun %d of %d calling daemon.Write(rawdata)", tot, len(rawdata))
 		}
 
 	}
 
 	// read the response from the daemon
-	_, err = daemon.Read(buffer)
+	_, err = daemonConnection.Read(buffer)
 
 	if err != nil {
-		if daemon != nil {
-			daemon.Close()
+		if daemonConnection != nil {
+			daemonConnection.Close()
 		}
-		daemon = nil
+		daemonConnection = nil
 		return string(buffer), err
 	}
 

@@ -3,7 +3,7 @@ package dict
 import (
 	"bufio"
 	"fmt"
-	"github.com/untangle/packetd/services/exec"
+//	"github.com/untangle/packetd/services/syscmd"
 	"github.com/untangle/packetd/services/logger"
 	"net"
 	"os"
@@ -25,7 +25,7 @@ func Startup() {
 	}
 
 	// Load the dict module
-	exec.SystemCommand("modprobe", []string{"nf_conntrack_dict"})
+//	syscmd.SystemCommand("modprobe", []string{"nf_conntrack_dict"})
 }
 
 //-----------------------------------------------------------------------------

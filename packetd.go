@@ -11,7 +11,7 @@ import (
 	"github.com/untangle/packetd/plugins/sni"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
-	"github.com/untangle/packetd/services/exec"
+	"github.com/untangle/packetd/services/syscmd"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
@@ -37,7 +37,7 @@ func main() {
 	logger.Startup()
 	kernel.Startup()
 	dispatch.Startup()
-	exec.Startup()
+	syscmd.Startup()
 	settings.Startup()
 	reports.Startup()
 	dict.Startup()
@@ -111,7 +111,7 @@ func cleanup() {
 
 	// Stop services
 	logger.LogInfo(logsrc, "Shutting down services...\n")
-	exec.Shutdown()
+	syscmd.Shutdown()
 	reports.Shutdown()
 	settings.Shutdown()
 	restd.Shutdown()
@@ -180,22 +180,22 @@ func handleSignals() {
 	}()
 }
 
-//update the netfilter queue rules for packetd
+// update the netfilter queue rules for packetd
 func updateRules() {
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
 		logger.LogErr(logsrc, "Error determining directory: %s\n", err.Error())
 		return
 	}
-	exec.SystemCommand(dir+"/packetd_rules", []string{})
+	syscmd.SystemCommand(dir+"/packetd_rules", []string{})
 }
 
-//remove the netfilter queue rules for packetd
+// remove the netfilter queue rules for packetd
 func removeRules() {
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
 		logger.LogErr(logsrc, "Error determining directory: %s\n", err.Error())
 		return
 	}
-	exec.SystemCommand(dir+"/packetd_rules", []string{"-r"})
+	syscmd.SystemCommand(dir+"/packetd_rules", []string{"-r"})
 }
