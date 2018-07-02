@@ -512,7 +512,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 	if session, ok = findSessionEntry(ctid); ok {
 		logger.LogTrace(logsrc, "Session Found %d in table\n", ctid)
 		session.LastActivityTime = time.Now()
-		session.PacketCount++;
+		session.PacketCount++
 		session.ByteCount += uint64(packetLength)
 		session.EventCount++
 		if !session.ClientSideTuple.Equal(mess.Tuple) {
@@ -539,8 +539,8 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		session = new(SessionEntry)
 		session.SessionID = nextSessionID()
 		session.CreationTime = time.Now()
-		session.PacketCount = 1;
-		session.ByteCount = uint64(packetLength);
+		session.PacketCount = 1
+		session.ByteCount = uint64(packetLength)
 		session.LastActivityTime = time.Now()
 		session.ClientSideTuple = mess.Tuple
 		session.EventCount = 1

@@ -34,11 +34,11 @@ func PluginStartup() {
 
 	// start the classd daemon
 	daemonProcess = exec.Command("/usr/bin/classd", "-f")
-	err = daemonProcess.Start();
-	if (err != nil) {
-		logger.LogErr(logsrc, "Error starting classd daemon: %v\n", err);
+	err = daemonProcess.Start()
+	if err != nil {
+		logger.LogErr(logsrc, "Error starting classd daemon: %v\n", err)
 	} else {
-		logger.LogInfo(logsrc, "The classd daemon has been started\n");
+		logger.LogInfo(logsrc, "The classd daemon has been started\n")
 	}
 
 	// give the daemon a second to open the socket
@@ -68,7 +68,7 @@ func PluginShutdown() {
 
 	// terminate the classd daemon
 	err := daemonProcess.Process.Kill()
-	if (err != nil) {
+	if err != nil {
 		logger.LogErr(logsrc, "Error stopping classd daemon: %v\n", err)
 	} else {
 		logger.LogInfo(logsrc, "The classd daemon has been stopped\n")
