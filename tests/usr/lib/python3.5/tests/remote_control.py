@@ -63,7 +63,7 @@ def run_command( command, host=None, stdout=False, nowait=False):
         if nowait:
             time.sleep(1)
             if stdout:
-                return proc.communicate()[0].strip()
+                return proc.communicate()[0].strip().decode("utf-8")
             else:
                 return 0
 
@@ -73,7 +73,7 @@ def run_command( command, host=None, stdout=False, nowait=False):
         print("Output  : %s"  % output)
         sys.stdout.flush()
         if stdout:
-            return output
+            return output.decode("utf-8")
         else:
             return result
     finally:

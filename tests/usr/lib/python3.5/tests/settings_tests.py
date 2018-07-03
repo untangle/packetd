@@ -1,8 +1,8 @@
 import subprocess
 import unittest
-import tests.test_registry
 import json
 import sys
+import tests.test_registry as test_registry
 
 initial_settings = None
 
@@ -213,4 +213,4 @@ class SettingsTests(unittest.TestCase):
         set_settings(None, initial_settings)
         pass
     
-tests.test_registry.register_module("settings", SettingsTests)
+test_registry.register_module("settings", SettingsTests)

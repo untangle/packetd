@@ -67,7 +67,7 @@ func main() {
 
 	// Loop forever
 	for {
-		time.Sleep(60 * time.Second)
+		time.Sleep(600 * time.Second)
 		logger.LogInfo(logsrc, ".\n")
 
 		var mem runtime.MemStats

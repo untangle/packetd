@@ -28,20 +28,14 @@ func Startup() {
 	syscmd.SystemCommand("modprobe", []string{"nf_conntrack_dict"})
 }
 
-//-----------------------------------------------------------------------------
-
 // Shutdown dict service
 func Shutdown() {
 }
-
-//-----------------------------------------------------------------------------
 
 // Disable disable dict writing
 func Disable() {
 	disabled = true
 }
-
-//-----------------------------------------------------------------------------
 
 // Entry holds a dictionary entry
 type Entry struct {
@@ -51,8 +45,6 @@ type Entry struct {
 	Value interface{}
 }
 
-//-----------------------------------------------------------------------------
-
 // Parse the table name from the argument string
 func parseTable(arg string) string {
 	var table string
@@ -60,16 +52,12 @@ func parseTable(arg string) string {
 	return table
 }
 
-//-----------------------------------------------------------------------------
-
 // Parse the field name from the argument string
 func parseField(arg string) string {
 	var field string
 	fmt.Sscanf(arg, "field: %s", &field)
 	return field
 }
-
-//-----------------------------------------------------------------------------
 
 // Parse the key from the argument string
 func parseKey(arg string) interface{} {
@@ -102,8 +90,6 @@ func parseKey(arg string) interface{} {
 
 	return key
 }
-
-//-----------------------------------------------------------------------------
 
 // Parse the value from the argument string
 func parseValue(arg string) interface{} {
@@ -146,8 +132,6 @@ func parseValue(arg string) interface{} {
 	return value
 }
 
-//-----------------------------------------------------------------------------
-
 // Parse an entry from a line of output from /proc/net/dict/*
 func parseEntry(line string) Entry {
 	var entry Entry
@@ -170,21 +154,15 @@ func parseEntry(line string) Entry {
 	return entry
 }
 
-//-----------------------------------------------------------------------------
-
 // Format a Entry table string
 func formatTable(table string) string {
 	return fmt.Sprintf("Table: %s", table)
 }
 
-//-----------------------------------------------------------------------------
-
 // Format a Entry field string
 func formatField(field string) string {
 	return fmt.Sprintf("Field: %s", field)
 }
-
-//-----------------------------------------------------------------------------
 
 // Format a Entry key string
 func formatKey(key interface{}) string {
@@ -202,8 +180,6 @@ func formatKey(key interface{}) string {
 
 	return ""
 }
-
-//-----------------------------------------------------------------------------
 
 // Format a Entry value string
 func formatValue(value interface{}) string {
@@ -226,21 +202,15 @@ func formatValue(value interface{}) string {
 	return ""
 }
 
-//-----------------------------------------------------------------------------
-
 // Print an Entry
 func (p Entry) Print() {
 	logger.LogInfo(logsrc, "%s %s %s %s\n", formatTable(p.Table), formatKey(p.Key), formatField(p.Field), formatValue(p.Value))
 }
 
-//-----------------------------------------------------------------------------
-
 // GetValue gets an entry's value
 func (p Entry) GetValue() interface{} {
 	return p.Value
 }
-
-//-----------------------------------------------------------------------------
 
 // GetString gets an entry's string value
 func (p Entry) GetString() (string, error) {
@@ -253,8 +223,6 @@ func (p Entry) GetString() (string, error) {
 	}
 }
 
-//-----------------------------------------------------------------------------
-
 // GetInt gets an entry's integer value
 func (p Entry) GetInt() (uint32, error) {
 
@@ -266,8 +234,6 @@ func (p Entry) GetInt() (uint32, error) {
 	}
 }
 
-//-----------------------------------------------------------------------------
-
 // GetInt64 gets an entry's 64 bit integer value
 func (p Entry) GetInt64() (uint64, error) {
 
@@ -278,8 +244,6 @@ func (p Entry) GetInt64() (uint64, error) {
 		return 0, fmt.Errorf("GetInt64: Requested value is not a 64 bit integer")
 	}
 }
-
-//-----------------------------------------------------------------------------
 
 // GetMac gets an entry's mac value
 func (p Entry) GetMac() (net.HardwareAddr, error) {
@@ -293,8 +257,6 @@ func (p Entry) GetMac() (net.HardwareAddr, error) {
 	}
 }
 
-//-----------------------------------------------------------------------------
-
 // GetIP gets an entry's IP value
 func (p Entry) GetIP() (net.IP, error) {
 
@@ -307,8 +269,6 @@ func (p Entry) GetIP() (net.IP, error) {
 	}
 }
 
-//-----------------------------------------------------------------------------
-
 // GetBool gets an entry's bool value
 func (p Entry) GetBool() (bool, error) {
 
@@ -319,8 +279,6 @@ func (p Entry) GetBool() (bool, error) {
 		return false, fmt.Errorf("GetBool: Requested value is not a bool")
 	}
 }
-
-//-----------------------------------------------------------------------------
 
 // writeEntry writes out a set string to the dict proc write node
 func writeEntry(setstr string) error {
@@ -344,8 +302,6 @@ func writeEntry(setstr string) error {
 	return err
 }
 
-//-----------------------------------------------------------------------------
-
 // deleteEntry writes out a string to the dict proc delete node
 func deleteEntry(setstr string) error {
 	file, err := os.OpenFile(pathBase+"/delete", os.O_WRONLY, 0660)
@@ -368,70 +324,50 @@ func deleteEntry(setstr string) error {
 	return err
 }
 
-//-----------------------------------------------------------------------------
-
 // generateTable generates the table token for the dict proc write string
 func generateTable(table string) string {
 	return fmt.Sprintf("table=%s,", table)
 }
-
-//-----------------------------------------------------------------------------
 
 // generateField generates the field token for the dict proc write string
 func generateField(field string) string {
 	return fmt.Sprintf("field=%s,", field)
 }
 
-//-----------------------------------------------------------------------------
-
 // generateString generates the value token for the dict proc write string
 func generateString(value string) string {
 	return fmt.Sprintf("value=%s,", value)
 }
-
-//-----------------------------------------------------------------------------
 
 // generateMac generates the mac token for the dict proc write string
 func generateMac(value net.HardwareAddr) string {
 	return fmt.Sprintf("mac=%s,", value.String())
 }
 
-//-----------------------------------------------------------------------------
-
 // generateInt generates the int token for the dict proc write string
 func generateInt(value uint32) string {
 	return fmt.Sprintf("int=%d,", value)
 }
-
-//-----------------------------------------------------------------------------
 
 // generateInt64 generates the int token for the dict proc write string
 func generateInt64(value uint64) string {
 	return fmt.Sprintf("int64=%d,", value)
 }
 
-//-----------------------------------------------------------------------------
-
 // generateBool generates the bool token for the dict proc write string
 func generateBool(value bool) string {
 	return fmt.Sprintf("bool=%s,", strconv.FormatBool(value))
 }
-
-//-----------------------------------------------------------------------------
 
 // generateIP generates the ip token for the dict proc write string
 func generateIP(value net.IP) string {
 	return fmt.Sprintf("ip=%s,", value.String())
 }
 
-//-----------------------------------------------------------------------------
-
 // generateIP6 generates the ip token for the dict proc write string
 func generateIP6(value net.IP) string {
 	return fmt.Sprintf("ip6=%s,", value.String())
 }
-
-//-----------------------------------------------------------------------------
 
 // generateValue sets a field/value entry for the supplied key in the supplied table
 func generateValue(value interface{}) string {
@@ -457,42 +393,30 @@ func generateValue(value interface{}) string {
 	}
 }
 
-//-----------------------------------------------------------------------------
-
 // generateKeyInt generates the key_int token for the dict proc write string
 func generateKeyInt(key uint32) string {
 	return fmt.Sprintf("key_int=%d,", key)
 }
-
-//-----------------------------------------------------------------------------
 
 // generateKeyIP generates the key_ip token for the dict proc write string
 func generateKeyIP(key net.IP) string {
 	return fmt.Sprintf("key_ip=%s,", key.String())
 }
 
-//-----------------------------------------------------------------------------
-
 // generateKeyIP6 generates the key_ip6 token for the dict proc write string
 func generateKeyIP6(key net.IP) string {
 	return fmt.Sprintf("key_ip6=%s,", key.String())
 }
-
-//-----------------------------------------------------------------------------
 
 // generateKeyString generates the key_string token for the dict proc write string
 func generateKeyString(key string) string {
 	return fmt.Sprintf("key_string=%s,", key)
 }
 
-//-----------------------------------------------------------------------------
-
 // generateKeyMac generates the key_mac token for the dict proc write string
 func generateKeyMac(key net.HardwareAddr) string {
 	return fmt.Sprintf("key_mac=%s,", key.String())
 }
-
-//-----------------------------------------------------------------------------
 
 // generateKey sets a field/value entry for the supplied key in the supplied table
 func generateKey(key interface{}) string {
@@ -514,8 +438,6 @@ func generateKey(key interface{}) string {
 	}
 }
 
-//-----------------------------------------------------------------------------
-
 // AddEntry sets a field/value entry for the supplied key in the supplied table
 func AddEntry(table string, key interface{}, field string, value interface{}) error {
 	var setstr string
@@ -530,35 +452,25 @@ func AddEntry(table string, key interface{}, field string, value interface{}) er
 	return err
 }
 
-//-----------------------------------------------------------------------------
-
 // AddHostEntry sets a field/value entry for the supplied ip key in the host table
 func AddHostEntry(key net.IP, field string, value interface{}) error {
 	return AddEntry("host", key, field, value)
 }
-
-//-----------------------------------------------------------------------------
 
 // AddUserEntry sets a field/value entry for the supplied string key in the user table
 func AddUserEntry(key string, field string, value interface{}) error {
 	return AddEntry("user", key, field, value)
 }
 
-//-----------------------------------------------------------------------------
-
 // AddDeviceEntry sets a field/value entry for the supplied mac key in the device table
 func AddDeviceEntry(key net.HardwareAddr, field string, value interface{}) error {
 	return AddEntry("device", key, field, value)
 }
 
-//-----------------------------------------------------------------------------
-
 // AddSessionEntry sets a field/value entry for the supplied int key in the session table
 func AddSessionEntry(key uint32, field string, value interface{}) error {
 	return AddEntry("session", key, field, value)
 }
-
-//-----------------------------------------------------------------------------
 
 // DeleteDictionary removes a dictionary with the supplied key in the supplied table
 func DeleteDictionary(table string, key interface{}) error {
@@ -574,35 +486,25 @@ func DeleteDictionary(table string, key interface{}) error {
 	return err
 }
 
-//-----------------------------------------------------------------------------
-
 // DeleteHost removes a dictionary from the host table
 func DeleteHost(key net.IP) error {
 	return DeleteDictionary("host", key)
 }
-
-//-----------------------------------------------------------------------------
 
 // DeleteUser removes a dictionary from the user table
 func DeleteUser(key string) error {
 	return DeleteDictionary("user", key)
 }
 
-//-----------------------------------------------------------------------------
-
 // DeleteDevice removes a dictionary from the device table
 func DeleteDevice(key net.HardwareAddr) error {
 	return DeleteDictionary("device", key)
 }
 
-//-----------------------------------------------------------------------------
-
 // DeleteSession removes a dictionary from the session table
 func DeleteSession(key uint32) error {
 	return DeleteDictionary("session", key)
 }
-
-//-----------------------------------------------------------------------------
 
 // GetDictionary gets all of the dictionary entries for the supplied key
 func GetDictionary(table string, key interface{}) ([]Entry, error) {
@@ -636,8 +538,6 @@ func GetDictionary(table string, key interface{}) ([]Entry, error) {
 	return entries, err
 }
 
-//-----------------------------------------------------------------------------
-
 // GetEntry gets the dictionary entry for the specified table, key and field
 func GetEntry(table string, key interface{}, field string) (Entry, error) {
 	var entry Entry
@@ -664,35 +564,25 @@ func GetEntry(table string, key interface{}, field string) (Entry, error) {
 	return entry, err
 }
 
-//-----------------------------------------------------------------------------
-
 // GetHostEntry gets the dictionary entry from the host table with the specified key and field
 func GetHostEntry(key net.IP, field string) (Entry, error) {
 	return GetEntry("host", key, field)
 }
-
-//-----------------------------------------------------------------------------
 
 // GetUserEntry gets the dictionary entry from the user table with the specified key and field
 func GetUserEntry(key string, field string) (Entry, error) {
 	return GetEntry("user", key, field)
 }
 
-//-----------------------------------------------------------------------------
-
 // GetDeviceEntry gets the dictionary entry from the device table with the specified key and field
 func GetDeviceEntry(key net.HardwareAddr, field string) (Entry, error) {
 	return GetEntry("device", key, field)
 }
 
-//-----------------------------------------------------------------------------
-
 // GetSessionEntry gets the dictionary entry from the session table with the specified key and field
 func GetSessionEntry(key uint32, field string) (Entry, error) {
 	return GetEntry("session", key, field)
 }
-
-//-----------------------------------------------------------------------------
 
 // GetAllEntries gets all of entries for all known dictionaries
 func GetAllEntries() ([]Entry, error) {
