@@ -666,7 +666,7 @@ func cleanConntrackTable() {
 			continue
 		}
 		removeConntrackEntry(key)
-		// this should never happen, so warn
+		// this should never happen, so print an error
 		logger.LogErr(logsrc, "Removing stale conntrack entry %d %v\n", key, val.ClientSideTuple)
 	}
 }
@@ -680,7 +680,13 @@ func cleanSessionTable() {
 			continue
 		}
 		removeSessionEntry(key)
-		logger.LogErr(logsrc, "Removing stale session entry %d %v\n", key, val.ClientSideTuple)
+		// This happens in some corner cases
+		// such as a session that is blocked we will have a session in the session table
+		// but it will never reach the conntrack confirmed state, and thus never
+		// get a conntrack new or destroy event
+		// as such this will exist in the table until the conntrack ID gets re-used
+		// or this happens. Since this is condition is expected, just log as debug
+		logger.LogDebug(logsrc, "Removing stale session entry %d %v\n", key, val.ClientSideTuple)
 	}
 }
 
