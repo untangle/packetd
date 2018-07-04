@@ -8,7 +8,6 @@ import (
 	"bufio"
 	"encoding/csv"
 	"fmt"
-	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
@@ -442,23 +441,23 @@ func loadApplicationTable() {
 	}
 }
 
-func updateClassifyDetail(mess dispatch.TrafficMessage, ctid uint32, pairname string, pairdata string) {
-	// if the session doesn't have this attachment yet we add it and write to the dictionary
-	if mess.Session.Attachments[pairname] == nil {
-		mess.Session.Attachments[pairname] = pairdata
-		dict.AddSessionEntry(ctid, pairname, pairdata)
-		logger.LogDebug(logsrc, "Setting classification detail %s = %s\n", pairname, pairdata)
-		return
-	}
+func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname string, pairdata string) {
+	// // if the session doesn't have this attachment yet we add it and write to the dictionary
+	// if mess.Session.Attachments[pairname] == nil {
+	// 	mess.Session.Attachments[pairname] = pairdata
+	// 	dict.AddSessionEntry(ctid, pairname, pairdata)
+	// 	logger.LogDebug(logsrc, "Setting classification detail %s = %s\n", pairname, pairdata)
+	// 	return
+	// }
 
-	// if the session has the attachment and it has not changed just return
-	if strings.Compare(mess.Session.Attachments[pairname].(string), pairdata) == 0 {
-		logger.LogTrace(logsrc, "Ignoring classification detail %s = %s\n", pairname, pairdata)
-		return
-	}
+	// // if the session has the attachment and it has not changed just return
+	// if strings.Compare(mess.Session.Attachments[pairname].(string), pairdata) == 0 {
+	// 	logger.LogTrace(logsrc, "Ignoring classification detail %s = %s\n", pairname, pairdata)
+	// 	return
+	// }
 
-	// at this point the session has the attachment but the data has changed so we update the session and the dictionary
-	mess.Session.Attachments[pairname] = pairdata
-	dict.AddSessionEntry(ctid, pairname, pairdata)
-	logger.LogDebug(logsrc, "Updating classification detail %s = %s\n", pairname, pairdata)
+	// // at this point the session has the attachment but the data has changed so we update the session and the dictionary
+	// mess.Session.Attachments[pairname] = pairdata
+	// dict.AddSessionEntry(ctid, pairname, pairdata)
+	// logger.LogDebug(logsrc, "Updating classification detail %s = %s\n", pairname, pairdata)
 }
