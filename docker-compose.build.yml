@@ -2,13 +2,11 @@ version: '2'
 services:
     libc:
       build:
-        context: .
-        dockerfile: Dockerfile.build-libc
+        image: untangleinc/packetd:libc
       volumes:
         - ./../../..:/go/src
     musl:
       build:
-        context: .
-        dockerfile: Dockerfile.build-musl
+        image: untangleinc/packetd:musl
       volumes:
         - ./../../..:/go/src
