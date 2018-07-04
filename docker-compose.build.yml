@@ -1,12 +1,10 @@
 version: '2'
 services:
     libc:
-      build:
-        image: untangleinc/packetd:libc
+      image: untangleinc/packetd:build-libc
       volumes:
         - ./../../..:/go/src
     musl:
-      build:
-        image: untangleinc/packetd:musl
+      image: untangleinc/packetd:build-musl
       volumes:
         - ./../../..:/go/src
