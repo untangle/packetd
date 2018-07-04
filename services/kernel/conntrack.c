@@ -58,8 +58,8 @@ static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrac
 	} else if (info.family == AF_INET6) {
 		memcpy(&info.orig_6saddr,nfct_get_attr(ct,ATTR_ORIG_IPV6_SRC),sizeof(info.orig_6saddr));
 		memcpy(&info.orig_6daddr,nfct_get_attr(ct,ATTR_ORIG_IPV6_DST),sizeof(info.orig_6daddr));
-		memcpy(&info.repl_6saddr,nfct_get_attr(ct,ATTR_REPL_IPV4_SRC),sizeof(info.repl_6saddr));
-		memcpy(&info.repl_6daddr,nfct_get_attr(ct,ATTR_REPL_IPV4_DST),sizeof(info.repl_6daddr));
+		memcpy(&info.repl_6saddr,nfct_get_attr(ct,ATTR_REPL_IPV6_SRC),sizeof(info.repl_6saddr));
+		memcpy(&info.repl_6daddr,nfct_get_attr(ct,ATTR_REPL_IPV6_DST),sizeof(info.repl_6daddr));
 	} else {
 		tracker_garbage++;
 		return(NFCT_CB_CONTINUE);
