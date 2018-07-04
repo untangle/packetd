@@ -5,12 +5,16 @@
 package classify
 
 import (
+	"bufio"
+	"encoding/csv"
 	"fmt"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
+	"io"
 	"net"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -18,11 +22,32 @@ import (
 	"time"
 )
 
+// applicationInfo stores the details for each know application
+type applicationInfo struct {
+	guid         string
+	index        int
+	name         string
+	description  string
+	category     string
+	productivity int
+	risk         int
+	flags        int
+	reference    string
+	plugin       string
+}
+
+const daemonBinary = "/usr/bin/classd"
+const guidInfoFile = "/usr/share/untangle-classd/protolist.csv"
+
 const navlStateTerminated = 0 // Indicates the connection has been terminated
 const navlStateInspecting = 1 // Indicates the connection is under inspection
 const navlStateMonitoring = 2 // Indicates the connection is under monitoring
 const navlStateClassified = 3 // Indicates the connection is fully classified
 
+const maxPacketCount = 32     // The maximum number of packets to inspect before releasing
+const maxTrafficSize = 0x8000 // The maximum number of bytes to inspect before releasing
+
+var applicationTable map[string]applicationInfo
 var socktime time.Time
 var sockspin int64
 var logsrc = "classify"
@@ -37,14 +62,17 @@ func PluginStartup() {
 
 	logger.LogInfo(logsrc, "PluginStartup(%s) has been called\n", logsrc)
 
-	// start the classd daemon
-	daemonProcess = exec.Command("/usr/bin/classd", "-f")
+	// start the classd daemon with the no fork flag
+	daemonProcess = exec.Command(daemonBinary, "-f")
 	err = daemonProcess.Start()
 	if err != nil {
 		logger.LogErr(logsrc, "Error starting classd daemon: %v\n", err)
 	} else {
 		logger.LogInfo(logsrc, "The classd daemon has been started\n")
 	}
+
+	applicationTable = make(map[string]applicationInfo)
+	loadApplicationTable()
 
 	// give the daemon a second to open the socket
 	time.Sleep(time.Second)
@@ -151,6 +179,7 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint32, newSession 
 	var reportsProtochain string
 	var reportsDetail string
 	var reportsConfidence uint64
+	var reportsCategory string
 
 	for i := 0; i < len(catinfo); i++ {
 		if len(catinfo[i]) < 3 {
@@ -214,30 +243,23 @@ func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint32, newSession 
 			continue
 		}
 
-		// if the session doesn't have this attachment yet we add it and write to the dictionary
-		if mess.Session.Attachments[pairname] == nil {
-			mess.Session.Attachments[pairname] = pairdata
-			dict.AddSessionEntry(ctid, pairname, pairdata)
-			logger.LogDebug(logsrc, "Setting classification detail %s = %s\n", pairname, pairdata)
-			continue
-		}
-
-		// if the session has the attachment and it has not change just continue
-		if strings.Compare(mess.Session.Attachments[pairname].(string), pairdata) == 0 {
-			continue
-		}
-
-		// at this point the session has the attachment but the data has changed so we update the session and the dictionary
-		mess.Session.Attachments[pairname] = pairdata
-		dict.AddSessionEntry(ctid, pairname, pairdata)
-		logger.LogDebug(logsrc, "Updating classification detail %s = %s\n", pairname, pairdata)
+		updateClassifyDetail(mess, ctid, pairname, pairdata)
 	}
 
-	// if the daemon says the session is fully classified or terminated, or after we have seen 10 packets or 256k of data, we log an event and release
-	if stateval == navlStateClassified || stateval == navlStateTerminated || mess.Session.PacketCount > 10 || mess.Session.ByteCount > 0x40000 {
-		// FIXME add application_category as last argument
+	// lookup the category in the application table
+	appinfo, finder := applicationTable[reportsApplication]
+	if finder == true {
+		reportsCategory = appinfo.category
+	}
+
+	if len(reportsCategory) > 0 {
+		updateClassifyDetail(mess, ctid, "ClassifyCategory", reportsCategory)
+	}
+
+	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, we log an event and release
+	if stateval == navlStateClassified || stateval == navlStateTerminated || mess.Session.PacketCount > maxPacketCount || mess.Session.ByteCount > maxTrafficSize {
 		// FIXME need to detect and log when a session ends before it meets the criteria for logging here
-		logEvent(mess.Session, reportsApplication, reportsProtochain, reportsDetail, reportsConfidence, "")
+		logEvent(mess.Session, reportsApplication, reportsProtochain, reportsDetail, reportsConfidence, reportsCategory)
 		result.SessionRelease = true
 	}
 
@@ -348,4 +370,95 @@ func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, 
 	}
 
 	return string(buffer), nil
+}
+
+// loadApplicationTable loads the details for each application
+func loadApplicationTable() {
+	var file *os.File
+	var linecount int
+	var infocount int
+	var list []string
+	var err error
+
+	// open the guid info file provided by Sandvine
+	file, err = os.Open(guidInfoFile)
+
+	// if there was an error log and return
+	if err != nil {
+		logger.LogWarn(logsrc, "Unable to load application details: %s\n", guidInfoFile)
+		return
+	}
+
+	// create a new CSV reader
+	reader := csv.NewReader(bufio.NewReader(file))
+	for {
+		list, err = reader.Read()
+		// on end of file just break out of the read loop
+		if err == io.EOF {
+			break
+			// for anything else log the error and break
+		} else if err != nil {
+			logger.LogErr(logsrc, "Unable to parse application details: %v\n", err)
+			break
+		}
+
+		// count the number of lines read so we can compare with
+		// the number successfully parsed when we finish loading
+		linecount++
+
+		// skip the first line that holds the file format description
+		if linecount == 1 {
+			continue
+		}
+
+		// if we did not parse exactly 10 fields skip the line
+		if len(list) != 10 {
+			continue
+		}
+
+		var info applicationInfo
+
+		info.guid = list[0]
+		info.index, err = strconv.Atoi(list[1])
+		info.name = list[2]
+		info.description = list[3]
+		info.category = list[4]
+		info.productivity, err = strconv.Atoi(list[5])
+		info.risk, err = strconv.Atoi(list[6])
+		info.flags, err = strconv.Atoi(list[7])
+		info.reference = list[8]
+		info.plugin = list[9]
+
+		applicationTable[list[0]] = info
+		infocount++
+	}
+
+	file.Close()
+	logger.LogInfo(logsrc, "Loaded classification details for %d applications\n", infocount)
+
+	// if there were any bad lines in the file log a warning
+	if infocount != linecount-1 {
+		logger.LogWarn(logsrc, "Detected garbage in the application info file: %s\n", guidInfoFile)
+	}
+}
+
+func updateClassifyDetail(mess dispatch.TrafficMessage, ctid uint32, pairname string, pairdata string) {
+	// if the session doesn't have this attachment yet we add it and write to the dictionary
+	if mess.Session.Attachments[pairname] == nil {
+		mess.Session.Attachments[pairname] = pairdata
+		dict.AddSessionEntry(ctid, pairname, pairdata)
+		logger.LogDebug(logsrc, "Setting classification detail %s = %s\n", pairname, pairdata)
+		return
+	}
+
+	// if the session has the attachment and it has not changed just return
+	if strings.Compare(mess.Session.Attachments[pairname].(string), pairdata) == 0 {
+		logger.LogTrace(logsrc, "Ignoring classification detail %s = %s\n", pairname, pairdata)
+		return
+	}
+
+	// at this point the session has the attachment but the data has changed so we update the session and the dictionary
+	mess.Session.Attachments[pairname] = pairdata
+	dict.AddSessionEntry(ctid, pairname, pairdata)
+	logger.LogDebug(logsrc, "Updating classification detail %s = %s\n", pairname, pairdata)
 }
