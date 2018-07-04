@@ -22,7 +22,7 @@ func PluginShutdown() {
 // PluginNfqueueHandler is called to handle nfqueue packet data. We only
 // look at traffic with port 443 as destination. When detected, we look
 // for a TLS ClientHello packet from which we extract the SNI hostname
-func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
+func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
 	result.Owner = logsrc
 	result.PacketMark = 0

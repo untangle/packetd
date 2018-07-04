@@ -27,7 +27,7 @@ func PluginShutdown() {
 
 // PluginNfqueueHandler handles the first packet of a session
 // Logs a new session_new event
-func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
+func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
 	result.Owner = logsrc
 	result.SessionRelease = true

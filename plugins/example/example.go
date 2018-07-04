@@ -24,12 +24,12 @@ func PluginShutdown() {
 	logger.LogInfo(logsrc, "PluginShutdown(%s) has been called\n", logsrc)
 }
 
-// PluginNfqueueHandler receives a TrafficMessage which includes a Tuple and
+// PluginNfqueueHandler receives a NfqueueMessage which includes a Tuple and
 // a gopacket.Packet, along with the IP and TCP or UDP layer already extracted.
 // We do whatever we like with the data, and when finished, we return an
 // integer via the argumented channel with any bits set that we want added to
 // the packet mark.
-func PluginNfqueueHandler(mess dispatch.TrafficMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
+func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	// our example simply dumps the raw message to the console
 	logger.LogDebug(logsrc, "NfqueueHandler received %d BYTES from %s to %s\n%s\n", mess.Length, mess.IPlayer.SrcIP, mess.IPlayer.DstIP, hex.Dump(mess.Packet.Data()))
 
