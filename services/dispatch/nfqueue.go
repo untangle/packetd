@@ -123,14 +123,18 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		session.EventCount++
 		if !session.ClientSideTuple.Equal(mess.Tuple) {
 
-			logger.LogInfo(logsrc, "Conntrack ID Mismatch! %d nfqueue:%v session:%v\n",
-				ctid,
-				mess.Tuple,
-				session.ClientSideTuple)
 			if session.ConntrackConfirmed {
+				logger.LogErr(logsrc, "Conntrack ID Mismatch! %d nfqueue:%v session:%v\n",
+					ctid,
+					mess.Tuple,
+					session.ClientSideTuple)
 				panic("CONNTRACK ID RE-USE DETECTED")
 			} else {
-				logger.LogInfo(logsrc, "Removing stale session %d %v\n", ctid, session.ClientSideTuple)
+				logger.LogDebug(logsrc, "Conntrack ID Mismatch! %d nfqueue:%v session:%v\n",
+					ctid,
+					mess.Tuple,
+					session.ClientSideTuple)
+				logger.LogDebug(logsrc, "Removing stale session %d %v\n", ctid, session.ClientSideTuple)
 				removeSessionEntry(ctid)
 				session = nil
 			}
