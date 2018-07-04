@@ -35,6 +35,7 @@ func main() {
 
 	// Start services
 	logger.Startup()
+	printVersion()
 	kernel.Startup()
 	dispatch.Startup()
 	syscmd.Startup()
@@ -53,9 +54,6 @@ func main() {
 
 	// Insert netfilter rules
 	updateRules()
-
-	// Startup Complete
-	logger.LogInfo(logsrc, "Untangle Packet Daemon Version %s\n", "1.00")
 
 	// Check that all the C services started correctly
 	// This flag is only set on Startup so this only needs to be checked once
@@ -80,12 +78,22 @@ func main() {
 	}
 }
 
+func printVersion() {
+	logger.LogInfo(logsrc, "Untangle Packet Daemon Version %s\n", Version)
+}
+
 // parseArguments parses the command line arguments
 func parseArguments() {
 	classdAddressStringPtr := flag.String("classd", "127.0.0.1:8123", "host:port for classd daemon")
 	disableConndictPtr := flag.Bool("disable-dict", false, "disable dict")
+	versionPtr := flag.Bool("version", false, "version")
 
 	flag.Parse()
+
+	if *versionPtr {
+		printVersion()
+		os.Exit(0)
+	}
 
 	classify.SetHostPort(*classdAddressStringPtr)
 	if *disableConndictPtr {

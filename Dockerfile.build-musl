@@ -30,4 +30,4 @@ RUN ./autogen.sh && ./configure && make && make install
 # build packetd
 VOLUME /go/src
 WORKDIR /go/src/github.com/untangle/packetd
-CMD go get -d -v ./... && go build -v -o packetd
+CMD make

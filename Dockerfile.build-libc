@@ -9,4 +9,4 @@ RUN apt-get install -y libnetfilter-log-dev libnetfilter-queue-dev libnetfilter-
 VOLUME /go/src
 WORKDIR /go/src/github.com/untangle/packetd
 
-CMD go get -d -v ./... && go build -v -o packetd
+CMD make
