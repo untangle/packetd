@@ -1,3 +1,5 @@
 packetd
 *.pyc
 __pycache__/
+#*
+.#*
