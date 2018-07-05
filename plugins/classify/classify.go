@@ -32,7 +32,7 @@ type applicationInfo struct {
 	category     string
 	productivity int
 	risk         int
-	flags        int
+	flags        uint64
 	reference    string
 	plugin       string
 }
@@ -415,6 +415,7 @@ func loadApplicationTable() {
 
 		// if we did not parse exactly 10 fields skip the line
 		if len(list) != 10 {
+			logger.LogWarn(logsrc, "Invalid line length: %d\n", len(list))
 			continue
 		}
 
@@ -422,12 +423,24 @@ func loadApplicationTable() {
 
 		info.guid = list[0]
 		info.index, err = strconv.Atoi(list[1])
+		if err != nil {
+			logger.LogWarn(logsrc, "Invalid index: %s\n", list[1])
+		}
 		info.name = list[2]
 		info.description = list[3]
 		info.category = list[4]
 		info.productivity, err = strconv.Atoi(list[5])
+		if err != nil {
+			logger.LogWarn(logsrc, "Invalid productivity: %s\n", list[5])
+		}
 		info.risk, err = strconv.Atoi(list[6])
-		info.flags, err = strconv.Atoi(list[7])
+		if err != nil {
+			logger.LogWarn(logsrc, "Invalid risk: %s\n", list[6])
+		}
+		info.flags, err = strconv.ParseUint(list[7], 10, 64)
+		if err != nil {
+			logger.LogWarn(logsrc, "Invalid flags: %s %s\n", list[7], err)
+		}
 		info.reference = list[8]
 		info.plugin = list[9]
 
@@ -444,6 +457,9 @@ func loadApplicationTable() {
 	}
 }
 
+// updateClassifyDetail updates a key/value pair in the session attachments
+// if the value has changed for the provided key, it will also update the nf_dict session table
+// returns true if value changed, false otherwise
 func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname string, pairdata interface{}) bool {
 	// if the session doesn't have this attachment yet we add it and write to the dictionary
 	if mess.Session.Attachments[pairname] == nil {
