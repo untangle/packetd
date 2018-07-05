@@ -47,12 +47,15 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	// this is the first packet so source interface = client interface
-	var clientInterface uint8 = uint8((result.PacketMark & 0x000000FF))
-	var serverInterface uint8 = uint8((result.PacketMark & 0x0000FF00) >> 8)
-
-	var clientIsOnLan bool = ((result.PacketMark & 0x01000000) == 0)
+	var clientInterface uint8
+	var serverInterface uint8
+	var clientIsOnLan bool
 	var localAddress net.IP
 	var remoteAddress net.IP
+
+	clientInterface = uint8((result.PacketMark & 0x000000FF))
+	serverInterface = uint8((result.PacketMark & 0x0000FF00) >> 8)
+	clientIsOnLan = ((result.PacketMark & 0x01000000) == 0)
 
 	if clientIsOnLan {
 		localAddress = session.ClientSideTuple.ClientAddress
