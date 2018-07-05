@@ -122,7 +122,6 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	result.PacketMark = 0
 	result.SessionRelease = false
 
-	var stateval int
 	var status string
 	var proto string
 	var err error
@@ -132,8 +131,8 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	} else if mess.TCPlayer != nil {
 		proto = "TCP"
 	} else {
-		//FIXME unsupported protocol
-		//We need to support any IP-based protocol in packetd
+		// FIXME unsupported protocol
+		// Which protocols do we support: TCP/UDP... ICMP? Others?
 		if mess.Session != nil {
 			logger.LogErr(logsrc, "Unsupported protocol: %v\n", mess.Session.ClientSideTuple.Protocol)
 		} else {
@@ -145,7 +144,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	// if this is the first packet of the session we send a session create command
-	if mess.Session.EventCount == 1 {
+	if newSession {
 		status, err = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.Session.ClientSideTuple.ClientAddress, mess.Session.ClientSideTuple.ClientPort, mess.Session.ClientSideTuple.ServerAddress, mess.Session.ClientSideTuple.ServerPort)
 		if err != nil {
 			logger.LogErr(logsrc, "daemonCommand error: %s\n", err.Error())
@@ -168,18 +167,52 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	logger.LogTrace(logsrc, "daemonCommand result: %s\n", status)
 
-	// Parse the output from classd to get the classification details
-	var pairname string
-	var pairdata string
-	var pairflag bool
+	var application string
+	var protochain string
+	var detail string
+	var confidence uint64
+	var category string
+	var state int
 
-	catinfo := strings.Split(status, "\r\n")
+	application, protochain, detail, confidence, category, state = parseReply(status)
 
-	var reportsApplication string
-	var reportsProtochain string
-	var reportsDetail string
-	var reportsConfidence uint64
-	var reportsCategory string
+	var changed bool
+
+	changed = changed || updateClassifyDetail(mess, ctid, "application", application)
+	changed = changed || updateClassifyDetail(mess, ctid, "application_protochain", application)
+	changed = changed || updateClassifyDetail(mess, ctid, "application_detail", detail)
+	changed = changed || updateClassifyDetail(mess, ctid, "application_confidence", confidence)
+	if len(category) > 0 {
+		changed = changed || updateClassifyDetail(mess, ctid, "application_category", category)
+	}
+
+	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, we log an event and release
+	if state == navlStateClassified || state == navlStateTerminated || mess.Session.PacketCount > maxPacketCount || mess.Session.ByteCount > maxTrafficSize {
+		// FIXME need to detect and log when a session ends before it meets the criteria for logging here
+		logEvent(mess.Session, application, protochain, detail, confidence, category)
+		result.SessionRelease = true
+		return result
+	}
+
+	if changed {
+		logEvent(mess.Session, application, protochain, detail, confidence, category)
+	}
+
+	return result
+}
+
+// parseReply parses a reply from classd and returns
+// (application, protochain, detail, confidence, category, state)
+func parseReply(replyString string) (string, string, string, uint64, string, int) {
+	var err error
+	var application string
+	var protochain string
+	var detail string
+	var confidence uint64
+	var category string
+	var state int
+
+	catinfo := strings.Split(replyString, "\r\n")
 
 	for i := 0; i < len(catinfo); i++ {
 		if len(catinfo[i]) < 3 {
@@ -190,82 +223,33 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 			continue
 		}
 
-		pairflag = false
-
 		if catpair[0] == "APPLICATION: " {
-			pairname = "ClassifyApplication"
-			pairdata = catpair[1]
-			pairflag = true
-			reportsApplication = pairdata
-		}
-
-		if catpair[0] == "PROTOCHAIN: " {
-			pairname = "ClassifyProtochain"
-			pairdata = catpair[1]
-			pairflag = true
-			reportsProtochain = pairdata
-		}
-
-		if catpair[0] == "DETAIL: " {
-			pairname = "ClassifyDetail"
-			pairdata = catpair[1]
-			pairflag = true
-			reportsDetail = pairdata
-		}
-
-		if catpair[0] == "CONFIDENCE: " {
-			pairname = "ClassifyConfidence"
-			pairdata = catpair[1]
-			pairflag = true
-			reportsConfidence, err = strconv.ParseUint(pairdata, 10, 64)
+			application = catpair[1]
+		} else if catpair[0] == "PROTOCHAIN: " {
+			protochain = catpair[1]
+		} else if catpair[0] == "DETAIL: " {
+			detail = catpair[1]
+		} else if catpair[0] == "CONFIDENCE: " {
+			confidence, err = strconv.ParseUint(catpair[1], 10, 64)
 			if err != nil {
-				reportsConfidence = 0
+				confidence = 0
+			}
+		} else if catpair[0] == "STATE: " {
+			state, err = strconv.Atoi(catpair[1])
+			if err != nil {
+				state = 0
 			}
 		}
-
-		if catpair[0] == "STATE: " {
-			pairname = "ClassifyState"
-			pairdata = catpair[1]
-			pairflag = true
-			stateval, err = strconv.Atoi(pairdata)
-			if err != nil {
-				stateval = 0
-			}
-		}
-
-		// continue if the tag is something we don't want
-		if pairflag == false {
-			continue
-		}
-
-		// continue if the tag has no data
-		if len(pairdata) == 0 {
-			continue
-		}
-
-		updateClassifyDetail(mess, ctid, pairname, pairdata)
 	}
 
 	// lookup the category in the application table
-	appinfo, finder := applicationTable[reportsApplication]
+	appinfo, finder := applicationTable[application]
 	if finder == true {
-		reportsCategory = appinfo.category
+		category = appinfo.category
 	}
 
-	if len(reportsCategory) > 0 {
-		updateClassifyDetail(mess, ctid, "ClassifyCategory", reportsCategory)
-	}
+	return application, protochain, detail, confidence, category, state
 
-	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, we log an event and release
-	if stateval == navlStateClassified || stateval == navlStateTerminated || mess.Session.PacketCount > maxPacketCount || mess.Session.ByteCount > maxTrafficSize {
-		// FIXME need to detect and log when a session ends before it meets the criteria for logging here
-		logEvent(mess.Session, reportsApplication, reportsProtochain, reportsDetail, reportsConfidence, reportsCategory)
-		result.SessionRelease = true
-	}
-
-	logEvent(mess.Session, reportsApplication, reportsProtochain, reportsDetail, reportsConfidence, "")
-
-	return result
 }
 
 func logEvent(session *dispatch.SessionEntry, application string, protochain string, detail string, confidence uint64, category string) {
@@ -442,23 +426,24 @@ func loadApplicationTable() {
 	}
 }
 
-func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname string, pairdata string) {
+func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname string, pairdata interface{}) bool {
 	// if the session doesn't have this attachment yet we add it and write to the dictionary
 	if mess.Session.Attachments[pairname] == nil {
 		mess.Session.Attachments[pairname] = pairdata
 		dict.AddSessionEntry(ctid, pairname, pairdata)
 		logger.LogDebug(logsrc, "Setting classification detail %s = %s\n", pairname, pairdata)
-		return
+		return true
 	}
 
 	// if the session has the attachment and it has not changed just return
-	if strings.Compare(mess.Session.Attachments[pairname].(string), pairdata) == 0 {
-		logger.LogTrace(logsrc, "Ignoring classification detail %s = %s\n", pairname, pairdata)
-		return
+	if mess.Session.Attachments[pairname] == pairdata {
+		logger.LogTrace(logsrc, "Ignoring classification detail %s = %v\n", pairname, pairdata)
+		return false
 	}
 
 	// at this point the session has the attachment but the data has changed so we update the session and the dictionary
 	mess.Session.Attachments[pairname] = pairdata
 	dict.AddSessionEntry(ctid, pairname, pairdata)
 	logger.LogDebug(logsrc, "Updating classification detail %s = %s\n", pairname, pairdata)
+	return true
 }
