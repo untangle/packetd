@@ -2,6 +2,7 @@ package restd
 
 import (
 	"fmt"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
@@ -20,6 +21,13 @@ func Startup() {
 	gin.DisableConsoleColor()
 	gin.DefaultWriter = logger.NewLogWriter("restd")
 	engine = gin.Default()
+
+	// FIXME allow cross-site for dev
+	// this should be disable for production
+	// or moved to an option
+	config := cors.DefaultConfig()
+	config.AllowAllOrigins = true
+	engine.Use(cors.New(config))
 
 	// routes
 	engine.GET("/ping", pingHandler)
@@ -169,10 +177,8 @@ func removeEmptyStrings(strings []string) []string {
 }
 
 func addHeaders(c *gin.Context) {
-	// FIXME
-	// This should be removed at some point
-	// For development
-	c.Header("Access-Control-Allow-Origin", "*")
-	c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE")
-	c.Header("Access-Control-Allow-Headers", "X-Custom-Header")
+	// c.Header("Example-Header", "foo")
+	// c.Header("Access-Control-Allow-Origin", "*")
+	// c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE")
+	// c.Header("Access-Control-Allow-Headers", "X-Custom-Header")
 }
