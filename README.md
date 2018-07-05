@@ -14,10 +14,30 @@ You'll need an Untangle mirror to get the patched libnetfilter-queue-dev:
 apt-get install libnetfilter-log-dev libnetfilter-queue-dev libnetfilter-conntrack-dev
 ```
 
+You will also need to install several golang packages dependencies:
+
+```
+go get -u github.com/gin-gonic/gin
+go get -u github.com/google/gopacket
+go get -u github.com/mattn/go-sqlite3
+go get -u github.com/oschwald/geoip2-golang
+```
+
 Then build the regular way:
 
 ```
 go build
+```
+
+If you want to use the golint tool, you can install it with this command:
+```
+go get -u golang.org/x/lint/golint
+```
+
+You can run golint with the following command: (assumes GOPATH=~/golang)
+
+```
+~/golang/bin/golint github.com/untangle/packetd/...
 ```
 
 Building in docker

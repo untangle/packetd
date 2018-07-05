@@ -159,7 +159,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	var changed bool
 	changed = changed || updateClassifyDetail(mess, ctid, "application", application)
-	changed = changed || updateClassifyDetail(mess, ctid, "application_protochain", application)
+	changed = changed || updateClassifyDetail(mess, ctid, "application_protochain", protochain)
 	changed = changed || updateClassifyDetail(mess, ctid, "application_detail", detail)
 	changed = changed || updateClassifyDetail(mess, ctid, "application_confidence", confidence)
 	changed = changed || updateClassifyDetail(mess, ctid, "application_category", category)

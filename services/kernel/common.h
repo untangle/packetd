@@ -22,6 +22,7 @@
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
 #include <linux/netfilter.h>
+#include <linux/netfilter/nfnetlink_queue.h>
 #include <libnetfilter_conntrack/libnetfilter_conntrack.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
 #include <libnetfilter_log/libnetfilter_log.h>
