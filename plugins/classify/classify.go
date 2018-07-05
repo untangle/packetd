@@ -7,6 +7,7 @@ package classify
 import (
 	"bufio"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
@@ -117,55 +118,34 @@ func SetHostPort(value string) {
 // packet directly to the Sandvine NAVL library for classification, and
 // push the results to the conntrack dictionary.
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
+	var reply string
+	var err error
 	var result dispatch.NfqueueResult
 	result.Owner = logsrc
 	result.PacketMark = 0
 	result.SessionRelease = false
 
-	var status string
-	var proto string
-	var err error
-
-	if mess.UDPlayer != nil {
-		proto = "UDP"
-	} else if mess.TCPlayer != nil {
-		proto = "TCP"
-	} else {
+	// sanity checks
+	if mess.Session == nil {
+		logger.LogErr(logsrc, "Invalid event!\n")
+		result.SessionRelease = true
+		return result
+	}
+	if mess.UDPlayer == nil && mess.TCPlayer == nil {
 		// FIXME unsupported protocol
 		// Which protocols do we support: TCP/UDP... ICMP? Others?
-		if mess.Session != nil {
-			logger.LogErr(logsrc, "Unsupported protocol: %v\n", mess.Session.ClientSideTuple.Protocol)
-		} else {
-			logger.LogErr(logsrc, "Unsupported protocol\n")
-		}
-
+		logger.LogErr(logsrc, "Unsupported protocol: %v\n", mess.Session.ClientSideTuple.Protocol)
 		result.SessionRelease = true
 		return result
 	}
 
-	// if this is the first packet of the session we send a session create command
-	if newSession {
-		status, err = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.Session.ClientSideTuple.ClientAddress, mess.Session.ClientSideTuple.ClientPort, mess.Session.ClientSideTuple.ServerAddress, mess.Session.ClientSideTuple.ServerPort)
-		if err != nil {
-			logger.LogErr(logsrc, "daemonCommand error: %s\n", err.Error())
-			return result
-		}
-		logger.LogTrace(logsrc, "daemonCommand result: %s\n", status)
-	}
-
-	// send the application payload to the daemon
-	if mess.Session.ClientSideTuple.ClientAddress.Equal(mess.IPlayer.SrcIP) {
-		status, err = daemonCommand(mess.Payload, "CLIENT:%d:%d\r\n", ctid, len(mess.Payload))
-	} else {
-		status, err = daemonCommand(mess.Payload, "SERVER:%d:%d\r\n", ctid, len(mess.Payload))
-	}
-
+	// send the data to classd and read reply
+	reply, err = sendCommand(mess, ctid, newSession)
 	if err != nil {
-		logger.LogErr(logsrc, "daemonCommand error: %s\n", err.Error())
+		logger.LogErr(logsrc, "classd communication error: %v\n", err)
+		result.SessionRelease = true
 		return result
 	}
-
-	logger.LogTrace(logsrc, "daemonCommand result: %s\n", status)
 
 	var application string
 	var protochain string
@@ -174,31 +154,69 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var category string
 	var state int
 
-	application, protochain, detail, confidence, category, state = parseReply(status)
+	// parse update classd information from reply
+	application, protochain, detail, confidence, category, state = parseReply(reply)
 
 	var changed bool
-
 	changed = changed || updateClassifyDetail(mess, ctid, "application", application)
 	changed = changed || updateClassifyDetail(mess, ctid, "application_protochain", application)
 	changed = changed || updateClassifyDetail(mess, ctid, "application_detail", detail)
 	changed = changed || updateClassifyDetail(mess, ctid, "application_confidence", confidence)
-	if len(category) > 0 {
-		changed = changed || updateClassifyDetail(mess, ctid, "application_category", category)
+	changed = changed || updateClassifyDetail(mess, ctid, "application_category", category)
+
+	// if something changed, log a new event
+	if changed {
+		logEvent(mess.Session, application, protochain, detail, confidence, category)
 	}
 
 	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, we log an event and release
 	if state == navlStateClassified || state == navlStateTerminated || mess.Session.PacketCount > maxPacketCount || mess.Session.ByteCount > maxTrafficSize {
 		// FIXME need to detect and log when a session ends before it meets the criteria for logging here
-		logEvent(mess.Session, application, protochain, detail, confidence, category)
 		result.SessionRelease = true
 		return result
 	}
 
-	if changed {
-		logEvent(mess.Session, application, protochain, detail, confidence, category)
+	return result
+}
+
+// sendCommand sends classd the commands and returns the reply
+func sendCommand(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) (string, error) {
+	var proto string
+	var reply string
+	var err error
+
+	if mess.UDPlayer != nil {
+		proto = "UDP"
+	} else if mess.TCPlayer != nil {
+		proto = "TCP"
+	} else {
+		return "", errors.New("Unsupported protocol")
 	}
 
-	return result
+	// if this is the first packet of the session we send a session create command
+	if newSession {
+		reply, err = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.Session.ClientSideTuple.ClientAddress, mess.Session.ClientSideTuple.ClientPort, mess.Session.ClientSideTuple.ServerAddress, mess.Session.ClientSideTuple.ServerPort)
+		if err != nil {
+			logger.LogErr(logsrc, "daemonCommand error: %s\n", err.Error())
+			return "", err
+		}
+		logger.LogTrace(logsrc, "daemonCommand result: %s\n", reply)
+	}
+
+	// send the application payload to the daemon
+	if mess.Session.ClientSideTuple.ClientAddress.Equal(mess.IPlayer.SrcIP) {
+		reply, err = daemonCommand(mess.Payload, "CLIENT:%d:%d\r\n", ctid, len(mess.Payload))
+	} else {
+		reply, err = daemonCommand(mess.Payload, "SERVER:%d:%d\r\n", ctid, len(mess.Payload))
+	}
+
+	if err != nil {
+		logger.LogErr(logsrc, "daemonCommand error: %s\n", err.Error())
+		return "", err
+	}
+
+	logger.LogTrace(logsrc, "daemonCommand result: %s\n", reply)
+	return reply, nil
 }
 
 // parseReply parses a reply from classd and returns
