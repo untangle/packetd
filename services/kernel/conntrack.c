@@ -43,9 +43,6 @@ static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrac
 	info.family = nfct_get_attr_u8(ct,ATTR_ORIG_L3PROTO);
 	info.orig_proto = nfct_get_attr_u8(ct,ATTR_ORIG_L4PROTO);
 
-	// ignore everything except TCP and UDP
-	if ((info.orig_proto != IPPROTO_TCP) && (info.orig_proto != IPPROTO_UDP)) return(NFCT_CB_CONTINUE);
-
 	// get the conntrack ID
 	info.conn_id = nfct_get_attr_u32(ct, ATTR_ID);
 

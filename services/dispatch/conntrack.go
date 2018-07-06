@@ -67,7 +67,7 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 
 	if conntrackEntryFound {
 		conntrackEntry.EventCount++
-		logger.LogTrace(logsrc, "conntrack event[%d,%c]: %v \n", ctid, eventType, conntrackEntry.ClientSideTuple)
+		logger.LogTrace(logsrc, "conntrack event[%d,%c]: %s \n", ctid, eventType, conntrackEntry.ClientSideTuple)
 	} else {
 		conntrackEntry = new(ConntrackEntry)
 		conntrackEntry.ConntrackID = ctid
@@ -103,22 +103,24 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 				//those conntrack IDs get re-used instantly
 				//however, if this was conntrack confirmed - something is very wrong
 				//and we seem to be re-using conntrack IDs when not expected!
+				var logLevel int = logger.LogLevelDebug
 				if session.ConntrackConfirmed {
-					logger.LogErr(logsrc, "Conntrack ID Mismatch! %d conntrack:%v session:%v\n",
-						ctid,
-						conntrackEntry.ClientSideTuple,
-						session.ClientSideTuple)
-					panic("CONNTRACK ID RE-USE DETECTED")
-				} else {
-					logger.LogDebug(logsrc, "Conntrack ID Mismatch! %d conntrack:%v session:%v\n",
-						ctid,
-						conntrackEntry.ClientSideTuple,
-						session.ClientSideTuple)
-					logger.LogDebug(logsrc, "Removing stale session %d %v\n", ctid, session.ClientSideTuple)
-					removeSessionEntry(ctid)
-					session = nil
+					// if conntrack has been confirmed, this is an error
+					// so increase log level
+					logLevel = logger.LogLevelErr
+				}
+				if logger.IsLogEnabled(logsrc, logLevel) {
+					logger.LogMessage(logLevel, logsrc, "Conntrack Mismatch! %d\n", ctid)
+					logger.LogMessage(logLevel, logsrc, "  Packet     Tuple: %s\n", conntrackEntry.ClientSideTuple)
+					logger.LogMessage(logLevel, logsrc, "  ClientSide Tuple: %s\n", session.ClientSideTuple)
 				}
 
+				if session.ConntrackConfirmed {
+					panic("CONNTRACK ID RE-USE DETECTED")
+				}
+				logger.LogDebug(logsrc, "Removing stale session %d %v\n", ctid, session.ClientSideTuple)
+				removeSessionEntry(ctid)
+				session = nil
 			}
 		}
 		insertConntrackEntry(ctid, conntrackEntry)

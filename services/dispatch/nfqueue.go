@@ -121,22 +121,30 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		session.PacketCount++
 		session.ByteCount += uint64(packetLength)
 		session.EventCount++
+		// the packet tuple should either match the client side tuple
+		// or
 		if !session.ClientSideTuple.Equal(mess.Tuple) && !session.ServerSideTuple.EqualReverse(mess.Tuple) {
+			var logLevel int = logger.LogLevelDebug
 			if session.ConntrackConfirmed {
-				logger.LogErr(logsrc, "Conntrack ID Mismatch! %d nfqueue:%v session:%v\n",
-					ctid,
-					mess.Tuple,
-					session.ClientSideTuple)
-				panic("CONNTRACK ID RE-USE DETECTED")
-			} else {
-				logger.LogDebug(logsrc, "Conntrack ID Mismatch! %d nfqueue:%v session:%v\n",
-					ctid,
-					mess.Tuple,
-					session.ClientSideTuple)
-				logger.LogDebug(logsrc, "Removing stale session %d %v\n", ctid, session.ClientSideTuple)
-				removeSessionEntry(ctid)
-				session = nil
+				// if conntrack has been confirmed, this is an error
+				// so increase log level
+				logLevel = logger.LogLevelErr
 			}
+			if logger.IsLogEnabled(logsrc, logLevel) {
+				logger.LogMessage(logLevel, logsrc, "Conntrack ID Mismatch! %d\n", ctid)
+				logger.LogMessage(logLevel, logsrc, "  Packet     Tuple: %s\n", mess.Tuple)
+				logger.LogMessage(logLevel, logsrc, "  ClientSide Tuple: %s\n", session.ClientSideTuple.String())
+				logger.LogMessage(logLevel, logsrc, "  ServerSide Tuple: %s\n", session.ServerSideTuple.StringReverse())
+			}
+
+			if session.ConntrackConfirmed {
+				panic("CONNTRACK ID RE-USE DETECTED")
+			}
+			if logger.IsDebugEnabled(logsrc) {
+				logger.LogDebug(logsrc, "Removing stale session %d %v\n", ctid, session.ClientSideTuple)
+			}
+			removeSessionEntry(ctid)
+			session = nil
 		}
 
 	}
