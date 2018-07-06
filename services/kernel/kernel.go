@@ -8,7 +8,6 @@ package kernel
 import "C"
 
 import (
-	"encoding/binary"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/untangle/packetd/services/logger"
@@ -19,7 +18,7 @@ import (
 )
 
 // ConntrackCallback is a function to handle conntrack events
-type ConntrackCallback func(uint32, uint8, uint8, net.IP, net.IP, uint16, uint16, net.IP, net.IP, uint16, uint16, uint64, uint64)
+type ConntrackCallback func(uint32, uint8, uint8, uint8, net.IP, net.IP, uint16, uint16, net.IP, net.IP, uint16, uint16, uint64, uint64)
 
 // NfqueueCallback is a function to handle nfqueue events
 type NfqueueCallback func(uint32, gopacket.Packet, int, uint32) uint32
@@ -112,7 +111,13 @@ func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint
 
 		// create a Go pointer and gopacket from the packet data
 		pointer := (*[0xFFFF]byte)(unsafe.Pointer(data))[:int(size):int(size)]
-		packet = gopacket.NewPacket(pointer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
+
+		if pointer[0]&0xF0 == 0x40 {
+			packet = gopacket.NewPacket(pointer, layers.LayerTypeIPv4, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
+		} else {
+			packet = gopacket.NewPacket(pointer, layers.LayerTypeIPv6, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
+		}
+
 		packetLength = int(size)
 
 		newMark := nfqueueCallback(conntrackID, packet, packetLength, pmark)
@@ -127,6 +132,7 @@ func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint
 //export go_conntrack_callback
 func go_conntrack_callback(info *C.struct_conntrack_info) {
 	var ctid uint32
+	var family uint8
 	var eventType uint8
 	var c2sBytes uint64
 	var s2cBytes uint64
@@ -146,28 +152,52 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	}
 
 	ctid = uint32(info.conn_id)
+	family = uint8(info.family)
 	eventType = uint8(info.msg_type)
 	c2sBytes = uint64(info.orig_bytes)
 	s2cBytes = uint64(info.repl_bytes)
-
 	protocol = uint8(info.orig_proto)
 
-	client = make(net.IP, 4) // FIXME IPv6
-	server = make(net.IP, 4) // FIXME IPv6
-	binary.LittleEndian.PutUint32(client, uint32(info.orig_4saddr.s_addr))
-	binary.LittleEndian.PutUint32(server, uint32(info.orig_4daddr.s_addr))
+	if family == C.AF_INET {
+		client = make(net.IP, 4)
+		server = make(net.IP, 4)
+		clientNew = make(net.IP, 4)
+		serverNew = make(net.IP, 4)
 
-	clientNew = make(net.IP, 4) // FIXME IPv6
-	serverNew = make(net.IP, 4) // FIXME IPv6
-	binary.LittleEndian.PutUint32(clientNew, uint32(info.repl_4daddr.s_addr))
-	binary.LittleEndian.PutUint32(serverNew, uint32(info.repl_4saddr.s_addr))
+		origSptr := *(*[4]byte)(unsafe.Pointer(&info.orig_saddr))
+		origDptr := *(*[4]byte)(unsafe.Pointer(&info.orig_daddr))
+		replSptr := *(*[4]byte)(unsafe.Pointer(&info.repl_saddr))
+		replDptr := *(*[4]byte)(unsafe.Pointer(&info.repl_daddr))
+
+		copy(client, origSptr[:])
+		copy(server, origDptr[:])
+		copy(clientNew, replDptr[:])
+		copy(serverNew, replSptr[:])
+	}
+
+	if family == C.AF_INET6 {
+		client = make(net.IP, 16)
+		server = make(net.IP, 16)
+		clientNew = make(net.IP, 16)
+		serverNew = make(net.IP, 16)
+
+		origSptr := *(*[16]byte)(unsafe.Pointer(&info.orig_saddr))
+		origDptr := *(*[16]byte)(unsafe.Pointer(&info.orig_daddr))
+		replSptr := *(*[16]byte)(unsafe.Pointer(&info.repl_saddr))
+		replDptr := *(*[16]byte)(unsafe.Pointer(&info.repl_daddr))
+
+		copy(client, origSptr[:])
+		copy(server, origDptr[:])
+		copy(clientNew, replDptr[:])
+		copy(serverNew, replSptr[:])
+	}
 
 	clientPort = uint16(info.orig_sport)
 	serverPort = uint16(info.orig_dport)
 	clientPortNew = uint16(info.repl_dport)
 	serverPortNew = uint16(info.repl_sport)
 
-	conntrackCallback(ctid, eventType, protocol,
+	conntrackCallback(ctid, family, eventType, protocol,
 		client, server, clientPort, serverPort,
 		clientNew, serverNew, clientPortNew, serverPortNew,
 		c2sBytes, s2cBytes)

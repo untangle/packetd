@@ -54,7 +54,7 @@ func InsertConntrackSubscription(owner string, priority int, function ConntrackH
 }
 
 // conntrackCallback is the global conntrack event handler
-func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
+func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint8,
 	client net.IP, server net.IP, clientPort uint16, serverPort uint16,
 	clientNew net.IP, serverNew net.IP, clientPortNew uint16, serverPortNew uint16,
 	c2sBytes uint64, s2cBytes uint64) {

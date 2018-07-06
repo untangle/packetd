@@ -29,25 +29,22 @@
 #include <libnfnetlink/libnfnetlink.h>
 
 /*
- * We have variables for IPv4 and IPv6 address and our
- * conntrack callback handler will fill the appropriate
- * vars based on the value of family (AF_INET or AF_INET6)
+ * We have a single set of variables for the orig and repl source and
+ * destination addresses that are large enough to hold either an IPv4
+ * or an IPv6 address. The callback handler will extract the correct
+ * data and fill them based on the value of family (AF_INET or AF_INET6)
  */
 struct conntrack_info {
 	u_int8_t		msg_type;
 	u_int8_t		family;
 	u_int32_t		conn_id;
 	u_int8_t		orig_proto;
-	struct in_addr	orig_4saddr;
-	struct in_addr	orig_4daddr;
-	struct in6_addr	orig_6saddr;
-	struct in6_addr	orig_6daddr;
+	char			orig_saddr[16];
+	char			orig_daddr[16];
+	char			repl_saddr[16];
+	char			repl_daddr[16];
 	u_int16_t		orig_sport;
 	u_int16_t		orig_dport;
-	struct in_addr	repl_4saddr;
-	struct in_addr	repl_4daddr;
-	struct in6_addr	repl_6saddr;
-	struct in6_addr	repl_6daddr;
 	u_int16_t		repl_sport;
 	u_int16_t		repl_dport;
 	u_int64_t		orig_bytes;

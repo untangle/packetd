@@ -48,24 +48,19 @@ static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrac
 
 	// get the orig and repl source and destination addresses
 	if (info.family == AF_INET) {
-		memcpy(&info.orig_4saddr,nfct_get_attr(ct,ATTR_ORIG_IPV4_SRC),sizeof(info.orig_4saddr));
-		memcpy(&info.orig_4daddr,nfct_get_attr(ct,ATTR_ORIG_IPV4_DST),sizeof(info.orig_4daddr));
-		memcpy(&info.repl_4saddr,nfct_get_attr(ct,ATTR_REPL_IPV4_SRC),sizeof(info.repl_4saddr));
-		memcpy(&info.repl_4daddr,nfct_get_attr(ct,ATTR_REPL_IPV4_DST),sizeof(info.repl_4daddr));
+		memcpy(&info.orig_saddr,nfct_get_attr(ct,ATTR_ORIG_IPV4_SRC),4);
+		memcpy(&info.orig_daddr,nfct_get_attr(ct,ATTR_ORIG_IPV4_DST),4);
+		memcpy(&info.repl_saddr,nfct_get_attr(ct,ATTR_REPL_IPV4_SRC),4);
+		memcpy(&info.repl_daddr,nfct_get_attr(ct,ATTR_REPL_IPV4_DST),4);
 	} else if (info.family == AF_INET6) {
-		memcpy(&info.orig_6saddr,nfct_get_attr(ct,ATTR_ORIG_IPV6_SRC),sizeof(info.orig_6saddr));
-		memcpy(&info.orig_6daddr,nfct_get_attr(ct,ATTR_ORIG_IPV6_DST),sizeof(info.orig_6daddr));
-		memcpy(&info.repl_6saddr,nfct_get_attr(ct,ATTR_REPL_IPV6_SRC),sizeof(info.repl_6saddr));
-		memcpy(&info.repl_6daddr,nfct_get_attr(ct,ATTR_REPL_IPV6_DST),sizeof(info.repl_6daddr));
+		memcpy(&info.orig_saddr,nfct_get_attr(ct,ATTR_ORIG_IPV6_SRC),16);
+		memcpy(&info.orig_daddr,nfct_get_attr(ct,ATTR_ORIG_IPV6_DST),16);
+		memcpy(&info.repl_saddr,nfct_get_attr(ct,ATTR_REPL_IPV6_SRC),16);
+		memcpy(&info.repl_daddr,nfct_get_attr(ct,ATTR_REPL_IPV6_DST),16);
 	} else {
 		tracker_garbage++;
 		return(NFCT_CB_CONTINUE);
 	}
-
-	// ignore anything on the loopback interface by looking at the least
-	// significant byte because these values are in network byte order
-	if ((info.orig_4saddr.s_addr & 0x000000FF) == 0x0000007F) return(NFCT_CB_CONTINUE);
-	if ((info.orig_4daddr.s_addr & 0x000000FF) == 0x0000007F) return(NFCT_CB_CONTINUE);
 
 	// get all of the source and destination ports
 	info.orig_sport = be16toh(nfct_get_attr_u16(ct,ATTR_ORIG_PORT_SRC));
