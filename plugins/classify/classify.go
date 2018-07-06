@@ -158,17 +158,29 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	// parse update classd information from reply
 	appid, name, protochain, detail, confidence, category, state = parseReply(reply)
 
-	var changed bool
-	changed = changed || updateClassifyDetail(mess, ctid, "application_id", appid)
-	changed = changed || updateClassifyDetail(mess, ctid, "application_name", name)
-	changed = changed || updateClassifyDetail(mess, ctid, "application_protochain", protochain)
-	changed = changed || updateClassifyDetail(mess, ctid, "application_detail", detail)
-	changed = changed || updateClassifyDetail(mess, ctid, "application_confidence", confidence)
-	changed = changed || updateClassifyDetail(mess, ctid, "application_category", category)
+	var changed []string
+	if updateClassifyDetail(mess, ctid, "application_id", appid) {
+		changed = append(changed, "application_id")
+	}
+	if updateClassifyDetail(mess, ctid, "application_name", name) {
+		changed = append(changed, "application_name")
+	}
+	if updateClassifyDetail(mess, ctid, "application_protochain", protochain) {
+		changed = append(changed, "application_protochain")
+	}
+	if updateClassifyDetail(mess, ctid, "application_detail", detail) {
+		changed = append(changed, "application_detail")
+	}
+	if updateClassifyDetail(mess, ctid, "application_confidence", confidence) {
+		changed = append(changed, "application_confidence")
+	}
+	if updateClassifyDetail(mess, ctid, "application_category", category) {
+		changed = append(changed, "application_category")
+	}
 
 	// if something changed, log a new event
-	if changed {
-		logEvent(mess.Session, appid, name, protochain, detail, confidence, category)
+	if len(changed) > 0 {
+		logEvent(mess.Session, changed)
 	}
 
 	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, we log an event and release
@@ -279,20 +291,29 @@ func parseReply(replyString string) (string, string, string, string, uint64, str
 }
 
 // logEvent logs a session_classify event that updtase the application_* columns
-func logEvent(session *dispatch.SessionEntry, appid string, name string, protochain string, detail string, confidence uint64, category string) {
+// provide the session and the changed column names
+func logEvent(session *dispatch.SessionEntry, changed []string) {
+	if len(changed) == 0 {
+		return
+	}
 	columns := map[string]interface{}{
 		"session_id": session.SessionID,
 	}
-	modifiedColumns := map[string]interface{}{
-		"application_id":         appid,
-		"application_name":       name,
-		"application_protochain": protochain,
-		"application_detail":     detail,
-		"application_category":   category,
-		"application_confidence": confidence,
+	modifiedColumns := make(map[string]interface{})
+	for _, v := range changed {
+		modifiedColumns[v] = session.Attachments[v]
 	}
+	allColumns := map[string]interface{}{
+		"application_id":         session.Attachments["application_id"],
+		"application_name":       session.Attachments["application_name"],
+		"application_protochain": session.Attachments["application_protochain"],
+		"application_detail":     session.Attachments["application_detail"],
+		"application_category":   session.Attachments["application_category"],
+		"application_confidence": session.Attachments["application_confidence"],
+	}
+
 	reports.LogEvent(reports.CreateEvent("session_classify", "sessions", 2, columns, modifiedColumns, session.Attachments))
-	session.Attachments["session_classify"] = modifiedColumns
+	session.Attachments["session_classify"] = allColumns
 }
 
 // daemonCommand will send a command to the untangle-classd daemon and return the result message

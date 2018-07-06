@@ -92,9 +92,8 @@ func IsLogEnabled(source string, level int) bool {
 	item, stat := appLogLevel[source]
 	if stat == true {
 		return (item >= level)
-	} else {
-		return false
 	}
+	return false
 }
 
 // LogEmerg is called for log level EMERG messages
