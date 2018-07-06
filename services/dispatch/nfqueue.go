@@ -132,9 +132,9 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			}
 			if logger.IsLogEnabled(logLevel) {
 				logger.LogMessage(logLevel, "Conntrack ID Mismatch! %d\n", ctid)
-				logger.LogMessage(logLevel, "  Packet     Tuple: %s\n", mess.Tuple)
-				logger.LogMessage(logLevel, "  ClientSide Tuple: %s\n", session.ClientSideTuple.String())
-				logger.LogMessage(logLevel, "  ServerSide Tuple: %s\n", session.ServerSideTuple.StringReverse())
+				logger.LogMessage(logLevel, "  Packet Tuple: %s\n", mess.Tuple)
+				logger.LogMessage(logLevel, "  Orig   Tuple: %s\n", session.ClientSideTuple.String())
+				logger.LogMessage(logLevel, "  Reply  Tuple: %s\n", session.ServerSideTuple.StringReverse())
 			}
 
 			if session.ConntrackConfirmed {
