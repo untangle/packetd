@@ -26,7 +26,6 @@ import (
 	"time"
 )
 
-var logsrc = "packetd"
 var exitLock sync.Mutex
 
 func main() {
@@ -66,20 +65,20 @@ func main() {
 	// Loop forever
 	for {
 		time.Sleep(600 * time.Second)
-		logger.LogInfo(logsrc, ".\n")
+		logger.LogInfo(".\n")
 
 		var mem runtime.MemStats
 		runtime.ReadMemStats(&mem)
-		logger.LogDebug(logsrc, "Memory Stats:\n")
-		logger.LogDebug(logsrc, "Memory Alloc: %d\n", mem.Alloc)
-		logger.LogDebug(logsrc, "Memory TotalAlloc: %d\n", mem.TotalAlloc)
-		logger.LogDebug(logsrc, "Memory HeapAlloc: %d\n", mem.HeapAlloc)
-		logger.LogDebug(logsrc, "Memory HeapSys: %d\n", mem.HeapSys)
+		logger.LogDebug("Memory Stats:\n")
+		logger.LogDebug("Memory Alloc: %d\n", mem.Alloc)
+		logger.LogDebug("Memory TotalAlloc: %d\n", mem.TotalAlloc)
+		logger.LogDebug("Memory HeapAlloc: %d\n", mem.HeapAlloc)
+		logger.LogDebug("Memory HeapSys: %d\n", mem.HeapSys)
 	}
 }
 
 func printVersion() {
-	logger.LogInfo(logsrc, "Untangle Packet Daemon Version %s\n", Version)
+	logger.LogInfo("Untangle Packet Daemon Version %s\n", Version)
 }
 
 // parseArguments parses the command line arguments
@@ -107,18 +106,18 @@ func cleanup() {
 	exitLock.Lock()
 
 	// Remove netfilter rules
-	logger.LogInfo(logsrc, "Removing netfilter rules...\n")
+	logger.LogInfo("Removing netfilter rules...\n")
 	removeRules()
 
 	// Stop kernel callbacks
-	logger.LogInfo(logsrc, "Removing kernel hooks...\n")
+	logger.LogInfo("Removing kernel hooks...\n")
 	kernel.StopCallbacks()
 
 	// Stop all plugins
 	stopPlugins()
 
 	// Stop services
-	logger.LogInfo(logsrc, "Shutting down services...\n")
+	logger.LogInfo("Shutting down services...\n")
 	syscmd.Shutdown()
 	reports.Shutdown()
 	settings.Shutdown()
@@ -182,7 +181,7 @@ func handleSignals() {
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-ch
-		logger.LogWarn(logsrc, "Received signal [%v]. Exiting...\n", sig)
+		logger.LogWarn("Received signal [%v]. Exiting...\n", sig)
 		cleanup()
 		os.Exit(1)
 	}()
@@ -192,7 +191,7 @@ func handleSignals() {
 func updateRules() {
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
-		logger.LogErr(logsrc, "Error determining directory: %s\n", err.Error())
+		logger.LogErr("Error determining directory: %s\n", err.Error())
 		return
 	}
 	syscmd.SystemCommand(dir+"/packetd_rules", []string{})
@@ -202,7 +201,7 @@ func updateRules() {
 func removeRules() {
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
-		logger.LogErr(logsrc, "Error determining directory: %s\n", err.Error())
+		logger.LogErr("Error determining directory: %s\n", err.Error())
 		return
 	}
 	syscmd.SystemCommand(dir+"/packetd_rules", []string{"-r"})

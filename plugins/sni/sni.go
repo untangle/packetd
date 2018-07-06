@@ -6,17 +6,15 @@ import (
 	"github.com/untangle/packetd/services/logger"
 )
 
-var logsrc = "sni"
-
 // PluginStartup function is called to allow plugin specific initialization.
 func PluginStartup() {
-	logger.LogInfo(logsrc, "PluginStartup(%s) has been called\n", logsrc)
-	dispatch.InsertNfqueueSubscription(logsrc, 2, PluginNfqueueHandler)
+	logger.LogInfo("PluginStartup(%s) has been called\n")
+	dispatch.InsertNfqueueSubscription("sni", 2, PluginNfqueueHandler)
 }
 
 // PluginShutdown function called when the daemon is shutting down.
 func PluginShutdown() {
-	logger.LogInfo(logsrc, "PluginShutdown(%s) has been called\n", logsrc)
+	logger.LogInfo("PluginShutdown(%s) has been called\n")
 }
 
 // PluginNfqueueHandler is called to handle nfqueue packet data. We only
@@ -24,7 +22,7 @@ func PluginShutdown() {
 // for a TLS ClientHello packet from which we extract the SNI hostname
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	result.Owner = logsrc
+	result.Owner = "sni"
 	result.PacketMark = 0
 	result.SessionRelease = false
 
@@ -39,7 +37,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// if we found the hostname write to the dictionary and release the session
 	if hostname != "" {
-		logger.LogDebug(logsrc, "Extracted SNI %s for %d\n", hostname, ctid)
+		logger.LogDebug("Extracted SNI %s for %d\n", hostname, ctid)
 		dict.AddSessionEntry(ctid, "ssl_sni", hostname)
 	}
 

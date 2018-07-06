@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -14,7 +15,6 @@ const logConfigFile = "/tmp/logconfig.js"
 var logLevelName = [...]string{"EMERG", "ALERT", "CRIT", "ERROR", "WARN", "NOTICE", "INFO", "DEBUG", "TRACE"}
 var appLogLevel map[string]int
 var launchTime time.Time
-var logsrc = "logger"
 
 //LogLevelEmerg = stdlog.h/LOG_EMERG
 const LogLevelEmerg = 0
@@ -53,7 +53,7 @@ func Startup() {
 	loadLoggerConfig()
 
 	// Set system logger to use our logger
-	log.SetOutput(NewLogWriter("log"))
+	log.SetOutput(NewLogWriter())
 }
 
 // Shutdown stops the logging service
@@ -62,17 +62,17 @@ func Shutdown() {
 }
 
 // LogMessage is called to write messages to the system log
-func LogMessage(level int, source string, format string, args ...interface{}) {
-	var ignore bool
+func LogMessage(level int, format string, args ...interface{}) {
+	caller, packagename, _, _ := findCaller()
 
-	item, stat := appLogLevel[source]
+	// if no log level defined, assume Info
+	var loglvl = LogLevelInfo
+
+	item, stat := appLogLevel[packagename]
 	if stat == true {
-		if item < level {
-			ignore = true
-		}
+		loglvl = item
 	}
-
-	if ignore == true {
+	if level > loglvl {
 		return
 	}
 
@@ -80,16 +80,43 @@ func LogMessage(level int, source string, format string, args ...interface{}) {
 	var elapsed = nowtime.Sub(launchTime)
 
 	if len(args) == 0 {
-		fmt.Printf("[%11.5f] %-6s %10s: %s", elapsed.Seconds(), logLevelName[level], source, format)
+		fmt.Printf("[%11.5f] %-6s %25s: %s", elapsed.Seconds(), logLevelName[level], caller, format)
 	} else {
 		buffer := fmt.Sprintf(format, args...)
-		fmt.Printf("[%11.5f] %-6s %10s: %s", elapsed.Seconds(), logLevelName[level], source, buffer)
+		fmt.Printf("[%11.5f] %-6s %25s: %s", elapsed.Seconds(), logLevelName[level], caller, buffer)
 	}
 }
 
-// IsLogEnabled retruns true if logging is enabled for the specified source at the specified level, false otherwise
-func IsLogEnabled(source string, level int) bool {
+// LogMessageSource is similar to LogMessage
+// except instead of using runtime to determine the caller/source
+// the source is specified manually
+func LogMessageSource(level int, source string, format string, args ...interface{}) {
+	// if no log level defined, assume Info
+	var loglvl = LogLevelInfo
+
 	item, stat := appLogLevel[source]
+	if stat == true {
+		loglvl = item
+	}
+	if level > loglvl {
+		return
+	}
+
+	nowtime := time.Now()
+	var elapsed = nowtime.Sub(launchTime)
+
+	if len(args) == 0 {
+		fmt.Printf("[%11.5f] %-6s %25s: %s", elapsed.Seconds(), logLevelName[level], source, format)
+	} else {
+		buffer := fmt.Sprintf(format, args...)
+		fmt.Printf("[%11.5f] %-6s %25s: %s", elapsed.Seconds(), logLevelName[level], source, buffer)
+	}
+}
+
+// IsLogEnabled retruns true if logging is enabled for the caller at the specified level, false otherwise
+func IsLogEnabled(level int) bool {
+	_, packagename, _, _ := findCaller()
+	item, stat := appLogLevel[packagename]
 	if stat == true {
 		return (item >= level)
 	}
@@ -97,104 +124,103 @@ func IsLogEnabled(source string, level int) bool {
 }
 
 // LogEmerg is called for log level EMERG messages
-func LogEmerg(source string, format string, args ...interface{}) {
-	LogMessage(LogLevelEmerg, source, format, args...)
+func LogEmerg(format string, args ...interface{}) {
+	LogMessage(LogLevelEmerg, format, args...)
 }
 
-// IsEmergEnabled returns true if EMERG logging is enable for the specified source
-func IsEmergEnabled(source string) bool {
-	return IsLogEnabled(source, LogLevelEmerg)
+// IsEmergEnabled returns true if EMERG logging is enable for the caller
+func IsEmergEnabled() bool {
+	return IsLogEnabled(LogLevelEmerg)
 }
 
 // LogAlert is called for log level ALERT messages
-func LogAlert(source string, format string, args ...interface{}) {
-	LogMessage(LogLevelAlert, source, format, args...)
+func LogAlert(format string, args ...interface{}) {
+	LogMessage(LogLevelAlert, format, args...)
 }
 
-// IsAlertEnabled returns true if ALERT logging is enable for the specified source
-func IsAlertEnabled(source string) bool {
-	return IsLogEnabled(source, LogLevelAlert)
+// IsAlertEnabled returns true if ALERT logging is enable for the caller
+func IsAlertEnabled() bool {
+	return IsLogEnabled(LogLevelAlert)
 }
 
 // LogCrit is called for log level CRIT messages
-func LogCrit(source string, format string, args ...interface{}) {
-	LogMessage(LogLevelCrit, source, format, args...)
+func LogCrit(format string, args ...interface{}) {
+	LogMessage(LogLevelCrit, format, args...)
 }
 
-// IsCritEnabled returns true if CRIT logging is enable for the specified source
-func IsCritEnabled(source string) bool {
-	return IsLogEnabled(source, LogLevelCrit)
+// IsCritEnabled returns true if CRIT logging is enable for the caller
+func IsCritEnabled() bool {
+	return IsLogEnabled(LogLevelCrit)
 }
 
 // LogErr is called for log level ERR messages
-func LogErr(source string, format string, args ...interface{}) {
-	LogMessage(LogLevelErr, source, format, args...)
+func LogErr(format string, args ...interface{}) {
+	LogMessage(LogLevelErr, format, args...)
 }
 
-// IsErrEnabled returns true if ERR logging is enable for the specified source
-func IsErrEnabled(source string) bool {
-	return IsLogEnabled(source, LogLevelErr)
+// IsErrEnabled returns true if ERR logging is enable for the caller
+func IsErrEnabled() bool {
+	return IsLogEnabled(LogLevelErr)
 }
 
 // LogWarn is called for log level WARN messages
-func LogWarn(source string, format string, args ...interface{}) {
-	LogMessage(LogLevelWarn, source, format, args...)
+func LogWarn(format string, args ...interface{}) {
+	LogMessage(LogLevelWarn, format, args...)
 }
 
-// IsWarnEnabled returns true if WARN logging is enable for the specified source
-func IsWarnEnabled(source string) bool {
-	return IsLogEnabled(source, LogLevelWarn)
+// IsWarnEnabled returns true if WARN logging is enable for the caller
+func IsWarnEnabled() bool {
+	return IsLogEnabled(LogLevelWarn)
 }
 
 // LogNotice is called for log level NOTICE messages
-func LogNotice(source string, format string, args ...interface{}) {
-	LogMessage(LogLevelNotice, source, format, args...)
+func LogNotice(format string, args ...interface{}) {
+	LogMessage(LogLevelNotice, format, args...)
 }
 
-// IsNoticeEnabled returns true if NOTICE logging is enable for the specified source
-func IsNoticeEnabled(source string) bool {
-	return IsLogEnabled(source, LogLevelNotice)
+// IsNoticeEnabled returns true if NOTICE logging is enable for the caller
+func IsNoticeEnabled() bool {
+	return IsLogEnabled(LogLevelNotice)
 }
 
 // LogInfo is called for log level INFO messages
-func LogInfo(source string, format string, args ...interface{}) {
-	LogMessage(LogLevelInfo, source, format, args...)
+func LogInfo(format string, args ...interface{}) {
+	LogMessage(LogLevelInfo, format, args...)
 }
 
-// IsInfoEnabled returns true if INFO logging is enable for the specified source
-func IsInfoEnabled(source string) bool {
-	return IsLogEnabled(source, LogLevelInfo)
+// IsInfoEnabled returns true if INFO logging is enable for the caller
+func IsInfoEnabled() bool {
+	return IsLogEnabled(LogLevelInfo)
 }
 
 // LogDebug is called for log level DEBUG messages
-func LogDebug(source string, format string, args ...interface{}) {
-	LogMessage(LogLevelDebug, source, format, args...)
+func LogDebug(format string, args ...interface{}) {
+	LogMessage(LogLevelDebug, format, args...)
 }
 
-// IsDebugEnabled returns true if DEBUG logging is enable for the specified source
-func IsDebugEnabled(source string) bool {
-	return IsLogEnabled(source, LogLevelDebug)
+// IsDebugEnabled returns true if DEBUG logging is enable for the caller
+func IsDebugEnabled() bool {
+	return IsLogEnabled(LogLevelDebug)
 }
 
 // LogTrace is called for log level TRACE messages
-func LogTrace(source string, format string, args ...interface{}) {
-	LogMessage(LogLevelTrace, source, format, args...)
+func LogTrace(format string, args ...interface{}) {
+	LogMessage(LogLevelTrace, format, args...)
 }
 
-// IsTraceEnabled returns true if TRACE logging is enable for the specified source
-func IsTraceEnabled(source string) bool {
-	return IsLogEnabled(source, LogLevelTrace)
+// IsTraceEnabled returns true if TRACE logging is enable for the caller
+func IsTraceEnabled() bool {
+	return IsLogEnabled(LogLevelTrace)
 }
 
 // LogWriter is used to send an output stream to the Log facility
 type LogWriter struct {
-	source string
 	buffer []byte
 }
 
 // NewLogWriter creates an io Writer to steam output to the Log facility
-func NewLogWriter(source string) *LogWriter {
-	return (&LogWriter{source, make([]byte, 256)})
+func NewLogWriter() *LogWriter {
+	return (&LogWriter{make([]byte, 256)})
 }
 
 // Write takes written data and stores it in a buffer and writes to the log when a line feed is detected
@@ -202,7 +228,7 @@ func (w *LogWriter) Write(p []byte) (int, error) {
 	for _, b := range p {
 		w.buffer = append(w.buffer, b)
 		if b == '\n' {
-			LogInfo(w.source, string(w.buffer))
+			LogInfo(string(w.buffer))
 			w.buffer = make([]byte, 256)
 		}
 	}
@@ -225,7 +251,7 @@ func loadLoggerConfig() {
 
 		// if there is still an error we are out of options
 		if err != nil {
-			LogErr(logsrc, "Unable to load Log configuration file: %s\n", logConfigFile)
+			LogErr("Unable to load Log configuration file: %s\n", logConfigFile)
 			return
 		}
 	}
@@ -236,7 +262,7 @@ func loadLoggerConfig() {
 	// get the file status
 	info, err = file.Stat()
 	if err != nil {
-		LogErr(logsrc, "Unable to query file information\n")
+		LogErr("Unable to query file information\n")
 		return
 	}
 
@@ -246,14 +272,14 @@ func loadLoggerConfig() {
 	len, err := file.Read(data)
 
 	if (err != nil) || (len < 1) {
-		LogErr(logsrc, "Unable to read Log configuration\n")
+		LogErr("Unable to read Log configuration\n")
 		return
 	}
 
 	// unmarshal the configuration into a map
 	err = json.Unmarshal(data, &config)
 	if err != nil {
-		LogErr(logsrc, "Unable to parse Log configuration\n")
+		LogErr("Unable to parse Log configuration\n")
 		return
 	}
 
@@ -273,13 +299,13 @@ func loadLoggerConfig() {
 			}
 		}
 		if found == false {
-			LogWarn(logsrc, "Invalid Log configuration entry: %s=%s\n", cfgname, cfglevel)
+			LogWarn("Invalid Log configuration entry: %s=%s\n", cfgname, cfglevel)
 		}
 	}
 }
 
 func initLoggerConfig() {
-	LogAlert(logsrc, "Log configuration not found. Creating default file: %s\n", logConfigFile)
+	LogAlert("Log configuration not found. Creating default file: %s\n", logConfigFile)
 
 	// create a comment that shows all valid log level names
 	var comment string
@@ -320,7 +346,7 @@ func initLoggerConfig() {
 	// convert the config map to a json object
 	jstr, err := json.MarshalIndent(config, "", "")
 	if err != nil {
-		LogAlert(logsrc, "Log failure creating default configuration: %s\n", err.Error())
+		LogAlert("Log failure creating default configuration: %s\n", err.Error())
 		return
 	}
 
@@ -333,4 +359,36 @@ func initLoggerConfig() {
 	// write the default configuration and close the file
 	file.Write(jstr)
 	file.Close()
+}
+
+func findCaller() (string, string, string, int) {
+	// start with 1 because this is not public
+	for depth := 1; depth < 15; depth++ {
+		_, filename, line, ok := runtime.Caller(depth)
+		if ok && !strings.HasSuffix(filename, "logger.go") && !strings.HasSuffix(filename, "log.go") {
+			var split = strings.Split(filename, "/")
+			var shortname string
+			if len(split) > 1 {
+				shortname = split[len(split)-1]
+			} else {
+				shortname = filename
+			}
+			//shortname = strings.TrimSuffix(shortname, ".go")
+
+			var packagename string
+			if len(split) > 2 {
+				packagename = split[len(split)-2]
+			} else {
+				packagename = shortname
+			}
+
+			var summary = fmt.Sprintf("%s/%s:%04d", packagename, shortname, line)
+			if len(summary) > 25 {
+				summary = summary[len(summary)-25:]
+			}
+			return summary, packagename, shortname, line
+		}
+	}
+
+	return "unknown|unknown:0", "unknown:0", "unknown", 0
 }

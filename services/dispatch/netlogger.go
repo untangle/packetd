@@ -29,7 +29,7 @@ var netloggerListMutex sync.Mutex
 // InsertNetloggerSubscription adds a subscription for receiving netlogger messages
 func InsertNetloggerSubscription(owner string, priority int, function NetloggerHandlerFunction) {
 	var holder SubscriptionHolder
-	logger.LogInfo(logsrc, "Adding Netlogger Event Subscription (%s, %d)\n", owner, priority)
+	logger.LogInfo("Adding Netlogger Event Subscription (%s, %d)\n", owner, priority)
 
 	holder.Owner = owner
 	holder.Priority = priority
@@ -58,7 +58,7 @@ func netloggerCallback(version uint8,
 	netlogger.Mark = mark
 	netlogger.Prefix = prefix
 
-	logger.LogTrace(logsrc, "netlogger event: %v \n", netlogger)
+	logger.LogTrace("netlogger event: %v \n", netlogger)
 
 	// We loop and increment the priority until all subscriptions have been called
 	sublist := netloggerList
@@ -74,12 +74,12 @@ func netloggerCallback(version uint8,
 			if val.Priority != priority {
 				continue
 			}
-			logger.LogDebug(logsrc, "Calling netlogger APP:%s PRIORITY:%d\n", key, priority)
+			logger.LogDebug("Calling netlogger APP:%s PRIORITY:%d\n", key, priority)
 			wg.Add(1)
 			go func(val SubscriptionHolder) {
 				val.NetloggerFunc(&netlogger)
 				wg.Done()
-				logger.LogDebug(logsrc, "Finished netlogger APP:%s PRIORITY:%d\n", key, priority)
+				logger.LogDebug("Finished netlogger APP:%s PRIORITY:%d\n", key, priority)
 			}(val)
 			subcount++
 

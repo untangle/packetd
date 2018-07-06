@@ -24,7 +24,6 @@ type SubscriptionHolder struct {
 }
 
 var shutdownCleanerTask = make(chan bool)
-var logsrc = "dispatch"
 
 // Startup starts the event handling service
 func Startup() {
@@ -60,7 +59,7 @@ func Shutdown() {
 	select {
 	case <-shutdownCleanerTask:
 	case <-time.After(10 * time.Second):
-		logger.LogErr(logsrc, "Failed to properly shutdown cleanerTask\n")
+		logger.LogErr("Failed to properly shutdown cleanerTask\n")
 	}
 }
 
@@ -75,7 +74,7 @@ func cleanerTask() {
 			return
 		case <-time.After(60 * time.Second):
 			counter++
-			logger.LogDebug(logsrc, "Calling cleaner task %d\n", counter)
+			logger.LogDebug("Calling cleaner task %d\n", counter)
 			cleanSessionTable()
 			cleanConntrackTable()
 		}

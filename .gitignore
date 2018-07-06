@@ -3,3 +3,4 @@ packetd
 __pycache__/
 #*
 .#*
+core

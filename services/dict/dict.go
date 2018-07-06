@@ -15,7 +15,6 @@ import (
 const pathBase string = "/proc/net/dict"
 
 var readMutex = &sync.Mutex{}
-var logsrc = "dict"
 var disabled = false
 
 // Startup dict service
@@ -228,7 +227,7 @@ func formatValue(value interface{}) string {
 // Given a dictionary Entry, print (log)
 // the Entry table, key, field, and value
 func (p Entry) Print() {
-	logger.LogInfo(logsrc, "%s %s %s %s\n", formatTable(p.Table), formatKey(p.Key), formatField(p.Field), formatValue(p.Value))
+	logger.LogInfo("%s %s %s %s\n", formatTable(p.Table), formatKey(p.Key), formatField(p.Field), formatValue(p.Value))
 }
 
 // GetValue gets an entry's value
@@ -330,7 +329,7 @@ func writeEntry(setstr string) error {
 	file, err := os.OpenFile(pathBase+"/write", os.O_WRONLY, 0660)
 
 	if err != nil {
-		logger.LogWarn(logsrc, "writeEntry: Failed to open %s\n", pathBase+"/write")
+		logger.LogWarn("writeEntry: Failed to open %s\n", pathBase+"/write")
 		return err
 	}
 
@@ -338,7 +337,7 @@ func writeEntry(setstr string) error {
 
 	_, err = file.WriteString(setstr)
 	if err != nil {
-		logger.LogWarn(logsrc, "writeEntry: Failed to write %s\n", setstr)
+		logger.LogWarn("writeEntry: Failed to write %s\n", setstr)
 		return (err)
 	}
 
@@ -354,7 +353,7 @@ func deleteEntry(setstr string) error {
 	file, err := os.OpenFile(pathBase+"/delete", os.O_WRONLY, 0660)
 
 	if err != nil {
-		logger.LogWarn(logsrc, "deleteEntry: Failed to open %s\n", pathBase+"/delete")
+		logger.LogWarn("deleteEntry: Failed to open %s\n", pathBase+"/delete")
 		return err
 	}
 
@@ -362,7 +361,7 @@ func deleteEntry(setstr string) error {
 
 	_, err = file.WriteString(setstr)
 	if err != nil {
-		logger.LogErr(logsrc, "dict: deleteEntry: Failed to write %s\n", setstr)
+		logger.LogErr("dict: deleteEntry: Failed to write %s\n", setstr)
 		return (err)
 	}
 
@@ -490,14 +489,14 @@ func AddEntry(table string, key interface{}, field string, value interface{}) er
 	var setstr string
 	setstr = fmt.Sprintf("%s%s%s%s", generateTable(table), generateKey(key), generateField(field), generateValue(value))
 
-	if logger.IsDebugEnabled(logsrc) {
-		logger.LogDebug(logsrc, "SET table: %s[%v] | %s = %v\n", table, key, field, value)
+	if logger.IsDebugEnabled() {
+		logger.LogDebug("SET table: %s[%v] | %s = %v\n", table, key, field, value)
 	}
 
 	err := writeEntry(setstr)
 
 	if err != nil {
-		logger.LogWarn(logsrc, "AddEntry: Failed to write %s\n", setstr)
+		logger.LogWarn("AddEntry: Failed to write %s\n", setstr)
 	}
 
 	return err
@@ -532,14 +531,14 @@ func DeleteDictionary(table string, key interface{}) error {
 	var setstr string
 	setstr = fmt.Sprintf("%s%s", generateTable(table), generateKey(key))
 
-	if logger.IsDebugEnabled(logsrc) {
-		logger.LogDebug(logsrc, "DEL table: %s[%v]\n", table, key)
+	if logger.IsDebugEnabled() {
+		logger.LogDebug("DEL table: %s[%v]\n", table, key)
 	}
 
 	err := deleteEntry(setstr)
 
 	if err != nil {
-		logger.LogWarn(logsrc, "AddEntry ERROR: %s\n", err)
+		logger.LogWarn("AddEntry ERROR: %s\n", err)
 	}
 
 	return err
@@ -577,7 +576,7 @@ func GetDictionary(table string, key interface{}) ([]Entry, error) {
 	setstr := fmt.Sprintf("%s%s", generateTable(table), generateKey(key))
 
 	if err != nil {
-		logger.LogWarn(logsrc, "GetDictionary: Failed to open %s\n", pathBase+"/read")
+		logger.LogWarn("GetDictionary: Failed to open %s\n", pathBase+"/read")
 		return nil, err
 	}
 
@@ -587,7 +586,7 @@ func GetDictionary(table string, key interface{}) ([]Entry, error) {
 	_, err = file.WriteString(setstr)
 
 	if err != nil {
-		logger.LogWarn(logsrc, "GetDictionary: Failed to write %s\n", setstr)
+		logger.LogWarn("GetDictionary: Failed to write %s\n", setstr)
 		return nil, err
 	}
 
@@ -611,7 +610,7 @@ func GetEntry(table string, key interface{}, field string) (Entry, error) {
 
 	entries, err := GetDictionary(table, key)
 	if err != nil {
-		logger.LogWarn(logsrc, "GetEntry: Failed to get %s %s\n", formatTable(table), formatKey(key))
+		logger.LogWarn("GetEntry: Failed to get %s %s\n", formatTable(table), formatKey(key))
 		return entry, err
 	}
 
@@ -661,7 +660,7 @@ func GetAllEntries() ([]Entry, error) {
 	file, err := os.OpenFile(pathBase+"/all", os.O_RDWR, 0660)
 
 	if err != nil {
-		logger.LogWarn(logsrc, "GetAll: Failed to open %s\n", pathBase+"/all")
+		logger.LogWarn("GetAll: Failed to open %s\n", pathBase+"/all")
 		return nil, err
 	}
 

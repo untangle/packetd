@@ -36,7 +36,7 @@ var nfqueueListMutex sync.Mutex
 // InsertNfqueueSubscription adds a subscription for receiving nfqueue messages
 func InsertNfqueueSubscription(owner string, priority int, function NfqueueHandlerFunction) {
 	var holder SubscriptionHolder
-	logger.LogInfo(logsrc, "Adding NFQueue Event Subscription (%s, %d)\n", owner, priority)
+	logger.LogInfo("Adding NFQueue Event Subscription (%s, %d)\n", owner, priority)
 
 	holder.Owner = owner
 	holder.Priority = priority
@@ -108,7 +108,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		mess.Payload = appLayer.Payload()
 	}
 
-	logger.LogTrace(logsrc, "nfqueue event[%d]: %v \n", ctid, mess.Tuple)
+	logger.LogTrace("nfqueue event[%d]: %v \n", ctid, mess.Tuple)
 
 	var session *SessionEntry
 	var ok bool
@@ -116,7 +116,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 	// If we already have a session entry update the existing, otherwise create a new entry for the table.
 	if session, ok = findSessionEntry(ctid); ok {
-		logger.LogTrace(logsrc, "Session Found %d in table\n", ctid)
+		logger.LogTrace("Session Found %d in table\n", ctid)
 		session.LastActivityTime = time.Now()
 		session.PacketCount++
 		session.ByteCount += uint64(packetLength)
@@ -130,18 +130,18 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 				// so increase log level
 				logLevel = logger.LogLevelErr
 			}
-			if logger.IsLogEnabled(logsrc, logLevel) {
-				logger.LogMessage(logLevel, logsrc, "Conntrack ID Mismatch! %d\n", ctid)
-				logger.LogMessage(logLevel, logsrc, "  Packet     Tuple: %s\n", mess.Tuple)
-				logger.LogMessage(logLevel, logsrc, "  ClientSide Tuple: %s\n", session.ClientSideTuple.String())
-				logger.LogMessage(logLevel, logsrc, "  ServerSide Tuple: %s\n", session.ServerSideTuple.StringReverse())
+			if logger.IsLogEnabled(logLevel) {
+				logger.LogMessage(logLevel, "Conntrack ID Mismatch! %d\n", ctid)
+				logger.LogMessage(logLevel, "  Packet     Tuple: %s\n", mess.Tuple)
+				logger.LogMessage(logLevel, "  ClientSide Tuple: %s\n", session.ClientSideTuple.String())
+				logger.LogMessage(logLevel, "  ServerSide Tuple: %s\n", session.ServerSideTuple.StringReverse())
 			}
 
 			if session.ConntrackConfirmed {
 				panic("CONNTRACK ID RE-USE DETECTED")
 			}
-			if logger.IsDebugEnabled(logsrc) {
-				logger.LogDebug(logsrc, "Removing stale session %d %v\n", ctid, session.ClientSideTuple)
+			if logger.IsDebugEnabled() {
+				logger.LogDebug("Removing stale session %d %v\n", ctid, session.ClientSideTuple)
 			}
 			removeSessionEntry(ctid)
 			session = nil
@@ -151,7 +151,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 	// create a new session object
 	if session == nil {
-		logger.LogTrace(logsrc, "Session Adding %d to table\n", ctid)
+		logger.LogTrace("Session Adding %d to table\n", ctid)
 		newSession = true
 		session = new(SessionEntry)
 		session.SessionID = nextSessionID()
@@ -186,10 +186,10 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			if val.Priority != priority {
 				continue
 			}
-			logger.LogDebug(logsrc, "Calling nfqueue APP:%s PRIORITY:%d\n", key, priority)
+			logger.LogDebug("Calling nfqueue APP:%s PRIORITY:%d\n", key, priority)
 			go func(key string, val SubscriptionHolder) {
 				pipe <- val.NfqueueFunc(mess, ctid, newSession)
-				logger.LogDebug(logsrc, "Finished nfqueue APP:%s PRIORITY:%d\n", key, priority)
+				logger.LogDebug("Finished nfqueue APP:%s PRIORITY:%d\n", key, priority)
 			}(key, val)
 			hitcount++
 			subcount++
@@ -202,7 +202,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			case result := <-pipe:
 				pmark |= result.PacketMark
 				if result.SessionRelease {
-					logger.LogDebug(logsrc, "Removing %s session nfqueue subscription for %d\n", result.Owner, uint32(ctid))
+					logger.LogDebug("Removing %s session nfqueue subscription for %d\n", result.Owner, uint32(ctid))
 					delete(session.Subs, result.Owner)
 				}
 			}

@@ -13,13 +13,12 @@ import (
 )
 
 var engine *gin.Engine
-var logsrc = "restd"
 
 // Startup is called to start the rest daemon
 func Startup() {
 
 	gin.DisableConsoleColor()
-	gin.DefaultWriter = logger.NewLogWriter("restd")
+	gin.DefaultWriter = logger.NewLogWriter()
 	engine = gin.Default()
 
 	// FIXME allow cross-site for dev
@@ -43,7 +42,7 @@ func Startup() {
 	// listen and serve on 0.0.0.0:8080
 	engine.Run()
 
-	logger.LogInfo(logsrc, "The RestD engine has been started\n")
+	logger.LogInfo("The RestD engine has been started\n")
 }
 
 // Shutdown restd
@@ -102,7 +101,7 @@ func reportsCreateQuery(c *gin.Context) {
 		return
 	}
 	str := fmt.Sprintf("%v", q.ID)
-	logger.LogDebug(logsrc, "CreateQuery(%s)\n", str)
+	logger.LogDebug("CreateQuery(%s)\n", str)
 	c.String(200, str)
 	// c.JSON(200, gin.H{
 	// 	"queryID": q.ID,

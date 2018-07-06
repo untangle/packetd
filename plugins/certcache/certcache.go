@@ -21,18 +21,17 @@ type CertificateHolder struct {
 var shutdownChannel = make(chan bool)
 var certificateTable map[string]CertificateHolder
 var certificateMutex sync.Mutex
-var logsrc = "certcache"
 var localMutex sync.Mutex
 
 // PluginStartup function is called to allow plugin specific initialization. We
 // increment the argumented WaitGroup so the main process can wait for
 // our shutdown function to return during shutdown.
 func PluginStartup() {
-	logger.LogInfo(logsrc, "PluginStartup(%s) has been called\n", logsrc)
+	logger.LogInfo("PluginStartup(%s) has been called\n")
 	certificateTable = make(map[string]CertificateHolder)
 	go cleanupTask()
 
-	dispatch.InsertNfqueueSubscription(logsrc, 2, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription("certcache", 2, PluginNfqueueHandler)
 }
 
 // PluginShutdown function called when the daemon is shutting down. We call Done
@@ -43,10 +42,10 @@ func PluginShutdown() {
 	select {
 	case <-shutdownChannel:
 	case <-time.After(10 * time.Second):
-		logger.LogErr(logsrc, "Failed to properly shutdown cleanupTask\n")
+		logger.LogErr("Failed to properly shutdown cleanupTask\n")
 	}
 
-	logger.LogInfo(logsrc, "PluginShutdown(%s) has been called\n", logsrc)
+	logger.LogInfo("PluginShutdown(%s) has been called\n")
 }
 
 // PluginNfqueueHandler is called to handle nfqueue packet data. We only
@@ -56,7 +55,7 @@ func PluginShutdown() {
 // extract the interesting subject fields, and put them in the session table.
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	result.Owner = logsrc
+	result.Owner = "certcache"
 	result.PacketMark = 0
 	result.SessionRelease = true
 
@@ -73,9 +72,9 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	localMutex.Lock()
 
 	if cert, ok = findCertificate(client); ok {
-		logger.LogInfo(logsrc, "Loading certificate for %s\n", mess.Tuple.ServerAddress)
+		logger.LogInfo("Loading certificate for %s\n", mess.Tuple.ServerAddress)
 	} else {
-		logger.LogInfo(logsrc, "Fetching certificate for %s\n", mess.Tuple.ServerAddress)
+		logger.LogInfo("Fetching certificate for %s\n", mess.Tuple.ServerAddress)
 
 		conf := &tls.Config{
 			InsecureSkipVerify: true,
@@ -86,12 +85,12 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		defer conn.Close()
 
 		if err != nil {
-			logger.LogWarn(logsrc, "TLS ERROR: %s\n", err)
+			logger.LogWarn("TLS ERROR: %s\n", err)
 			return result
 		}
 
 		if len(conn.ConnectionState().PeerCertificates) < 1 {
-			logger.LogWarn(logsrc, "Could not fetch certificate from %s\n", mess.Tuple.ServerAddress)
+			logger.LogWarn("Could not fetch certificate from %s\n", mess.Tuple.ServerAddress)
 			return result
 		}
 
@@ -188,10 +187,10 @@ func cleanCertificateTable() {
 		}
 		removeCertificate(key)
 		counter++
-		logger.LogDebug(logsrc, "CERTIFICATE Removing %s from table\n", key)
+		logger.LogDebug("CERTIFICATE Removing %s from table\n", key)
 	}
 
-	logger.LogDebug(logsrc, "CERTIFICATE REMOVED:%d REMAINING:%d\n", counter, len(certificateTable))
+	logger.LogDebug("CERTIFICATE REMOVED:%d REMAINING:%d\n", counter, len(certificateTable))
 }
 
 // periodic task to clean the certificate table

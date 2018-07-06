@@ -10,39 +10,37 @@ import (
 	"time"
 )
 
-var logsrc = "reporter"
-
 // PluginStartup starts the reporter
 func PluginStartup() {
-	logger.LogInfo(logsrc, "PluginStartup(%s) has been called\n", logsrc)
-	dispatch.InsertNfqueueSubscription(logsrc, 1, PluginNfqueueHandler)
-	dispatch.InsertConntrackSubscription(logsrc, 1, PluginConntrackHandler)
-	dispatch.InsertNetloggerSubscription(logsrc, 1, PluginNetloggerHandler)
+	logger.LogInfo("PluginStartup(%s) has been called\n")
+	dispatch.InsertNfqueueSubscription("reporter", 1, PluginNfqueueHandler)
+	dispatch.InsertConntrackSubscription("reporter", 1, PluginConntrackHandler)
+	dispatch.InsertNetloggerSubscription("reporter", 1, PluginNetloggerHandler)
 }
 
 // PluginShutdown stops the reporter
 func PluginShutdown() {
-	logger.LogInfo(logsrc, "PluginShutdown(%s) has been called\n", logsrc)
+	logger.LogInfo("PluginShutdown(%s) has been called\n")
 }
 
 // PluginNfqueueHandler handles the first packet of a session
 // Logs a new session_new event
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	result.Owner = logsrc
+	result.Owner = "reporter"
 	result.SessionRelease = true
 	result.PacketMark = 0
 
 	// We only care about new sessions
 	if !newSession {
-		logger.LogErr(logsrc, "Unexpected event received!")
+		logger.LogErr("Unexpected event received!")
 		return result
 	}
 
 	var session *dispatch.SessionEntry
 	session = mess.Session
 	if session == nil {
-		logger.LogErr(logsrc, "Missing session on NFQueue packet!")
+		logger.LogErr("Missing session on NFQueue packet!")
 		return result
 	}
 

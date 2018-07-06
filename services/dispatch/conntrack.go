@@ -43,7 +43,7 @@ func (c ConntrackEntry) String() string {
 // InsertConntrackSubscription adds a subscription for receiving conntrack messages
 func InsertConntrackSubscription(owner string, priority int, function ConntrackHandlerFunction) {
 	var holder SubscriptionHolder
-	logger.LogInfo(logsrc, "Adding Conntrack Event Subscription (%s, %d)\n", owner, priority)
+	logger.LogInfo("Adding Conntrack Event Subscription (%s, %d)\n", owner, priority)
 
 	holder.Owner = owner
 	holder.Priority = priority
@@ -67,7 +67,7 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 
 	if conntrackEntryFound {
 		conntrackEntry.EventCount++
-		logger.LogTrace(logsrc, "conntrack event[%d,%c]: %s \n", ctid, eventType, conntrackEntry.ClientSideTuple)
+		logger.LogTrace("conntrack event[%d,%c]: %s \n", ctid, eventType, conntrackEntry.ClientSideTuple)
 	} else {
 		conntrackEntry = new(ConntrackEntry)
 		conntrackEntry.ConntrackID = ctid
@@ -85,7 +85,7 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 		conntrackEntry.ServerSideTuple.ServerPort = serverPortNew
 		conntrackEntry.EventCount = 1
 
-		logger.LogTrace(logsrc, "conntrack event[%d,%c]: %v \n", ctid, eventType, conntrackEntry.ClientSideTuple)
+		logger.LogTrace("conntrack event[%d,%c]: %v \n", ctid, eventType, conntrackEntry.ClientSideTuple)
 
 		session, _ := findSessionEntry(uint32(ctid))
 		if session != nil {
@@ -109,16 +109,16 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 					// so increase log level
 					logLevel = logger.LogLevelErr
 				}
-				if logger.IsLogEnabled(logsrc, logLevel) {
-					logger.LogMessage(logLevel, logsrc, "Conntrack Mismatch! %d\n", ctid)
-					logger.LogMessage(logLevel, logsrc, "  Packet     Tuple: %s\n", conntrackEntry.ClientSideTuple)
-					logger.LogMessage(logLevel, logsrc, "  ClientSide Tuple: %s\n", session.ClientSideTuple)
+				if logger.IsLogEnabled(logLevel) {
+					logger.LogMessage(logLevel, "Conntrack Mismatch! %d\n", ctid)
+					logger.LogMessage(logLevel, "  Packet     Tuple: %s\n", conntrackEntry.ClientSideTuple)
+					logger.LogMessage(logLevel, "  ClientSide Tuple: %s\n", session.ClientSideTuple)
 				}
 
 				if session.ConntrackConfirmed {
 					panic("CONNTRACK ID RE-USE DETECTED")
 				}
-				logger.LogDebug(logsrc, "Removing stale session %d %v\n", ctid, session.ClientSideTuple)
+				logger.LogDebug("Removing stale session %d %v\n", ctid, session.ClientSideTuple)
 				removeSessionEntry(ctid)
 				session = nil
 			}
@@ -190,12 +190,12 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 			if val.Priority != priority {
 				continue
 			}
-			logger.LogDebug(logsrc, "Calling conntrack APP:%s PRIORITY:%d\n", key, priority)
+			logger.LogDebug("Calling conntrack APP:%s PRIORITY:%d\n", key, priority)
 			wg.Add(1)
 			go func(val SubscriptionHolder) {
 				val.ConntrackFunc(int(eventType), conntrackEntry)
 				wg.Done()
-				logger.LogDebug(logsrc, "Finished conntrack APP:%s PRIORITY:%d\n", key, priority)
+				logger.LogDebug("Finished conntrack APP:%s PRIORITY:%d\n", key, priority)
 			}(val)
 			subcount++
 		}
@@ -225,7 +225,7 @@ func insertConntrackEntry(finder uint32, entry *ConntrackEntry) {
 
 // removeConntrackEntry removes an entry from the conntrack table
 func removeConntrackEntry(finder uint32) {
-	logger.LogTrace(logsrc, "Remove conntrack ctid %d\n", finder)
+	logger.LogTrace("Remove conntrack ctid %d\n", finder)
 	conntrackTableMutex.Lock()
 	defer conntrackTableMutex.Unlock()
 	delete(conntrackTable, finder)
@@ -244,6 +244,6 @@ func cleanConntrackTable() {
 		}
 		removeConntrackEntry(key)
 		// this should never happen, so print an error
-		logger.LogErr(logsrc, "Removing stale conntrack entry %d %v\n", key, val.ClientSideTuple)
+		logger.LogErr("Removing stale conntrack entry %d %v\n", key, val.ClientSideTuple)
 	}
 }
