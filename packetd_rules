@@ -74,17 +74,16 @@ insert_packetd_iptables_rules()
     ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -s 127.0.0.0/8 -j RETURN
     ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -d 127.0.0.0/8 -j RETURN
 
-    # we don't care about traffic to a local address
-    # ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -m addrtype --dst-type local -j RETURN
-    # ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -m addrtype --dst-type local -j RETURN
-
-    # special hook to allow bypass of a development machine or network
-    if [ ! -z ${PACKETD_DEV_NETWORK} ]; then
-        ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -s ${PACKETD_DEV_NETWORK} -j RETURN
-        ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -d ${PACKETD_DEV_NETWORK} -j RETURN
-    fi
-
+    # don't queue bypassed traffic
+    ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -m connmark --mark 0xf0000000/0xf0000000 -j RETURN -m comment --comment 'Do not queue (bypass) all packets with bypass bit set'
+    # connmark all local traffic (subsequent packets will not be queued)
+    ${IPTABLES} -t mangle -I INPUT -j CONNMARK --or-mark 0xf0000000
+    ${IPTABLES} -t mangle -I OUTPUT -j CONNMARK --or-mark 0xf0000000
+    
     # all other packets will be sent to the netfilter queue
+    # ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -p udp --sport 53 -j NFQUEUE --queue-num ${PACKETD_QUEUE_NUM} --queue-bypass
+    # ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -p udp --dport 53 -j NFQUEUE --queue-num ${PACKETD_QUEUE_NUM} --queue-bypass
+    ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -j NFQUEUE --queue-num ${PACKETD_QUEUE_NUM} --queue-bypass
     ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -j NFQUEUE --queue-num ${PACKETD_QUEUE_NUM} --queue-bypass
 
     # insert rule to send traffic to our capture chain
@@ -119,11 +118,6 @@ if test ${USERVAL} -ne 0
 then
   printf "\n  ERROR: You must be root to run this script\n\n"
   exit
-fi
-
-## Source the configuration file if available
-if [ -f /etc/default/untangle-packetd ]; then
-    . /etc/default/untangle-packetd
 fi
 
 if [ "$OP" = "remove" ] ; then

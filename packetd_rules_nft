@@ -1,0 +1,128 @@
+#!/bin/sh
+
+# FIXME - Things go haywire if there is more than a single line in /proc/net/netfilter/nfnetlink_queue
+
+PACKETD_QUEUE_NUM=1818
+
+NFT=${NFT:-nft}
+CHAIN_NAME=packetd-queue
+TABLE_NAME=filter
+PRIORITY="-140"
+
+debug()
+{
+    echo "[DEBUG:`date`] $*"
+}
+
+is_queue_open()
+{
+    local l_queue_stat
+    local l_queue_mode
+    local l_queue_size
+
+    # make sure the nfnetlink_queue file is available
+    if [ ! -f /proc/net/netfilter/nfnetlink_queue ]; then
+        echo "[`date`] The netfilter nfnetlink_queue does not exist - not inserting rules for packetd"
+        return 1
+    fi
+
+    # see if our queue is active
+    l_queue_stat=`awk -v queue=${PACKETD_QUEUE_NUM} '{ if ( $1 == queue ) print $2 }' /proc/net/netfilter/nfnetlink_queue`
+
+    if [ -z "${l_queue_stat}" ]; then
+        echo "[`date`] The packetd netfilter queue is not open - not inserting rules for packetd"
+        return 1
+    fi
+
+    # see if the queue copy mode is what we expect
+    l_queue_mode=`awk '{ print $4 }' /proc/net/netfilter/nfnetlink_queue`
+
+    if [ $((l_queue_mode)) -ne 2 ]; then
+        echo "[`date`] Unexpected queue copy mode - not inserting rules for packetd"
+        return 1
+    fi
+
+    # see if the queue copy size is what we expect
+    l_queue_mode=`awk '{ print $5 }' /proc/net/netfilter/nfnetlink_queue`
+
+    if [ $((l_queue_mode)) -ne 32768 ]; then
+        echo "[`date`] Unexpected queue copy size - not inserting rules for packetd"
+        return 1
+    fi
+
+    # the queue is open and seems to be owned by packetd so return success
+    return 0
+}
+
+remove_packetd_rules()
+{
+    ${NFT} flush chain filter ${CHAIN_NAME}
+}
+
+insert_packetd_rules()
+{
+    # create the table if needed
+    ${NFT} add table filter
+    ${NFT} add chain filter ${CHAIN_NAME} "{ type filter hook prerouting priority $PRIORITY ; }"
+    ${NFT} flush chain filter ${CHAIN_NAME}
+
+    # Don't catch loopback traffic
+    ${NFT} add rule filter ${CHAIN_NAME} ip saddr 127.0.0.1/8 return
+    ${NFT} add rule filter ${CHAIN_NAME} ip daddr 127.0.0.1/8 return
+
+    # Local?
+    # ${NFT} add rule filter ${CHAIN_NAME} fib daddr . oif type local return
+    
+    ${NFT} add rule filter ${CHAIN_NAME} counter queue num ${PACKETD_QUEUE_NUM} bypass
+}
+
+usage() {
+    echo "$0 [options]"
+    echo "optional options: "
+    echo " -r              (force removal only)"
+    echo " -i              (force insert only)"
+    echo " -h              (help)"
+    echo
+}
+
+##### Start of script
+
+OP=""
+while getopts "rih" opt; do
+  case $opt in
+    r) OP="remove";;
+    i) OP="insert";;
+    h) usage;exit 0;;
+    *) usage;exit 0;;
+  esac
+done
+
+
+## make sure we are called as root
+USERVAL=`id -u`
+if test ${USERVAL} -ne 0
+then
+  printf "\n  ERROR: You must be root to run this script\n\n"
+  exit
+fi
+
+## Source the configuration file if available
+if [ -f /etc/default/untangle-packetd ]; then
+    . /etc/default/untangle-packetd
+fi
+
+if [ "$OP" = "remove" ] ; then
+    remove_packetd_rules
+    echo "[`date`] The packetd netfilter rules removed."
+    exit 0
+elif [ "$OP" = "insert" ] ; then
+    insert_packetd_rules
+    echo "[`date`] The packetd netfilter rules inserted."
+    exit 0
+else
+    remove_packetd_rules
+    is_queue_open && {
+        insert_packetd_rules
+        echo "[`date`] The packetd netfilter rules inserted."
+    }
+fi

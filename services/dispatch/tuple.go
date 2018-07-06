@@ -30,3 +30,16 @@ func (t Tuple) Equal(o Tuple) bool {
 	}
 	return true
 }
+
+// EqualReverse returns true if two Tuples are equal when one is inversed in the other direction, false otherwise
+// 1.2.3.4:5 -> 6.7.8.9:0 == 6.7.8.9:0 -> 1.2.3.4:5 = true
+func (t Tuple) EqualReverse(o Tuple) bool {
+	if t.Protocol != o.Protocol ||
+		!t.ClientAddress.Equal(o.ServerAddress) ||
+		!t.ServerAddress.Equal(o.ClientAddress) ||
+		t.ClientPort != o.ServerPort ||
+		t.ServerPort != o.ClientPort {
+		return false
+	}
+	return true
+}

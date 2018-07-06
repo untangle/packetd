@@ -59,15 +59,20 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 {
 	struct nfqnl_msg_packet_hdr		*hdr;
 	unsigned char					*rawpkt;
-    uint32_t                        omark,nmark;
+    uint32_t                        mark;
 	uint32_t    					ctid;
+    uint32_t                        nfid;
 	struct iphdr					*iphead;
 	int								rawlen;
 
 	// get the packet header and mark
 	hdr = nfq_get_msg_packet_hdr(nfad);
-
-	omark = nfq_get_nfmark(nfad);
+    if (hdr == NULL) {
+		logmessage(LOG_ERR,logsrc,"NULL packet\n");
+        return(0);
+    }
+    nfid = ntohl(hdr->packet_id);
+	mark = nfq_get_nfmark(nfad);
 
 	// get the packet length and data
 	rawlen = nfq_get_payload(nfad,(unsigned char **)&rawpkt);
@@ -95,7 +100,7 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 	ctid = nfq_get_conntrack_id(nfad,nfmsg->nfgen_family);
 
 	// call the go handler function which will call nfqueue_free_buffer(buffer) when finished
-    go_nfqueue_callback(omark,rawpkt,rawlen,ctid,(hdr ? ntohl(hdr->packet_id) : 0),buffer);
+    go_nfqueue_callback(mark,rawpkt,rawlen,ctid,nfid,buffer);
 
 	return(0);
 }
@@ -105,7 +110,11 @@ int nfqueue_set_verdict(uint32_t nfid, uint32_t verdict, uint32_t mark)
     if (nfqqh == NULL)
         return -1;
 
-	return nfq_set_verdict2(nfqqh,nfid,verdict,mark,0,NULL);
+	int ret = nfq_set_verdict2(nfqqh,nfid,verdict,mark,0,NULL);
+    if (ret < 1) {
+        logmessage(LOG_ERR,logsrc,"nfq_set_verdict2(): %s\n",strerror(errno));
+    }
+    return ret;
 }
 
 int nfqueue_startup(void)

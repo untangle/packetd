@@ -121,8 +121,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		session.PacketCount++
 		session.ByteCount += uint64(packetLength)
 		session.EventCount++
-		if !session.ClientSideTuple.Equal(mess.Tuple) {
-
+		if !session.ClientSideTuple.Equal(mess.Tuple) && !session.ServerSideTuple.EqualReverse(mess.Tuple) {
 			if session.ConntrackConfirmed {
 				logger.LogErr(logsrc, "Conntrack ID Mismatch! %d nfqueue:%v session:%v\n",
 					ctid,
