@@ -495,7 +495,7 @@ func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname st
 	if mess.Session.Attachments[pairname] == nil {
 		mess.Session.Attachments[pairname] = pairdata
 		dict.AddSessionEntry(ctid, pairname, pairdata)
-		logger.Debug("Setting classification detail %s = %s\n", pairname, pairdata)
+		logger.Debug("Setting classification detail %s = %v\n", pairname, pairdata)
 		return true
 	}
 
@@ -510,6 +510,6 @@ func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname st
 	// at this point the session has the attachment but the data has changed so we update the session and the dictionary
 	mess.Session.Attachments[pairname] = pairdata
 	dict.AddSessionEntry(ctid, pairname, pairdata)
-	logger.Debug("Updating classification detail %s = %s\n", pairname, pairdata)
+	logger.Debug("Updating classification detail %s = %v\n", pairname, pairdata)
 	return true
 }
