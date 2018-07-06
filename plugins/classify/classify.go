@@ -147,7 +147,8 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		return result
 	}
 
-	var application string
+	var appid string
+	var name string
 	var protochain string
 	var detail string
 	var confidence uint64
@@ -155,10 +156,11 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var state int
 
 	// parse update classd information from reply
-	application, protochain, detail, confidence, category, state = parseReply(reply)
+	appid, name, protochain, detail, confidence, category, state = parseReply(reply)
 
 	var changed bool
-	changed = changed || updateClassifyDetail(mess, ctid, "application", application)
+	changed = changed || updateClassifyDetail(mess, ctid, "application_id", appid)
+	changed = changed || updateClassifyDetail(mess, ctid, "application_name", name)
 	changed = changed || updateClassifyDetail(mess, ctid, "application_protochain", protochain)
 	changed = changed || updateClassifyDetail(mess, ctid, "application_detail", detail)
 	changed = changed || updateClassifyDetail(mess, ctid, "application_confidence", confidence)
@@ -166,7 +168,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// if something changed, log a new event
 	if changed {
-		logEvent(mess.Session, application, protochain, detail, confidence, category)
+		logEvent(mess.Session, appid, name, protochain, detail, confidence, category)
 	}
 
 	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, we log an event and release
@@ -200,7 +202,9 @@ func sendCommand(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) (st
 			logger.LogErr(logsrc, "daemonCommand error: %s\n", err.Error())
 			return "", err
 		}
-		logger.LogTrace(logsrc, "daemonCommand result: %s\n", reply)
+		if logger.IsTraceEnabled(logsrc) {
+			logger.LogTrace(logsrc, "daemonCommand result: %s\n", strings.Replace(strings.Replace(reply, "\n", "|", -1), "\r", "", -1))
+		}
 	}
 
 	// send the application payload to the daemon
@@ -215,15 +219,18 @@ func sendCommand(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) (st
 		return "", err
 	}
 
-	logger.LogTrace(logsrc, "daemonCommand result: %s\n", reply)
+	if logger.IsTraceEnabled(logsrc) {
+		logger.LogTrace(logsrc, "daemonCommand result: %s\n", strings.Replace(strings.Replace(reply, "\n", "|", -1), "\r", "", -1))
+	}
 	return reply, nil
 }
 
 // parseReply parses a reply from classd and returns
-// (application, protochain, detail, confidence, category, state)
-func parseReply(replyString string) (string, string, string, uint64, string, int) {
+// (appid, name, protochain, detail, confidence, category, state)
+func parseReply(replyString string) (string, string, string, string, uint64, string, int) {
 	var err error
-	var application string
+	var appid string
+	var name string
 	var protochain string
 	var detail string
 	var confidence uint64
@@ -242,7 +249,7 @@ func parseReply(replyString string) (string, string, string, uint64, string, int
 		}
 
 		if catpair[0] == "APPLICATION: " {
-			application = catpair[1]
+			appid = catpair[1]
 		} else if catpair[0] == "PROTOCHAIN: " {
 			protochain = catpair[1]
 		} else if catpair[0] == "DETAIL: " {
@@ -261,21 +268,24 @@ func parseReply(replyString string) (string, string, string, uint64, string, int
 	}
 
 	// lookup the category in the application table
-	appinfo, finder := applicationTable[application]
+	appinfo, finder := applicationTable[appid]
 	if finder == true {
+		name = appinfo.name
 		category = appinfo.category
 	}
 
-	return application, protochain, detail, confidence, category, state
+	return appid, name, protochain, detail, confidence, category, state
 
 }
 
-func logEvent(session *dispatch.SessionEntry, application string, protochain string, detail string, confidence uint64, category string) {
+// logEvent logs a session_classify event that updtase the application_* columns
+func logEvent(session *dispatch.SessionEntry, appid string, name string, protochain string, detail string, confidence uint64, category string) {
 	columns := map[string]interface{}{
 		"session_id": session.SessionID,
 	}
 	modifiedColumns := map[string]interface{}{
-		"application":            application,
+		"application_id":         appid,
+		"application_name":       name,
 		"application_protochain": protochain,
 		"application_detail":     detail,
 		"application_category":   category,
@@ -471,7 +481,9 @@ func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname st
 
 	// if the session has the attachment and it has not changed just return
 	if mess.Session.Attachments[pairname] == pairdata {
-		logger.LogTrace(logsrc, "Ignoring classification detail %s = %v\n", pairname, pairdata)
+		if logger.IsTraceEnabled(logsrc) {
+			logger.LogTrace(logsrc, "Ignoring classification detail %s = %v\n", pairname, pairdata)
+		}
 		return false
 	}
 

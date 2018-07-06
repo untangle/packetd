@@ -87,9 +87,24 @@ func LogMessage(level int, source string, format string, args ...interface{}) {
 	}
 }
 
+// IsLogEnabled retruns true if logging is enabled for the specified source at the specified level, false otherwise
+func IsLogEnabled(source string, level int) bool {
+	item, stat := appLogLevel[source]
+	if stat == true {
+		return (item >= level)
+	} else {
+		return false
+	}
+}
+
 // LogEmerg is called for log level EMERG messages
 func LogEmerg(source string, format string, args ...interface{}) {
 	LogMessage(LogLevelEmerg, source, format, args...)
+}
+
+// IsEmergEnabled returns true if EMERG logging is enable for the specified source
+func IsEmergEnabled(source string) bool {
+	return IsLogEnabled(source, LogLevelEmerg)
 }
 
 // LogAlert is called for log level ALERT messages
@@ -97,9 +112,19 @@ func LogAlert(source string, format string, args ...interface{}) {
 	LogMessage(LogLevelAlert, source, format, args...)
 }
 
+// IsAlertEnabled returns true if ALERT logging is enable for the specified source
+func IsAlertEnabled(source string) bool {
+	return IsLogEnabled(source, LogLevelAlert)
+}
+
 // LogCrit is called for log level CRIT messages
 func LogCrit(source string, format string, args ...interface{}) {
 	LogMessage(LogLevelCrit, source, format, args...)
+}
+
+// IsCritEnabled returns true if CRIT logging is enable for the specified source
+func IsCritEnabled(source string) bool {
+	return IsLogEnabled(source, LogLevelCrit)
 }
 
 // LogErr is called for log level ERR messages
@@ -107,9 +132,19 @@ func LogErr(source string, format string, args ...interface{}) {
 	LogMessage(LogLevelErr, source, format, args...)
 }
 
+// IsErrEnabled returns true if ERR logging is enable for the specified source
+func IsErrEnabled(source string) bool {
+	return IsLogEnabled(source, LogLevelErr)
+}
+
 // LogWarn is called for log level WARN messages
 func LogWarn(source string, format string, args ...interface{}) {
 	LogMessage(LogLevelWarn, source, format, args...)
+}
+
+// IsWarnEnabled returns true if WARN logging is enable for the specified source
+func IsWarnEnabled(source string) bool {
+	return IsLogEnabled(source, LogLevelWarn)
 }
 
 // LogNotice is called for log level NOTICE messages
@@ -117,9 +152,19 @@ func LogNotice(source string, format string, args ...interface{}) {
 	LogMessage(LogLevelNotice, source, format, args...)
 }
 
+// IsNoticeEnabled returns true if NOTICE logging is enable for the specified source
+func IsNoticeEnabled(source string) bool {
+	return IsLogEnabled(source, LogLevelNotice)
+}
+
 // LogInfo is called for log level INFO messages
 func LogInfo(source string, format string, args ...interface{}) {
 	LogMessage(LogLevelInfo, source, format, args...)
+}
+
+// IsInfoEnabled returns true if INFO logging is enable for the specified source
+func IsInfoEnabled(source string) bool {
+	return IsLogEnabled(source, LogLevelInfo)
 }
 
 // LogDebug is called for log level DEBUG messages
@@ -127,9 +172,19 @@ func LogDebug(source string, format string, args ...interface{}) {
 	LogMessage(LogLevelDebug, source, format, args...)
 }
 
+// IsDebugEnabled returns true if DEBUG logging is enable for the specified source
+func IsDebugEnabled(source string) bool {
+	return IsLogEnabled(source, LogLevelDebug)
+}
+
 // LogTrace is called for log level TRACE messages
 func LogTrace(source string, format string, args ...interface{}) {
 	LogMessage(LogLevelTrace, source, format, args...)
+}
+
+// IsTraceEnabled returns true if TRACE logging is enable for the specified source
+func IsTraceEnabled(source string) bool {
+	return IsLogEnabled(source, LogLevelTrace)
 }
 
 // LogWriter is used to send an output stream to the Log facility
