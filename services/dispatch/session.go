@@ -55,7 +55,7 @@ func insertSessionEntry(finder uint32, entry *SessionEntry) {
 	logger.LogTrace(logsrc, "Insert session ctid %d -> %v\n", finder, entry.ClientSideTuple)
 	sessionMutex.Lock()
 	sessionTable[finder] = entry
-	dict.AddSessionEntry(finder, "SessionID", entry.SessionID)
+	dict.AddSessionEntry(finder, "session_id", entry.SessionID)
 	sessionMutex.Unlock()
 }
 

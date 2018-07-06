@@ -40,7 +40,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	// if we found the hostname write to the dictionary and release the session
 	if hostname != "" {
 		logger.LogDebug(logsrc, "Extracted SNI %s for %d\n", hostname, ctid)
-		dict.AddSessionEntry(ctid, "ClientSNI", hostname)
+		dict.AddSessionEntry(ctid, "ssl_sni", hostname)
 	}
 
 	// set the session release from the extractor return

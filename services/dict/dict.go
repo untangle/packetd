@@ -490,6 +490,10 @@ func AddEntry(table string, key interface{}, field string, value interface{}) er
 	var setstr string
 	setstr = fmt.Sprintf("%s%s%s%s", generateTable(table), generateKey(key), generateField(field), generateValue(value))
 
+	if logger.IsDebugEnabled(logsrc) {
+		logger.LogDebug(logsrc, "SET table: %s[%v] | %s = %s\n", table, key, field, value)
+	}
+
 	err := writeEntry(setstr)
 
 	if err != nil {
@@ -527,6 +531,10 @@ func AddSessionEntry(key uint32, field string, value interface{}) error {
 func DeleteDictionary(table string, key interface{}) error {
 	var setstr string
 	setstr = fmt.Sprintf("%s%s", generateTable(table), generateKey(key))
+
+	if logger.IsDebugEnabled(logsrc) {
+		logger.LogDebug(logsrc, "DEL table: %s[%v]\n", table, key)
+	}
 
 	err := deleteEntry(setstr)
 
