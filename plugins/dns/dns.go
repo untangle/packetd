@@ -10,14 +10,14 @@ import (
 // increment the argumented WaitGroup so the main process can wait for
 // our shutdown function to return during shutdown.
 func PluginStartup() {
-	logger.LogInfo("PluginStartup(%s) has been called\n")
+	logger.Info("PluginStartup(%s) has been called\n")
 	dispatch.InsertNfqueueSubscription("dns", 2, PluginNfqueueHandler)
 }
 
 // PluginShutdown function called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
 func PluginShutdown() {
-	logger.LogInfo("PluginShutdown(%s) has been called\n")
+	logger.Info("PluginShutdown(%s) has been called\n")
 }
 
 // PluginNfqueueHandler is called to handle nfqueue packet data. We only
@@ -41,7 +41,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	query := dns.Questions[0]
-	logger.LogInfo("DNS QUERY DETECTED NAME:%s TYPE:%d CLASS:%d\n", query.Name, query.Type, query.Class)
+	logger.Info("DNS QUERY DETECTED NAME:%s TYPE:%d CLASS:%d\n", query.Name, query.Type, query.Class)
 
 	// use the channel to return our result
 	return result

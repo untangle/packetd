@@ -63,7 +63,7 @@ func StopCallbacks() {
 	select {
 	case <-shutdownConntrackTask:
 	case <-time.After(10 * time.Second):
-		logger.LogErr("Failed to properly shutdown conntrackPeriodicTask\n")
+		logger.Err("Failed to properly shutdown conntrackPeriodicTask\n")
 	}
 
 	// wait on above shutdowns
@@ -98,7 +98,7 @@ func RegisterNetloggerCallback(cb NetloggerCallback) {
 //export go_nfqueue_callback
 func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.char) {
 	if nfqueueCallback == nil {
-		logger.LogWarn("No queue callback registered. Ignoring packet.\n")
+		logger.Warn("No queue callback registered. Ignoring packet.\n")
 		C.nfqueue_set_verdict(nfid, C.NF_ACCEPT, mark)
 		return
 	}
@@ -141,7 +141,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	var serverPortNew uint16
 
 	if conntrackCallback == nil {
-		logger.LogWarn("No conntrack callback registered. Ignoring event.\n")
+		logger.Warn("No conntrack callback registered. Ignoring event.\n")
 		return
 	}
 
@@ -188,7 +188,7 @@ func go_netlogger_callback(info *C.struct_netlogger_info) {
 	var prefix string = C.GoString(&info.prefix[0])
 
 	if netloggerCallback == nil {
-		logger.LogWarn("No conntrack callback registered. Ignoring event.\n")
+		logger.Warn("No conntrack callback registered. Ignoring event.\n")
 		return
 	}
 
@@ -223,7 +223,7 @@ func conntrackTask() {
 			return
 		case <-time.After(timeUntilNextMin()):
 			counter++
-			logger.LogDebug("Calling conntrack dump %d\n", counter)
+			logger.Debug("Calling conntrack dump %d\n", counter)
 			C.conntrack_dump()
 		}
 	}

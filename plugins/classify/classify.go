@@ -60,15 +60,15 @@ var classdMutex sync.Mutex
 func PluginStartup() {
 	var err error
 
-	logger.LogInfo("PluginStartup(%s) has been called\n")
+	logger.Info("PluginStartup(%s) has been called\n")
 
 	// start the classd daemon with the no fork flag
 	daemonProcess = exec.Command(daemonBinary, "-f")
 	err = daemonProcess.Start()
 	if err != nil {
-		logger.LogErr("Error starting classd daemon: %v\n", err)
+		logger.Err("Error starting classd daemon: %v\n", err)
 	} else {
-		logger.LogInfo("The classd daemon has been started\n")
+		logger.Info("The classd daemon has been started\n")
 	}
 
 	applicationTable = make(map[string]applicationInfo)
@@ -82,7 +82,7 @@ func PluginStartup() {
 	sockspin = 0
 	daemonConnection, err = net.Dial("tcp", classdHostPort)
 	if err != nil {
-		logger.LogErr("Error calling net.Dial(): %v\n", err)
+		logger.Err("Error calling net.Dial(): %v\n", err)
 	}
 
 	dispatch.InsertNfqueueSubscription("classify", 2, PluginNfqueueHandler)
@@ -90,7 +90,7 @@ func PluginStartup() {
 
 // PluginShutdown is called when the daemon is shutting down
 func PluginShutdown() {
-	logger.LogInfo("PluginShutdown(%s) has been called\n")
+	logger.Info("PluginShutdown(%s) has been called\n")
 
 	// if we have a connection to the daemon close it
 	if daemonConnection != nil {
@@ -102,9 +102,9 @@ func PluginShutdown() {
 	// terminate the classd daemon
 	err := daemonProcess.Process.Kill()
 	if err != nil {
-		logger.LogErr("Error stopping classd daemon: %v\n", err)
+		logger.Err("Error stopping classd daemon: %v\n", err)
 	} else {
-		logger.LogInfo("The classd daemon has been stopped\n")
+		logger.Info("The classd daemon has been stopped\n")
 	}
 }
 
@@ -126,14 +126,14 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// sanity checks
 	if mess.Session == nil {
-		logger.LogErr("Invalid event!\n")
+		logger.Err("Invalid event!\n")
 		result.SessionRelease = true
 		return result
 	}
 	if mess.UDPlayer == nil && mess.TCPlayer == nil {
 		// FIXME unsupported protocol
 		// Which protocols do we support: TCP/UDP... ICMP? Others?
-		logger.LogErr("Unsupported protocol: %v\n", mess.Session.ClientSideTuple.Protocol)
+		logger.Err("Unsupported protocol: %v\n", mess.Session.ClientSideTuple.Protocol)
 		result.SessionRelease = true
 		return result
 	}
@@ -141,7 +141,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	// send the data to classd and read reply
 	reply, err = sendCommand(mess, ctid, newSession)
 	if err != nil {
-		logger.LogErr("classd communication error: %v\n", err)
+		logger.Err("classd communication error: %v\n", err)
 		result.SessionRelease = true
 		return result
 	}
@@ -210,11 +210,11 @@ func sendCommand(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) (st
 	if newSession {
 		reply, err = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.Session.ClientSideTuple.ClientAddress, mess.Session.ClientSideTuple.ClientPort, mess.Session.ClientSideTuple.ServerAddress, mess.Session.ClientSideTuple.ServerPort)
 		if err != nil {
-			logger.LogErr("daemonCommand error: %s\n", err.Error())
+			logger.Err("daemonCommand error: %s\n", err.Error())
 			return "", err
 		}
 		if logger.IsTraceEnabled() {
-			logger.LogTrace("daemonCommand result: %s\n", strings.Replace(strings.Replace(reply, "\n", "|", -1), "\r", "", -1))
+			logger.Trace("daemonCommand result: %s\n", strings.Replace(strings.Replace(reply, "\n", "|", -1), "\r", "", -1))
 		}
 	}
 
@@ -226,12 +226,12 @@ func sendCommand(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) (st
 	}
 
 	if err != nil {
-		logger.LogErr("daemonCommand error: %s\n", err.Error())
+		logger.Err("daemonCommand error: %s\n", err.Error())
 		return "", err
 	}
 
 	if logger.IsTraceEnabled() {
-		logger.LogTrace("daemonCommand result: %s\n", strings.Replace(strings.Replace(reply, "\n", "|", -1), "\r", "", -1))
+		logger.Trace("daemonCommand result: %s\n", strings.Replace(strings.Replace(reply, "\n", "|", -1), "\r", "", -1))
 	}
 	return reply, nil
 }
@@ -417,7 +417,7 @@ func loadApplicationTable() {
 
 	// if there was an error log and return
 	if err != nil {
-		logger.LogWarn("Unable to load application details: %s\n", guidInfoFile)
+		logger.Warn("Unable to load application details: %s\n", guidInfoFile)
 		return
 	}
 
@@ -430,7 +430,7 @@ func loadApplicationTable() {
 			break
 			// for anything else log the error and break
 		} else if err != nil {
-			logger.LogErr("Unable to parse application details: %v\n", err)
+			logger.Err("Unable to parse application details: %v\n", err)
 			break
 		}
 
@@ -445,7 +445,7 @@ func loadApplicationTable() {
 
 		// if we did not parse exactly 10 fields skip the line
 		if len(list) != 10 {
-			logger.LogWarn("Invalid line length: %d\n", len(list))
+			logger.Warn("Invalid line length: %d\n", len(list))
 			continue
 		}
 
@@ -454,22 +454,22 @@ func loadApplicationTable() {
 		info.guid = list[0]
 		info.index, err = strconv.Atoi(list[1])
 		if err != nil {
-			logger.LogWarn("Invalid index: %s\n", list[1])
+			logger.Warn("Invalid index: %s\n", list[1])
 		}
 		info.name = list[2]
 		info.description = list[3]
 		info.category = list[4]
 		info.productivity, err = strconv.Atoi(list[5])
 		if err != nil {
-			logger.LogWarn("Invalid productivity: %s\n", list[5])
+			logger.Warn("Invalid productivity: %s\n", list[5])
 		}
 		info.risk, err = strconv.Atoi(list[6])
 		if err != nil {
-			logger.LogWarn("Invalid risk: %s\n", list[6])
+			logger.Warn("Invalid risk: %s\n", list[6])
 		}
 		info.flags, err = strconv.ParseUint(list[7], 10, 64)
 		if err != nil {
-			logger.LogWarn("Invalid flags: %s %s\n", list[7], err)
+			logger.Warn("Invalid flags: %s %s\n", list[7], err)
 		}
 		info.reference = list[8]
 		info.plugin = list[9]
@@ -479,11 +479,11 @@ func loadApplicationTable() {
 	}
 
 	file.Close()
-	logger.LogInfo("Loaded classification details for %d applications\n", infocount)
+	logger.Info("Loaded classification details for %d applications\n", infocount)
 
 	// if there were any bad lines in the file log a warning
 	if infocount != linecount-1 {
-		logger.LogWarn("Detected garbage in the application info file: %s\n", guidInfoFile)
+		logger.Warn("Detected garbage in the application info file: %s\n", guidInfoFile)
 	}
 }
 
@@ -495,14 +495,14 @@ func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname st
 	if mess.Session.Attachments[pairname] == nil {
 		mess.Session.Attachments[pairname] = pairdata
 		dict.AddSessionEntry(ctid, pairname, pairdata)
-		logger.LogDebug("Setting classification detail %s = %s\n", pairname, pairdata)
+		logger.Debug("Setting classification detail %s = %s\n", pairname, pairdata)
 		return true
 	}
 
 	// if the session has the attachment and it has not changed just return
 	if mess.Session.Attachments[pairname] == pairdata {
 		if logger.IsTraceEnabled() {
-			logger.LogTrace("Ignoring classification detail %s = %v\n", pairname, pairdata)
+			logger.Trace("Ignoring classification detail %s = %v\n", pairname, pairdata)
 		}
 		return false
 	}
@@ -510,6 +510,6 @@ func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname st
 	// at this point the session has the attachment but the data has changed so we update the session and the dictionary
 	mess.Session.Attachments[pairname] = pairdata
 	dict.AddSessionEntry(ctid, pairname, pairdata)
-	logger.LogDebug("Updating classification detail %s = %s\n", pairname, pairdata)
+	logger.Debug("Updating classification detail %s = %s\n", pairname, pairdata)
 	return true
 }

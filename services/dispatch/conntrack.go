@@ -43,7 +43,7 @@ func (c ConntrackEntry) String() string {
 // InsertConntrackSubscription adds a subscription for receiving conntrack messages
 func InsertConntrackSubscription(owner string, priority int, function ConntrackHandlerFunction) {
 	var holder SubscriptionHolder
-	logger.LogInfo("Adding Conntrack Event Subscription (%s, %d)\n", owner, priority)
+	logger.Info("Adding Conntrack Event Subscription (%s, %d)\n", owner, priority)
 
 	holder.Owner = owner
 	holder.Priority = priority
@@ -67,7 +67,7 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 
 	if conntrackEntryFound {
 		conntrackEntry.EventCount++
-		logger.LogTrace("conntrack event[%d,%c]: %s \n", ctid, eventType, conntrackEntry.ClientSideTuple)
+		logger.Trace("conntrack event[%d,%c]: %s \n", ctid, eventType, conntrackEntry.ClientSideTuple)
 	} else {
 		conntrackEntry = new(ConntrackEntry)
 		conntrackEntry.ConntrackID = ctid
@@ -85,7 +85,7 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 		conntrackEntry.ServerSideTuple.ServerPort = serverPortNew
 		conntrackEntry.EventCount = 1
 
-		logger.LogTrace("conntrack event[%d,%c]: %v \n", ctid, eventType, conntrackEntry.ClientSideTuple)
+		logger.Trace("conntrack event[%d,%c]: %v \n", ctid, eventType, conntrackEntry.ClientSideTuple)
 
 		session, _ := findSessionEntry(uint32(ctid))
 		if session != nil {
@@ -118,7 +118,7 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 				if session.ConntrackConfirmed {
 					panic("CONNTRACK ID RE-USE DETECTED")
 				}
-				logger.LogDebug("Removing stale session %d %v\n", ctid, session.ClientSideTuple)
+				logger.Debug("Removing stale session %d %v\n", ctid, session.ClientSideTuple)
 				removeSessionEntry(ctid)
 				session = nil
 			}
@@ -190,12 +190,12 @@ func conntrackCallback(ctid uint32, eventType uint8, protocol uint8,
 			if val.Priority != priority {
 				continue
 			}
-			logger.LogDebug("Calling conntrack APP:%s PRIORITY:%d\n", key, priority)
+			logger.Debug("Calling conntrack APP:%s PRIORITY:%d\n", key, priority)
 			wg.Add(1)
 			go func(val SubscriptionHolder) {
 				val.ConntrackFunc(int(eventType), conntrackEntry)
 				wg.Done()
-				logger.LogDebug("Finished conntrack APP:%s PRIORITY:%d\n", key, priority)
+				logger.Debug("Finished conntrack APP:%s PRIORITY:%d\n", key, priority)
 			}(val)
 			subcount++
 		}
@@ -225,7 +225,7 @@ func insertConntrackEntry(finder uint32, entry *ConntrackEntry) {
 
 // removeConntrackEntry removes an entry from the conntrack table
 func removeConntrackEntry(finder uint32) {
-	logger.LogTrace("Remove conntrack ctid %d\n", finder)
+	logger.Trace("Remove conntrack ctid %d\n", finder)
 	conntrackTableMutex.Lock()
 	defer conntrackTableMutex.Unlock()
 	delete(conntrackTable, finder)
@@ -244,6 +244,6 @@ func cleanConntrackTable() {
 		}
 		removeConntrackEntry(key)
 		// this should never happen, so print an error
-		logger.LogErr("Removing stale conntrack entry %d %v\n", key, val.ClientSideTuple)
+		logger.Err("Removing stale conntrack entry %d %v\n", key, val.ClientSideTuple)
 	}
 }

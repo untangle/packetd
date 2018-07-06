@@ -45,14 +45,14 @@ func nextSessionID() uint64 {
 func findSessionEntry(finder uint32) (*SessionEntry, bool) {
 	sessionMutex.Lock()
 	entry, status := sessionTable[finder]
-	logger.LogTrace("Lookup session ctid %d -> %v\n", finder, status)
+	logger.Trace("Lookup session ctid %d -> %v\n", finder, status)
 	sessionMutex.Unlock()
 	return entry, status
 }
 
 // insertSessionEntry adds an entry to the session table
 func insertSessionEntry(finder uint32, entry *SessionEntry) {
-	logger.LogTrace("Insert session ctid %d -> %v\n", finder, entry.ClientSideTuple)
+	logger.Trace("Insert session ctid %d -> %v\n", finder, entry.ClientSideTuple)
 	sessionMutex.Lock()
 	sessionTable[finder] = entry
 	dict.AddSessionEntry(finder, "session_id", entry.SessionID)
@@ -61,7 +61,7 @@ func insertSessionEntry(finder uint32, entry *SessionEntry) {
 
 // removeSessionEntry removes an entry from the session table
 func removeSessionEntry(finder uint32) {
-	logger.LogTrace("Remove session ctid %d\n", finder)
+	logger.Trace("Remove session ctid %d\n", finder)
 	sessionMutex.Lock()
 	dict.DeleteSession(finder)
 	delete(sessionTable, finder)
@@ -83,7 +83,7 @@ func cleanSessionTable() {
 		// get a conntrack new or destroy event
 		// as such this will exist in the table until the conntrack ID gets re-used
 		// or this happens. Since this is condition is expected, just log as debug
-		logger.LogDebug("Removing stale session entry %d %v\n", key, val.ClientSideTuple)
+		logger.Debug("Removing stale session entry %d %v\n", key, val.ClientSideTuple)
 	}
 }
 
@@ -92,6 +92,6 @@ func printSessionTable() {
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
 	for k, v := range sessionTable {
-		logger.LogDebug("Session[%d] = %s\n", k, v.ClientSideTuple.String())
+		logger.Debug("Session[%d] = %s\n", k, v.ClientSideTuple.String())
 	}
 }

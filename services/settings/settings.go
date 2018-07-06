@@ -17,25 +17,25 @@ func Startup() {
 	var err error
 	settings, err = readSettingsFileJSON()
 	if err != nil {
-		logger.LogWarn("Error reading settings file: %s\n", err.Error())
+		logger.Warn("Error reading settings file: %s\n", err.Error())
 	}
 
 	if settings == nil {
 		settings, err = createNewSettings()
 	}
 	if err != nil {
-		logger.LogErr("Failed to create/read settings file: %s\n", err.Error())
+		logger.Err("Failed to create/read settings file: %s\n", err.Error())
 		//FIXME abort / exit
 	} else if settings == nil {
-		logger.LogErr("Failed to create/read settings file.\n")
+		logger.Err("Failed to create/read settings file.\n")
 		//FIXME abort / exit
 	}
 
 	// jsonString, err := json.MarshalIndent(settings, "", "  ")
 	// if err != nil {
-	// logger.LogWarn("Error reading settings file: %s\n", err.Error())
+	// logger.Warn("Error reading settings file: %s\n", err.Error())
 	// } else {
-	// logger.LogDebug("settings: %s\n", jsonString)
+	// logger.Debug("settings: %s\n", jsonString)
 	// }
 }
 
@@ -261,20 +261,20 @@ func createJSONErrorString(str string) map[string]interface{} {
 
 // createNewSettings creates a new settings file
 func createNewSettings() (map[string]interface{}, error) {
-	logger.LogInfo("Initializing new settings...\n")
+	logger.Info("Initializing new settings...\n")
 	cmd := exec.Command("sh", "-c", "/usr/bin/sync-settings -c -f /etc/config/settings.json")
 	stdoutStderr, err := cmd.CombinedOutput()
 	if err != nil {
-		logger.LogWarn("Error creating new settings file: %s\n", err.Error())
+		logger.Warn("Error creating new settings file: %s\n", err.Error())
 		return nil, err
 	}
 	for _, line := range strings.Split(strings.TrimSpace(string(stdoutStderr)), "\n") {
-		logger.LogInfo("sync-settings: %s\n", line)
+		logger.Info("sync-settings: %s\n", line)
 	}
 
 	settings, err = readSettingsFileJSON()
 	if err != nil {
-		logger.LogWarn("Error reading settings file: %s\n", err.Error())
+		logger.Warn("Error reading settings file: %s\n", err.Error())
 	}
 	return settings, err
 }

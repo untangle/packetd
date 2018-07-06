@@ -19,7 +19,7 @@ var geodb *geoip2.Reader
 // argumented WaitGroup so the main process can wait for our shutdown function
 // to return during shutdown.
 func PluginStartup() {
-	logger.LogInfo("PluginStartup(%s) has been called\n")
+	logger.Info("PluginStartup(%s) has been called\n")
 
 	var filename string
 
@@ -40,9 +40,9 @@ func PluginStartup() {
 
 	db, err := geoip2.Open(filename)
 	if err != nil {
-		logger.LogWarn("Unable to load GeoIP Database: %s\n", err)
+		logger.Warn("Unable to load GeoIP Database: %s\n", err)
 	} else {
-		logger.LogInfo("Loading GeoIP Database: %s\n", filename)
+		logger.Info("Loading GeoIP Database: %s\n", filename)
 		geodb = db
 	}
 
@@ -53,7 +53,7 @@ func PluginStartup() {
 // GeoIP engine and call done for the argumented WaitGroup to let the main
 // process know we're finished.
 func PluginShutdown() {
-	logger.LogInfo("PluginShutdown(%s) has been called\n")
+	logger.Info("PluginShutdown(%s) has been called\n")
 	geodb.Close()
 }
 
@@ -67,13 +67,13 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	SrcRecord, err := geodb.City(mess.IPlayer.SrcIP)
 	if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
 		SrcCode = SrcRecord.Country.IsoCode
-		logger.LogDebug("SRC: %s = %s\n", mess.IPlayer.SrcIP, SrcCode)
+		logger.Debug("SRC: %s = %s\n", mess.IPlayer.SrcIP, SrcCode)
 	}
 
 	DstRecord, err := geodb.City(mess.IPlayer.DstIP)
 	if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
 		DstCode = DstRecord.Country.IsoCode
-		logger.LogDebug("DST: %s = %s\n", mess.IPlayer.DstIP, DstCode)
+		logger.Debug("DST: %s = %s\n", mess.IPlayer.DstIP, DstCode)
 	}
 
 	dict.AddSessionEntry(ctid, "client_country", SrcCode)
@@ -87,7 +87,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 }
 
 func databaseDownload(filename string) {
-	logger.LogInfo("Downloading GeoIP Database\n")
+	logger.Info("Downloading GeoIP Database\n")
 
 	// Get the GeoIP database from MaxMind
 	resp, err := http.Get("http://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.mmdb.gz")
@@ -98,7 +98,7 @@ func databaseDownload(filename string) {
 
 	// Check server response
 	if resp.StatusCode != http.StatusOK {
-		logger.LogWarn("Download failure: %s\n", resp.Status)
+		logger.Warn("Download failure: %s\n", resp.Status)
 		return
 	}
 

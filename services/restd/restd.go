@@ -42,7 +42,7 @@ func Startup() {
 	// listen and serve on 0.0.0.0:8080
 	engine.Run()
 
-	logger.LogInfo("The RestD engine has been started\n")
+	logger.Info("The RestD engine has been started\n")
 }
 
 // Shutdown restd
@@ -101,7 +101,7 @@ func reportsCreateQuery(c *gin.Context) {
 		return
 	}
 	str := fmt.Sprintf("%v", q.ID)
-	logger.LogDebug("CreateQuery(%s)\n", str)
+	logger.Debug("CreateQuery(%s)\n", str)
 	c.String(200, str)
 	// c.JSON(200, gin.H{
 	// 	"queryID": q.ID,

@@ -12,7 +12,7 @@ import (
 
 const logConfigFile = "/tmp/logconfig.js"
 
-var logLevelName = [...]string{"EMERG", "ALERT", "CRIT", "ERROR", "WARN", "NOTICE", "INFO", "DEBUG", "TRACE"}
+var logLevelName = [...]string{"EMERG", "ALERT", "CRIT", "ERROR", "WARN", "NOTIC", "INFO", "DEBUG", "TRACE"}
 var appLogLevel map[string]int
 var launchTime time.Time
 
@@ -80,10 +80,10 @@ func LogMessage(level int, format string, args ...interface{}) {
 	var elapsed = nowtime.Sub(launchTime)
 
 	if len(args) == 0 {
-		fmt.Printf("[%11.5f] %-6s %25s: %s", elapsed.Seconds(), logLevelName[level], caller, format)
+		fmt.Printf("[%11.5f] %-5s %26s: %s", elapsed.Seconds(), logLevelName[level], caller, format)
 	} else {
 		buffer := fmt.Sprintf(format, args...)
-		fmt.Printf("[%11.5f] %-6s %25s: %s", elapsed.Seconds(), logLevelName[level], caller, buffer)
+		fmt.Printf("[%11.5f] %-5s %26s: %s", elapsed.Seconds(), logLevelName[level], caller, buffer)
 	}
 }
 
@@ -106,10 +106,10 @@ func LogMessageSource(level int, source string, format string, args ...interface
 	var elapsed = nowtime.Sub(launchTime)
 
 	if len(args) == 0 {
-		fmt.Printf("[%11.5f] %-6s %25s: %s", elapsed.Seconds(), logLevelName[level], source, format)
+		fmt.Printf("[%11.5f] %-5s %26s: %s", elapsed.Seconds(), logLevelName[level], source, format)
 	} else {
 		buffer := fmt.Sprintf(format, args...)
-		fmt.Printf("[%11.5f] %-6s %25s: %s", elapsed.Seconds(), logLevelName[level], source, buffer)
+		fmt.Printf("[%11.5f] %-5s %26s: %s", elapsed.Seconds(), logLevelName[level], source, buffer)
 	}
 }
 
@@ -123,8 +123,8 @@ func IsLogEnabled(level int) bool {
 	return false
 }
 
-// LogEmerg is called for log level EMERG messages
-func LogEmerg(format string, args ...interface{}) {
+// Emerg is called for log level EMERG messages
+func Emerg(format string, args ...interface{}) {
 	LogMessage(LogLevelEmerg, format, args...)
 }
 
@@ -133,8 +133,8 @@ func IsEmergEnabled() bool {
 	return IsLogEnabled(LogLevelEmerg)
 }
 
-// LogAlert is called for log level ALERT messages
-func LogAlert(format string, args ...interface{}) {
+// Alert is called for log level ALERT messages
+func Alert(format string, args ...interface{}) {
 	LogMessage(LogLevelAlert, format, args...)
 }
 
@@ -143,8 +143,8 @@ func IsAlertEnabled() bool {
 	return IsLogEnabled(LogLevelAlert)
 }
 
-// LogCrit is called for log level CRIT messages
-func LogCrit(format string, args ...interface{}) {
+// Crit is called for log level CRIT messages
+func Crit(format string, args ...interface{}) {
 	LogMessage(LogLevelCrit, format, args...)
 }
 
@@ -153,8 +153,8 @@ func IsCritEnabled() bool {
 	return IsLogEnabled(LogLevelCrit)
 }
 
-// LogErr is called for log level ERR messages
-func LogErr(format string, args ...interface{}) {
+// Err is called for log level ERR messages
+func Err(format string, args ...interface{}) {
 	LogMessage(LogLevelErr, format, args...)
 }
 
@@ -163,8 +163,8 @@ func IsErrEnabled() bool {
 	return IsLogEnabled(LogLevelErr)
 }
 
-// LogWarn is called for log level WARN messages
-func LogWarn(format string, args ...interface{}) {
+// Warn is called for log level WARN messages
+func Warn(format string, args ...interface{}) {
 	LogMessage(LogLevelWarn, format, args...)
 }
 
@@ -173,8 +173,8 @@ func IsWarnEnabled() bool {
 	return IsLogEnabled(LogLevelWarn)
 }
 
-// LogNotice is called for log level NOTICE messages
-func LogNotice(format string, args ...interface{}) {
+// Notice is called for log level NOTICE messages
+func Notice(format string, args ...interface{}) {
 	LogMessage(LogLevelNotice, format, args...)
 }
 
@@ -183,8 +183,8 @@ func IsNoticeEnabled() bool {
 	return IsLogEnabled(LogLevelNotice)
 }
 
-// LogInfo is called for log level INFO messages
-func LogInfo(format string, args ...interface{}) {
+// Info is called for log level INFO messages
+func Info(format string, args ...interface{}) {
 	LogMessage(LogLevelInfo, format, args...)
 }
 
@@ -193,8 +193,8 @@ func IsInfoEnabled() bool {
 	return IsLogEnabled(LogLevelInfo)
 }
 
-// LogDebug is called for log level DEBUG messages
-func LogDebug(format string, args ...interface{}) {
+// Debug is called for log level DEBUG messages
+func Debug(format string, args ...interface{}) {
 	LogMessage(LogLevelDebug, format, args...)
 }
 
@@ -203,8 +203,8 @@ func IsDebugEnabled() bool {
 	return IsLogEnabled(LogLevelDebug)
 }
 
-// LogTrace is called for log level TRACE messages
-func LogTrace(format string, args ...interface{}) {
+// Trace is called for log level TRACE messages
+func Trace(format string, args ...interface{}) {
 	LogMessage(LogLevelTrace, format, args...)
 }
 
@@ -228,7 +228,7 @@ func (w *LogWriter) Write(p []byte) (int, error) {
 	for _, b := range p {
 		w.buffer = append(w.buffer, b)
 		if b == '\n' {
-			LogInfo(string(w.buffer))
+			Info(string(w.buffer))
 			w.buffer = make([]byte, 256)
 		}
 	}
@@ -251,7 +251,7 @@ func loadLoggerConfig() {
 
 		// if there is still an error we are out of options
 		if err != nil {
-			LogErr("Unable to load Log configuration file: %s\n", logConfigFile)
+			Err("Unable to load Log configuration file: %s\n", logConfigFile)
 			return
 		}
 	}
@@ -262,7 +262,7 @@ func loadLoggerConfig() {
 	// get the file status
 	info, err = file.Stat()
 	if err != nil {
-		LogErr("Unable to query file information\n")
+		Err("Unable to query file information\n")
 		return
 	}
 
@@ -272,14 +272,14 @@ func loadLoggerConfig() {
 	len, err := file.Read(data)
 
 	if (err != nil) || (len < 1) {
-		LogErr("Unable to read Log configuration\n")
+		Err("Unable to read Log configuration\n")
 		return
 	}
 
 	// unmarshal the configuration into a map
 	err = json.Unmarshal(data, &config)
 	if err != nil {
-		LogErr("Unable to parse Log configuration\n")
+		Err("Unable to parse Log configuration\n")
 		return
 	}
 
@@ -299,13 +299,13 @@ func loadLoggerConfig() {
 			}
 		}
 		if found == false {
-			LogWarn("Invalid Log configuration entry: %s=%s\n", cfgname, cfglevel)
+			Warn("Invalid Log configuration entry: %s=%s\n", cfgname, cfglevel)
 		}
 	}
 }
 
 func initLoggerConfig() {
-	LogAlert("Log configuration not found. Creating default file: %s\n", logConfigFile)
+	Alert("Log configuration not found. Creating default file: %s\n", logConfigFile)
 
 	// create a comment that shows all valid log level names
 	var comment string
@@ -346,7 +346,7 @@ func initLoggerConfig() {
 	// convert the config map to a json object
 	jstr, err := json.MarshalIndent(config, "", "")
 	if err != nil {
-		LogAlert("Log failure creating default configuration: %s\n", err.Error())
+		Alert("Log failure creating default configuration: %s\n", err.Error())
 		return
 	}
 
@@ -383,8 +383,8 @@ func findCaller() (string, string, string, int) {
 			}
 
 			var summary = fmt.Sprintf("%s/%s:%04d", packagename, shortname, line)
-			if len(summary) > 25 {
-				summary = summary[len(summary)-25:]
+			if len(summary) > 26 {
+				summary = summary[len(summary)-26:]
 			}
 			return summary, packagename, shortname, line
 		}

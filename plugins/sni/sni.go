@@ -8,13 +8,13 @@ import (
 
 // PluginStartup function is called to allow plugin specific initialization.
 func PluginStartup() {
-	logger.LogInfo("PluginStartup(%s) has been called\n")
+	logger.Info("PluginStartup(%s) has been called\n")
 	dispatch.InsertNfqueueSubscription("sni", 2, PluginNfqueueHandler)
 }
 
 // PluginShutdown function called when the daemon is shutting down.
 func PluginShutdown() {
-	logger.LogInfo("PluginShutdown(%s) has been called\n")
+	logger.Info("PluginShutdown(%s) has been called\n")
 }
 
 // PluginNfqueueHandler is called to handle nfqueue packet data. We only
@@ -37,7 +37,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// if we found the hostname write to the dictionary and release the session
 	if hostname != "" {
-		logger.LogDebug("Extracted SNI %s for %d\n", hostname, ctid)
+		logger.Debug("Extracted SNI %s for %d\n", hostname, ctid)
 		dict.AddSessionEntry(ctid, "ssl_sni", hostname)
 	}
 

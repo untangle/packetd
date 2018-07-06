@@ -59,7 +59,7 @@ func Shutdown() {
 	select {
 	case <-shutdownCleanerTask:
 	case <-time.After(10 * time.Second):
-		logger.LogErr("Failed to properly shutdown cleanerTask\n")
+		logger.Err("Failed to properly shutdown cleanerTask\n")
 	}
 }
 
@@ -74,7 +74,7 @@ func cleanerTask() {
 			return
 		case <-time.After(60 * time.Second):
 			counter++
-			logger.LogDebug("Calling cleaner task %d\n", counter)
+			logger.Debug("Calling cleaner task %d\n", counter)
 			cleanSessionTable()
 			cleanConntrackTable()
 		}

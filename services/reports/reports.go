@@ -44,7 +44,7 @@ func Startup() {
 	db, err = sql.Open("sqlite3", "/tmp/reports.db")
 
 	if err != nil {
-		logger.LogErr("Failed to open database: %s\n", err.Error())
+		logger.Err("Failed to open database: %s\n", err.Error())
 	}
 
 	go func() {
@@ -62,7 +62,7 @@ func Shutdown() {
 func CreateQuery(reportEntry string) (*Query, error) {
 	rows, err := db.Query("SELECT * FROM sessions LIMIT 5")
 	if err != nil {
-		logger.LogErr("db.Query error: %s\n", err)
+		logger.Err("db.Query error: %s\n", err)
 		return nil, err
 	}
 	q := new(Query)
@@ -78,7 +78,7 @@ func CreateQuery(reportEntry string) (*Query, error) {
 func GetData(queryID uint64) (string, error) {
 	q := queries[queryID]
 	if q == nil {
-		logger.LogWarn("Query not found: %d\n", queryID)
+		logger.Warn("Query not found: %d\n", queryID)
 		return "", errors.New("Query ID not found")
 	}
 	result, err := getRows(q.Rows, 1000)
@@ -121,10 +121,10 @@ func eventLogger() {
 			if err == nil {
 				summary = summary + "UPDATE: " + string(str)
 			} else {
-				logger.LogWarn("ERROR: %s\n", err.Error())
+				logger.Warn("ERROR: %s\n", err.Error())
 			}
 		}
-		logger.LogDebug("Log Event: %s %v\n", summary, event.SQLOp)
+		logger.Debug("Log Event: %s %v\n", summary, event.SQLOp)
 
 		if event.SQLOp == 1 {
 			logInsertEvent(event)
@@ -155,15 +155,15 @@ func logInsertEvent(event Event) {
 	valueStr += ")"
 	sqlStr += " VALUES " + valueStr
 
-	logger.LogDebug("SQL: %s\n", sqlStr)
+	logger.Debug("SQL: %s\n", sqlStr)
 	stmt, err := db.Prepare(sqlStr)
 	if err != nil {
-		logger.LogWarn("Failed to prepare statement: %s %s\n", err.Error(), sqlStr)
+		logger.Warn("Failed to prepare statement: %s %s\n", err.Error(), sqlStr)
 		return
 	}
 	_, err = stmt.Exec(values...)
 	if err != nil {
-		logger.LogWarn("Failed to exec statement: %s %s\n", err.Error(), sqlStr)
+		logger.Warn("Failed to exec statement: %s %s\n", err.Error(), sqlStr)
 		return
 	}
 }
@@ -195,15 +195,15 @@ func logUpdateEvent(event Event) {
 		first = false
 	}
 
-	logger.LogDebug("SQL: %s\n", sqlStr)
+	logger.Debug("SQL: %s\n", sqlStr)
 	stmt, err := db.Prepare(sqlStr)
 	if err != nil {
-		logger.LogWarn("Failed to prepare statement: %s %s\n", err.Error(), sqlStr)
+		logger.Warn("Failed to prepare statement: %s %s\n", err.Error(), sqlStr)
 		return
 	}
 	_, err = stmt.Exec(values...)
 	if err != nil {
-		logger.LogWarn("Failed to exec statement: %s %s\n", err.Error(), sqlStr)
+		logger.Warn("Failed to exec statement: %s %s\n", err.Error(), sqlStr)
 		return
 	}
 	return
@@ -251,13 +251,13 @@ func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
 }
 
 func cleanupQuery(query *Query) {
-	logger.LogDebug("cleanupQuery(%d) launched\n", query.ID)
+	logger.Debug("cleanupQuery(%d) launched\n", query.ID)
 	time.Sleep(30 * time.Second)
 	delete(queries, query.ID)
 	if query.Rows != nil {
 		query.Rows.Close()
 	}
-	logger.LogDebug("cleanupQuery(%d) finished\n", query.ID)
+	logger.Debug("cleanupQuery(%d) finished\n", query.ID)
 }
 
 func createTables() {
@@ -309,6 +309,6 @@ func createTables() {
 	// FIXME add web_domain (for HTTP host header)
 
 	if err != nil {
-		logger.LogErr("Failed to create table: %s\n", err.Error())
+		logger.Err("Failed to create table: %s\n", err.Error())
 	}
 }

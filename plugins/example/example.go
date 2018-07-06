@@ -10,7 +10,7 @@ import (
 // increment the argumented WaitGroup so the main process can wait for
 // our shutdown function to return during shutdown.
 func PluginStartup() {
-	logger.LogInfo("PluginStartup(%s) has been called\n")
+	logger.Info("PluginStartup(%s) has been called\n")
 	dispatch.InsertNfqueueSubscription("example", 2, PluginNfqueueHandler)
 	dispatch.InsertConntrackSubscription("example", 2, PluginConntrackHandler)
 	dispatch.InsertNetloggerSubscription("example", 2, PluginNetloggerHandler)
@@ -19,7 +19,7 @@ func PluginStartup() {
 // PluginShutdown function called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
 func PluginShutdown() {
-	logger.LogInfo("PluginShutdown(%s) has been called\n")
+	logger.Info("PluginShutdown(%s) has been called\n")
 }
 
 // PluginNfqueueHandler receives a NfqueueMessage which includes a Tuple and
@@ -29,7 +29,7 @@ func PluginShutdown() {
 // the packet mark.
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	// our example simply dumps the raw message to the console
-	logger.LogDebug("NfqueueHandler received %d BYTES from %s to %s\n%s\n", mess.Length, mess.IPlayer.SrcIP, mess.IPlayer.DstIP, hex.Dump(mess.Packet.Data()))
+	logger.Debug("NfqueueHandler received %d BYTES from %s to %s\n%s\n", mess.Length, mess.IPlayer.SrcIP, mess.IPlayer.DstIP, hex.Dump(mess.Packet.Data()))
 
 	var result dispatch.NfqueueResult
 	result.Owner = "example"
@@ -43,7 +43,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 // of three possible values: N, U, or D for new entry, an update to an existing
 // entry, or delete of an existing entry.
 func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
-	logger.LogDebug("ConntrackHandler MSG:%c ID:%d PROTO:%d SADDR:%s SPORT:%d DADDR:%s DPORT:%d TX:%d RX:%d UC:%d\n",
+	logger.Debug("ConntrackHandler MSG:%c ID:%d PROTO:%d SADDR:%s SPORT:%d DADDR:%s DPORT:%d TX:%d RX:%d UC:%d\n",
 		message,
 		entry.ConntrackID,
 		entry.ClientSideTuple.Protocol,
@@ -58,7 +58,7 @@ func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
 
 // PluginNetloggerHandler receives NFLOG dispatch.
 func PluginNetloggerHandler(netlogger *dispatch.NetloggerMessage) {
-	logger.LogDebug("NetloggerHandler PROTO:%d ICMP:%d SIF:%d DIF:%d SADR:%s DADR:%s SPORT:%d DPORT:%d MARK:%X PREFIX:%s\n",
+	logger.Debug("NetloggerHandler PROTO:%d ICMP:%d SIF:%d DIF:%d SADR:%s DADR:%s SPORT:%d DPORT:%d MARK:%X PREFIX:%s\n",
 		netlogger.Protocol,
 		netlogger.IcmpType,
 		netlogger.SrcInterface,

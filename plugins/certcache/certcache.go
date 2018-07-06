@@ -27,7 +27,7 @@ var localMutex sync.Mutex
 // increment the argumented WaitGroup so the main process can wait for
 // our shutdown function to return during shutdown.
 func PluginStartup() {
-	logger.LogInfo("PluginStartup(%s) has been called\n")
+	logger.Info("PluginStartup(%s) has been called\n")
 	certificateTable = make(map[string]CertificateHolder)
 	go cleanupTask()
 
@@ -42,10 +42,10 @@ func PluginShutdown() {
 	select {
 	case <-shutdownChannel:
 	case <-time.After(10 * time.Second):
-		logger.LogErr("Failed to properly shutdown cleanupTask\n")
+		logger.Err("Failed to properly shutdown cleanupTask\n")
 	}
 
-	logger.LogInfo("PluginShutdown(%s) has been called\n")
+	logger.Info("PluginShutdown(%s) has been called\n")
 }
 
 // PluginNfqueueHandler is called to handle nfqueue packet data. We only
@@ -72,9 +72,9 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	localMutex.Lock()
 
 	if cert, ok = findCertificate(client); ok {
-		logger.LogInfo("Loading certificate for %s\n", mess.Tuple.ServerAddress)
+		logger.Info("Loading certificate for %s\n", mess.Tuple.ServerAddress)
 	} else {
-		logger.LogInfo("Fetching certificate for %s\n", mess.Tuple.ServerAddress)
+		logger.Info("Fetching certificate for %s\n", mess.Tuple.ServerAddress)
 
 		conf := &tls.Config{
 			InsecureSkipVerify: true,
@@ -85,12 +85,12 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		defer conn.Close()
 
 		if err != nil {
-			logger.LogWarn("TLS ERROR: %s\n", err)
+			logger.Warn("TLS ERROR: %s\n", err)
 			return result
 		}
 
 		if len(conn.ConnectionState().PeerCertificates) < 1 {
-			logger.LogWarn("Could not fetch certificate from %s\n", mess.Tuple.ServerAddress)
+			logger.Warn("Could not fetch certificate from %s\n", mess.Tuple.ServerAddress)
 			return result
 		}
 
@@ -187,10 +187,10 @@ func cleanCertificateTable() {
 		}
 		removeCertificate(key)
 		counter++
-		logger.LogDebug("CERTIFICATE Removing %s from table\n", key)
+		logger.Debug("CERTIFICATE Removing %s from table\n", key)
 	}
 
-	logger.LogDebug("CERTIFICATE REMOVED:%d REMAINING:%d\n", counter, len(certificateTable))
+	logger.Debug("CERTIFICATE REMOVED:%d REMAINING:%d\n", counter, len(certificateTable))
 }
 
 // periodic task to clean the certificate table
