@@ -491,7 +491,7 @@ func AddEntry(table string, key interface{}, field string, value interface{}) er
 	setstr = fmt.Sprintf("%s%s%s%s", generateTable(table), generateKey(key), generateField(field), generateValue(value))
 
 	if logger.IsDebugEnabled(logsrc) {
-		logger.LogDebug(logsrc, "SET table: %s[%v] | %s = %s\n", table, key, field, value)
+		logger.LogDebug(logsrc, "SET table: %s[%v] | %s = %v\n", table, key, field, value)
 	}
 
 	err := writeEntry(setstr)
