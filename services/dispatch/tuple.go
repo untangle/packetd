@@ -19,7 +19,7 @@ func (t Tuple) String() string {
 	return strconv.Itoa(int(t.Protocol)) + "|" + t.ClientAddress.String() + ":" + strconv.Itoa(int(t.ClientPort)) + "->" + t.ServerAddress.String() + ":" + strconv.Itoa(int(t.ServerPort))
 }
 
-// String returns string representation of tuple
+// StringReverse returns string representation of reverse tuple
 func (t Tuple) StringReverse() string {
 	return strconv.Itoa(int(t.Protocol)) + "|" + t.ServerAddress.String() + ":" + strconv.Itoa(int(t.ServerPort)) + "->" + t.ClientAddress.String() + ":" + strconv.Itoa(int(t.ClientPort))
 }

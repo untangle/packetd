@@ -124,7 +124,8 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		// the packet tuple should either match the client side tuple
 		// or
 		if !session.ClientSideTuple.Equal(mess.Tuple) && !session.ServerSideTuple.EqualReverse(mess.Tuple) {
-			var logLevel int = logger.LogLevelDebug
+			var logLevel int
+			logLevel = logger.LogLevelDebug
 			if session.ConntrackConfirmed {
 				// if conntrack has been confirmed, this is an error
 				// so increase log level

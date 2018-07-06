@@ -103,7 +103,8 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 				//those conntrack IDs get re-used instantly
 				//however, if this was conntrack confirmed - something is very wrong
 				//and we seem to be re-using conntrack IDs when not expected!
-				var logLevel int = logger.LogLevelDebug
+				var logLevel int
+				logLevel = logger.LogLevelDebug
 				if session.ConntrackConfirmed {
 					// if conntrack has been confirmed, this is an error
 					// so increase log level
