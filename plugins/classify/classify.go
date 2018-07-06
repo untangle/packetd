@@ -37,6 +37,7 @@ type applicationInfo struct {
 	plugin       string
 }
 
+const pluginName = "classify"
 const daemonBinary = "/usr/bin/classd"
 const guidInfoFile = "/usr/share/untangle-classd/protolist.csv"
 
@@ -60,7 +61,7 @@ var classdMutex sync.Mutex
 func PluginStartup() {
 	var err error
 
-	logger.Info("PluginStartup(%s) has been called\n")
+	logger.Info("PluginStartup(%s) has been called\n", pluginName)
 
 	// start the classd daemon with the no fork flag
 	daemonProcess = exec.Command(daemonBinary, "-f")
@@ -85,12 +86,12 @@ func PluginStartup() {
 		logger.Err("Error calling net.Dial(): %v\n", err)
 	}
 
-	dispatch.InsertNfqueueSubscription("classify", 2, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
 }
 
 // PluginShutdown is called when the daemon is shutting down
 func PluginShutdown() {
-	logger.Info("PluginShutdown(%s) has been called\n")
+	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
 
 	// if we have a connection to the daemon close it
 	if daemonConnection != nil {

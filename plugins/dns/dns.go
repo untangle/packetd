@@ -6,18 +6,20 @@ import (
 	"github.com/untangle/packetd/services/logger"
 )
 
+const pluginName = "dns"
+
 // PluginStartup function is called to allow plugin specific initialization. We
 // increment the argumented WaitGroup so the main process can wait for
 // our shutdown function to return during shutdown.
 func PluginStartup() {
-	logger.Info("PluginStartup(%s) has been called\n")
-	dispatch.InsertNfqueueSubscription("dns", 2, PluginNfqueueHandler)
+	logger.Info("PluginStartup(%s) has been called\n", pluginName)
+	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
 }
 
 // PluginShutdown function called when the daemon is shutting down. We call Done
 // for the argumented WaitGroup to let the main process know we're finished.
 func PluginShutdown() {
-	logger.Info("PluginShutdown(%s) has been called\n")
+	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
 }
 
 // PluginNfqueueHandler is called to handle nfqueue packet data. We only

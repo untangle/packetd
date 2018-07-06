@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const pluginName = "certcache"
+
 // CertificateHolder is used to cache SSL/TLS certificates
 type CertificateHolder struct {
 	CreationTime time.Time
@@ -27,11 +29,11 @@ var localMutex sync.Mutex
 // increment the argumented WaitGroup so the main process can wait for
 // our shutdown function to return during shutdown.
 func PluginStartup() {
-	logger.Info("PluginStartup(%s) has been called\n")
+	logger.Info("PluginStartup(%s) has been called\n", pluginName)
 	certificateTable = make(map[string]CertificateHolder)
 	go cleanupTask()
 
-	dispatch.InsertNfqueueSubscription("certcache", 2, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
 }
 
 // PluginShutdown function called when the daemon is shutting down. We call Done
@@ -45,7 +47,7 @@ func PluginShutdown() {
 		logger.Err("Failed to properly shutdown cleanupTask\n")
 	}
 
-	logger.Info("PluginShutdown(%s) has been called\n")
+	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
 }
 
 // PluginNfqueueHandler is called to handle nfqueue packet data. We only

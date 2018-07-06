@@ -11,6 +11,8 @@ import (
 	"os"
 )
 
+const pluginName = "geoip"
+
 var geodb *geoip2.Reader
 
 // PluginStartup is called to allow plugin specific initialization.
@@ -19,7 +21,7 @@ var geodb *geoip2.Reader
 // argumented WaitGroup so the main process can wait for our shutdown function
 // to return during shutdown.
 func PluginStartup() {
-	logger.Info("PluginStartup(%s) has been called\n")
+	logger.Info("PluginStartup(%s) has been called\n", pluginName)
 
 	var filename string
 
@@ -46,14 +48,14 @@ func PluginStartup() {
 		geodb = db
 	}
 
-	dispatch.InsertNfqueueSubscription("geoip", 2, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
 }
 
 // PluginShutdown is called when the daemon is shutting down. We close our
 // GeoIP engine and call done for the argumented WaitGroup to let the main
 // process know we're finished.
 func PluginShutdown() {
-	logger.Info("PluginShutdown(%s) has been called\n")
+	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
 	geodb.Close()
 }
 

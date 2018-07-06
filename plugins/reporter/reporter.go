@@ -10,17 +10,19 @@ import (
 	"time"
 )
 
+const pluginName = "reporter"
+
 // PluginStartup starts the reporter
 func PluginStartup() {
-	logger.Info("PluginStartup(%s) has been called\n")
-	dispatch.InsertNfqueueSubscription("reporter", 1, PluginNfqueueHandler)
-	dispatch.InsertConntrackSubscription("reporter", 1, PluginConntrackHandler)
-	dispatch.InsertNetloggerSubscription("reporter", 1, PluginNetloggerHandler)
+	logger.Info("PluginStartup(%s) has been called\n", pluginName)
+	dispatch.InsertNfqueueSubscription(pluginName, 1, PluginNfqueueHandler)
+	dispatch.InsertConntrackSubscription(pluginName, 1, PluginConntrackHandler)
+	dispatch.InsertNetloggerSubscription(pluginName, 1, PluginNetloggerHandler)
 }
 
 // PluginShutdown stops the reporter
 func PluginShutdown() {
-	logger.Info("PluginShutdown(%s) has been called\n")
+	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
 }
 
 // PluginNfqueueHandler handles the first packet of a session
