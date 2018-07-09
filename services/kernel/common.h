@@ -98,6 +98,7 @@ int conntrack_startup(void);
 void conntrack_shutdown(void);
 int conntrack_thread(void);
 void conntrack_dump(void);
+int conntrack_update_mark(uint32_t ctid, uint32_t mask, uint32_t value);
 
 int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data);
 uint32_t nfq_get_conntrack_id(struct nfq_data *nfad, int l3num);

@@ -281,3 +281,9 @@ func timeUntilNextMin() time.Duration {
 
 	return duration
 }
+
+// UpdateConntrackMark updates the conntrack entry specified by ctid
+// by anding it with mask and oring it with value
+func UpdateConntrackMark(ctid uint32, mask uint32, value uint32) {
+	C.conntrack_update_mark(C.uint32_t(ctid), C.uint32_t(mask), C.uint32_t(value))
+}
