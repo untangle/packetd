@@ -163,7 +163,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		session.ClientSideTuple = mess.Tuple
 		session.EventCount = 1
 		session.ConntrackConfirmed = false
-		session.Attachments = make(map[string]interface{})
+		session.attachments = make(map[string]interface{})
 		AttachNfqueueSubscriptions(session)
 		insertSessionEntry(ctid, session)
 	}

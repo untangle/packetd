@@ -19,7 +19,8 @@ type SessionEntry struct {
 	ConntrackConfirmed bool
 	EventCount         uint64
 	Subs               map[string]SubscriptionHolder
-	Attachments        map[string]interface{}
+	attachments        map[string]interface{}
+	sessionLocker      sync.Mutex
 }
 
 var sessionTable map[uint32]*SessionEntry
@@ -66,6 +67,21 @@ func removeSessionEntry(finder uint32) {
 	dict.DeleteSession(finder)
 	delete(sessionTable, finder)
 	sessionMutex.Unlock()
+}
+
+// PutSessionAttachment is used to safely add an attachment to a session object
+func PutSessionAttachment(entry *SessionEntry, name string, value interface{}) {
+	entry.sessionLocker.Lock()
+	entry.attachments[name] = value
+	entry.sessionLocker.Unlock()
+}
+
+// GetSessionAttachment is used to safely get an attachment from a session object
+func GetSessionAttachment(entry *SessionEntry, name string) interface{} {
+	entry.sessionLocker.Lock()
+	value := entry.attachments[name]
+	entry.sessionLocker.Unlock()
+	return value
 }
 
 // cleanSessionTable cleans the session table by removing stale entries

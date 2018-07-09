@@ -290,7 +290,7 @@ func parseReply(replyString string) (string, string, string, string, uint64, str
 
 }
 
-// logEvent logs a session_classify event that updtase the application_* columns
+// logEvent logs a session_classify event that updates the application_* columns
 // provide the session and the changed column names
 func logEvent(session *dispatch.SessionEntry, changed []string) {
 	if len(changed) == 0 {
@@ -301,19 +301,18 @@ func logEvent(session *dispatch.SessionEntry, changed []string) {
 	}
 	modifiedColumns := make(map[string]interface{})
 	for _, v := range changed {
-		modifiedColumns[v] = session.Attachments[v]
-	}
-	allColumns := map[string]interface{}{
-		"application_id":         session.Attachments["application_id"],
-		"application_name":       session.Attachments["application_name"],
-		"application_protochain": session.Attachments["application_protochain"],
-		"application_detail":     session.Attachments["application_detail"],
-		"application_category":   session.Attachments["application_category"],
-		"application_confidence": session.Attachments["application_confidence"],
+		modifiedColumns[v] = dispatch.GetSessionAttachment(session, v)
 	}
 
-	reports.LogEvent(reports.CreateEvent("session_classify", "sessions", 2, columns, modifiedColumns, session.Attachments))
-	session.Attachments["session_classify"] = allColumns
+	allColumns := make(map[string]interface{})
+	allColumns["application_id"] = dispatch.GetSessionAttachment(session, "application_id")
+	allColumns["application_name"] = dispatch.GetSessionAttachment(session, "application_name")
+	allColumns["application_protochain"] = dispatch.GetSessionAttachment(session, "application_protochain")
+	allColumns["application_detail"] = dispatch.GetSessionAttachment(session, "application_detail")
+	allColumns["application_category"] = dispatch.GetSessionAttachment(session, "application_category")
+	allColumns["application_confidence"] = dispatch.GetSessionAttachment(session, "application_confidence")
+	reports.LogEvent(reports.CreateEvent("session_classify", "sessions", 2, columns, modifiedColumns))
+	dispatch.PutSessionAttachment(session, "session_classify", allColumns)
 }
 
 // daemonCommand will send a command to the untangle-classd daemon and return the result message
@@ -493,15 +492,18 @@ func loadApplicationTable() {
 // returns true if value changed, false otherwise
 func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname string, pairdata interface{}) bool {
 	// if the session doesn't have this attachment yet we add it and write to the dictionary
-	if mess.Session.Attachments[pairname] == nil {
-		mess.Session.Attachments[pairname] = pairdata
+
+	checkname := dispatch.GetSessionAttachment(mess.Session, pairname)
+
+	if checkname == nil {
+		dispatch.PutSessionAttachment(mess.Session, pairname, pairdata)
 		dict.AddSessionEntry(ctid, pairname, pairdata)
 		logger.Debug("Setting classification detail %s = %v\n", pairname, pairdata)
 		return true
 	}
 
 	// if the session has the attachment and it has not changed just return
-	if mess.Session.Attachments[pairname] == pairdata {
+	if checkname == pairdata {
 		if logger.IsTraceEnabled() {
 			logger.Trace("Ignoring classification detail %s = %v\n", pairname, pairdata)
 		}
@@ -509,7 +511,7 @@ func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname st
 	}
 
 	// at this point the session has the attachment but the data has changed so we update the session and the dictionary
-	mess.Session.Attachments[pairname] = pairdata
+	dispatch.PutSessionAttachment(mess.Session, pairname, pairdata)
 	dict.AddSessionEntry(ctid, pairname, pairdata)
 	logger.Debug("Updating classification detail %s = %v\n", pairname, pairdata)
 	return true
