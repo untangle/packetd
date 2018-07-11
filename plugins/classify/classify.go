@@ -101,6 +101,11 @@ func PluginShutdown() {
 	daemonConnection = nil
 
 	// terminate the classd daemon
+	if daemonProcess.Process == nil {
+		logger.Err("The classd daemon process was invalid\n")
+		return
+	}
+
 	err := daemonProcess.Process.Kill()
 	if err != nil {
 		logger.Err("Error stopping classd daemon: %v\n", err)

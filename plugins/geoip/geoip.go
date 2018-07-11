@@ -56,13 +56,24 @@ func PluginStartup() {
 // process know we're finished.
 func PluginShutdown() {
 	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
-	geodb.Close()
+	if geodb != nil {
+		geodb.Close()
+	}
 }
 
 // PluginNfqueueHandler is called to handle nfqueue packet data. We extract
 // the source and destination IP address from the packet, lookup the GeoIP
 // country code for each, and store them in the conntrack dictionary.
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
+	var result dispatch.NfqueueResult
+	result.Owner = "geoip"
+	result.PacketMark = 0
+	result.SessionRelease = true
+
+	if geodb == nil {
+		return result
+	}
+
 	var SrcCode = "XX"
 	var DstCode = "XX"
 
@@ -81,10 +92,6 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	dict.AddSessionEntry(ctid, "client_country", SrcCode)
 	dict.AddSessionEntry(ctid, "server_country", DstCode)
 
-	var result dispatch.NfqueueResult
-	result.Owner = "geoip"
-	result.PacketMark = 0
-	result.SessionRelease = true
 	return result
 }
 
