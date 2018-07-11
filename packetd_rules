@@ -47,9 +47,9 @@ is_queue_open()
 
 remove_packetd_rules()
 {
-    ${NFT} flush chain filter packetd-queue
-    ${NFT} flush chain filter packetd-input
-    ${NFT} flush chain filter packetd-output
+    ${NFT} flush chain filter packetd-queue 2>/dev/null
+    ${NFT} flush chain filter packetd-input 2>/dev/null
+    ${NFT} flush chain filter packetd-output 2>/dev/null
 }
 
 insert_packetd_rules()
@@ -75,7 +75,12 @@ insert_packetd_rules()
     # Local?
     # ${NFT} add rule filter packetd-queue fib daddr . oif type local return
 
+    # FIXME - nft_dict does not autoload like other nft modules - why?
+    # load in manually
+    modprobe nft_dict
+
     # Don't catch bypassed traffic
+    ${NFT} add rule filter packetd-queue dict session ct id bypass_queue bool true counter return
     ${NFT} add rule filter packetd-queue ct mark and 0xf0000000 == 0xf0000000 counter return 
 
     # Queue the traffic
