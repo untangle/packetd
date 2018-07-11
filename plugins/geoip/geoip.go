@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 )
 
 const pluginName = "geoip"
@@ -97,6 +98,14 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 func databaseDownload(filename string) {
 	logger.Info("Downloading GeoIP Database\n")
+
+	// Make sure the target directory exists
+	marker := strings.LastIndex(filename, "/")
+
+	// Get the index of the last slash so we can isolate the path and create the directory
+	if marker > 0 {
+		os.MkdirAll(filename[0:marker], 0755)
+	}
 
 	// Get the GeoIP database from MaxMind
 	resp, err := http.Get("http://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.mmdb.gz")
