@@ -9,10 +9,10 @@ initial_settings = None
 def get_settings(attributes=None, seperator="/"):
     """Gets the current settings and returns the JSON Object or None if there is any error"""
     if attributes == None:
-        result = subprocess.run('curl -X GET -s -o - -H "Content-Type: application/json; charset=utf-8" "http://localhost:8080/settings/get_settings"', shell=True, stdout=subprocess.PIPE)
+        result = subprocess.run('curl -m 5 -X GET -s -o - -H "Content-Type: application/json; charset=utf-8" "http://localhost:8080/settings/get_settings"', shell=True, stdout=subprocess.PIPE)
     else:
         subpath = seperator.join(map(str, attributes))
-        result = subprocess.run('curl -X GET -s -o - -H "Content-Type: application/json; charset=utf-8" "http://localhost:8080/settings/get_settings/%s"' % subpath, shell=True, stdout=subprocess.PIPE)
+        result = subprocess.run('curl -m 5 -X GET -s -o - -H "Content-Type: application/json; charset=utf-8" "http://localhost:8080/settings/get_settings/%s"' % subpath, shell=True, stdout=subprocess.PIPE)
     if result.returncode != 0:
         return None
     else:
@@ -21,10 +21,10 @@ def get_settings(attributes=None, seperator="/"):
 def trim_settings(attributes, seperator="/"):
     """Trims the current settings"""
     if attributes == None:
-        result = subprocess.run('curl -X DELETE -s -o - -H "Content-Type: application/json; charset=utf-8" "http://localhost:8080/settings/trim_settings"', shell=True, stdout=subprocess.PIPE)
+        result = subprocess.run('curl -m 5 -X DELETE -s -o - -H "Content-Type: application/json; charset=utf-8" "http://localhost:8080/settings/trim_settings"', shell=True, stdout=subprocess.PIPE)
     else:
         subpath = seperator.join(map(str, attributes))
-        result = subprocess.run('curl -X DELETE -s -o - -H "Content-Type: application/json; charset=utf-8" "http://localhost:8080/settings/trim_settings/%s"' % subpath, shell=True, stdout=subprocess.PIPE)
+        result = subprocess.run('curl -m 5 -X DELETE -s -o - -H "Content-Type: application/json; charset=utf-8" "http://localhost:8080/settings/trim_settings/%s"' % subpath, shell=True, stdout=subprocess.PIPE)
     if result.returncode != 0:
         return None
     else:
@@ -34,10 +34,10 @@ def trim_settings(attributes, seperator="/"):
 def set_settings(attributes, settings, seperator="/"):
     """Sets the current settings to the provided JSON object"""
     if attributes == None:
-        result = subprocess.run('curl -X POST -s -o - -H "Content-Type: application/json; charset=utf-8" -d \'%s\' "http://localhost:8080/settings/set_settings"' % json.dumps(settings), shell=True, stdout=subprocess.PIPE)
+        result = subprocess.run('curl -m 5 -X POST -s -o - -H "Content-Type: application/json; charset=utf-8" -d \'%s\' "http://localhost:8080/settings/set_settings"' % json.dumps(settings), shell=True, stdout=subprocess.PIPE)
     else:
         subpath = seperator.join(map(str, attributes))
-        result = subprocess.run('curl -X POST -s -o - -H "Content-Type: application/json; charset=utf-8" -d \'%s\' "http://localhost:8080/settings/set_settings/%s"' % (json.dumps(settings),subpath), shell=True, stdout=subprocess.PIPE)
+        result = subprocess.run('curl -m 5 -X POST -s -o - -H "Content-Type: application/json; charset=utf-8" -d \'%s\' "http://localhost:8080/settings/set_settings/%s"' % (json.dumps(settings),subpath), shell=True, stdout=subprocess.PIPE)
     if result.returncode != 0:
         return None
     else:

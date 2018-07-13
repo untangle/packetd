@@ -193,7 +193,7 @@ def run_test_suite(suite):
         print("="*70)
         print(test_name + " start [" + time.strftime("%Y-%m-%dT%H:%M:%S") + "]")
         tests.global_functions.set_test_start_time()
-        results = unittest.TextTestRunner( stream=logfile, verbosity=parser.verbosity ).run( test )
+        results = unittest.TextTestRunner( stream=logfile, verbosity=parser.verbosity ).run(test)
         print(test_name + " end   [" + time.strftime("%Y-%m-%dT%H:%M:%S") + "]")
         print("="*70)
         sys.stdout.flush
