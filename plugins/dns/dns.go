@@ -2,6 +2,7 @@ package dns
 
 import (
 	"github.com/google/gopacket/layers"
+	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 )
@@ -37,13 +38,42 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	dns := dnsLayer.(*layers.DNS)
+	logger.Trace("ID:%d QR:%v OC:%d QD:%d AN:%d NS:%d AR:%d\n", dns.ID, dns.QR, dns.OpCode, dns.QDCount, dns.ANCount, dns.NSCount, dns.ARCount)
 
-	if dns.QDCount < 1 {
-		return result
+	// The QR flag will be false for a query, true for a response
+	if dns.QR == false {
+		// make sure there is at least one question record
+		if dns.QDCount < 1 {
+			return result
+		}
+
+		// use the first question record
+		query := dns.Questions[0]
+
+		// ignore requests for other than A and AAAA records
+		if (query.Type != layers.DNSTypeA) && (query.Type != layers.DNSTypeAAAA) {
+			return result
+		}
+
+		logger.Debug("DNS QUERY DETECTED NAME:%s TYPE:%d CLASS:%d\n", query.Name, query.Type, query.Class)
+		dict.AddSessionEntry(ctid, "dns_query", string(query.Name))
+	} else {
+		// make sure there is at least one answer record
+		if dns.ANCount < 1 {
+			return result
+		}
+
+		// use the first answer record
+		reply := dns.Answers[0]
+
+		// ignore answers that are not A or AAAA records
+		if (reply.Type != layers.DNSTypeA) && (reply.Type != layers.DNSTypeAAAA) {
+			return result
+		}
+
+		logger.Debug("DNS REPLY DETECTED VALUE:%v\n", reply.IP)
+		dict.AddSessionEntry(ctid, "dns_reply", reply.IP)
 	}
-
-	query := dns.Questions[0]
-	logger.Info("DNS QUERY DETECTED NAME:%s TYPE:%d CLASS:%d\n", query.Name, query.Type, query.Class)
 
 	// use the channel to return our result
 	return result
