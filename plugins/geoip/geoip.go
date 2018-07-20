@@ -7,6 +7,7 @@ import (
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -75,19 +76,31 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		return result
 	}
 
+	var srcAddr net.IP
+	var dstAddr net.IP
 	var SrcCode = "XX"
 	var DstCode = "XX"
 
-	SrcRecord, err := geodb.City(mess.IPlayer.SrcIP)
-	if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
-		SrcCode = SrcRecord.Country.IsoCode
-		logger.Debug("SRC: %s = %s\n", mess.IPlayer.SrcIP, SrcCode)
+	if mess.IP6layer != nil {
+		srcAddr = mess.IP6layer.SrcIP
+		dstAddr = mess.IP6layer.DstIP
 	}
 
-	DstRecord, err := geodb.City(mess.IPlayer.DstIP)
+	if mess.IP4layer != nil {
+		srcAddr = mess.IP4layer.SrcIP
+		dstAddr = mess.IP4layer.DstIP
+	}
+
+	SrcRecord, err := geodb.City(srcAddr)
+	if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
+		SrcCode = SrcRecord.Country.IsoCode
+		logger.Debug("SRC: %v = %s\n", srcAddr, SrcCode)
+	}
+
+	DstRecord, err := geodb.City(dstAddr)
 	if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
 		DstCode = DstRecord.Country.IsoCode
-		logger.Debug("DST: %s = %s\n", mess.IPlayer.DstIP, DstCode)
+		logger.Debug("DST: %v = %s\n", dstAddr, DstCode)
 	}
 
 	dict.AddSessionEntry(ctid, "client_country", SrcCode)

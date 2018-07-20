@@ -93,9 +93,6 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
         return(0);
     }
 
-	// we only care about TCP and UDP
-	// if ((iphead->protocol != IPPROTO_TCP) && (iphead->protocol != IPPROTO_UDP))	return(0);
-
 	// get the conntrack ID
 	ctid = nfq_get_conntrack_id(nfad,nfmsg->nfgen_family);
 

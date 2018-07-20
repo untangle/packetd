@@ -204,10 +204,10 @@ func sendCommand(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) (st
 	var reply string
 	var err error
 
-	if mess.UDPlayer != nil {
-		proto = "UDP"
-	} else if mess.TCPlayer != nil {
-		proto = "TCP"
+	if mess.IP4layer != nil {
+		proto = "IP4"
+	} else if mess.IP6layer != nil {
+		proto = "IP6"
 	} else {
 		return "", errors.New("Unsupported protocol")
 	}
@@ -224,12 +224,8 @@ func sendCommand(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) (st
 		}
 	}
 
-	// send the application payload to the daemon
-	if mess.Session.ClientSideTuple.ClientAddress.Equal(mess.IPlayer.SrcIP) {
-		reply, err = daemonCommand(mess.Payload, "CLIENT:%d:%d\r\n", ctid, len(mess.Payload))
-	} else {
-		reply, err = daemonCommand(mess.Payload, "SERVER:%d:%d\r\n", ctid, len(mess.Payload))
-	}
+	// send the packet data to the daemon
+	reply, err = daemonCommand(mess.Packet.Data(), "PACKET:%d:%d\r\n", ctid, len(mess.Packet.Data()))
 
 	if err != nil {
 		logger.Err("daemonCommand error: %s\n", err.Error())
@@ -377,7 +373,7 @@ func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, 
 		return string(buffer), fmt.Errorf("Underrun %d of %d calling daemon.Write(%s)", tot, len(command), command)
 	}
 
-	// if we have raw payload data send to the daemon socket after the command
+	// if we have packet data send to the daemon socket after the command
 	if rawdata != nil {
 		tot, err = daemonConnection.Write(rawdata)
 

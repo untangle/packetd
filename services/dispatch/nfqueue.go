@@ -24,7 +24,8 @@ type NfqueueMessage struct {
 	Tuple    Tuple
 	Packet   gopacket.Packet
 	Length   int
-	IPlayer  *layers.IPv4
+	IP4layer *layers.IPv4
+	IP6layer *layers.IPv6
 	TCPlayer *layers.TCP
 	UDPlayer *layers.UDP
 	Payload  []byte
@@ -61,30 +62,26 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 	var mess NfqueueMessage
 	//printSessionTable()
 
-	type NfqueueMessage struct {
-		Session  SessionEntry
-		Tuple    Tuple
-		Packet   gopacket.Packet
-		Length   int
-		IPlayer  *layers.IPv4
-		TCPlayer *layers.TCP
-		UDPlayer *layers.UDP
-		Payload  []byte
-	}
-
 	mess.Packet = packet
 	mess.Length = packetLength
 
-	// get the IPv4 layer
-	ipLayer := mess.Packet.Layer(layers.LayerTypeIPv4)
-	if ipLayer == nil {
+	// get the IPv4 and IPv6 layers
+	ip4Layer := mess.Packet.Layer(layers.LayerTypeIPv4)
+	ip6Layer := mess.Packet.Layer(layers.LayerTypeIPv4)
+
+	if ip4Layer != nil {
+		mess.IP4layer = ip4Layer.(*layers.IPv4)
+		mess.Tuple.Protocol = uint8(mess.IP4layer.Protocol)
+		mess.Tuple.ClientAddress = dupIP(mess.IP4layer.SrcIP)
+		mess.Tuple.ServerAddress = dupIP(mess.IP4layer.DstIP)
+	} else if ip6Layer != nil {
+		mess.IP6layer = ip6Layer.(*layers.IPv6)
+		mess.Tuple.Protocol = uint8(mess.IP6layer.NextHeader) // FIXME - is this the correct field?
+		mess.Tuple.ClientAddress = dupIP(mess.IP6layer.SrcIP)
+		mess.Tuple.ServerAddress = dupIP(mess.IP6layer.DstIP)
+	} else {
 		return (pmark)
 	}
-	mess.IPlayer = ipLayer.(*layers.IPv4)
-
-	mess.Tuple.Protocol = uint8(mess.IPlayer.Protocol)
-	mess.Tuple.ClientAddress = dupIP(mess.IPlayer.SrcIP)
-	mess.Tuple.ServerAddress = dupIP(mess.IPlayer.DstIP)
 
 	// get the TCP layer
 	tcpLayer := mess.Packet.Layer(layers.LayerTypeTCP)

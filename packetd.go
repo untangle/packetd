@@ -26,6 +26,10 @@ import (
 	"time"
 )
 
+const rulesScript = "packetd_rules"
+
+//const rulesScript = "packetd_rules_iptables"
+
 var exitLock sync.Mutex
 
 func main() {
@@ -194,7 +198,7 @@ func updateRules() {
 		logger.Err("Error determining directory: %s\n", err.Error())
 		return
 	}
-	syscmd.SystemCommand(dir+"/packetd_rules", []string{})
+	syscmd.SystemCommand(dir+"/"+rulesScript, []string{})
 }
 
 // remove the netfilter queue rules for packetd
@@ -204,5 +208,5 @@ func removeRules() {
 		logger.Err("Error determining directory: %s\n", err.Error())
 		return
 	}
-	syscmd.SystemCommand(dir+"/packetd_rules", []string{"-r"})
+	syscmd.SystemCommand(dir+"/"+rulesScript, []string{"-r"})
 }

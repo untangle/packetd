@@ -1,7 +1,5 @@
 #!/bin/sh
 
-# FIXME - Things go haywire if there is more than a single line in /proc/net/netfilter/nfnetlink_queue
-
 PACKETD_QUEUE_NUM=1818
 
 IPTABLES=${IPTABLES:-iptables}
@@ -14,50 +12,14 @@ debug()
     echo "[DEBUG:`date`] $*"
 }
 
-is_queue_open()
-{
-    local l_queue_stat
-    local l_queue_mode
-    local l_queue_size
-
-    # make sure the nfnetlink_queue file is available
-    if [ ! -f /proc/net/netfilter/nfnetlink_queue ]; then
-        echo "[`date`] The netfilter nfnetlink_queue does not exist - not inserting rules for packetd"
-        return 1
-    fi
-
-    # see if our queue is active
-    l_queue_stat=`awk -v queue=${PACKETD_QUEUE_NUM} '{ if ( $1 == queue ) print $2 }' /proc/net/netfilter/nfnetlink_queue`
-
-    if [ -z "${l_queue_stat}" ]; then
-        echo "[`date`] The packetd netfilter queue is not open - not inserting rules for packetd"
-        return 1
-    fi
-
-    # see if the queue copy mode is what we expect
-    l_queue_mode=`awk '{ print $4 }' /proc/net/netfilter/nfnetlink_queue`
-
-    if [ $((l_queue_mode)) -ne 2 ]; then
-        echo "[`date`] Unexpected queue copy mode - not inserting rules for packetd"
-        return 1
-    fi
-
-    # see if the queue copy size is what we expect
-    l_queue_mode=`awk '{ print $5 }' /proc/net/netfilter/nfnetlink_queue`
-
-    if [ $((l_queue_mode)) -ne 32768 ]; then
-        echo "[`date`] Unexpected queue copy size - not inserting rules for packetd"
-        return 1
-    fi
-
-    # the queue is open and seems to be owned by packetd so return success
-    return 0
-}
-
 remove_packetd_iptables_rules()
 {
     # remove previous rules to call our chain if they exist
     ${IPTABLES} -t ${TABLE_NAME} -D ${TABLE_HOOK} -j ${CHAIN_NAME} >/dev/null 2>&1
+
+    # remove the connmark local traffic rules
+    ${IPTABLES} -t mangle -D INPUT -j CONNMARK --or-mark 0xf0000000
+    ${IPTABLES} -t mangle -D OUTPUT -j CONNMARK --or-mark 0xf0000000
 
     # flush and remove our chain
     ${IPTABLES} -t ${TABLE_NAME} -F ${CHAIN_NAME} >/dev/null 2>&1
@@ -76,15 +38,14 @@ insert_packetd_iptables_rules()
 
     # don't queue bypassed traffic
     ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -m connmark --mark 0xf0000000/0xf0000000 -j RETURN -m comment --comment 'Do not queue (bypass) all packets with bypass bit set'
+
+    # all other packets will be sent to the netfilter queue
+    ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -j NFQUEUE --queue-num ${PACKETD_QUEUE_NUM} --queue-bypass
+    ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -j NFQUEUE --queue-num ${PACKETD_QUEUE_NUM} --queue-bypass
+
     # connmark all local traffic (subsequent packets will not be queued)
     ${IPTABLES} -t mangle -I INPUT -j CONNMARK --or-mark 0xf0000000
     ${IPTABLES} -t mangle -I OUTPUT -j CONNMARK --or-mark 0xf0000000
-    
-    # all other packets will be sent to the netfilter queue
-    # ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -p udp --sport 53 -j NFQUEUE --queue-num ${PACKETD_QUEUE_NUM} --queue-bypass
-    # ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -p udp --dport 53 -j NFQUEUE --queue-num ${PACKETD_QUEUE_NUM} --queue-bypass
-    ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -j NFQUEUE --queue-num ${PACKETD_QUEUE_NUM} --queue-bypass
-    ${IPTABLES} -t ${TABLE_NAME} -A ${CHAIN_NAME} -j NFQUEUE --queue-num ${PACKETD_QUEUE_NUM} --queue-bypass
 
     # insert rule to send traffic to our capture chain
     ${IPTABLES} -t ${TABLE_NAME} -I ${TABLE_HOOK} -j ${CHAIN_NAME}
@@ -130,8 +91,7 @@ elif [ "$OP" = "insert" ] ; then
     exit 0
 else
     remove_packetd_iptables_rules
-    is_queue_open && {
-        insert_packetd_iptables_rules
-        echo "[`date`] The packetd netfilter rules inserted."
-    }
+    insert_packetd_iptables_rules
+    echo "[`date`] The packetd netfilter rules inserted."
 fi
+

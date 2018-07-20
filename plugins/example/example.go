@@ -31,7 +31,12 @@ func PluginShutdown() {
 // the packet mark.
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	// our example simply dumps the raw message to the console
-	logger.Debug("NfqueueHandler received %d BYTES from %s to %s\n%s\n", mess.Length, mess.IPlayer.SrcIP, mess.IPlayer.DstIP, hex.Dump(mess.Packet.Data()))
+	if mess.IP4layer != nil {
+		logger.Debug("NfqueueHandler received %d BYTES from %s to %s\n%s\n", mess.Length, mess.IP4layer.SrcIP, mess.IP4layer.DstIP, hex.Dump(mess.Packet.Data()))
+	}
+	if mess.IP6layer != nil {
+		logger.Debug("NfqueueHandler received %d BYTES from %s to %s\n%s\n", mess.Length, mess.IP6layer.SrcIP, mess.IP6layer.DstIP, hex.Dump(mess.Packet.Data()))
+	}
 
 	var result dispatch.NfqueueResult
 	result.Owner = "example"
