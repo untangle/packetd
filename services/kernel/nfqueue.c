@@ -185,7 +185,7 @@ int nfqueue_startup(void)
 	return(0);
 }
 
-void nfqueue_close(void)
+void nfqueue_shutdown(void)
 {
     struct nfq_q_handle* qh = nfqqh;
     struct nfq_handle* h = nfqh;
@@ -281,16 +281,11 @@ int nfqueue_thread(void)
 	}
 
 	// call our nfqueue shutdown function
-	nfqueue_close();
+	nfqueue_shutdown();
 
 	logmessage(LOG_INFO,logsrc,"The nfqueue thread has terminated\n");
 	go_child_shutdown();
 	return(0);
-}
-
-void nfqueue_shutdown(void)
-{
-	set_shutdown_flag(1);
 }
 
 void nfqueue_free_buffer(char *buffer)

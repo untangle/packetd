@@ -38,8 +38,7 @@ func Startup() {
 	C.common_startup()
 }
 
-// StartCallbacks donates threads for all the C services
-// after this all callbacks will be called using these threads
+// StartCallbacks donates threads for all the C services and starts other persistent tasks
 func StartCallbacks() {
 	// Donate threads to kernel hooks
 	go C.nfqueue_thread()
@@ -50,12 +49,10 @@ func StartCallbacks() {
 	go conntrackTask()
 }
 
-// StopCallbacks stops all services and callbacks
+// StopCallbacks stops all C services and callbacks
 func StopCallbacks() {
-	// Remove all kernel hooks
-	go C.nfqueue_shutdown()
-	go C.conntrack_shutdown()
-	go C.netlogger_shutdown()
+	// make sure the shutdown flag is set
+	SetShutdownFlag()
 
 	// Send shutdown signal to periodicTask and wait for it to return
 	shutdownConntrackTask <- true
@@ -74,9 +71,14 @@ func Shutdown() {
 	C.common_shutdown()
 }
 
-// GetShutdownFlag returns the c shutdown flag
+// GetShutdownFlag returns the C shutdown flag
 func GetShutdownFlag() int {
 	return int(C.get_shutdown_flag())
+}
+
+// SetShutdownFlag sets the C shutdown flag
+func SetShutdownFlag() {
+	C.set_shutdown_flag(1)
 }
 
 // RegisterConntrackCallback registers the global conntrack callback for handling conntrack events

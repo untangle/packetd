@@ -87,6 +87,7 @@ func PluginStartup() {
 	}
 
 	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
+	dispatch.InsertConntrackSubscription(pluginName, 2, PluginConntrackHandler)
 }
 
 // PluginShutdown is called when the daemon is shutting down
@@ -136,10 +137,10 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		result.SessionRelease = true
 		return result
 	}
-	if mess.UDPlayer == nil && mess.TCPlayer == nil {
-		// FIXME unsupported protocol
-		// Which protocols do we support: TCP/UDP... ICMP? Others?
-		logger.Err("Unsupported protocol: %v\n", mess.Session.ClientSideTuple.Protocol)
+
+	// make sure we have a valid IPv4 or IPv6 layer
+	if mess.IP4layer == nil && mess.IP6layer == nil {
+		logger.Err("Invalid packet: %v\n", mess.Session.ClientSideTuple.Protocol)
 		result.SessionRelease = true
 		return result
 	}
@@ -188,14 +189,40 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		logEvent(mess.Session, changed)
 	}
 
-	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, we log an event and release
+	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, release the session
 	if state == navlStateClassified || state == navlStateTerminated || mess.Session.PacketCount > maxPacketCount || mess.Session.ByteCount > maxTrafficSize {
-		// FIXME need to detect and log when a session ends before it meets the criteria for logging here
 		result.SessionRelease = true
 		return result
 	}
 
 	return result
+}
+
+// PluginConntrackHandler receives conntrack dispatch. The message will be one
+// of three possible values: N, U, or D for new entry, an update to an existing
+// entry, or delete of an existing entry.
+func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
+	var reply string
+	var err error
+
+	// we're only interested in delete events
+	if message != 'D' {
+		return
+	}
+
+	if logger.IsTraceEnabled() {
+		logger.Trace("daemonCommand REMOVE:%d\n", entry.ConntrackID)
+	}
+
+	reply, err = daemonCommand(nil, "REMOVE:%d\r\n", entry.ConntrackID)
+	if err != nil {
+		logger.Err("daemonCommand error: %s\n", err.Error())
+		return
+	}
+
+	if logger.IsTraceEnabled() {
+		logger.Trace("daemonCommand result: %s\n", strings.Replace(strings.Replace(reply, "\n", "|", -1), "\r", "", -1))
+	}
 }
 
 // sendCommand sends classd the commands and returns the reply

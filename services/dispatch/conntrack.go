@@ -196,7 +196,7 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 			go func(val SubscriptionHolder) {
 				val.ConntrackFunc(int(eventType), conntrackEntry)
 				wg.Done()
-				logger.Debug("Finished conntrack APP:%s PRIORITY:%d\n", key, priority)
+				logger.Debug("Finished conntrack APP:%s PRIORITY:%d\n", val.Owner, val.Priority)
 			}(val)
 			subcount++
 		}

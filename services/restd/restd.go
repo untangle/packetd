@@ -40,14 +40,13 @@ func Startup() {
 	engine.DELETE("/settings/trim_settings/*path", trimSettings)
 
 	// listen and serve on 0.0.0.0:8080
-	engine.Run()
+	go engine.Run()
 
 	logger.Info("The RestD engine has been started\n")
 }
 
 // Shutdown restd
 func Shutdown() {
-
 }
 
 func pingHandler(c *gin.Context) {

@@ -14,6 +14,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <poll.h>
 #include <arpa/inet.h>
 #include <netinet/ip.h>
@@ -96,7 +97,6 @@ void set_shutdown_flag(int value);
 int conntrack_startup(void);
 void conntrack_shutdown(void);
 int conntrack_thread(void);
-void conntrack_shutdown(void);
 void conntrack_dump(void);
 
 int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data);

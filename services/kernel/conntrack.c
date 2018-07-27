@@ -106,7 +106,7 @@ int conntrack_startup(void)
 	return(0);
 }
 
-void conntrack_unregister(void)
+void conntrack_shutdown(void)
 {
 	if (nfcth == NULL) return;
 
@@ -122,7 +122,9 @@ void conntrack_unregister(void)
 
 int conntrack_thread(void)
 {
-	int		ret;
+	struct timeval	tv;
+	fd_set			tester;
+	int				sock,ret;
 
 	logmessage(LOG_INFO,logsrc,"The conntrack thread is starting\n");
 
@@ -137,30 +139,28 @@ int conntrack_thread(void)
 
 	go_child_startup();
 
-	// the nfct_catch function should only return if it receives a signal
-	// other than EINTR or if NFCT_CB_STOP is returned from the callback
+	// set the file descriptor to non-blocking mode
+	sock = nfct_fd(nfcth);
+	fcntl(sock, F_SETFL, O_NONBLOCK);
+
+	// detect and process events while the shutdown flag is clear
 	while (get_shutdown_flag() == 0) {
+		FD_ZERO(&tester);
+		FD_SET(sock,&tester);
+		tv.tv_sec = 1;
+		tv.tv_usec = 0;
+		ret = select(sock+1,&tester,NULL,NULL,&tv);
+		if (ret < 1) continue;
+		if (FD_ISSET(sock,&tester) == 0) continue;
 		nfct_catch(nfcth);
 	}
 
 	// call our conntrack shutdown function
-	conntrack_unregister();
+	conntrack_shutdown();
 
 	logmessage(LOG_INFO,logsrc,"The conntrack thread has terminated\n");
 	go_child_shutdown();
 	return(0);
-}
-
-void conntrack_shutdown(void)
-{
-	u_int32_t	family;
-
-	set_shutdown_flag(1);
-	if (nfcth == NULL) return;
-
-	// dump the conntrack table to interrupt the nfct_catch function
-	family = AF_INET;
-	nfct_send(nfcth,NFCT_Q_DUMP,&family);
 }
 
 void conntrack_dump(void)
