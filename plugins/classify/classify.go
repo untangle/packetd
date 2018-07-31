@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
+	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
 	"io"
@@ -64,7 +65,11 @@ func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
 
 	// start the classd daemon with the no fork flag
-	daemonProcess = exec.Command(daemonBinary, "-f")
+	if kernel.GetDebugFlag() {
+		daemonProcess = exec.Command(daemonBinary, "-f", "-d")
+	} else {
+		daemonProcess = exec.Command(daemonBinary, "-f")
+	}
 	err = daemonProcess.Start()
 	if err != nil {
 		logger.Err("Error starting classd daemon: %v\n", err)
@@ -131,9 +136,16 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	result.PacketMark = 0
 	result.SessionRelease = false
 
-	// sanity checks
+	// make sure we have a valid conntrack id
+	if ctid == 0 {
+		logger.Err("Ignoring event with invalid ctid\n")
+		result.SessionRelease = true
+		return result
+	}
+
+	// make sure we have a valid session
 	if mess.Session == nil {
-		logger.Err("Invalid event!\n")
+		logger.Err("Ignoring event with invalid session\n")
 		result.SessionRelease = true
 		return result
 	}

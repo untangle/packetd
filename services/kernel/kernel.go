@@ -32,6 +32,7 @@ var shutdownConntrackTask = make(chan bool)
 var conntrackCallback ConntrackCallback
 var nfqueueCallback NfqueueCallback
 var netloggerCallback NetloggerCallback
+var debugFlag bool
 
 // Startup starts C services
 func Startup() {
@@ -79,6 +80,16 @@ func GetShutdownFlag() int {
 // SetShutdownFlag sets the C shutdown flag
 func SetShutdownFlag() {
 	C.set_shutdown_flag(1)
+}
+
+// GetDebugFlag gets the shared debug flag
+func GetDebugFlag() bool {
+	return debugFlag
+}
+
+// SetDebugFlag sets the shared debug flag
+func SetDebugFlag() {
+	debugFlag = true
 }
 
 // RegisterConntrackCallback registers the global conntrack callback for handling conntrack events

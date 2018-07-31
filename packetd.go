@@ -28,7 +28,9 @@ import (
 )
 
 const rulesScript = "packetd_rules"
+
 //const rulesScript = "packetd_rules_iptables" // FIXME - do not commit with this enabled
+
 var localFlag bool
 
 func main() {
@@ -121,6 +123,7 @@ func parseArguments() {
 	disableConndictPtr := flag.Bool("disable-dict", false, "disable dict")
 	versionPtr := flag.Bool("version", false, "version")
 	localPtr := flag.Bool("local", false, "run on console")
+	debugPtr := flag.Bool("debug", false, "enable debug")
 
 	flag.Parse()
 
@@ -137,6 +140,10 @@ func parseArguments() {
 
 	if *localPtr {
 		localFlag = true
+	}
+
+	if *debugPtr {
+		kernel.SetDebugFlag()
 	}
 }
 
