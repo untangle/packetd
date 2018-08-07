@@ -86,7 +86,7 @@ func PluginStartup() {
 	// establish our connection to the daemon
 	socktime = time.Now()
 	sockspin = 0
-	daemonConnection, err = net.Dial("tcp", classdHostPort)
+	daemonConnection, err = net.DialTimeout("tcp", classdHostPort, 5*time.Second)
 	if err != nil {
 		logger.Err("Error calling net.Dial(): %v\n", err)
 	}
