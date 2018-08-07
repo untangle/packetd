@@ -112,7 +112,7 @@ func PluginShutdown() {
 		return
 	}
 
-	err := daemonProcess.Process.Kill()
+	err := daemonProcess.Process.Signal(os.Interrupt)
 	if err != nil {
 		logger.Err("Error stopping classd daemon: %v\n", err)
 	} else {
