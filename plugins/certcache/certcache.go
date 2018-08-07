@@ -13,6 +13,7 @@ import (
 )
 
 const pluginName = "certcache"
+const cleanTimeout = 86400
 
 // CertificateHolder is used to cache SSL/TLS certificates
 type CertificateHolder struct {
@@ -184,7 +185,7 @@ func cleanCertificateTable() {
 	nowtime := time.Now()
 
 	for key, val := range certificateTable {
-		if (nowtime.Unix() - val.CreationTime.Unix()) < 86400 {
+		if (nowtime.Unix() - val.CreationTime.Unix()) < cleanTimeout {
 			continue
 		}
 		removeCertificate(key)
