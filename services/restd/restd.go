@@ -21,10 +21,8 @@ func Startup() {
 	gin.DefaultWriter = logger.NewLogWriter()
 	engine = gin.Default()
 
-	// FIXME allow cross-site for dev
-	// this should be disable for production
-	// or moved to an option
 	config := cors.DefaultConfig()
+	// FIXME Allow cross-site for dev - this should be disabled in production
 	config.AllowAllOrigins = true
 	engine.Use(cors.New(config))
 
@@ -38,6 +36,9 @@ func Startup() {
 	engine.POST("/settings/set_settings/*path", setSettings)
 	engine.DELETE("/settings/trim_settings", trimSettings)
 	engine.DELETE("/settings/trim_settings/*path", trimSettings)
+
+	// files
+	engine.Static("/files", "/var/www")
 
 	// listen and serve on 0.0.0.0:8080
 	go engine.Run()
