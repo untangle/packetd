@@ -58,7 +58,7 @@ func PluginShutdown() {
 // extract the interesting subject fields, and put them in the session table.
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	result.Owner = "certcache"
+	result.Owner = pluginName
 	result.PacketMark = 0
 	result.SessionRelease = true
 

@@ -115,7 +115,14 @@ func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint
 		return
 	}
 
-	go func(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.char) {
+// FIXME - This goroutine currently causes ALL kinds of problems. For instance, geoip is doing the country
+// lookup on every packet of a session, even though we release after the first packet, because other
+// goroutines have already started processing subsequent packets for the same session. This also suggests
+// that all plugins could get and process packets out of order. No idea what kind of problems that could cause.
+// If we really need to call the dispatcher on a goroutine, we'll need to re-think the subscription model
+// because what we currently have is not working as intended with this added layer of concurrency.
+
+//	go func(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.char) {
 
 		var packet gopacket.Packet
 		var packetLength int
@@ -137,7 +144,7 @@ func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint
 		C.nfqueue_set_verdict(nfid, C.NF_ACCEPT, C.uint32_t(newMark))
 		C.nfqueue_free_buffer(buffer)
 
-	}(mark, data, size, ctid, nfid, buffer)
+//	}(mark, data, size, ctid, nfid, buffer)
 
 	return
 }

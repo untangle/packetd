@@ -68,7 +68,7 @@ func PluginShutdown() {
 // country code for each, and store them in the conntrack dictionary.
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	result.Owner = "geoip"
+	result.Owner = pluginName
 	result.PacketMark = 0
 	result.SessionRelease = true
 
@@ -94,14 +94,15 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	SrcRecord, err := geodb.City(srcAddr)
 	if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
 		SrcCode = SrcRecord.Country.IsoCode
-		logger.Debug("SRC: %v = %s\n", srcAddr, SrcCode)
 	}
 
 	DstRecord, err := geodb.City(dstAddr)
 	if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
 		DstCode = DstRecord.Country.IsoCode
-		logger.Debug("DST: %v = %s\n", dstAddr, DstCode)
 	}
+
+	logger.Debug("SRC: %v = %s\n", srcAddr, SrcCode)
+	logger.Debug("DST: %v = %s\n", dstAddr, DstCode)
 
 	dict.AddSessionEntry(ctid, "client_country", SrcCode)
 	dict.AddSessionEntry(ctid, "server_country", DstCode)

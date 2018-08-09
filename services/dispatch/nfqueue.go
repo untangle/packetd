@@ -49,10 +49,10 @@ func InsertNfqueueSubscription(owner string, priority int, function NfqueueHandl
 
 // AttachNfqueueSubscriptions attaches active nfqueue subscriptions to the argumented SessionEntry
 func AttachNfqueueSubscriptions(session *SessionEntry) {
-	session.Subs = make(map[string]SubscriptionHolder)
+	session.subscriptions = make(map[string]SubscriptionHolder)
 
 	for index, element := range nfqueueList {
-		session.Subs[index] = element
+		session.subscriptions[index] = element
 	}
 }
 
@@ -170,7 +170,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 	pipe := make(chan NfqueueResult)
 
 	// We loop and increment the priority until all subscriptions have been called
-	subtotal := len(session.Subs)
+	subtotal := len(session.subscriptions)
 	subcount := 0
 	priority := 0
 
@@ -180,7 +180,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		hitcount := 0
 
 		// Call all of the subscribed handlers for the current priority
-		for key, val := range session.Subs {
+		for key, val := range session.subscriptions {
 			if val.Priority != priority {
 				continue
 			}
@@ -201,7 +201,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 				pmark |= result.PacketMark
 				if result.SessionRelease {
 					logger.Debug("Removing %s session nfqueue subscription for %d\n", result.Owner, uint32(ctid))
-					delete(session.Subs, result.Owner)
+					delete(session.subscriptions, result.Owner)
 				}
 			}
 		}

@@ -132,7 +132,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var reply string
 	var err error
 	var result dispatch.NfqueueResult
-	result.Owner = "classify"
+	result.Owner = pluginName
 	result.PacketMark = 0
 	result.SessionRelease = false
 
@@ -223,10 +223,10 @@ func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
 	}
 
 	if logger.IsTraceEnabled() {
-		logger.Trace("daemonCommand REMOVE:%d\n", entry.ConntrackID)
+		logger.Trace("daemonCommand REMOVE|%d\n", entry.ConntrackID)
 	}
 
-	reply, err = daemonCommand(nil, "REMOVE:%d\r\n", entry.ConntrackID)
+	reply, err = daemonCommand(nil, "REMOVE|%d\r\n", entry.ConntrackID)
 	if err != nil {
 		logger.Err("daemonCommand error: %s\n", err.Error())
 		return
@@ -253,7 +253,7 @@ func sendCommand(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) (st
 
 	// if this is the first packet of the session we send a session create command
 	if newSession {
-		reply, err = daemonCommand(nil, "CREATE:%d:%s:%s:%d:%s:%d\r\n", ctid, proto, mess.Session.ClientSideTuple.ClientAddress, mess.Session.ClientSideTuple.ClientPort, mess.Session.ClientSideTuple.ServerAddress, mess.Session.ClientSideTuple.ServerPort)
+		reply, err = daemonCommand(nil, "CREATE|%d|%s|%s|%d|%s|%d\r\n", ctid, proto, mess.Session.ClientSideTuple.ClientAddress, mess.Session.ClientSideTuple.ClientPort, mess.Session.ClientSideTuple.ServerAddress, mess.Session.ClientSideTuple.ServerPort)
 		if err != nil {
 			logger.Err("daemonCommand error: %s\n", err.Error())
 			return "", err
@@ -264,7 +264,7 @@ func sendCommand(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) (st
 	}
 
 	// send the packet data to the daemon
-	reply, err = daemonCommand(mess.Packet.Data(), "PACKET:%d:%d\r\n", ctid, len(mess.Packet.Data()))
+	reply, err = daemonCommand(mess.Packet.Data(), "PACKET|%d|%d\r\n", ctid, len(mess.Packet.Data()))
 
 	if err != nil {
 		logger.Err("daemonCommand error: %s\n", err.Error())

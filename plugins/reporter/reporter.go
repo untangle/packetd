@@ -29,13 +29,13 @@ func PluginShutdown() {
 // Logs a new session_new event
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	result.Owner = "reporter"
+	result.Owner = pluginName
 	result.SessionRelease = true
 	result.PacketMark = 0
 
 	// We only care about new sessions
 	if !newSession {
-		logger.Err("Unexpected event received!")
+		logger.Err("Unexpected event received!\n")
 		return result
 	}
 

@@ -39,7 +39,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	var result dispatch.NfqueueResult
-	result.Owner = "example"
+	result.Owner = pluginName
 	result.SessionRelease = true
 	result.PacketMark = 0
 

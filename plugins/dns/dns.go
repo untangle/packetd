@@ -43,7 +43,7 @@ func PluginShutdown() {
 // look at DNS packets, extracting the QNAME and putting it in the session table.
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	result.Owner = "dns"
+	result.Owner = pluginName
 	result.SessionRelease = true
 	result.PacketMark = 0
 
