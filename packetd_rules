@@ -47,30 +47,55 @@ is_queue_open()
 
 remove_packetd_rules()
 {
-    ${NFT} flush chain filter packetd-queue 2>/dev/null
-    ${NFT} flush chain filter packetd-input 2>/dev/null
-    ${NFT} flush chain filter packetd-output 2>/dev/null
+    ${NFT} flush chain ip filter packetd-queue 2>/dev/null
+    ${NFT} flush chain ip filter packetd-input 2>/dev/null
+    ${NFT} flush chain ip filter packetd-output 2>/dev/null
+    ${NFT} delete chain ip filter packetd-queue 2>/dev/null
+    ${NFT} delete chain ip filter packetd-input 2>/dev/null
+    ${NFT} delete chain ip filter packetd-output 2>/dev/null
+    ${NFT} delete table ip filter
+
+    ${NFT} flush chain ip6 filter packetd-queue 2>/dev/null
+    ${NFT} flush chain ip6 filter packetd-input 2>/dev/null
+    ${NFT} flush chain ip6 filter packetd-output 2>/dev/null
+    ${NFT} delete chain ip6 filter packetd-queue 2>/dev/null
+    ${NFT} delete chain ip6 filter packetd-input 2>/dev/null
+    ${NFT} delete chain ip6 filter packetd-output 2>/dev/null
+    ${NFT} delete table ip6 filter
 }
 
 insert_packetd_rules()
 {
-    # create the table if needed
-    ${NFT} add table filter
-    ${NFT} add chain filter packetd-queue "{ type filter hook prerouting priority $QUEUE_PRIORITY ; }"
-    ${NFT} flush chain filter packetd-queue
+    # create the tables if needed
+    ${NFT} add table ip filter
+    ${NFT} add chain ip filter packetd-queue "{ type filter hook prerouting priority $QUEUE_PRIORITY ; }"
+    ${NFT} flush chain ip filter packetd-queue
+
+    ${NFT} add table ip6 filter
+    ${NFT} add chain ip6 filter packetd-queue "{ type filter hook prerouting priority $QUEUE_PRIORITY ; }"
+    ${NFT} flush chain ip6 filter packetd-queue
 
     # Create chains for setting the connmark on input/output
-    ${NFT} add chain filter packetd-output "{ type filter hook output priority $MANGLE_PRIORITY ; }"
-    ${NFT} add chain filter packetd-input "{ type filter hook input priority $MANGLE_PRIORITY ; }"
-    ${NFT} flush chain filter packetd-output
-    ${NFT} flush chain filter packetd-input
+    ${NFT} add chain ip filter packetd-output "{ type filter hook output priority $MANGLE_PRIORITY ; }"
+    ${NFT} add chain ip filter packetd-input "{ type filter hook input priority $MANGLE_PRIORITY ; }"
+    ${NFT} flush chain ip filter packetd-output
+    ${NFT} flush chain ip filter packetd-input
+
+    ${NFT} add chain ip6 filter packetd-output "{ type filter hook output priority $MANGLE_PRIORITY ; }"
+    ${NFT} add chain ip6 filter packetd-input "{ type filter hook input priority $MANGLE_PRIORITY ; }"
+    ${NFT} flush chain ip6 filter packetd-output
+    ${NFT} flush chain ip6 filter packetd-input
+
     # Set bypass bit on local traffic
-    ${NFT} add rule filter packetd-output ct mark set "mark|0xf0000000"
-    ${NFT} add rule filter packetd-input ct mark set "mark|0xf0000000"
+    ${NFT} add rule ip filter packetd-output ct mark set "mark|0xf0000000"
+    ${NFT} add rule ip filter packetd-input ct mark set "mark|0xf0000000"
+
+    ${NFT} add rule ip6 filter packetd-output ct mark set "mark|0xf0000000"
+    ${NFT} add rule ip6 filter packetd-input ct mark set "mark|0xf0000000"
 
     # Don't catch loopback traffic
-    ${NFT} add rule filter packetd-queue ip saddr 127.0.0.1/8 return
-    ${NFT} add rule filter packetd-queue ip daddr 127.0.0.1/8 return
+    ${NFT} add rule ip filter packetd-queue ip saddr 127.0.0.1/8 return
+    ${NFT} add rule ip filter packetd-queue ip daddr 127.0.0.1/8 return
 
     # Local?
     # ${NFT} add rule filter packetd-queue fib daddr . oif type local return
@@ -80,11 +105,15 @@ insert_packetd_rules()
     modprobe nft_dict
 
     # Don't catch bypassed traffic
-    ${NFT} add rule filter packetd-queue dict session ct id bypass_queue bool true counter return
-    ${NFT} add rule filter packetd-queue ct mark and 0xf0000000 == 0xf0000000 counter return 
+    ${NFT} add rule ip filter packetd-queue dict session ct id bypass_queue bool true counter return
+    ${NFT} add rule ip filter packetd-queue ct mark and 0xf0000000 == 0xf0000000 counter return
+
+    ${NFT} add rule ip6 filter packetd-queue dict session ct id bypass_queue bool true counter return
+    ${NFT} add rule ip6 filter packetd-queue ct mark and 0xf0000000 == 0xf0000000 counter return
 
     # Queue the traffic
-    ${NFT} add rule filter packetd-queue counter queue num ${PACKETD_QUEUE_NUM} bypass
+    ${NFT} add rule ip filter packetd-queue counter queue num ${PACKETD_QUEUE_NUM} bypass
+    ${NFT} add rule ip6 filter packetd-queue counter queue num ${PACKETD_QUEUE_NUM} bypass
 }
 
 usage() {

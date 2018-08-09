@@ -67,7 +67,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 	// get the IPv4 and IPv6 layers
 	ip4Layer := mess.Packet.Layer(layers.LayerTypeIPv4)
-	ip6Layer := mess.Packet.Layer(layers.LayerTypeIPv4)
+	ip6Layer := mess.Packet.Layer(layers.LayerTypeIPv6)
 
 	if ip4Layer != nil {
 		mess.IP4layer = ip4Layer.(*layers.IPv4)

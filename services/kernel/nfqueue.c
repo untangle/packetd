@@ -179,7 +179,7 @@ int nfqueue_startup(void)
 	if (ret < 0) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_set_queue_flags(NFQA_CFG_F_CONNTRACK)\n");
 		set_shutdown_flag(1);
-		return(7);
+		return(8);
 	}
 
 	return(0);
