@@ -24,7 +24,8 @@ func Startup() {
 	}
 
 	// Load the dict module
-	syscmd.SystemCommand("modprobe", []string{"nf_conntrack_dict"})
+	syscmd.SystemCommand("modprobe", []string{"nf_conntrack_dict"}) // FIXME - should be removed at some point
+	syscmd.SystemCommand("modprobe", []string{"nft_dict"})
 }
 
 // Shutdown dict service

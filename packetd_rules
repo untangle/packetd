@@ -98,11 +98,8 @@ insert_packetd_rules()
     ${NFT} add rule ip filter packetd-queue ip daddr 127.0.0.1/8 return
 
     # Local?
-    # ${NFT} add rule filter packetd-queue fib daddr . oif type local return
-
-    # FIXME - nft_dict does not autoload like other nft modules - why?
-    # load in manually
-    modprobe nft_dict
+    # ${NFT} add rule ip filter packetd-queue fib daddr . oif type local return
+    # ${NFT} add rule ip6 filter packetd-queue fib daddr . oif type local return
 
     # Don't catch bypassed traffic
     ${NFT} add rule ip filter packetd-queue dict session ct id bypass_queue bool true counter return
