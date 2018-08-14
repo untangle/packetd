@@ -84,19 +84,20 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 			InsecureSkipVerify: true,
 		}
 
-		if (mess.IP6layer != nil) {
+		if mess.IP6layer != nil {
 			target = fmt.Sprintf("[%s]:443", mess.Tuple.ServerAddress)
 		} else {
 			target = fmt.Sprintf("%s:443", mess.Tuple.ServerAddress)
 		}
 
 		conn, err := tls.Dial("tcp", target, conf)
-		defer conn.Close()
 
 		if err != nil {
 			logger.Warn("TLS ERROR: %s\n", err)
 			return result
 		}
+
+		defer conn.Close()
 
 		if len(conn.ConnectionState().PeerCertificates) < 1 {
 			logger.Warn("Could not fetch certificate from %s\n", mess.Tuple.ServerAddress)

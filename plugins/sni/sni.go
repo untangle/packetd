@@ -7,6 +7,7 @@ import (
 )
 
 const pluginName = "sni"
+const maxPacketCount = 5
 
 // PluginStartup function is called to allow plugin specific initialization.
 func PluginStartup() {
@@ -28,8 +29,16 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	result.PacketMark = 0
 	result.SessionRelease = false
 
-	// we only need to search for SNI in TCP traffic going to port 443
-	if mess.TCPlayer == nil || mess.Tuple.ServerPort != 443 {
+	// We only search for SNI in TCP traffic
+	if mess.TCPlayer == nil {
+		result.SessionRelease = true
+		return result
+	}
+
+	// We only search for SNI in port 443 traffic. Since the client and server ports
+	// flip back and forth depending on traffic direction, we check both while waiting
+	// for the handshake to finish and the ClientHello packet to arrive.
+	if mess.Tuple.ServerPort != 443 && mess.Tuple.ClientPort != 443 {
 		result.SessionRelease = true
 		return result
 	}
@@ -41,6 +50,12 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	if hostname != "" {
 		logger.Debug("Extracted SNI %s for %d\n", hostname, ctid)
 		dict.AddSessionEntry(ctid, "ssl_sni", hostname)
+	}
+
+	// release the session if we don't find SNI in the first few packets
+	if mess.Session.PacketCount >= maxPacketCount {
+		logger.Debug("Missing SNI for %d\n", ctid)
+		release = true
 	}
 
 	// set the session release from the extractor return
