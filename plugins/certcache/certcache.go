@@ -69,6 +69,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	client := fmt.Sprintf("%s", mess.Tuple.ClientAddress)
 
+	var target string
 	var cert x509.Certificate
 	var ok bool
 
@@ -83,7 +84,12 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 			InsecureSkipVerify: true,
 		}
 
-		target := fmt.Sprintf("%s:443", mess.Tuple.ServerAddress)
+		if (mess.IP6layer != nil) {
+			target = fmt.Sprintf("[%s]:443", mess.Tuple.ServerAddress)
+		} else {
+			target = fmt.Sprintf("%s:443", mess.Tuple.ServerAddress)
+		}
+
 		conn, err := tls.Dial("tcp", target, conf)
 		defer conn.Close()
 
