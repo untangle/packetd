@@ -531,11 +531,20 @@ func loadApplicationTable() {
 // if the value has changed for the provided key, it will also update the nf_dict session table
 // returns true if value changed, false otherwise
 func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname string, pairdata interface{}) bool {
+
+	// we don't wan't to put empty strings in the attachments or the dictionary
+	switch v := pairdata.(type) {
+	case string:
+		if len(v) > 0 {
+			break
+		}
+		logger.Trace("Empty classification detail for %s\n", pairname)
+		return false
+	}
+
 	// if the session doesn't have this attachment yet we add it and write to the dictionary
-
-	checkname := dispatch.GetSessionAttachment(mess.Session, pairname)
-
-	if checkname == nil {
+	checkdata := dispatch.GetSessionAttachment(mess.Session, pairname)
+	if checkdata == nil {
 		dispatch.PutSessionAttachment(mess.Session, pairname, pairdata)
 		dict.AddSessionEntry(ctid, pairname, pairdata)
 		logger.Debug("Setting classification detail %s = %v\n", pairname, pairdata)
@@ -543,7 +552,7 @@ func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname st
 	}
 
 	// if the session has the attachment and it has not changed just return
-	if checkname == pairdata {
+	if checkdata == pairdata {
 		if logger.IsTraceEnabled() {
 			logger.Trace("Ignoring classification detail %s = %v\n", pairname, pairdata)
 		}
