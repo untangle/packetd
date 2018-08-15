@@ -38,7 +38,7 @@ func Startup() {
 	engine.DELETE("/settings/trim_settings/*path", trimSettings)
 
 	// files
-	engine.Static("/files", "/var/www")
+	engine.Static("/files", "/www")
 
 	// listen and serve on 0.0.0.0:8080
 	go engine.Run()
