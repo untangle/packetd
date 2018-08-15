@@ -19,6 +19,7 @@ type SessionEntry struct {
 	ConntrackConfirmed bool
 	EventCount         uint64
 	subscriptions      map[string]SubscriptionHolder
+	subLocker          sync.Mutex
 	attachments        map[string]interface{}
 	attLocker          sync.Mutex
 }

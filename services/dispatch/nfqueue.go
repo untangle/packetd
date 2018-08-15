@@ -49,11 +49,21 @@ func InsertNfqueueSubscription(owner string, priority int, function NfqueueHandl
 
 // AttachNfqueueSubscriptions attaches active nfqueue subscriptions to the argumented SessionEntry
 func AttachNfqueueSubscriptions(session *SessionEntry) {
+	session.subLocker.Lock()
 	session.subscriptions = make(map[string]SubscriptionHolder)
 
 	for index, element := range nfqueueList {
 		session.subscriptions[index] = element
 	}
+	session.subLocker.Unlock()
+}
+
+// ReleaseSession is called by a subscriber to stop receiving traffic for a session
+func ReleaseSession(session *SessionEntry, owner string) {
+	logger.Debug("Removing %s session nfqueue subscription for SID:%d\n", owner, session.SessionID)
+	session.subLocker.Lock()
+	delete(session.subscriptions, owner)
+	session.subLocker.Unlock()
 }
 
 // nfqueueCallback is the callback for the packet
@@ -184,10 +194,10 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			if val.Priority != priority {
 				continue
 			}
-			logger.Debug("Calling nfqueue APP:%s PRIORITY:%d\n", key, priority)
+			logger.Debug("Calling nfqueue APP:%s PRI:%d  SID:%d\n", key, priority, session.SessionID)
 			go func(key string, val SubscriptionHolder) {
 				pipe <- val.NfqueueFunc(mess, ctid, newSession)
-				logger.Debug("Finished nfqueue APP:%s PRIORITY:%d\n", key, priority)
+				logger.Debug("Finished nfqueue APP:%s PRI:%d SID:%d\n", key, priority, session.SessionID)
 			}(key, val)
 			hitcount++
 			subcount++
@@ -200,7 +210,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			case result := <-pipe:
 				pmark |= result.PacketMark
 				if result.SessionRelease {
-					logger.Debug("Removing %s session nfqueue subscription for %d\n", result.Owner, uint32(ctid))
+					ReleaseSession(session, result.Owner)
 					delete(session.subscriptions, result.Owner)
 				}
 			}
