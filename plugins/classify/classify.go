@@ -165,41 +165,8 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		return result
 	}
 
-	var appid string
-	var name string
-	var protochain string
-	var detail string
-	var confidence uint64
-	var category string
-	var state int
-
-	// parse update classd information from reply
-	appid, name, protochain, detail, confidence, category, state = parseReply(reply)
-
-	var changed []string
-	if updateClassifyDetail(mess, ctid, "application_id", appid) {
-		changed = append(changed, "application_id")
-	}
-	if updateClassifyDetail(mess, ctid, "application_name", name) {
-		changed = append(changed, "application_name")
-	}
-	if updateClassifyDetail(mess, ctid, "application_protochain", protochain) {
-		changed = append(changed, "application_protochain")
-	}
-	if updateClassifyDetail(mess, ctid, "application_detail", detail) {
-		changed = append(changed, "application_detail")
-	}
-	if updateClassifyDetail(mess, ctid, "application_confidence", confidence) {
-		changed = append(changed, "application_confidence")
-	}
-	if updateClassifyDetail(mess, ctid, "application_category", category) {
-		changed = append(changed, "application_category")
-	}
-
-	// if something changed, log a new event
-	if len(changed) > 0 {
-		logEvent(mess.Session, changed)
-	}
+	// process the reply and get the classification state
+	state := processReply(reply, mess, ctid)
 
 	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, release the session
 	if state == navlStateClassified || state == navlStateTerminated || mess.Session.PacketCount > maxPacketCount || mess.Session.ByteCount > maxTrafficSize {
@@ -275,6 +242,47 @@ func sendCommand(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) (st
 		logger.Trace("daemonCommand result: %s\n", strings.Replace(strings.Replace(reply, "\n", "|", -1), "\r", "", -1))
 	}
 	return reply, nil
+}
+
+// processReply processes a reply from the classd daemon
+func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) int {
+	var appid string
+	var name string
+	var protochain string
+	var detail string
+	var confidence uint64
+	var category string
+	var state int
+
+	// parse update classd information from reply
+	appid, name, protochain, detail, confidence, category, state = parseReply(reply)
+
+	var changed []string
+	if updateClassifyDetail(mess, ctid, "application_id", appid) {
+		changed = append(changed, "application_id")
+	}
+	if updateClassifyDetail(mess, ctid, "application_name", name) {
+		changed = append(changed, "application_name")
+	}
+	if updateClassifyDetail(mess, ctid, "application_protochain", protochain) {
+		changed = append(changed, "application_protochain")
+	}
+	if updateClassifyDetail(mess, ctid, "application_detail", detail) {
+		changed = append(changed, "application_detail")
+	}
+	if updateClassifyDetail(mess, ctid, "application_confidence", confidence) {
+		changed = append(changed, "application_confidence")
+	}
+	if updateClassifyDetail(mess, ctid, "application_category", category) {
+		changed = append(changed, "application_category")
+	}
+
+	// if something changed, log a new event
+	if len(changed) > 0 {
+		logEvent(mess.Session, changed)
+	}
+
+	return state
 }
 
 // parseReply parses a reply from classd and returns
@@ -430,7 +438,7 @@ func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, 
 
 	}
 
-	// read the response from the daemon
+	// read the reply from the daemon
 	_, err = daemonConnection.Read(buffer)
 
 	if err != nil {
