@@ -117,19 +117,71 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 	logger.Trace("nfqueue event[%d]: %v \n", ctid, mess.Tuple)
 
+	session, newflag := obtainSessionEntry(mess, ctid)
+	mess.Session = session
+
+	pipe := make(chan NfqueueResult)
+
+	// We loop and increment the priority until all subscriptions have been called
+	subtotal := len(session.subscriptions)
+	subcount := 0
+	priority := 0
+
+	for subcount != subtotal {
+		// Counts the total number of calls made for each priority so we know
+		// how many NfqueueResult's to read from the result channel
+		hitcount := 0
+
+		// Call all of the subscribed handlers for the current priority
+		for key, val := range session.subscriptions {
+			if val.Priority != priority {
+				continue
+			}
+			logger.Debug("Calling nfqueue APP:%s PRI:%d  SID:%d\n", key, priority, session.SessionID)
+			go func(key string, val SubscriptionHolder) {
+				pipe <- val.NfqueueFunc(mess, ctid, newflag)
+				logger.Debug("Finished nfqueue APP:%s PRI:%d SID:%d\n", key, priority, session.SessionID)
+			}(key, val)
+			hitcount++
+			subcount++
+		}
+
+		// Add the mark bits returned from each handler and remove the session
+		// subscription for any that set the SessionRelease flag
+		for i := 0; i < hitcount; i++ {
+			select {
+			case result := <-pipe:
+				pmark |= result.PacketMark
+				if result.SessionRelease {
+					ReleaseSession(session, result.Owner)
+					delete(session.subscriptions, result.Owner)
+				}
+			}
+		}
+
+		// Increment the priority and keep looping until we've called all subscribers
+		priority++
+	}
+
+	// return the updated mark to be set on the packet
+	return (pmark)
+}
+
+// obtainSessionEntry finds an existing or creates a new Session object
+func obtainSessionEntry(mess NfqueueMessage, ctid uint32) (*SessionEntry, bool) {
 	var session *SessionEntry
+	var newFlag bool
 	var ok bool
-	var newSession = false
 
 	// If we already have a session entry update the existing, otherwise create a new entry for the table.
 	if session, ok = findSessionEntry(ctid); ok {
 		logger.Trace("Session Found %d in table\n", ctid)
 		session.LastActivityTime = time.Now()
 		session.PacketCount++
-		session.ByteCount += uint64(packetLength)
+		session.ByteCount += uint64(mess.Length)
 		session.EventCount++
-		// the packet tuple should either match the client side tuple
-		// or
+
+		// the packet tuple should either match the client side tuple or the server side tuple
 		if !session.ClientSideTuple.Equal(mess.Tuple) && !session.ServerSideTuple.EqualReverse(mess.Tuple) {
 			var logLevel int
 			logLevel = logger.LogLevelDebug
@@ -160,12 +212,12 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 	// create a new session object
 	if session == nil {
 		logger.Trace("Session Adding %d to table\n", ctid)
-		newSession = true
+		newFlag = true
 		session = new(SessionEntry)
 		session.SessionID = nextSessionID()
 		session.CreationTime = time.Now()
 		session.PacketCount = 1
-		session.ByteCount = uint64(packetLength)
+		session.ByteCount = uint64(mess.Length)
 		session.LastActivityTime = time.Now()
 		session.ClientSideTuple = mess.Tuple
 		session.EventCount = 1
@@ -175,51 +227,5 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		insertSessionEntry(ctid, session)
 	}
 
-	mess.Session = session
-
-	pipe := make(chan NfqueueResult)
-
-	// We loop and increment the priority until all subscriptions have been called
-	subtotal := len(session.subscriptions)
-	subcount := 0
-	priority := 0
-
-	for subcount != subtotal {
-		// Counts the total number of calls made for each priority so we know
-		// how many NfqueueResult's to read from the result channel
-		hitcount := 0
-
-		// Call all of the subscribed handlers for the current priority
-		for key, val := range session.subscriptions {
-			if val.Priority != priority {
-				continue
-			}
-			logger.Debug("Calling nfqueue APP:%s PRI:%d  SID:%d\n", key, priority, session.SessionID)
-			go func(key string, val SubscriptionHolder) {
-				pipe <- val.NfqueueFunc(mess, ctid, newSession)
-				logger.Debug("Finished nfqueue APP:%s PRI:%d SID:%d\n", key, priority, session.SessionID)
-			}(key, val)
-			hitcount++
-			subcount++
-		}
-
-		// Add the mark bits returned from each handler and remove the session
-		// subscription for any that set the SessionRelease flag
-		for i := 0; i < hitcount; i++ {
-			select {
-			case result := <-pipe:
-				pmark |= result.PacketMark
-				if result.SessionRelease {
-					ReleaseSession(session, result.Owner)
-					delete(session.subscriptions, result.Owner)
-				}
-			}
-		}
-
-		// Increment the priority and keep looping until we've called all subscribers
-		priority++
-	}
-
-	// return the updated mark to be set on the packet
-	return (pmark)
+	return session, newFlag
 }
