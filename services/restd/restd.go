@@ -39,6 +39,8 @@ func Startup() {
 
 	// files
 	engine.Static("/files", "/www")
+	engine.Static("/admin", "/www/admin")
+	engine.Static("/static", "/www/static")
 
 	// listen and serve on 0.0.0.0:8080
 	go engine.Run()
