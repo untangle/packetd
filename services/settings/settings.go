@@ -19,16 +19,8 @@ func Startup() {
 	if err != nil {
 		logger.Warn("Error reading settings file: %s\n", err.Error())
 	}
-
 	if settings == nil {
-		settings, err = createNewSettings()
-	}
-	if err != nil {
-		logger.Err("Failed to create/read settings file: %s\n", err.Error())
-		//FIXME abort / exit
-	} else if settings == nil {
-		logger.Err("Failed to create/read settings file.\n")
-		//FIXME abort / exit
+		logger.Err("Failed to read settings file.\n")
 	}
 
 	// jsonString, err := json.MarshalIndent(settings, "", "  ")
@@ -257,24 +249,4 @@ func createJSONErrorObject(e error) map[string]interface{} {
 // Create a JSON object with an error based on the string
 func createJSONErrorString(str string) map[string]interface{} {
 	return createJSONObject("error", str)
-}
-
-// createNewSettings creates a new settings file
-func createNewSettings() (map[string]interface{}, error) {
-	logger.Info("Initializing new settings...\n")
-	cmd := exec.Command("sh", "-c", "/usr/bin/sync-settings -c -f /etc/config/settings.json")
-	stdoutStderr, err := cmd.CombinedOutput()
-	if err != nil {
-		logger.Warn("Error creating new settings file: %s\n", err.Error())
-		return nil, err
-	}
-	for _, line := range strings.Split(strings.TrimSpace(string(stdoutStderr)), "\n") {
-		logger.Info("sync-settings: %s\n", line)
-	}
-
-	settings, err = readSettingsFileJSON()
-	if err != nil {
-		logger.Warn("Error reading settings file: %s\n", err.Error())
-	}
-	return settings, err
 }
