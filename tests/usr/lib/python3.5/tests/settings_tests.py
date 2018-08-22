@@ -80,18 +80,24 @@ class SettingsTests(unittest.TestCase):
 
     def test_003_get_settings_subpart_missing(self):
         """Get some non-existant settings and verify it produces an error"""
-        settings = get_settings(['fakepart1','fakepart2','fakepart3'])
-        assert('error' in settings)
+        result1 = get_settings(['fakepart1','fakepart2','fakepart3'])
+        assert('error' in result1)
 
     def test_004_get_settings_array_index(self):
-        """Set the fakepart1 attribute of the root settings object to an array"""
+        """Get the subpath of an object including an array with an index"""
         result1 = set_settings(['fakearray1'],[0,1,2,3,4,5,6])
         result2 = get_settings(['fakearray1',3])
-        print(result2)
         assert(result1 != None)
         assert(result1.get('result') == 'OK')
         assert(result2 != None)
         assert(result2 == 3)
+
+    def test_005_get_settings_missing(self):
+        """Get a missing setting and makes sure an error is returned"""
+        fname = sys._getframe().f_code.co_name
+        result1 = get_settings([1,2,fname,3])
+        assert('error' in result1)
+        assert('missing' in result1.get('error'))
         
     def test_010_set_settings_string(self):
         """Set the fakepart1 attribute of the root settings object to a string"""

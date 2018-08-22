@@ -37,50 +37,17 @@ func Shutdown() {
 
 // GetSettings returns the daemon settings
 func GetSettings(segments []string) interface{} {
-	var ok bool
 	var err error
-	var jsonObject map[string]interface{}
-	var jsonArray []interface{}
+	var jsonObject interface{}
 
 	jsonObject, err = readSettingsFileJSON()
 	if err != nil {
 		return createJSONErrorObject(err)
 	}
-	for i, value := range segments {
-		if value != "" {
-			var j interface{}
-			if jsonObject != nil {
-				j = jsonObject[value]
-			} else if jsonArray != nil {
-				j, err = getArrayIndex(jsonArray, value)
-				if err != nil {
-					return err
-				}
-			}
 
-			if j == nil {
-				return createJSONErrorString("Attribute " + value + " not found in JSON object")
-			}
-			// if final
-			if i == (len(segments) - 1) {
-				return j
-			}
-			// if not final, it must be either a json object or an array
-			// set jsonObject if object or jsonArray if array and recurse
-			jsonObject, ok = j.(map[string]interface{})
-			if ok {
-				jsonArray = nil
-				continue
-			} else {
-				jsonArray, ok = j.([]interface{})
-				if ok {
-					jsonObject = nil
-					continue
-				} else {
-					return createJSONErrorString("Cast error")
-				}
-			}
-		}
+	jsonObject, err = getSettings(jsonObject, segments)
+	if err != nil {
+		return createJSONErrorObject(err)
 	}
 
 	return jsonObject
@@ -331,5 +298,25 @@ func setSettings(jsonObject interface{}, segments []string, value interface{}) (
 
 		mapJsonObject[element], err = setSettings(mapJsonObject[element], newSegments, value)
 		return jsonObject, err
+	}
+}
+
+// getSettings gets the value attribute specified by the segments string from the specified json object
+func getSettings(jsonObject interface{}, segments []string) (interface{}, error) {
+	if len(segments) == 0 {
+		return jsonObject, nil
+	} else if len(segments) == 1 {
+		return getObjectIndex(jsonObject, segments[0])
+	} else {
+		element, newSegments := segments[0], segments[1:]
+
+		newJsonObject, err := getObjectIndex(jsonObject, element)
+		if err != nil {
+			return nil, err
+		}
+		if newJsonObject == nil {
+			return nil, errors.New("Attribute " + element + " missing from JSON Object")
+		}
+		return getSettings(newJsonObject, newSegments)
 	}
 }
