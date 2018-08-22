@@ -5,8 +5,6 @@ import (
 	"errors"
 	"github.com/untangle/packetd/services/logger"
 	"io/ioutil"
-	"os/exec"
-	"strings"
 )
 
 // settings stores the current system settings
