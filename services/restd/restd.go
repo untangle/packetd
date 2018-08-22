@@ -37,6 +37,13 @@ func Startup() {
 	engine.DELETE("/settings/trim_settings", trimSettings)
 	engine.DELETE("/settings/trim_settings/*path", trimSettings)
 
+	engine.GET("/api/settings", getSettings)
+	engine.GET("/api/settings/*path", getSettings)
+	engine.POST("/api/settings", setSettings)
+	engine.POST("/api/settings/*path", setSettings)
+	engine.DELETE("/api/settings", trimSettings)
+	engine.DELETE("/api/settings/*path", trimSettings)
+
 	// files
 	engine.Static("/files", "/www")
 	engine.Static("/admin", "/www/admin")
