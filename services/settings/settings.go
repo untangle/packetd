@@ -71,18 +71,18 @@ func SetSettings(segments []string, value interface{}) interface{} {
 	var ok bool
 	var err error
 	var jsonSettings map[string]interface{}
-	var newJsonSettings interface{}
+	var newSettings interface{}
 
 	jsonSettings, err = readSettingsFileJSON()
 	if err != nil {
 		return createJSONErrorObject(err)
 	}
 
-	newJsonSettings, err = setSettings(jsonSettings, segments, value)
+	newSettings, err = setSettings(jsonSettings, segments, value)
 	if err != nil {
 		return createJSONErrorObject(err)
 	}
-	jsonSettings, ok = newJsonSettings.(map[string]interface{})
+	jsonSettings, ok = newSettings.(map[string]interface{})
 	if !ok {
 		return createJSONErrorObject(errors.New("Invalid global settings object"))
 	}
@@ -210,7 +210,7 @@ func getArrayIndex(array []interface{}, idx string) (interface{}, error) {
 		return nil, err
 	}
 	if i >= cap(array) {
-		return nil, errors.New("Array index exceeded capacity.")
+		return nil, errors.New("array index exceeded capacity")
 	}
 	return array[i], nil
 }
@@ -223,7 +223,7 @@ func setArrayIndex(array []interface{}, idx string, value interface{}) ([]interf
 		return nil, err
 	}
 	if i >= cap(array) {
-		return nil, errors.New("Array index exceeded capacity.")
+		return nil, errors.New("array index exceeded capacity")
 	}
 	array[i] = value
 	return array, nil
@@ -238,14 +238,12 @@ func getObjectIndex(obj interface{}, idx string) (interface{}, error) {
 	jsonObject, ok = obj.(map[string]interface{})
 	if ok {
 		return jsonObject[idx], nil
-	} else {
-		jsonArray, ok = obj.([]interface{})
-		if ok {
-			return getArrayIndex(jsonArray, idx)
-		} else {
-			return nil, errors.New("Unknown type.")
-		}
 	}
+	jsonArray, ok = obj.([]interface{})
+	if ok {
+		return getArrayIndex(jsonArray, idx)
+	}
+	return nil, errors.New("unknown type")
 }
 
 // setObjectIndex takes an object that is either a []interface{} or map[string]interface{}
@@ -260,14 +258,12 @@ func setObjectIndex(obj interface{}, idx string, value interface{}) (interface{}
 	if ok {
 		jsonObject[idx] = value
 		return jsonObject, nil
-	} else {
-		jsonArray, ok = obj.([]interface{})
-		if ok {
-			return setArrayIndex(jsonArray, idx, value)
-		} else {
-			return nil, errors.New("Unknown type.")
-		}
 	}
+	jsonArray, ok = obj.([]interface{})
+	if ok {
+		return setArrayIndex(jsonArray, idx, value)
+	}
+	return nil, errors.New("unknown type")
 }
 
 // setSettings sets the value attribute specified of the segments path to the specified value
@@ -282,21 +278,21 @@ func setSettings(jsonObject interface{}, segments []string, value interface{}) (
 	} else {
 		element, newSegments := segments[0], segments[1:]
 
-		mapJsonObject, ok := jsonObject.(map[string]interface{})
+		mapObject, ok := jsonObject.(map[string]interface{})
 
 		// if this element isnt a map, we cant recurse, so just make it a map
 		// this will override the existing value
 		if !ok {
-			mapJsonObject = make(map[string]interface{})
-			jsonObject = mapJsonObject
+			mapObject = make(map[string]interface{})
+			jsonObject = mapObject
 		}
 
 		// if the next element is null null, create a new map
-		if mapJsonObject[element] == nil {
-			mapJsonObject[element] = make(map[string]interface{})
+		if mapObject[element] == nil {
+			mapObject[element] = make(map[string]interface{})
 		}
 
-		mapJsonObject[element], err = setSettings(mapJsonObject[element], newSegments, value)
+		mapObject[element], err = setSettings(mapObject[element], newSegments, value)
 		return jsonObject, err
 	}
 }
@@ -310,13 +306,13 @@ func getSettings(jsonObject interface{}, segments []string) (interface{}, error)
 	} else {
 		element, newSegments := segments[0], segments[1:]
 
-		newJsonObject, err := getObjectIndex(jsonObject, element)
+		newObject, err := getObjectIndex(jsonObject, element)
 		if err != nil {
 			return nil, err
 		}
-		if newJsonObject == nil {
+		if newObject == nil {
 			return nil, errors.New("Attribute " + element + " missing from JSON Object")
 		}
-		return getSettings(newJsonObject, newSegments)
+		return getSettings(newObject, newSegments)
 	}
 }
