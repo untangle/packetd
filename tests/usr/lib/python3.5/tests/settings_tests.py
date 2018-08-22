@@ -82,6 +82,16 @@ class SettingsTests(unittest.TestCase):
         """Get some non-existant settings and verify it produces an error"""
         settings = get_settings(['fakepart1','fakepart2','fakepart3'])
         assert('error' in settings)
+
+    def test_004_get_settings_array_index(self):
+        """Set the fakepart1 attribute of the root settings object to an array"""
+        result1 = set_settings(['fakearray1'],[0,1,2,3,4,5,6])
+        result2 = get_settings(['fakearray1',3])
+        print(result2)
+        assert(result1 != None)
+        assert(result1.get('result') == 'OK')
+        assert(result2 != None)
+        assert(result2 == 3)
         
     def test_010_set_settings_string(self):
         """Set the fakepart1 attribute of the root settings object to a string"""
@@ -170,6 +180,24 @@ class SettingsTests(unittest.TestCase):
         assert(result1.get('result') == 'OK')
         assert(result2 != None)
         assert(result2.get('fakepart1').get('fakepart2').get('fakepart3') == fname)
+
+    def test_019_set_settings_array_index(self):
+        """Set the fakepart1 attribute of the root settings object to an array"""
+        result1 = set_settings(['fakearray1'],[0,1,2,3,4,5,6])
+        result2 = get_settings(['fakearray1'])
+        print(result2)
+        result3 = set_settings(['fakearray1',2],"foo")
+        result4 = get_settings(['fakearray1'])
+        print(result4)
+        print("XXX")
+        assert(result1 != None)
+        assert(result1.get('result') == 'OK')
+        assert(result2 != None)
+        assert(result2 == [0,1,2,3,4,5,6])
+        assert(result3 != None)
+        assert(result3.get('result') == 'OK')
+        assert(result4 != None)
+        assert(result4 == [0,1,"foo",3,4,5,6])
 
     def test_030_trim_settings(self):
         """Set the fakepart1/fakepart2 attribute of the root settings object and then trim it"""
