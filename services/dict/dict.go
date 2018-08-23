@@ -539,7 +539,7 @@ func DeleteDictionary(table string, key interface{}) error {
 	err := deleteEntry(setstr)
 
 	if err != nil {
-		logger.Warn("AddEntry ERROR: %s\n", err)
+		logger.Warn("DeleteDictionary ERROR: %s\n", err)
 	}
 
 	return err
