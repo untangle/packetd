@@ -488,6 +488,15 @@ func generateKey(key interface{}) string {
 // AddEntry adds a field/value entry for the supplied key in the supplied table
 func AddEntry(table string, key interface{}, field string, value interface{}) error {
 	var setstr string
+
+	switch value.(type) {
+	case string:
+		if value.(string) == "" {
+			logger.Warn("AddEntry: Set empty string request for %s %s %s\n", generateTable(table), generateKey(key), generateField(field))
+			return nil
+		}
+	}
+
 	setstr = fmt.Sprintf("%s%s%s%s", generateTable(table), generateKey(key), generateField(field), generateValue(value))
 
 	if logger.IsDebugEnabled() {
