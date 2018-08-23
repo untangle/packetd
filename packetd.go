@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
-	"github.com/untangle/packetd/plugins/certcache"
+	//"github.com/untangle/packetd/plugins/certcache"
 	"github.com/untangle/packetd/plugins/classify"
 	"github.com/untangle/packetd/plugins/dns"
 	"github.com/untangle/packetd/plugins/example"
@@ -181,7 +181,7 @@ func startPlugins() {
 		example.PluginStartup,
 		//classify.PluginStartup,
 		geoip.PluginStartup,
-		certcache.PluginStartup,
+		//certcache.PluginStartup,
 		dns.PluginStartup,
 		sni.PluginStartup,
 		reporter.PluginStartup}
@@ -204,7 +204,7 @@ func stopPlugins() {
 		example.PluginShutdown,
 		//classify.PluginShutdown,
 		geoip.PluginShutdown,
-		certcache.PluginShutdown,
+		//certcache.PluginShutdown,
 		dns.PluginShutdown,
 		sni.PluginShutdown,
 		reporter.PluginShutdown}
