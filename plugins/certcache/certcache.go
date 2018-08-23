@@ -94,6 +94,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 		if err != nil {
 			logger.Warn("TLS ERROR: %s\n", err)
+			localMutex.Unlock()
 			return result
 		}
 
@@ -101,6 +102,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 		if len(conn.ConnectionState().PeerCertificates) < 1 {
 			logger.Warn("Could not fetch certificate from %s\n", mess.Tuple.ServerAddress)
+			localMutex.Unlock()
 			return result
 		}
 
