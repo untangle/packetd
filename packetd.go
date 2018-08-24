@@ -221,12 +221,27 @@ func stopPlugins() {
 
 // Add signal handlers
 func handleSignals() {
+	// Add SIGINT & SIGTERM handler (exit)
 	ch := make(chan os.Signal)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-ch
 		logger.Warn("Received signal [%v]. Setting shutdown flag\n", sig)
 		kernel.SetShutdownFlag()
+	}()
+
+	// Add SIGQUIT handler (dump thread stack trace)
+	quitch := make(chan os.Signal, 1)
+	signal.Notify(quitch, syscall.SIGQUIT)
+	go func() {
+		for {
+			sig := <-quitch
+			buf := make([]byte, 1<<20)
+			logger.Warn("Received signal [%v]. Printing Thread Dump...\n", sig)
+			stacklen := runtime.Stack(buf, true)
+			logger.Warn("\n\n%s\n\n", buf[:stacklen])
+			logger.Warn("Thread dump complete.\n")
+		}
 	}()
 }
 
