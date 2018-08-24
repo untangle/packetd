@@ -7,6 +7,7 @@ import (
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -14,23 +15,25 @@ import (
 
 const pluginName = "certcache"
 const cleanTimeout = 86400
+const fetchTimeout = 10 * time.Second
 
 // CertificateHolder is used to cache SSL/TLS certificates
 type CertificateHolder struct {
 	CreationTime time.Time
 	Certificate  x509.Certificate
 	Available    bool
+	WaitGroup    sync.WaitGroup
 }
 
 var shutdownChannel = make(chan bool)
-var certificateTable map[string]CertificateHolder
+var certificateTable map[string]*CertificateHolder
 var certificateMutex sync.Mutex
 var localMutex sync.Mutex
 
 // PluginStartup function is called to allow plugin specific initialization.
 func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
-	certificateTable = make(map[string]CertificateHolder)
+	certificateTable = make(map[string]*CertificateHolder)
 	go cleanupTask()
 
 	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
@@ -67,35 +70,28 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	server := fmt.Sprintf("%s", mess.Tuple.ServerAddress)
 
-	var holder CertificateHolder
+	var holder *CertificateHolder
 	var target string
 	var found bool
 
 	localMutex.Lock()
 
-	if holder, found = findCertificate(server); found {
+	holder, found = findCertificate(server)
+	if found {
+		localMutex.Unlock()
 		logger.Debug("Loading certificate for %s\n", server)
 	} else {
 		logger.Debug("Fetching certificate for %s\n", server)
+		holder = new(CertificateHolder)
+		holder.WaitGroup.Add(1)
 		insertCertificate(server, holder)
-	}
-
-	localMutex.Unlock()
-
-	// if we found the holder but the certificate is not available it means
-	// another thread is fetching the cert, so we clear the release flag
-	// so we can check again on the next packet
-	if (found == true) && (holder.Available == false) {
-		logger.Trace("The certificate for %s is not available\n", server)
-		result.SessionRelease = false
-		return result
-	}
-
-	// if we didn't find the holder we need to fetch the certificate
-	if found == false {
+		localMutex.Unlock()
 
 		conf := &tls.Config{
 			InsecureSkipVerify: true,
+		}
+		dialer := &net.Dialer{
+			Timeout: fetchTimeout,
 		}
 
 		if mess.IP6layer != nil {
@@ -104,51 +100,62 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 			target = fmt.Sprintf("%s:443", server)
 		}
 
-		conn, err := tls.Dial("tcp", target, conf)
-
+		conn, err := tls.DialWithDialer(dialer, "tcp", target, conf)
 		if err != nil {
 			logger.Warn("TLS ERROR: %s\n", err)
-			removeCertificate(server)
-			return result
+		} else {
+			defer conn.Close()
 		}
 
-		defer conn.Close()
-
-		if len(conn.ConnectionState().PeerCertificates) < 1 {
-			logger.Warn("Could not fetch certificate from %s\n", server)
-			removeCertificate(server)
-			return result
+		if conn != nil && len(conn.ConnectionState().PeerCertificates) > 0 {
+			logger.Debug("Successfully fetched certificate from %s\n", server)
+			holder.Certificate = *conn.ConnectionState().PeerCertificates[0]
+			holder.Available = true
+		} else {
+			logger.Debug("Could not fetch certificate from %s\n", server)
+			holder.Available = false
 		}
-
-		holder.Certificate = *conn.ConnectionState().PeerCertificates[0]
 		holder.CreationTime = time.Now()
-		holder.Available = true
-
-		insertCertificate(server, holder)
+		holder.WaitGroup.Done()
 	}
 
-	dispatch.PutSessionAttachment(mess.Session, "certificate", holder.Certificate)
+	// At this point the holder has either been retrieved or created
+	if holder == nil {
+		logger.Err("Constraint failed: nil cert holder\n")
+		return result
+	}
 
-	setSessionEntry("certificate_subject_cn", holder.Certificate.Subject.CommonName, ctid)
-	setSessionEntry("certificate_subject_sn", holder.Certificate.Subject.SerialNumber, ctid)
-	setSessionList("certificate_subject_c", holder.Certificate.Subject.Country, ctid)
-	setSessionList("certificate_subject_o", holder.Certificate.Subject.Organization, ctid)
-	setSessionList("certificate_subject_ou", holder.Certificate.Subject.OrganizationalUnit, ctid)
-	setSessionList("certificate_subject_l", holder.Certificate.Subject.Locality, ctid)
-	setSessionList("certificate_subject_p", holder.Certificate.Subject.Province, ctid)
-	setSessionList("certificate_subject_sa", holder.Certificate.Subject.StreetAddress, ctid)
-	setSessionList("certificate_subject_pc", holder.Certificate.Subject.PostalCode, ctid)
-	setSessionList("certificate_subject_san", holder.Certificate.DNSNames, ctid)
+	// wait until the cert has been retrieved
+	// this will only happen when two+ sessions requests the same cert at the same time
+	// the first will fetch the cert, and the other threads will wait here
+	holder.WaitGroup.Wait()
+	logger.Trace("Certificate %v found: %v\n", server, holder.Available)
 
-	setSessionEntry("certificate_issuer_cn", holder.Certificate.Issuer.CommonName, ctid)
-	setSessionEntry("certificate_issuer_sn", holder.Certificate.Issuer.SerialNumber, ctid)
-	setSessionList("certificate_issuer_c", holder.Certificate.Issuer.Country, ctid)
-	setSessionList("certificate_issuer_o", holder.Certificate.Issuer.Organization, ctid)
-	setSessionList("certificate_issuer_ou", holder.Certificate.Issuer.OrganizationalUnit, ctid)
-	setSessionList("certificate_issuer_l", holder.Certificate.Issuer.Locality, ctid)
-	setSessionList("certificate_issuer_p", holder.Certificate.Issuer.Province, ctid)
-	setSessionList("certificate_issuer_sa", holder.Certificate.Issuer.StreetAddress, ctid)
-	setSessionList("certificate_issuer_pc", holder.Certificate.Issuer.PostalCode, ctid)
+	// if the cert is available for this server, add the metadata to the session dict
+	if holder.Available {
+		dispatch.PutSessionAttachment(mess.Session, "certificate", holder.Certificate)
+
+		setSessionEntry("certificate_subject_cn", holder.Certificate.Subject.CommonName, ctid)
+		setSessionEntry("certificate_subject_sn", holder.Certificate.Subject.SerialNumber, ctid)
+		setSessionList("certificate_subject_c", holder.Certificate.Subject.Country, ctid)
+		setSessionList("certificate_subject_o", holder.Certificate.Subject.Organization, ctid)
+		setSessionList("certificate_subject_ou", holder.Certificate.Subject.OrganizationalUnit, ctid)
+		setSessionList("certificate_subject_l", holder.Certificate.Subject.Locality, ctid)
+		setSessionList("certificate_subject_p", holder.Certificate.Subject.Province, ctid)
+		setSessionList("certificate_subject_sa", holder.Certificate.Subject.StreetAddress, ctid)
+		setSessionList("certificate_subject_pc", holder.Certificate.Subject.PostalCode, ctid)
+		setSessionList("certificate_subject_san", holder.Certificate.DNSNames, ctid)
+
+		setSessionEntry("certificate_issuer_cn", holder.Certificate.Issuer.CommonName, ctid)
+		setSessionEntry("certificate_issuer_sn", holder.Certificate.Issuer.SerialNumber, ctid)
+		setSessionList("certificate_issuer_c", holder.Certificate.Issuer.Country, ctid)
+		setSessionList("certificate_issuer_o", holder.Certificate.Issuer.Organization, ctid)
+		setSessionList("certificate_issuer_ou", holder.Certificate.Issuer.OrganizationalUnit, ctid)
+		setSessionList("certificate_issuer_l", holder.Certificate.Issuer.Locality, ctid)
+		setSessionList("certificate_issuer_p", holder.Certificate.Issuer.Province, ctid)
+		setSessionList("certificate_issuer_sa", holder.Certificate.Issuer.StreetAddress, ctid)
+		setSessionList("certificate_issuer_pc", holder.Certificate.Issuer.PostalCode, ctid)
+	}
 
 	return result
 }
@@ -187,7 +194,7 @@ func setSessionList(field string, value []string, ctid uint32) {
 }
 
 // findCertificate fetches the cached certificate for the argumented address.
-func findCertificate(finder string) (CertificateHolder, bool) {
+func findCertificate(finder string) (*CertificateHolder, bool) {
 	certificateMutex.Lock()
 	entry, status := certificateTable[finder]
 	certificateMutex.Unlock()
@@ -195,7 +202,7 @@ func findCertificate(finder string) (CertificateHolder, bool) {
 }
 
 // InsertCertificate adds a certificate to the cache
-func insertCertificate(finder string, holder CertificateHolder) {
+func insertCertificate(finder string, holder *CertificateHolder) {
 	certificateMutex.Lock()
 	certificateTable[finder] = holder
 	certificateMutex.Unlock()
