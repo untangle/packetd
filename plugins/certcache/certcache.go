@@ -129,7 +129,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	// this will only happen when two+ sessions requests the same cert at the same time
 	// the first will fetch the cert, and the other threads will wait here
 	holder.WaitGroup.Wait()
-	logger.Trace("Certificate %v found: %v\n", server, holder.Available)
+	logger.Debug("Certificate %v found: %v\n", server, holder.Available)
 
 	// if the cert is available for this server, add the metadata to the session dict
 	if holder.Available {
