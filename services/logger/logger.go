@@ -113,10 +113,15 @@ func LogMessageSource(level int, source string, format string, args ...interface
 	}
 }
 
-// IsLogEnabled retruns true if logging is enabled for the caller at the specified level, false otherwise
+// IsLogEnabled returns true if logging is enabled for the caller at the specified level, false otherwise
 func IsLogEnabled(level int) bool {
 	_, packagename, _, _ := findCaller()
-	item, stat := appLogLevel[packagename]
+	return IsLogEnabledSource(level, packagename)
+}
+
+// IsLogEnabledSource is the same as IsLogEnabled but for the manually specified source
+func IsLogEnabledSource(level int, source string) bool {
+	item, stat := appLogLevel[source]
 	if stat == true {
 		return (item >= level)
 	}
@@ -331,13 +336,11 @@ func initLoggerConfig() {
 
 	// services
 	config["dict"] = "INFO"
-	config["conntrack"] = "INFO"
 	config["dispatch"] = "INFO"
+	config["dispatch_timer"] = "INFO"
 	config["exec"] = "INFO"
 	config["kernel"] = "INFO"
 	config["logger"] = "INFO"
-	config["nfqueue"] = "INFO"
-	config["netlogger"] = "INFO"
 	config["packetd"] = "INFO"
 	config["reports"] = "INFO"
 	config["restd"] = "INFO"

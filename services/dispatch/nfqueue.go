@@ -126,6 +126,8 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 	subtotal := len(session.subscriptions)
 	subcount := 0
 	priority := 0
+	var timeMap = make(map[string]float64)
+	var timeMapLock = sync.RWMutex{}
 
 	for subcount != subtotal {
 		// Counts the total number of calls made for each priority so we know
@@ -137,10 +139,15 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			if val.Priority != priority {
 				continue
 			}
-			logger.Debug("Calling nfqueue APP:%s PRI:%d  SID:%d\n", key, priority, session.SessionID)
+			logger.Trace("Calling nfqueue  APP:%s PRI:%d SID:%d\n", key, priority, session.SessionID)
 			go func(key string, val SubscriptionHolder) {
+				t1 := getMicroseconds()
 				pipe <- val.NfqueueFunc(mess, ctid, newflag)
-				logger.Debug("Finished nfqueue APP:%s PRI:%d SID:%d\n", key, priority, session.SessionID)
+				timediff := (float64(getMicroseconds()-t1) / 1000.0)
+				timeMapLock.Lock()
+				timeMap[val.Owner] = timediff
+				timeMapLock.Unlock()
+				logger.Trace("Finished nfqueue APP:%s PRI:%d SID:%d ms:%.1f\n", key, priority, session.SessionID, timediff)
 			}(key, val)
 			hitcount++
 			subcount++
@@ -154,13 +161,22 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 				pmark |= result.PacketMark
 				if result.SessionRelease {
 					ReleaseSession(session, result.Owner)
-					delete(session.subscriptions, result.Owner)
 				}
 			}
 		}
 
 		// Increment the priority and keep looping until we've called all subscribers
 		priority++
+		if priority > 100 {
+			logger.Err("Priority > 100 Constraint failed! %d %d %d %v", subcount, subtotal, priority, session.subscriptions)
+			panic("Constraint failed - infinite loop detected")
+		}
+	}
+
+	if logger.IsLogEnabledSource(logger.LogLevelTrace, "dispatch_timer") {
+		timeMapLock.RLock()
+		logger.LogMessageSource(logger.LogLevelTrace, "dispatch_timer", "Timer Map: %v\n", timeMap)
+		timeMapLock.RUnlock()
 	}
 
 	// return the updated mark to be set on the packet
@@ -228,4 +244,9 @@ func obtainSessionEntry(mess NfqueueMessage, ctid uint32) (*SessionEntry, bool) 
 	}
 
 	return session, newFlag
+}
+
+// getMicroseconds returns the current clock in microseconds
+func getMicroseconds() int64 {
+	return time.Now().UnixNano() / int64(time.Microsecond)
 }
