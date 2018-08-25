@@ -2,7 +2,7 @@
 
 echo 1 > /proc/sys/net/ipv4/ip_forward
 
-nft add table nat
+nft add table ip nat
 nft add chain ip nat prerouting "{ type nat hook prerouting priority -100 ; }"
 nft add chain ip nat postrouting "{ type nat hook postrouting priority 100 ; }"
 nft flush chain ip nat postrouting
@@ -11,6 +11,11 @@ nft add rule ip nat postrouting oifname lo return
 nft add rule ip nat postrouting iifname lo return
 nft add rule ip nat postrouting counter masquerade
 
+#nft add table ip6 nat
+#nft add chain ip6 nat prerouting "{ type nat hook prerouting priority -100 ; }"
+#nft add chain ip6 nat postrouting "{ type nat hook postrouting priority 100 ; }"
+#nft flush chain ip6 nat postrouting
+#nft flush chain ip6 nat prerouting
 
 nft add table ip filter
 nft add chain ip filter forward "{ type filter hook forward priority 0 ; }"
