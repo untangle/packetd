@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+const maxAllowedTime = 30 * time.Second
+
 //NfqueueHandlerFunction defines a pointer to a nfqueue callback function
 type NfqueueHandlerFunction func(NfqueueMessage, uint32, bool) NfqueueResult
 
@@ -120,7 +122,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 	session, newflag := obtainSessionEntry(mess, ctid)
 	mess.Session = session
 
-	pipe := make(chan NfqueueResult)
+	resultsChannel := make(chan NfqueueResult)
 
 	// We loop and increment the priority until all subscriptions have been called
 	subtotal := len(session.subscriptions)
@@ -139,15 +141,29 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			if val.Priority != priority {
 				continue
 			}
-			logger.Trace("Calling nfqueue  APP:%s PRI:%d SID:%d\n", key, priority, session.SessionID)
+			logger.Trace("Calling nfqueue  plugin:%s priority:%d session_id:%d\n", key, priority, session.SessionID)
 			go func(key string, val SubscriptionHolder) {
+				timeoutTimer := time.NewTimer(maxAllowedTime)
+				c := make(chan NfqueueResult, 1)
 				t1 := getMicroseconds()
-				pipe <- val.NfqueueFunc(mess, ctid, newflag)
+
+				go func() { c <- val.NfqueueFunc(mess, ctid, newflag) }()
+
+				select {
+				case result := <-c:
+					resultsChannel <- result
+					timeoutTimer.Stop()
+				case <-timeoutTimer.C:
+					logger.Err("Timeout reached while processing nfqueue. plugin:%s\n", key)
+					resultsChannel <- NfqueueResult{Owner: key, PacketMark: 0, SessionRelease: true}
+				}
+
 				timediff := (float64(getMicroseconds()-t1) / 1000.0)
 				timeMapLock.Lock()
 				timeMap[val.Owner] = timediff
 				timeMapLock.Unlock()
-				logger.Trace("Finished nfqueue APP:%s PRI:%d SID:%d ms:%.1f\n", key, priority, session.SessionID, timediff)
+
+				logger.Trace("Finished nfqueue plugin:%s PRI:%d SID:%d ms:%.1f\n", key, priority, session.SessionID, timediff)
 			}(key, val)
 			hitcount++
 			subcount++
@@ -157,7 +173,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		// subscription for any that set the SessionRelease flag
 		for i := 0; i < hitcount; i++ {
 			select {
-			case result := <-pipe:
+			case result := <-resultsChannel:
 				pmark |= result.PacketMark
 				if result.SessionRelease {
 					ReleaseSession(session, result.Owner)

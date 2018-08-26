@@ -82,6 +82,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		logger.Debug("Loading certificate for %s\n", server)
 	} else {
 		logger.Debug("Fetching certificate for %s\n", server)
+
 		holder = new(CertificateHolder)
 		holder.WaitGroup.Add(1)
 		insertCertificate(server, holder)
