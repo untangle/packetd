@@ -72,6 +72,12 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	result.PacketMark = 0
 	result.SessionRelease = true
 
+	// release immediately as we only care about the first packet
+	dispatch.ReleaseSession(mess.Session, pluginName)
+	if !newSession {
+		return result
+	}
+
 	if geodb == nil {
 		return result
 	}

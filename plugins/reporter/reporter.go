@@ -33,16 +33,16 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	result.SessionRelease = true
 	result.PacketMark = 0
 
-	// We only care about new sessions
-	if !newSession {
-		logger.Err("Unexpected event received!\n")
-		return result
-	}
-
 	var session *dispatch.SessionEntry
 	session = mess.Session
 	if session == nil {
 		logger.Err("Missing session on NFQueue packet!")
+		return result
+	}
+	dispatch.ReleaseSession(session, pluginName)
+
+	// We only care about new sessions
+	if !newSession {
 		return result
 	}
 
