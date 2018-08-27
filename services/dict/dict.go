@@ -383,37 +383,37 @@ func generateField(field string) string {
 
 // generateString generates the value token for the dict proc write string
 func generateString(value string) string {
-	return fmt.Sprintf("value=%s,", value)
+	return fmt.Sprintf("value=%s", value)
 }
 
 // generateMac generates the mac token for the dict proc write string
 func generateMac(value net.HardwareAddr) string {
-	return fmt.Sprintf("mac=%s,", value.String())
+	return fmt.Sprintf("mac=%s", value.String())
 }
 
 // generateInt generates the int token for the dict proc write string
 func generateInt(value uint32) string {
-	return fmt.Sprintf("int=%d,", value)
+	return fmt.Sprintf("int=%d", value)
 }
 
 // generateInt64 generates the int token for the dict proc write string
 func generateInt64(value uint64) string {
-	return fmt.Sprintf("int64=%d,", value)
+	return fmt.Sprintf("int64=%d", value)
 }
 
 // generateBool generates the bool token for the dict proc write string
 func generateBool(value bool) string {
-	return fmt.Sprintf("bool=%s,", strconv.FormatBool(value))
+	return fmt.Sprintf("bool=%s", strconv.FormatBool(value))
 }
 
 // generateIP generates the ip token for the dict proc write string
 func generateIP(value net.IP) string {
-	return fmt.Sprintf("ip=%s,", value.String())
+	return fmt.Sprintf("ip=%s", value.String())
 }
 
 // generateIP6 generates the ip token for the dict proc write string
 func generateIP6(value net.IP) string {
-	return fmt.Sprintf("ip6=%s,", value.String())
+	return fmt.Sprintf("ip6=%s", value.String())
 }
 
 // generateValue generates the value token for the dict proc write string
