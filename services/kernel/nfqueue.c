@@ -20,7 +20,7 @@ static char						*buffer;
 
 int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data)
 {
-	*data = (unsigned char *)nfnl_get_pointer_to_data(nfad->data,NFQA_CT,struct nf_conntrack);
+    *data = (unsigned char *)nfnl_get_pointer_to_data(nfad->data,NFQA_CT,struct nf_conntrack);
 	if (*data) return NFA_PAYLOAD(nfad->data[NFQA_CT-1]);
 
 	logmessage(LOG_WARNING,logsrc,"Error calling nfnl_get_pointer_to_data(NFQA_CT)\n");
@@ -35,7 +35,9 @@ unsigned int nfq_get_conntrack_id(struct nfq_data *nfad, int l3num)
 	int						ct_len = 0;
 
 	ct_len = nfq_get_ct_info(nfad, &ct_data);
-	if (ct_len <= 0) return(0);
+	if (ct_len <= 0) {
+        return(0);
+    }
 
 	ct = nfct_new();
 
@@ -94,9 +96,20 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
     }
 
 	// get the conntrack ID
-	ctid = nfq_get_conntrack_id(nfad,nfmsg->nfgen_family);
+	if ((ctid = nfq_get_conntrack_id(nfad,nfmsg->nfgen_family)) <= 0) {
+        if (iphead->version == 4) {
+            struct in_addr ip_addr;
+            logmessage(LOG_WARNING,logsrc,"Error: Failed to retrieve conntrack ID\n");
+            ip_addr.s_addr = iphead->saddr;
+            logmessage(LOG_WARNING,logsrc,"Error: src IP: %s\n", inet_ntoa(ip_addr));
+            ip_addr.s_addr = iphead->daddr;
+            logmessage(LOG_WARNING,logsrc,"Error: dst IP: %s\n", inet_ntoa(ip_addr));
+        }
+		nfqueue_set_verdict(nfid, NF_ACCEPT, mark);
+        nfqueue_free_buffer(buffer);
+        return 0;
+    }
 
-	// call the go handler function which will call nfqueue_free_buffer(buffer) when finished
     go_nfqueue_callback(mark,rawpkt,rawlen,ctid,nfid,buffer);
 
 	return(0);
