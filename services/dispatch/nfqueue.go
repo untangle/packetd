@@ -3,6 +3,7 @@ package dispatch
 import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	//"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/logger"
 	"sync"
 	"time"
@@ -62,9 +63,14 @@ func AttachNfqueueSubscriptions(session *SessionEntry) {
 
 // ReleaseSession is called by a subscriber to stop receiving traffic for a session
 func ReleaseSession(session *SessionEntry, owner string) {
-	logger.Debug("Removing %s session nfqueue subscription for SID:%d\n", owner, session.SessionID)
+	logger.Debug("Removing %s session nfqueue subscription for session %d\n", owner, session.SessionID)
 	session.subLocker.Lock()
 	delete(session.subscriptions, owner)
+	if len(session.subscriptions) == 0 {
+		logger.Debug("Zero subscribers reached - settings bypass_packetd=true for session %d\n", session.SessionID)
+		// FIXME - causes kernel errors
+		//dict.AddSessionEntry(session.ConntrackID, "bypass_packetd", true)
+	}
 	session.subLocker.Unlock()
 }
 
@@ -247,6 +253,7 @@ func obtainSessionEntry(mess NfqueueMessage, ctid uint32) (*SessionEntry, bool) 
 		newFlag = true
 		session = new(SessionEntry)
 		session.SessionID = nextSessionID()
+		session.ConntrackID = ctid
 		session.CreationTime = time.Now()
 		session.PacketCount = 1
 		session.ByteCount = uint64(mess.Length)

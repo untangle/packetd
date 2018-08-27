@@ -10,6 +10,7 @@ import (
 // SessionEntry stores details related to a session
 type SessionEntry struct {
 	SessionID          uint64
+	ConntrackID        uint32
 	PacketCount        uint64
 	ByteCount          uint64
 	CreationTime       time.Time
