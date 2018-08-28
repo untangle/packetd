@@ -68,8 +68,7 @@ func ReleaseSession(session *SessionEntry, owner string) {
 	delete(session.subscriptions, owner)
 	if len(session.subscriptions) == 0 {
 		logger.Debug("Zero subscribers reached - settings bypass_packetd=true for session %d\n", session.SessionID)
-		// FIXME - causes kernel errors
-		//dict.AddSessionEntry(session.ConntrackID, "bypass_packetd", true)
+		dict.AddSessionEntry(session.ConntrackID, "bypass_packetd", true)
 	}
 	session.subLocker.Unlock()
 }
