@@ -3,7 +3,7 @@ package dispatch
 import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	//"github.com/untangle/packetd/services/dict"
+	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/logger"
 	"sync"
 	"time"
