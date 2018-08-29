@@ -45,7 +45,6 @@ func Startup() {
 	engine.DELETE("/api/settings/*path", trimSettings)
 
 	// files
-	engine.Static("/files", "/www")
 	engine.Static("/admin", "/www/admin")
 	engine.Static("/static", "/www/static")
 
