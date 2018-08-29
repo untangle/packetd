@@ -28,21 +28,7 @@ func PluginStartup() {
 	var filename string
 
 	// start by looking for the NGFW city database file
-	filename = "/var/cache/untangle-geoip/GeoLite2-City.mmdb"
-	_, err := os.Stat(filename)
-
-	// if not found look for the MicroFW country database file
-	if os.IsNotExist(err) {
-		filename = "/usr/share/untangle-geoip/GeoLite2-Country.mmdb" // FIXME - where should this file be stored?
-		_, err := os.Stat(filename)
-
-		// if still not found download the country database
-		if os.IsNotExist(err) {
-			databaseDownload(filename)
-		}
-	}
-
-	db, err := geoip2.Open(filename)
+	db, err := geoip2.Open(findGeoFile(true))
 	if err != nil {
 		logger.Warn("Unable to load GeoIP Database: %s\n", err)
 	} else {
@@ -117,7 +103,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 }
 
 func databaseDownload(filename string) {
-	logger.Info("Downloading GeoIP Database\n")
+	logger.Info("Downloading GeoIP Database...\n")
 
 	// Make sure the target directory exists
 	marker := strings.LastIndex(filename, "/")
@@ -156,4 +142,36 @@ func databaseDownload(filename string) {
 
 	// Write the uncompressed database to the file
 	io.Copy(writer, reader)
+	logger.Info("Downloaded  GeoIP Database.\n")
+}
+
+// findGeoFile finds the location of the GeoLite2-City.mmdb file
+// it checks several common locations and returns any found
+// if none found it just returns "/tmp/GeoLite2-City.mmdb"
+func findGeoFile(download bool) string {
+	possibleLocations := []string{
+		"/var/cache/untangle-geoip/GeoLite2-City.mmdb",
+		"/tmp/GeoLite2-City.mmdb",
+		"/usr/lib/GeoLite2-City.mmdb",
+	}
+
+	for _, filename := range possibleLocations {
+		_, err := os.Stat(filename)
+		if os.IsNotExist(err) {
+			continue
+		} else {
+			return filename
+		}
+	}
+
+	// If we reach this point it was not found
+	if download {
+		databaseDownload("/usr/lib/GeoLite2-City.mmdb")
+		// try again now that we tried to download
+		// but do not download again
+		return findGeoFile(false)
+	}
+
+	// Not found - just return one
+	return "/tmp/GeoLite2-City.mmdb"
 }
