@@ -153,6 +153,8 @@ func findGeoFile(download bool) string {
 		"/var/cache/untangle-geoip/GeoLite2-City.mmdb",
 		"/tmp/GeoLite2-City.mmdb",
 		"/usr/lib/GeoLite2-City.mmdb",
+		"/usr/share/untangle-geoip/GeoLite2-Country.mmdb",
+		"/usr/share/geoip/GeoLite2-Country.mmdb",
 	}
 
 	for _, filename := range possibleLocations {
