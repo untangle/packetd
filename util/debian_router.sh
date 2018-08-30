@@ -15,7 +15,8 @@ nft add rule ip postrouting postrouting-nat oifname lo accept
 nft add rule ip postrouting postrouting-nat iifname lo accept
 nft add rule ip postrouting postrouting-nat counter masquerade
 
-
+nft add table inet forward
+nft add chain inet forward forward-filter "{ type filter hook forward priority 0 ; }"
 
 
 
