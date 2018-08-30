@@ -26,9 +26,9 @@ class GeoipTests(unittest.TestCase):
         """verify a block rule works using remote_control"""
         # this test URL should NOT be blocked
         result1 = remote_control.run_command("ping -W5 -c1 4.2.2.1")
-        subprocess.call("nft add rule inet filter forward-filter dict session ct id server_country long_string US reject", shell=True)
+        subprocess.call("nft add rule inet forward forward-filter dict session ct id server_country long_string US reject", shell=True)
         result2 = remote_control.run_command("ping -W5 -c1 4.2.2.1")
-        subprocess.call("nft flush chain inet filter forward-filter", shell=True)
+        subprocess.call("nft flush chain inet forward forward-filter", shell=True)
         assert (result1 == 0)
         assert (result2 != 0)
     
