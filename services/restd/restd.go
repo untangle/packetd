@@ -30,12 +30,6 @@ func Startup() {
 	engine.GET("/ping", pingHandler)
 	engine.POST("/reports/create_query", reportsCreateQuery)
 	engine.GET("/reports/get_data/:query_id", reportsGetData)
-	engine.GET("/settings/get_settings", getSettings)
-	engine.GET("/settings/get_settings/*path", getSettings)
-	engine.POST("/settings/set_settings", setSettings)
-	engine.POST("/settings/set_settings/*path", setSettings)
-	engine.DELETE("/settings/trim_settings", trimSettings)
-	engine.DELETE("/settings/trim_settings/*path", trimSettings)
 
 	engine.GET("/api/settings", getSettings)
 	engine.GET("/api/settings/*path", getSettings)
