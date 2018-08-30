@@ -38,6 +38,9 @@ func Startup() {
 	engine.DELETE("/api/settings", trimSettings)
 	engine.DELETE("/api/settings/*path", trimSettings)
 
+	engine.GET("/api/defaults", getDefaultSettings)
+	engine.GET("/api/defaults/*path", getDefaultSettings)
+
 	// files
 	engine.Static("/admin", "/www/admin")
 	engine.Static("/static", "/www/static")
@@ -124,6 +127,24 @@ func getSettings(c *gin.Context) {
 	}
 
 	jsonResult := settings.GetSettings(segments)
+	c.JSON(200, jsonResult)
+	return
+}
+
+func getDefaultSettings(c *gin.Context) {
+	addHeaders(c)
+
+	var segments []string
+
+	path := c.Param("path")
+
+	if path == "" {
+		segments = nil
+	} else {
+		segments = removeEmptyStrings(strings.Split(path, "/"))
+	}
+
+	jsonResult := settings.GetDefaultSettings(segments)
 	c.JSON(200, jsonResult)
 	return
 }

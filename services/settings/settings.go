@@ -8,13 +8,16 @@ import (
 	"strconv"
 )
 
+const settings_file = "/etc/config/settings.json"
+const defaults_file = "/etc/config/defaults.json"
+
 // settings stores the current system settings
 var settings map[string]interface{}
 
 // Startup initializes all settings objects
 func Startup() {
 	var err error
-	settings, err = readSettingsFileJSON()
+	settings, err = readSettingsFileJSON(settings_file)
 	if err != nil {
 		logger.Warn("Error reading settings file: %s\n", err.Error())
 	}
@@ -35,25 +38,12 @@ func Shutdown() {
 
 }
 
-// GetSettings returns the daemon settings
+// GetSettings returns the settings from the specified path
 func GetSettings(segments []string) interface{} {
-	var err error
-	var jsonObject interface{}
-
-	jsonObject, err = readSettingsFileJSON()
-	if err != nil {
-		return createJSONErrorObject(err)
-	}
-
-	jsonObject, err = getSettings(jsonObject, segments)
-	if err != nil {
-		return createJSONErrorObject(err)
-	}
-
-	return jsonObject
+	return getSettings(segments, settings_file)
 }
 
-// SetSettingsParse updates the daemon settings from a parsed JSON object
+// SetSettingsParse updates the settings from a parsed JSON object
 func SetSettingsParse(segments []string, byteSlice []byte) interface{} {
 	var err error
 	var bodyJSONObject interface{}
@@ -66,93 +56,24 @@ func SetSettingsParse(segments []string, byteSlice []byte) interface{} {
 	return SetSettings(segments, bodyJSONObject)
 }
 
-// SetSettings updates the daemon settings
+// SetSettings updates the settings
 func SetSettings(segments []string, value interface{}) interface{} {
-	var ok bool
-	var err error
-	var jsonSettings map[string]interface{}
-	var newSettings interface{}
-
-	jsonSettings, err = readSettingsFileJSON()
-	if err != nil {
-		return createJSONErrorObject(err)
-	}
-
-	newSettings, err = setSettings(jsonSettings, segments, value)
-	if err != nil {
-		return createJSONErrorObject(err)
-	}
-	jsonSettings, ok = newSettings.(map[string]interface{})
-	if !ok {
-		return createJSONErrorObject(errors.New("Invalid global settings object"))
-	}
-
-	_, err = writeSettingsFileJSON(jsonSettings)
-	if err != nil {
-		return createJSONErrorObject(err)
-	}
-
-	return createJSONObject("result", "OK")
+	return setSettings(segments, value, settings_file)
 }
 
 // TrimSettings trims the settings
 func TrimSettings(segments []string) interface{} {
-	var ok bool
-	var err error
-	var iterJSONObject map[string]interface{}
-	var jsonSettings map[string]interface{}
+	return trimSettings(segments, settings_file)
+}
 
-	if segments == nil {
-		return createJSONErrorString("Invalid trim settings path")
-	}
-
-	jsonSettings, err = readSettingsFileJSON()
-	if err != nil {
-		return createJSONErrorObject(err)
-	}
-
-	iterJSONObject = jsonSettings
-
-	for i, value := range segments {
-		//if this is the last value, set and break
-		if i == len(segments)-1 {
-			delete(iterJSONObject, value)
-			break
-		}
-
-		// otherwise recurse down object
-		// 3 cases:
-		// if json[foo] does not exist, nothing to delete
-		// if json[foo] exists and is a map, recurse
-		// if json[foo] exists and is not a map (its some value)
-		//    in this case we throw an error
-		if iterJSONObject[value] == nil {
-			// path does not exists - nothing to delete, just quit
-			break
-		} else {
-			var j map[string]interface{}
-			j, ok = iterJSONObject[value].(map[string]interface{})
-			iterJSONObject[value] = make(map[string]interface{})
-			if ok {
-				iterJSONObject[value] = j
-				iterJSONObject = j // for next iteration
-			} else {
-				return createJSONErrorString("Non-dict found in path: " + string(value))
-			}
-		}
-	}
-
-	_, err = writeSettingsFileJSON(jsonSettings)
-	if err != nil {
-		return createJSONErrorObject(err)
-	}
-
-	return createJSONObject("result", "OK")
+// GetDefaultSettings returns the default settings from the specified path
+func GetDefaultSettings(segments []string) interface{} {
+	return getSettings(segments, defaults_file)
 }
 
 // readSettingsFileJSON reads the settings file and return the corresponding JSON object
-func readSettingsFileJSON() (map[string]interface{}, error) {
-	raw, err := ioutil.ReadFile("/etc/config/settings.json")
+func readSettingsFileJSON(filename string) (map[string]interface{}, error) {
+	raw, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -266,8 +187,92 @@ func setObjectIndex(obj interface{}, idx string, value interface{}) (interface{}
 	return nil, errors.New("unknown type")
 }
 
-// setSettings sets the value attribute specified of the segments path to the specified value
-func setSettings(jsonObject interface{}, segments []string, value interface{}) (interface{}, error) {
+// trimSettings trims the settings
+func trimSettings(segments []string, filename string) interface{} {
+	var ok bool
+	var err error
+	var iterJSONObject map[string]interface{}
+	var jsonSettings map[string]interface{}
+
+	if segments == nil {
+		return createJSONErrorString("Invalid trim settings path")
+	}
+
+	jsonSettings, err = readSettingsFileJSON(filename)
+	if err != nil {
+		return createJSONErrorObject(err)
+	}
+
+	iterJSONObject = jsonSettings
+
+	for i, value := range segments {
+		//if this is the last value, set and break
+		if i == len(segments)-1 {
+			delete(iterJSONObject, value)
+			break
+		}
+
+		// otherwise recurse down object
+		// 3 cases:
+		// if json[foo] does not exist, nothing to delete
+		// if json[foo] exists and is a map, recurse
+		// if json[foo] exists and is not a map (its some value)
+		//    in this case we throw an error
+		if iterJSONObject[value] == nil {
+			// path does not exists - nothing to delete, just quit
+			break
+		} else {
+			var j map[string]interface{}
+			j, ok = iterJSONObject[value].(map[string]interface{})
+			iterJSONObject[value] = make(map[string]interface{})
+			if ok {
+				iterJSONObject[value] = j
+				iterJSONObject = j // for next iteration
+			} else {
+				return createJSONErrorString("Non-dict found in path: " + string(value))
+			}
+		}
+	}
+
+	_, err = writeSettingsFileJSON(jsonSettings)
+	if err != nil {
+		return createJSONErrorObject(err)
+	}
+
+	return createJSONObject("result", "OK")
+}
+
+// setSettings updates the settings
+func setSettings(segments []string, value interface{}, filename string) interface{} {
+	var ok bool
+	var err error
+	var jsonSettings map[string]interface{}
+	var newSettings interface{}
+
+	jsonSettings, err = readSettingsFileJSON(filename)
+	if err != nil {
+		return createJSONErrorObject(err)
+	}
+
+	newSettings, err = setSettingsInJson(jsonSettings, segments, value)
+	if err != nil {
+		return createJSONErrorObject(err)
+	}
+	jsonSettings, ok = newSettings.(map[string]interface{})
+	if !ok {
+		return createJSONErrorObject(errors.New("Invalid global settings object"))
+	}
+
+	_, err = writeSettingsFileJSON(jsonSettings)
+	if err != nil {
+		return createJSONErrorObject(err)
+	}
+
+	return createJSONObject("result", "OK")
+}
+
+// setSettingsInJson sets the value attribute specified of the segments path to the specified value
+func setSettingsInJson(jsonObject interface{}, segments []string, value interface{}) (interface{}, error) {
 	var err error
 
 	if len(segments) == 0 {
@@ -292,13 +297,31 @@ func setSettings(jsonObject interface{}, segments []string, value interface{}) (
 			mapObject[element] = make(map[string]interface{})
 		}
 
-		mapObject[element], err = setSettings(mapObject[element], newSegments, value)
+		mapObject[element], err = setSettingsInJson(mapObject[element], newSegments, value)
 		return jsonObject, err
 	}
 }
 
-// getSettings gets the value attribute specified by the segments string from the specified json object
-func getSettings(jsonObject interface{}, segments []string) (interface{}, error) {
+// getSettings returns the settings from the specified path of the specified filename
+func getSettings(segments []string, filename string) interface{} {
+	var err error
+	var jsonObject interface{}
+
+	jsonObject, err = readSettingsFileJSON(filename)
+	if err != nil {
+		return createJSONErrorObject(err)
+	}
+
+	jsonObject, err = getSettingsFromJson(jsonObject, segments)
+	if err != nil {
+		return createJSONErrorObject(err)
+	}
+
+	return jsonObject
+}
+
+// getSettingsFromJson gets the value attribute specified by the segments string from the specified json object
+func getSettingsFromJson(jsonObject interface{}, segments []string) (interface{}, error) {
 	if len(segments) == 0 {
 		return jsonObject, nil
 	} else if len(segments) == 1 {
@@ -313,6 +336,6 @@ func getSettings(jsonObject interface{}, segments []string) (interface{}, error)
 		if newObject == nil {
 			return nil, errors.New("Attribute " + element + " missing from JSON Object")
 		}
-		return getSettings(newObject, newSegments)
+		return getSettingsFromJson(newObject, newSegments)
 	}
 }
