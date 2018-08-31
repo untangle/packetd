@@ -306,14 +306,14 @@ class NftablesTests(unittest.TestCase):
 # SOURCE_INTERFACE_NAME tests
 
     def test_011_condition_source_interface(self):
-        """Check SOURCE_INTERFACE_NAME is 1"""
+        """Check SOURCE_INTERFACE_NAME is lo"""
         condition = {"type": "SOURCE_INTERFACE_NAME","op":"IS","value": "lo"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'iifname lo')
 
     def test_011_condition_source_interface_invert(self):
-        """Check SOURCE_INTERFACE_NAME is not 1"""
+        """Check SOURCE_INTERFACE_NAME is not lo"""
         condition = {"type": "SOURCE_INTERFACE_NAME","op":"IS_NOT","value": "lo"}
         str = nftables_util.conditions_expression([condition])
         print(str)
@@ -324,14 +324,14 @@ class NftablesTests(unittest.TestCase):
 # DESTINATION_INTERFACE_NAME tests
 
     def test_012_condition_destination_interface(self):
-        """Check DESTINATION_INTERFACE_NAME is 1"""
+        """Check DESTINATION_INTERFACE_NAME is lo"""
         condition = {"type": "DESTINATION_INTERFACE_NAME","op":"IS","value": "lo"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'oifname lo')
 
     def test_012_condition_destination_interface_invert(self):
-        """Check DESTINATION_INTERFACE_NAME is not 1"""
+        """Check DESTINATION_INTERFACE_NAME is not lo"""
         condition = {"type": "DESTINATION_INTERFACE_NAME","op":"IS_NOT","value": "lo"}
         str = nftables_util.conditions_expression([condition])
         print(str)
@@ -830,7 +830,86 @@ class NftablesTests(unittest.TestCase):
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'dict session ct id server_port integer != "{1234,1235-1236}"')
+
+# ACTIONS
+# ACTIONS
+# ACTIONS
+
+    def test_100_action_reject(self):
+        """Check action REJECT"""
+        action = {"type": "REJECT"}
+        str = nftables_util.action_expression(action)
+        print(str)
+        assert(str == 'reject')
+
+    def test_101_action_accept(self):
+        """Check action ACCEPT"""
+        action = {"type": "ACCEPT"}
+        str = nftables_util.action_expression(action)
+        print(str)
+        assert(str == 'accept')
+
+    def test_102_action_jump(self):
+        """Check action JUMP"""
+        action = {"type": "JUMP", "chain":"target"}
+        str = nftables_util.action_expression(action)
+        print(str)
+        assert(str == 'jump target')
+
+    def test_103_action_goto(self):
+        """Check action GOTO"""
+        action = {"type": "GOTO", "chain":"target"}
+        str = nftables_util.action_expression(action)
+        print(str)
+        assert(str == 'goto target')
+
+# RULES
+# RULES
+# RULES
+
+    def test_200_rule_not_enabled(self):
+        """Check that a rule that is not enabled returns None"""
+        rule = {
+            "description": "description",
+            "ruleId": 1,
+            "enabled": False,
+            "conditions": [{
+                "type": "IP_PROTOCOL",
+                "value": "tcp"
+            }],
+            "op": "IS",
+            "action": {
+                "type": "ACCEPT"
+            }
+        }
+        rule_str = nftables_util.rule_cmd(rule, "inet", "forward", "forward-filter")
+        print(rule_str)
+        assert(rule_str == None)
+
+    def test_201_rule_basic(self):
+        """Check action a basic rule"""
+        rule = {
+            "description": "description",
+            "ruleId": 1,
+            "enabled": True,
+            "conditions": [{
+                "type": "IP_PROTOCOL",
+                "value": "tcp"
+            }],
+            "op": "IS",
+            "action": {
+                "type": "ACCEPT"
+            }
+        }
+        exp_str = nftables_util.rule_expression(rule)
+        print(exp_str)
+        rule_str = nftables_util.rule_cmd(rule, "inet", "forward", "forward-filter")
+        print(rule_str)
+        assert(exp_str == 'ip protocol tcp accept')
+        assert(rule_str == 'nft add rule inet forward forward-filter ip protocol tcp accept')
         
+
+
     @staticmethod
     def finalTearDown(self):
         pass
