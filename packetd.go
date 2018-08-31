@@ -40,7 +40,6 @@ func main() {
 	parseArguments()
 
 	// Start services
-	logger.Info("Starting services...\n")
 	startServices()
 
 	// Start the plugins
@@ -150,6 +149,7 @@ func parseArguments() {
 // startServices starts all the services
 func startServices() {
 	logger.Startup()
+	logger.Info("Starting services...\n")
 	printVersion()
 	kernel.Startup()
 	dispatch.Startup()
