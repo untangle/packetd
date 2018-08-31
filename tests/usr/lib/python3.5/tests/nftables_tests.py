@@ -81,225 +81,261 @@ class NftablesTests(unittest.TestCase):
         print(str)
         assert(str == 'ip protocol != "{tcp,udp}"')
         
-# SOURCE_INTERFACE tests
-# SOURCE_INTERFACE tests
-# SOURCE_INTERFACE tests
+# SOURCE_INTERFACE_ZONE tests
+# SOURCE_INTERFACE_ZONE tests
+# SOURCE_INTERFACE_ZONE tests
 
     def test_011_condition_source_interface(self):
-        """Check SOURCE_INTERFACE is 1"""
-        condition = {"type": "SOURCE_INTERFACE","op":"IS","value": "1"}
+        """Check SOURCE_INTERFACE_ZONE is 1"""
+        condition = {"type": "SOURCE_INTERFACE_ZONE","op":"IS","value": "1"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'mark and 0x000000ff 1')
 
     def test_011_condition_source_interface_invert(self):
-        """Check SOURCE_INTERFACE is not 1"""
-        condition = {"type": "SOURCE_INTERFACE","op":"IS_NOT","value": "1"}
+        """Check SOURCE_INTERFACE_ZONE is not 1"""
+        condition = {"type": "SOURCE_INTERFACE_ZONE","op":"IS_NOT","value": "1"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'mark and 0x000000ff != 1')
 
     def test_011_condition_source_interface_multiple(self):
-        """Check SOURCE_INTERFACE is 1,2"""
-        condition = {"type": "SOURCE_INTERFACE","op":"IS","value": "1,2"}
+        """Check SOURCE_INTERFACE_ZONE is 1,2"""
+        condition = {"type": "SOURCE_INTERFACE_ZONE","op":"IS","value": "1,2"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'mark and 0x000000ff "{1,2}"')
 
     def test_011_condition_source_interface_multiple_invert(self):
-        """Check SOURCE_INTERFACE is not 1,2"""
-        condition = {"type": "SOURCE_INTERFACE","op":"IS_NOT","value": "1,2"}
+        """Check SOURCE_INTERFACE_ZONE is not 1,2"""
+        condition = {"type": "SOURCE_INTERFACE_ZONE","op":"IS_NOT","value": "1,2"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'mark and 0x000000ff != "{1,2}"')
         
     def test_011_condition_source_interface_wan(self):
-        """Check SOURCE_INTERFACE is wan"""
-        condition = {"type": "SOURCE_INTERFACE","op":"IS","value": "wan"}
+        """Check SOURCE_INTERFACE_ZONE is wan"""
+        condition = {"type": "SOURCE_INTERFACE_ZONE","op":"IS","value": "wan"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'mark and 0x01000000 != 0')
 
     def test_011_condition_source_interface_non_wan(self):
-        """Check SOURCE_INTERFACE is non_wan"""
-        condition = {"type": "SOURCE_INTERFACE","op":"IS","value": "non_wan"}
+        """Check SOURCE_INTERFACE_ZONE is non_wan"""
+        condition = {"type": "SOURCE_INTERFACE_ZONE","op":"IS","value": "non_wan"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'mark and 0x01000000 == 0')
 
     def test_011_condition_source_interface_mix(self):
         """Check that mixing interface indexes and "wan" or "non_wan" is not allowed"""
-        condition = {"type": "SOURCE_INTERFACE","op":"IS","value": "1,wan"}
+        condition = {"type": "SOURCE_INTERFACE_ZONE","op":"IS","value": "1,wan"}
         try:
             str = nftables_util.conditions_expression([condition])
             assert(False)
         except:
             assert(True)
 
-# DESTINATION_INTERFACE tests
-# DESTINATION_INTERFACE tests
-# DESTINATION_INTERFACE tests
+# DESTINATION_INTERFACE_ZONE tests
+# DESTINATION_INTERFACE_ZONE tests
+# DESTINATION_INTERFACE_ZONE tests
 
     def test_012_condition_destination_interface(self):
-        """Check DESTINATION_INTERFACE is 1"""
-        condition = {"type": "DESTINATION_INTERFACE","op":"IS","value": "1"}
+        """Check DESTINATION_INTERFACE_ZONE is 1"""
+        condition = {"type": "DESTINATION_INTERFACE_ZONE","op":"IS","value": "1"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'mark and 0x0000ff00 1')
 
     def test_012_condition_destination_interface_invert(self):
-        """Check DESTINATION_INTERFACE is not 1"""
-        condition = {"type": "DESTINATION_INTERFACE","op":"IS_NOT","value": "1"}
+        """Check DESTINATION_INTERFACE_ZONE is not 1"""
+        condition = {"type": "DESTINATION_INTERFACE_ZONE","op":"IS_NOT","value": "1"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'mark and 0x0000ff00 != 1')
 
     def test_012_condition_destination_interface_multiple(self):
-        """Check DESTINATION_INTERFACE is 1,2"""
-        condition = {"type": "DESTINATION_INTERFACE","op":"IS","value": "1,2"}
+        """Check DESTINATION_INTERFACE_ZONE is 1,2"""
+        condition = {"type": "DESTINATION_INTERFACE_ZONE","op":"IS","value": "1,2"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'mark and 0x0000ff00 "{1,2}"')
 
     def test_012_condition_destination_interface_multiple_invert(self):
-        """Check DESTINATION_INTERFACE is not 1,2"""
-        condition = {"type": "DESTINATION_INTERFACE","op":"IS_NOT","value": "1,2"}
+        """Check DESTINATION_INTERFACE_ZONE is not 1,2"""
+        condition = {"type": "DESTINATION_INTERFACE_ZONE","op":"IS_NOT","value": "1,2"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'mark and 0x0000ff00 != "{1,2}"')
         
     def test_012_condition_destination_interface_wan(self):
-        """Check DESTINATION_INTERFACE is wan"""
-        condition = {"type": "DESTINATION_INTERFACE","op":"IS","value": "wan"}
+        """Check DESTINATION_INTERFACE_ZONE is wan"""
+        condition = {"type": "DESTINATION_INTERFACE_ZONE","op":"IS","value": "wan"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'mark and 0x02000000 != 0')
 
     def test_012_condition_destination_interface_non_wan(self):
-        """Check DESTINATION_INTERFACE is non_wan"""
-        condition = {"type": "DESTINATION_INTERFACE","op":"IS","value": "non_wan"}
+        """Check DESTINATION_INTERFACE_ZONE is non_wan"""
+        condition = {"type": "DESTINATION_INTERFACE_ZONE","op":"IS","value": "non_wan"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'mark and 0x02000000 == 0')
 
     def test_012_condition_destination_interface_mix(self):
         """Check that mixing interface indexes and "wan" or "non_wan" is not allowed"""
-        condition = {"type": "DESTINATION_INTERFACE","op":"IS","value": "1,wan"}
+        condition = {"type": "DESTINATION_INTERFACE_ZONE","op":"IS","value": "1,wan"}
         try:
             str = nftables_util.conditions_expression([condition])
             assert(False)
         except:
             assert(True)
 
-# CLIENT_INTERFACE tests
-# CLIENT_INTERFACE tests
-# CLIENT_INTERFACE tests
+# CLIENT_INTERFACE_ZONE tests
+# CLIENT_INTERFACE_ZONE tests
+# CLIENT_INTERFACE_ZONE tests
 
     def test_013_condition_client_interface(self):
-        """Check CLIENT_INTERFACE is 1"""
-        condition = {"type": "CLIENT_INTERFACE","op":"IS","value": "1"}
+        """Check CLIENT_INTERFACE_ZONE is 1"""
+        condition = {"type": "CLIENT_INTERFACE_ZONE","op":"IS","value": "1"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'ct mark and 0x000000ff 1')
 
     def test_013_condition_client_interface_invert(self):
-        """Check CLIENT_INTERFACE is not 1"""
-        condition = {"type": "CLIENT_INTERFACE","op":"IS_NOT","value": "1"}
+        """Check CLIENT_INTERFACE_ZONE is not 1"""
+        condition = {"type": "CLIENT_INTERFACE_ZONE","op":"IS_NOT","value": "1"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'ct mark and 0x000000ff != 1')
 
     def test_013_condition_client_interface_multiple(self):
-        """Check CLIENT_INTERFACE is 1,2"""
-        condition = {"type": "CLIENT_INTERFACE","op":"IS","value": "1,2"}
+        """Check CLIENT_INTERFACE_ZONE is 1,2"""
+        condition = {"type": "CLIENT_INTERFACE_ZONE","op":"IS","value": "1,2"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'ct mark and 0x000000ff "{1,2}"')
 
     def test_013_condition_client_interface_multiple_invert(self):
-        """Check CLIENT_INTERFACE is not 1,2"""
-        condition = {"type": "CLIENT_INTERFACE","op":"IS_NOT","value": "1,2"}
+        """Check CLIENT_INTERFACE_ZONE is not 1,2"""
+        condition = {"type": "CLIENT_INTERFACE_ZONE","op":"IS_NOT","value": "1,2"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'ct mark and 0x000000ff != "{1,2}"')
         
     def test_013_condition_client_interface_wan(self):
-        """Check CLIENT_INTERFACE is wan"""
-        condition = {"type": "CLIENT_INTERFACE","op":"IS","value": "wan"}
+        """Check CLIENT_INTERFACE_ZONE is wan"""
+        condition = {"type": "CLIENT_INTERFACE_ZONE","op":"IS","value": "wan"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'ct mark and 0x01000000 != 0')
 
     def test_013_condition_client_interface_non_wan(self):
-        """Check CLIENT_INTERFACE is non_wan"""
-        condition = {"type": "CLIENT_INTERFACE","op":"IS","value": "non_wan"}
+        """Check CLIENT_INTERFACE_ZONE is non_wan"""
+        condition = {"type": "CLIENT_INTERFACE_ZONE","op":"IS","value": "non_wan"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'ct mark and 0x01000000 == 0')
 
     def test_013_condition_client_interface_mix(self):
         """Check that mixing interface indexes and "wan" or "non_wan" is not allowed"""
-        condition = {"type": "CLIENT_INTERFACE","op":"IS","value": "1,wan"}
+        condition = {"type": "CLIENT_INTERFACE_ZONE","op":"IS","value": "1,wan"}
         try:
             str = nftables_util.conditions_expression([condition])
             assert(False)
         except:
             assert(True)
 
-# SERVER_INTERFACE tests
-# SERVER_INTERFACE tests
-# SERVER_INTERFACE tests
+# SERVER_INTERFACE_ZONE tests
+# SERVER_INTERFACE_ZONE tests
+# SERVER_INTERFACE_ZONE tests
 
     def test_014_condition_server_interface(self):
-        """Check SERVER_INTERFACE is 1"""
-        condition = {"type": "SERVER_INTERFACE","op":"IS","value": "1"}
+        """Check SERVER_INTERFACE_ZONE is 1"""
+        condition = {"type": "SERVER_INTERFACE_ZONE","op":"IS","value": "1"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'ct mark and 0x0000ff00 1')
 
     def test_014_condition_server_interface_invert(self):
-        """Check SERVER_INTERFACE is not 1"""
-        condition = {"type": "SERVER_INTERFACE","op":"IS_NOT","value": "1"}
+        """Check SERVER_INTERFACE_ZONE is not 1"""
+        condition = {"type": "SERVER_INTERFACE_ZONE","op":"IS_NOT","value": "1"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'ct mark and 0x0000ff00 != 1')
 
     def test_014_condition_server_interface_multiple(self):
-        """Check SERVER_INTERFACE is 1,2"""
-        condition = {"type": "SERVER_INTERFACE","op":"IS","value": "1,2"}
+        """Check SERVER_INTERFACE_ZONE is 1,2"""
+        condition = {"type": "SERVER_INTERFACE_ZONE","op":"IS","value": "1,2"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'ct mark and 0x0000ff00 "{1,2}"')
 
     def test_014_condition_server_interface_multiple_invert(self):
-        """Check SERVER_INTERFACE is not 1,2"""
-        condition = {"type": "SERVER_INTERFACE","op":"IS_NOT","value": "1,2"}
+        """Check SERVER_INTERFACE_ZONE is not 1,2"""
+        condition = {"type": "SERVER_INTERFACE_ZONE","op":"IS_NOT","value": "1,2"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'ct mark and 0x0000ff00 != "{1,2}"')
         
     def test_014_condition_server_interface_wan(self):
-        """Check SERVER_INTERFACE is wan"""
-        condition = {"type": "SERVER_INTERFACE","op":"IS","value": "wan"}
+        """Check SERVER_INTERFACE_ZONE is wan"""
+        condition = {"type": "SERVER_INTERFACE_ZONE","op":"IS","value": "wan"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'ct mark and 0x02000000 != 0')
 
     def test_014_condition_server_interface_non_wan(self):
-        """Check SERVER_INTERFACE is non_wan"""
-        condition = {"type": "SERVER_INTERFACE","op":"IS","value": "non_wan"}
+        """Check SERVER_INTERFACE_ZONE is non_wan"""
+        condition = {"type": "SERVER_INTERFACE_ZONE","op":"IS","value": "non_wan"}
         str = nftables_util.conditions_expression([condition])
         print(str)
         assert(str == 'ct mark and 0x02000000 == 0')
 
     def test_014_condition_server_interface_mix(self):
         """Check that mixing interface indexes and "wan" or "non_wan" is not allowed"""
-        condition = {"type": "SERVER_INTERFACE","op":"IS","value": "1,wan"}
+        condition = {"type": "SERVER_INTERFACE_ZONE","op":"IS","value": "1,wan"}
         try:
             str = nftables_util.conditions_expression([condition])
             assert(False)
         except:
             assert(True)
+
+# SOURCE_INTERFACE_NAME tests
+# SOURCE_INTERFACE_NAME tests
+# SOURCE_INTERFACE_NAME tests
+
+    def test_011_condition_source_interface(self):
+        """Check SOURCE_INTERFACE_NAME is 1"""
+        condition = {"type": "SOURCE_INTERFACE_NAME","op":"IS","value": "lo"}
+        str = nftables_util.conditions_expression([condition])
+        print(str)
+        assert(str == 'iifname lo')
+
+    def test_011_condition_source_interface_invert(self):
+        """Check SOURCE_INTERFACE_NAME is not 1"""
+        condition = {"type": "SOURCE_INTERFACE_NAME","op":"IS_NOT","value": "lo"}
+        str = nftables_util.conditions_expression([condition])
+        print(str)
+        assert(str == 'iifname != lo')
+
+# DESTINATION_INTERFACE_NAME tests
+# DESTINATION_INTERFACE_NAME tests
+# DESTINATION_INTERFACE_NAME tests
+
+    def test_012_condition_destination_interface(self):
+        """Check DESTINATION_INTERFACE_NAME is 1"""
+        condition = {"type": "DESTINATION_INTERFACE_NAME","op":"IS","value": "lo"}
+        str = nftables_util.conditions_expression([condition])
+        print(str)
+        assert(str == 'oifname lo')
+
+    def test_012_condition_destination_interface_invert(self):
+        """Check DESTINATION_INTERFACE_NAME is not 1"""
+        condition = {"type": "DESTINATION_INTERFACE_NAME","op":"IS_NOT","value": "lo"}
+        str = nftables_util.conditions_expression([condition])
+        print(str)
+        assert(str == 'oifname != lo')
 
 # SOURCE_ADDRESS tests
 # SOURCE_ADDRESS tests
