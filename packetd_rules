@@ -48,70 +48,47 @@ is_queue_open()
 
 remove_packetd_rules()
 {
-    ${NFT} flush chain ip ${TABLE_NAME} prerouting-packetd 2>/dev/null
-    ${NFT} flush chain ip ${TABLE_NAME} input-packetd 2>/dev/null
-    ${NFT} flush chain ip ${TABLE_NAME} output-packetd 2>/dev/null
-    ${NFT} delete chain ip ${TABLE_NAME} prerouting-packetd 2>/dev/null
-    ${NFT} delete chain ip ${TABLE_NAME} input-packetd 2>/dev/null
-    ${NFT} delete chain ip ${TABLE_NAME} output-packetd 2>/dev/null
-    ${NFT} delete table ip ${TABLE_NAME}
-
-    ${NFT} flush chain ip6 ${TABLE_NAME} prerouting-packetd 2>/dev/null
-    ${NFT} flush chain ip6 ${TABLE_NAME} input-packetd 2>/dev/null
-    ${NFT} flush chain ip6 ${TABLE_NAME} output-packetd 2>/dev/null
-    ${NFT} delete chain ip6 ${TABLE_NAME} prerouting-packetd 2>/dev/null
-    ${NFT} delete chain ip6 ${TABLE_NAME} input-packetd 2>/dev/null
-    ${NFT} delete chain ip6 ${TABLE_NAME} output-packetd 2>/dev/null
-    ${NFT} delete table ip6 ${TABLE_NAME}
+    ${NFT} flush chain inet ${TABLE_NAME} prerouting-packetd 2>/dev/null
+    ${NFT} flush chain inet ${TABLE_NAME} input-packetd 2>/dev/null
+    ${NFT} flush chain inet ${TABLE_NAME} output-packetd 2>/dev/null
+    ${NFT} delete chain inet ${TABLE_NAME} prerouting-packetd 2>/dev/null
+    ${NFT} delete chain inet ${TABLE_NAME} input-packetd 2>/dev/null
+    ${NFT} delete chain inet ${TABLE_NAME} output-packetd 2>/dev/null
+    ${NFT} delete table inet ${TABLE_NAME}
 }
 
 insert_packetd_rules()
 {
     # create the tables if needed
-    ${NFT} add table ip ${TABLE_NAME}
-    ${NFT} add chain ip ${TABLE_NAME} prerouting-packetd "{ type filter hook prerouting priority $QUEUE_PRIORITY ; }"
-    ${NFT} flush chain ip ${TABLE_NAME} prerouting-packetd
-
-    ${NFT} add table ip6 ${TABLE_NAME}
-    ${NFT} add chain ip6 ${TABLE_NAME} prerouting-packetd "{ type filter hook prerouting priority $QUEUE_PRIORITY ; }"
-    ${NFT} flush chain ip6 ${TABLE_NAME} prerouting-packetd
+    ${NFT} add table inet ${TABLE_NAME}
+    ${NFT} add chain inet ${TABLE_NAME} prerouting-packetd "{ type filter hook prerouting priority $QUEUE_PRIORITY ; }"
+    ${NFT} flush chain inet ${TABLE_NAME} prerouting-packetd
 
     # Create chains for setting the connmark on input/output
-    ${NFT} add chain ip ${TABLE_NAME} output-packetd "{ type filter hook output priority $MANGLE_PRIORITY ; }"
-    ${NFT} add chain ip ${TABLE_NAME} input-packetd "{ type filter hook input priority $MANGLE_PRIORITY ; }"
-    ${NFT} flush chain ip ${TABLE_NAME} output-packetd
-    ${NFT} flush chain ip ${TABLE_NAME} input-packetd
-
-    ${NFT} add chain ip6 ${TABLE_NAME} output-packetd "{ type filter hook output priority $MANGLE_PRIORITY ; }"
-    ${NFT} add chain ip6 ${TABLE_NAME} input-packetd "{ type filter hook input priority $MANGLE_PRIORITY ; }"
-    ${NFT} flush chain ip6 ${TABLE_NAME} output-packetd
-    ${NFT} flush chain ip6 ${TABLE_NAME} input-packetd
+    ${NFT} add chain inet ${TABLE_NAME} output-packetd "{ type filter hook output priority $MANGLE_PRIORITY ; }"
+    ${NFT} add chain inet ${TABLE_NAME} input-packetd "{ type filter hook input priority $MANGLE_PRIORITY ; }"
+    ${NFT} flush chain inet ${TABLE_NAME} output-packetd
+    ${NFT} flush chain inet ${TABLE_NAME} input-packetd
 
     # Set bypass bit on local traffic
-    ${NFT} add rule ip ${TABLE_NAME} output-packetd ct mark set "mark|0xf0000000"
-    ${NFT} add rule ip ${TABLE_NAME} input-packetd ct mark set "mark|0xf0000000"
-
-    ${NFT} add rule ip6 ${TABLE_NAME} output-packetd ct mark set "mark|0xf0000000"
-    ${NFT} add rule ip6 ${TABLE_NAME} input-packetd ct mark set "mark|0xf0000000"
+    ${NFT} add rule inet ${TABLE_NAME} output-packetd ct mark set "mark|0xf0000000"
+    ${NFT} add rule inet ${TABLE_NAME} input-packetd ct mark set "mark|0xf0000000"
 
     # Don't catch loopback traffic
-    ${NFT} add rule ip ${TABLE_NAME} prerouting-packetd ip saddr 127.0.0.1/8 return
-    ${NFT} add rule ip ${TABLE_NAME} prerouting-packetd ip daddr 127.0.0.1/8 return
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ip saddr 127.0.0.1/8 return
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ip daddr 127.0.0.1/8 return
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ip6 saddr ::1 return
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ip6 daddr ::1 return
 
     # Local?
-    # ${NFT} add rule ip ${TABLE_NAME} prerouting-packetd fib daddr . oif type local return
-    # ${NFT} add rule ip6 ${TABLE_NAME} prerouting-packetd fib daddr . oif type local return
+    # ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd fib daddr . oif type local return
 
     # Don't catch bypassed traffic
-    ${NFT} add rule ip ${TABLE_NAME} prerouting-packetd dict session ct id bypass_packetd bool true counter return
-    ${NFT} add rule ip ${TABLE_NAME} prerouting-packetd ct mark and 0xf0000000 == 0xf0000000 counter return
-
-    ${NFT} add rule ip6 ${TABLE_NAME} prerouting-packetd dict session ct id bypass_packetd bool true counter return
-    ${NFT} add rule ip6 ${TABLE_NAME} prerouting-packetd ct mark and 0xf0000000 == 0xf0000000 counter return
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd dict session ct id bypass_packetd bool true counter return
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct mark and 0xf0000000 == 0xf0000000 counter return
 
     # Queue the traffic
-    ${NFT} add rule ip ${TABLE_NAME} prerouting-packetd counter queue num ${PACKETD_QUEUE_NUM} bypass
-    ${NFT} add rule ip6 ${TABLE_NAME} prerouting-packetd counter queue num ${PACKETD_QUEUE_NUM} bypass
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd counter queue num ${PACKETD_QUEUE_NUM} bypass
 }
 
 usage() {
