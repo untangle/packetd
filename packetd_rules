@@ -79,6 +79,8 @@ insert_packetd_rules()
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ip daddr 127.0.0.1/8 return
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ip6 saddr ::1 return
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ip6 daddr ::1 return
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state invalid return
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state untracked return
 
     # Local?
     # ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd fib daddr . oif type local return
