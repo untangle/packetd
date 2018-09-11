@@ -56,15 +56,19 @@ func StopCallbacks() {
 	SetShutdownFlag()
 
 	// Send shutdown signal to periodicTask and wait for it to return
-	shutdownConntrackTask <- true
+	// wait on above shutdowns
+	c := make(chan bool)
+	go func() {
+		shutdownConntrackTask <- true
+		childsync.Wait()
+		c <- true
+	}()
+
 	select {
-	case <-shutdownConntrackTask:
+	case <-c:
 	case <-time.After(10 * time.Second):
 		logger.Err("Failed to properly shutdown conntrackPeriodicTask\n")
 	}
-
-	// wait on above shutdowns
-	childsync.Wait()
 }
 
 // Shutdown all C services
