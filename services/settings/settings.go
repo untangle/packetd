@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-const settings_file = "/etc/config/settings.json"
-const defaults_file = "/etc/config/defaults.json"
+const settingsFile = "/etc/config/settings.json"
+const defaultsFile = "/etc/config/defaults.json"
 
 // settings stores the current system settings
 var settings map[string]interface{}
@@ -17,7 +17,7 @@ var settings map[string]interface{}
 // Startup initializes all settings objects
 func Startup() {
 	var err error
-	settings, err = readSettingsFileJSON(settings_file)
+	settings, err = readSettingsFileJSON(settingsFile)
 	if err != nil {
 		logger.Warn("Error reading settings file: %s\n", err.Error())
 	}
@@ -40,7 +40,7 @@ func Shutdown() {
 
 // GetSettings returns the settings from the specified path
 func GetSettings(segments []string) interface{} {
-	return getSettings(segments, settings_file)
+	return getSettings(segments, settingsFile)
 }
 
 // SetSettingsParse updates the settings from a parsed JSON object
@@ -58,17 +58,17 @@ func SetSettingsParse(segments []string, byteSlice []byte) interface{} {
 
 // SetSettings updates the settings
 func SetSettings(segments []string, value interface{}) interface{} {
-	return setSettings(segments, value, settings_file)
+	return setSettings(segments, value, settingsFile)
 }
 
 // TrimSettings trims the settings
 func TrimSettings(segments []string) interface{} {
-	return trimSettings(segments, settings_file)
+	return trimSettings(segments, settingsFile)
 }
 
 // GetDefaultSettings returns the default settings from the specified path
 func GetDefaultSettings(segments []string) interface{} {
-	return getSettings(segments, defaults_file)
+	return getSettings(segments, defaultsFile)
 }
 
 // readSettingsFileJSON reads the settings file and return the corresponding JSON object
@@ -254,7 +254,7 @@ func setSettings(segments []string, value interface{}, filename string) interfac
 		return createJSONErrorObject(err)
 	}
 
-	newSettings, err = setSettingsInJson(jsonSettings, segments, value)
+	newSettings, err = setSettingsInJSON(jsonSettings, segments, value)
 	if err != nil {
 		return createJSONErrorObject(err)
 	}
@@ -271,8 +271,8 @@ func setSettings(segments []string, value interface{}, filename string) interfac
 	return createJSONObject("result", "OK")
 }
 
-// setSettingsInJson sets the value attribute specified of the segments path to the specified value
-func setSettingsInJson(jsonObject interface{}, segments []string, value interface{}) (interface{}, error) {
+// setSettingsInJSON sets the value attribute specified of the segments path to the specified value
+func setSettingsInJSON(jsonObject interface{}, segments []string, value interface{}) (interface{}, error) {
 	var err error
 
 	if len(segments) == 0 {
@@ -297,7 +297,7 @@ func setSettingsInJson(jsonObject interface{}, segments []string, value interfac
 			mapObject[element] = make(map[string]interface{})
 		}
 
-		mapObject[element], err = setSettingsInJson(mapObject[element], newSegments, value)
+		mapObject[element], err = setSettingsInJSON(mapObject[element], newSegments, value)
 		return jsonObject, err
 	}
 }
@@ -312,7 +312,7 @@ func getSettings(segments []string, filename string) interface{} {
 		return createJSONErrorObject(err)
 	}
 
-	jsonObject, err = getSettingsFromJson(jsonObject, segments)
+	jsonObject, err = getSettingsFromJSON(jsonObject, segments)
 	if err != nil {
 		return createJSONErrorObject(err)
 	}
@@ -320,8 +320,8 @@ func getSettings(segments []string, filename string) interface{} {
 	return jsonObject
 }
 
-// getSettingsFromJson gets the value attribute specified by the segments string from the specified json object
-func getSettingsFromJson(jsonObject interface{}, segments []string) (interface{}, error) {
+// getSettingsFromJSON gets the value attribute specified by the segments string from the specified json object
+func getSettingsFromJSON(jsonObject interface{}, segments []string) (interface{}, error) {
 	if len(segments) == 0 {
 		return jsonObject, nil
 	} else if len(segments) == 1 {
@@ -336,6 +336,6 @@ func getSettingsFromJson(jsonObject interface{}, segments []string) (interface{}
 		if newObject == nil {
 			return nil, errors.New("Attribute " + element + " missing from JSON Object")
 		}
-		return getSettingsFromJson(newObject, newSegments)
+		return getSettingsFromJSON(newObject, newSegments)
 	}
 }
