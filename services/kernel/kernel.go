@@ -13,6 +13,7 @@ import (
 	"github.com/untangle/packetd/services/logger"
 	"net"
 	"sync"
+	"syscall"
 	"time"
 	"unsafe"
 )
@@ -68,6 +69,9 @@ func StopCallbacks() {
 	case <-c:
 	case <-time.After(10 * time.Second):
 		logger.Err("Failed to properly shutdown conntrackPeriodicTask\n")
+		// print stack trace
+		syscall.Kill(syscall.Getpid(), syscall.SIGQUIT)
+		time.Sleep(1 * time.Second)
 	}
 }
 
