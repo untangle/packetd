@@ -61,6 +61,19 @@ func AttachNfqueueSubscriptions(session *SessionEntry) {
 	session.subLocker.Unlock()
 }
 
+// MirrorNfqueueSubscriptions creates a copy of the subscriptions for the argumented SessionEntry
+func MirrorNfqueueSubscriptions(session *SessionEntry) map[string]SubscriptionHolder {
+	mirror := make(map[string]SubscriptionHolder)
+	session.subLocker.Lock()
+
+	for k, v := range session.subscriptions {
+		mirror[k] = v
+	}
+
+	session.subLocker.Unlock()
+	return (mirror)
+}
+
 // ReleaseSession is called by a subscriber to stop receiving traffic for a session
 func ReleaseSession(session *SessionEntry, owner string) {
 	logger.Debug("Removing %s session nfqueue subscription for session %d\n", owner, session.SessionID)
@@ -130,7 +143,8 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 	resultsChannel := make(chan NfqueueResult)
 
 	// We loop and increment the priority until all subscriptions have been called
-	subtotal := len(session.subscriptions)
+	sublist := MirrorNfqueueSubscriptions(session)
+	subtotal := len(sublist)
 	subcount := 0
 	priority := 0
 	var timeMap = make(map[string]float64)
@@ -142,7 +156,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		hitcount := 0
 
 		// Call all of the subscribed handlers for the current priority
-		for key, val := range session.subscriptions {
+		for key, val := range sublist {
 			if val.Priority != priority {
 				continue
 			}
@@ -189,7 +203,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		// Increment the priority and keep looping until we've called all subscribers
 		priority++
 		if priority > 100 {
-			logger.Err("Priority > 100 Constraint failed! %d %d %d %v", subcount, subtotal, priority, session.subscriptions)
+			logger.Err("Priority > 100 Constraint failed! %d %d %d %v", subcount, subtotal, priority, sublist)
 			panic("Constraint failed - infinite loop detected")
 		}
 	}
