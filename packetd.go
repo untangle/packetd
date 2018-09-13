@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
+	"fmt"
 	"github.com/untangle/packetd/plugins/certcache"
 	"github.com/untangle/packetd/plugins/classify"
 	"github.com/untangle/packetd/plugins/dns"
@@ -162,14 +163,26 @@ func startServices() {
 
 // stopServices stops all the services
 func stopServices() {
-	restd.Shutdown()
-	dict.Shutdown()
-	reports.Shutdown()
-	settings.Shutdown()
-	syscmd.Shutdown()
-	dispatch.Shutdown()
-	kernel.Shutdown()
-	logger.Shutdown()
+	c := make(chan bool)
+	go func() {
+		restd.Shutdown()
+		dict.Shutdown()
+		reports.Shutdown()
+		settings.Shutdown()
+		syscmd.Shutdown()
+		dispatch.Shutdown()
+		kernel.Shutdown()
+		logger.Shutdown()
+		c <- true
+	}()
+
+	select {
+	case <-c:
+	case <-time.After(10 * time.Second):
+		// can't use logger as it may be stopped
+		fmt.Printf("ERROR: Failed to properly shutdown services\n")
+		time.Sleep(1 * time.Second)
+	}
 }
 
 // startPlugins starts all the plugins (in parallel)
