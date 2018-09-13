@@ -225,7 +225,7 @@ type LogWriter struct {
 
 // NewLogWriter creates an io Writer to steam output to the Log facility
 func NewLogWriter() *LogWriter {
-	return (&LogWriter{make([]byte, 256)})
+	return (&LogWriter{make([]byte, 0)})
 }
 
 // Write takes written data and stores it in a buffer and writes to the log when a line feed is detected
@@ -234,7 +234,7 @@ func (w *LogWriter) Write(p []byte) (int, error) {
 		w.buffer = append(w.buffer, b)
 		if b == '\n' {
 			Info(string(w.buffer))
-			w.buffer = make([]byte, 256)
+			w.buffer = make([]byte, 0)
 		}
 	}
 
