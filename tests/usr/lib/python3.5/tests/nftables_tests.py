@@ -273,6 +273,41 @@ conditions_tests = [
     [[{"type": "CLIENT_HOSTNAME","op":"!=","value": "hostname"}], "dict session ct id client_hostname long_string != 'hostname'"],
     [[{"type": "CLIENT_HOSTNAME","op":"==","value": "hostname,hostname2"}], "dict session ct id client_hostname long_string '{hostname,hostname2}'"],
     [[{"type": "CLIENT_HOSTNAME","op":"!=","value": "hostname,hostname2"}], "dict session ct id client_hostname long_string != '{hostname,hostname2}'"],
+
+    [[{"type": "SERVER_HOSTNAME","op":"==","value": "hostname"}], "dict session ct id server_hostname long_string 'hostname'"],
+    [[{"type": "SERVER_HOSTNAME","op":"!=","value": "hostname"}], "dict session ct id server_hostname long_string != 'hostname'"],
+    [[{"type": "SERVER_HOSTNAME","op":"==","value": "hostname,hostname2"}], "dict session ct id server_hostname long_string '{hostname,hostname2}'"],
+    [[{"type": "SERVER_HOSTNAME","op":"!=","value": "hostname,hostname2"}], "dict session ct id server_hostname long_string != '{hostname,hostname2}'"],
+
+    [[{"type": "LOCAL_HOSTNAME","op":"==","value": "hostname"}], "dict session ct id local_hostname long_string 'hostname'"],
+    [[{"type": "LOCAL_HOSTNAME","op":"!=","value": "hostname"}], "dict session ct id local_hostname long_string != 'hostname'"],
+    [[{"type": "LOCAL_HOSTNAME","op":"==","value": "hostname,hostname2"}], "dict session ct id local_hostname long_string '{hostname,hostname2}'"],
+    [[{"type": "LOCAL_HOSTNAME","op":"!=","value": "hostname,hostname2"}], "dict session ct id local_hostname long_string != '{hostname,hostname2}'"],
+
+    [[{"type": "REMOTE_HOSTNAME","op":"==","value": "hostname"}], "dict session ct id remote_hostname long_string 'hostname'"],
+    [[{"type": "REMOTE_HOSTNAME","op":"!=","value": "hostname"}], "dict session ct id remote_hostname long_string != 'hostname'"],
+    [[{"type": "REMOTE_HOSTNAME","op":"==","value": "hostname,hostname2"}], "dict session ct id remote_hostname long_string '{hostname,hostname2}'"],
+    [[{"type": "REMOTE_HOSTNAME","op":"!=","value": "hostname,hostname2"}], "dict session ct id remote_hostname long_string != '{hostname,hostname2}'"],
+
+    [[{"type": "CLIENT_USERNAME","op":"==","value": "username"}], "dict session ct id client_username long_string 'username'"],
+    [[{"type": "CLIENT_USERNAME","op":"!=","value": "username"}], "dict session ct id client_username long_string != 'username'"],
+    [[{"type": "CLIENT_USERNAME","op":"==","value": "username,username2"}], "dict session ct id client_username long_string '{username,username2}'"],
+    [[{"type": "CLIENT_USERNAME","op":"!=","value": "username,username2"}], "dict session ct id client_username long_string != '{username,username2}'"],
+
+    [[{"type": "SERVER_USERNAME","op":"==","value": "username"}], "dict session ct id server_username long_string 'username'"],
+    [[{"type": "SERVER_USERNAME","op":"!=","value": "username"}], "dict session ct id server_username long_string != 'username'"],
+    [[{"type": "SERVER_USERNAME","op":"==","value": "username,username2"}], "dict session ct id server_username long_string '{username,username2}'"],
+    [[{"type": "SERVER_USERNAME","op":"!=","value": "username,username2"}], "dict session ct id server_username long_string != '{username,username2}'"],
+
+    [[{"type": "LOCAL_USERNAME","op":"==","value": "username"}], "dict session ct id local_username long_string 'username'"],
+    [[{"type": "LOCAL_USERNAME","op":"!=","value": "username"}], "dict session ct id local_username long_string != 'username'"],
+    [[{"type": "LOCAL_USERNAME","op":"==","value": "username,username2"}], "dict session ct id local_username long_string '{username,username2}'"],
+    [[{"type": "LOCAL_USERNAME","op":"!=","value": "username,username2"}], "dict session ct id local_username long_string != '{username,username2}'"],
+
+    [[{"type": "REMOTE_USERNAME","op":"==","value": "username"}], "dict session ct id remote_username long_string 'username'"],
+    [[{"type": "REMOTE_USERNAME","op":"!=","value": "username"}], "dict session ct id remote_username long_string != 'username'"],
+    [[{"type": "REMOTE_USERNAME","op":"==","value": "username,username2"}], "dict session ct id remote_username long_string '{username,username2}'"],
+    [[{"type": "REMOTE_USERNAME","op":"!=","value": "username,username2"}], "dict session ct id remote_username long_string != '{username,username2}'"],
 ]
 
 for i, obj in enumerate(conditions_tests):
