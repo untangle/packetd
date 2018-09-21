@@ -110,6 +110,7 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
         return 0;
     }
 
+	if (get_warehouse_flag() != 0) warehouse_capture('Q',rawpkt,rawlen,mark,ctid,nfid);
     go_nfqueue_callback(mark,rawpkt,rawlen,ctid,nfid,buffer);
 
 	return(0);
@@ -303,8 +304,7 @@ int nfqueue_thread(void)
 
 void nfqueue_free_buffer(char *buffer)
 {
-	if (!buffer)
-		logmessage(LOG_ERR,logsrc,"nfqueue_free_buffer call with NULL\n");
-	else
+	if (buffer) {
 		free(buffer);
+	}
 }

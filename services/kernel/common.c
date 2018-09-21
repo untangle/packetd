@@ -9,18 +9,9 @@
 
 #include "common.h"
 
-static int		g_shutdown;
-static int		g_debug;
-
-void common_startup(void)
-{
-	g_shutdown = 0;
-	g_debug = 1;
-}
-
-void common_shutdown(void)
-{
-}
+static int		g_warehouse = 0;
+static int		g_shutdown = 0;
+static int		g_debug = 0;
 
 char* itolevel(int value,char *dest)
 {
@@ -91,3 +82,12 @@ void set_shutdown_flag(int value)
 	g_shutdown = value;
 }
 
+int get_warehouse_flag(void)
+{
+	return(g_warehouse);
+}
+
+void set_warehouse_flag(int value)
+{
+	g_warehouse = value;
+}

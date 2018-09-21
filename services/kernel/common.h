@@ -16,6 +16,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <time.h>
 #include <arpa/inet.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
@@ -93,6 +94,8 @@ void logmessage(int priority,const char *source,const char *format,...);
 void hexmessage(int priority,const char *source,const void *buffer,int size);
 int get_shutdown_flag(void);
 void set_shutdown_flag(int value);
+int get_warehouse_flag(void);
+void set_warehouse_flag(int value);
 
 int conntrack_startup(void);
 void conntrack_shutdown(void);
@@ -115,3 +118,8 @@ int netlogger_startup(void);
 void netlogger_shutdown(void);
 int netlogger_thread(void);
 void netlogger_shutdown(void);
+
+int warehouse_startup(void);
+void warehouse_shutdown(void);
+void warehouse_capture(const char origin,void *buffer,uint32_t length,uint32_t mark,uint32_t ctid,uint32_t nfid);
+void warehouse_playback(char *filename);

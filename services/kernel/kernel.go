@@ -35,9 +35,12 @@ var nfqueueCallback NfqueueCallback
 var netloggerCallback NetloggerCallback
 var debugFlag bool
 
-// Startup starts C services
+// Startup starts kernel services
 func Startup() {
-	C.common_startup()
+}
+
+// Shutdown stops kernel services
+func Shutdown() {
 }
 
 // StartCallbacks donates threads for all the C services and starts other persistent tasks
@@ -75,11 +78,6 @@ func StopCallbacks() {
 	}
 }
 
-// Shutdown all C services
-func Shutdown() {
-	C.common_shutdown()
-}
-
 // GetShutdownFlag returns the C shutdown flag
 func GetShutdownFlag() int {
 	return int(C.get_shutdown_flag())
@@ -98,6 +96,11 @@ func GetDebugFlag() bool {
 // SetDebugFlag sets the shared debug flag
 func SetDebugFlag() {
 	debugFlag = true
+}
+
+// SetCaptureFlag sets the warehouse capture flag
+func SetCaptureFlag() {
+	C.set_warehouse_flag(1)
 }
 
 // RegisterConntrackCallback registers the global conntrack callback for handling conntrack events
@@ -120,6 +123,7 @@ func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint
 	if nfqueueCallback == nil {
 		logger.Warn("No queue callback registered. Ignoring packet.\n")
 		C.nfqueue_set_verdict(nfid, C.NF_ACCEPT, mark)
+		C.nfqueue_free_buffer(buffer)
 		return
 	}
 
@@ -294,4 +298,11 @@ func timeUntilNextMin() time.Duration {
 // by anding it with mask and oring it with value
 func UpdateConntrackMark(ctid uint32, mask uint32, value uint32) {
 	C.conntrack_update_mark(C.uint32_t(ctid), C.uint32_t(mask), C.uint32_t(value))
+}
+
+// PlaybackWarehouseFile plays back a warehouse capture file
+func PlaybackWarehouseFile(filename string) {
+	go func() {
+		C.warehouse_playback(C.CString(filename))
+	}()
 }

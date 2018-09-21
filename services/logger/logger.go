@@ -345,6 +345,7 @@ func initLoggerConfig() {
 	config["reports"] = "INFO"
 	config["restd"] = "INFO"
 	config["settings"] = "INFO"
+	config["warehouse"] = "INFO"
 
 	// convert the config map to a json object
 	jstr, err := json.MarshalIndent(config, "", "")

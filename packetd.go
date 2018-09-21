@@ -30,8 +30,7 @@ import (
 
 const rulesScript = "packetd_rules"
 
-//const rulesScript = "packetd_rules_iptables" // FIXME - do not commit with this enabled
-
+var playbackFlag bool
 var localFlag bool
 
 func main() {
@@ -69,6 +68,10 @@ func main() {
 			logger.Notice("Console input detected - Application shutting down\n")
 			kernel.SetShutdownFlag()
 		}()
+	}
+
+	if playbackFlag {
+		kernel.PlaybackWarehouseFile("/tmp/playback.cap")
 	}
 
 	// Loop until the shutdown flag is set
@@ -124,6 +127,8 @@ func parseArguments() {
 	versionPtr := flag.Bool("version", false, "version")
 	localPtr := flag.Bool("local", false, "run on console")
 	debugPtr := flag.Bool("debug", false, "enable debug")
+	playbackPtr := flag.Bool("playback", false, "enable traffic playback")
+	capturePtr := flag.Bool("capture", false, "enable traffic capture")
 
 	flag.Parse()
 
@@ -144,6 +149,15 @@ func parseArguments() {
 
 	if *debugPtr {
 		kernel.SetDebugFlag()
+	}
+
+	if *playbackPtr {
+		playbackFlag = true
+	}
+
+	if *capturePtr {
+		logger.Info("Enabling capture flag")
+		kernel.SetCaptureFlag()
 	}
 }
 
