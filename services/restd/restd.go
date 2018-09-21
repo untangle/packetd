@@ -3,6 +3,8 @@ package restd
 import (
 	"fmt"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
@@ -22,24 +24,37 @@ func Startup() {
 	engine = gin.Default()
 
 	config := cors.DefaultConfig()
+
 	// FIXME Allow cross-site for dev - this should be disabled in production
 	config.AllowAllOrigins = true
 	engine.Use(cors.New(config))
 
-	// routes
+	// FIXME secret
+	store := cookie.NewStore([]byte("secret"))
+	engine.Use(sessions.Sessions("auth_session", store))
+
 	engine.GET("/ping", pingHandler)
-	engine.POST("/reports/create_query", reportsCreateQuery)
-	engine.GET("/reports/get_data/:query_id", reportsGetData)
 
-	engine.GET("/api/settings", getSettings)
-	engine.GET("/api/settings/*path", getSettings)
-	engine.POST("/api/settings", setSettings)
-	engine.POST("/api/settings/*path", setSettings)
-	engine.DELETE("/api/settings", trimSettings)
-	engine.DELETE("/api/settings/*path", trimSettings)
+	engine.POST("/login", login)
+	engine.GET("/login", login)
+	engine.POST("/logout", logout)
+	engine.GET("/logout", logout)
 
-	engine.GET("/api/defaults", getDefaultSettings)
-	engine.GET("/api/defaults/*path", getDefaultSettings)
+	reports := engine.Group("/reports")
+	reports.Use(authRequired(engine))
+	reports.POST("/create_query", reportsCreateQuery)
+	reports.GET("/get_data/:query_id", reportsGetData)
+
+	api := engine.Group("/api")
+	api.Use(authRequired(engine))
+	api.GET("/settings", getSettings)
+	api.GET("/settings/*path", getSettings)
+	api.POST("/settings", setSettings)
+	api.POST("/settings/*path", setSettings)
+	api.DELETE("/settings", trimSettings)
+	api.DELETE("/settings/*path", trimSettings)
+	api.GET("/defaults", getDefaultSettings)
+	api.GET("/defaults/*path", getDefaultSettings)
 
 	// files
 	engine.Static("/admin", "/www/admin")
