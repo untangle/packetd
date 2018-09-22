@@ -141,8 +141,9 @@ conditions_tests = [
     [[{"type": "SOURCE_ADDRESS","op":"!=","value": "1.2.3.4/24"}], "ip saddr != '1.2.3.4/24'"],
     [[{"type": "SOURCE_ADDRESS","op":"==","value": "1.2.3.4,1.2.3.5/24"}], "ip saddr '{1.2.3.4,1.2.3.5/24}'"],
     [[{"type": "SOURCE_ADDRESS","op":"!=","value": "1.2.3.4,1.2.3.5/24"}], "ip saddr != '{1.2.3.4,1.2.3.5/24}'"],
-    [[{"type": "SOURCE_ADDRESS","op":"==","value": "fe80::1"}], "ip6 saddr 'fe80::1'"],
-    [[{"type": "SOURCE_ADDRESS","op":"!=","value": "fe80::1"}], "ip6 saddr != 'fe80::1'"],
+
+    [[{"type": "SOURCE_ADDRESS_V6","op":"==","value": "fe80::1"}], "ip6 saddr 'fe80::1'"],
+    [[{"type": "SOURCE_ADDRESS_V6","op":"!=","value": "fe80::1"}], "ip6 saddr != 'fe80::1'"],
 
     [[{"type": "DESTINATION_ADDRESS","op":"==","value": "1.2.3.4"}], "ip daddr '1.2.3.4'"],
     [[{"type": "DESTINATION_ADDRESS","op":"!=","value": "1.2.3.4"}], "ip daddr != '1.2.3.4'"],
@@ -150,8 +151,9 @@ conditions_tests = [
     [[{"type": "DESTINATION_ADDRESS","op":"!=","value": "1.2.3.4/24"}], "ip daddr != '1.2.3.4/24'"],
     [[{"type": "DESTINATION_ADDRESS","op":"==","value": "1.2.3.4,1.2.3.5/24"}], "ip daddr '{1.2.3.4,1.2.3.5/24}'"],
     [[{"type": "DESTINATION_ADDRESS","op":"!=","value": "1.2.3.4,1.2.3.5/24"}], "ip daddr != '{1.2.3.4,1.2.3.5/24}'"],
-    [[{"type": "DESTINATION_ADDRESS","op":"==","value": "fe80::1"}], "ip6 daddr 'fe80::1'"],
-    [[{"type": "DESTINATION_ADDRESS","op":"!=","value": "fe80::1"}], "ip6 daddr != 'fe80::1'"],
+
+    [[{"type": "DESTINATION_ADDRESS_V6","op":"==","value": "fe80::1"}], "ip6 daddr 'fe80::1'"],
+    [[{"type": "DESTINATION_ADDRESS_V6","op":"!=","value": "fe80::1"}], "ip6 daddr != 'fe80::1'"],
 
     [[{"type": "SOURCE_PORT","op":"==","value": "1234"}], None],
     [[{"type": "SOURCE_PORT","op":"==","value": "1234"}], None],
@@ -239,8 +241,9 @@ conditions_tests = [
     [[{"type": "CLIENT_ADDRESS","op":"!=","value": "1.2.3.4/24"}], "dict session ct id client_address ipv4_addr != '1.2.3.4/24'"],
     [[{"type": "CLIENT_ADDRESS","op":"==","value": "1.2.3.4,1.2.3.5/24"}], "dict session ct id client_address ipv4_addr '{1.2.3.4,1.2.3.5/24}'"],
     [[{"type": "CLIENT_ADDRESS","op":"!=","value": "1.2.3.4,1.2.3.5/24"}], "dict session ct id client_address ipv4_addr != '{1.2.3.4,1.2.3.5/24}'"],
-    [[{"type": "CLIENT_ADDRESS","op":"==","value": "fe80::1"}], "dict session ct id client_address ipv6_addr 'fe80::1'"],
-    [[{"type": "CLIENT_ADDRESS","op":"!=","value": "fe80::1"}], "dict session ct id client_address ipv6_addr != 'fe80::1'"],
+
+    [[{"type": "CLIENT_ADDRESS_V6","op":"==","value": "fe80::1"}], "dict session ct id client_address ipv6_addr 'fe80::1'"],
+    [[{"type": "CLIENT_ADDRESS_V6","op":"!=","value": "fe80::1"}], "dict session ct id client_address ipv6_addr != 'fe80::1'"],
 
     [[{"type": "SERVER_ADDRESS","op":"==","value": "1.2.3.4"}], "dict session ct id server_address ipv4_addr '1.2.3.4'"],
     [[{"type": "SERVER_ADDRESS","op":"!=","value": "1.2.3.4"}], "dict session ct id server_address ipv4_addr != '1.2.3.4'"],
@@ -248,8 +251,9 @@ conditions_tests = [
     [[{"type": "SERVER_ADDRESS","op":"!=","value": "1.2.3.4/24"}], "dict session ct id server_address ipv4_addr != '1.2.3.4/24'"],
     [[{"type": "SERVER_ADDRESS","op":"==","value": "1.2.3.4,1.2.3.5/24"}], "dict session ct id server_address ipv4_addr '{1.2.3.4,1.2.3.5/24}'"],
     [[{"type": "SERVER_ADDRESS","op":"!=","value": "1.2.3.4,1.2.3.5/24"}], "dict session ct id server_address ipv4_addr != '{1.2.3.4,1.2.3.5/24}'"],
-    [[{"type": "SERVER_ADDRESS","op":"==","value": "fe80::1"}], "dict session ct id server_address ipv6_addr 'fe80::1'"],
-    [[{"type": "SERVER_ADDRESS","op":"!=","value": "fe80::1"}], "dict session ct id server_address ipv6_addr != 'fe80::1'"],
+
+    [[{"type": "SERVER_ADDRESS_V6","op":"==","value": "fe80::1"}], "dict session ct id server_address ipv6_addr 'fe80::1'"],
+    [[{"type": "SERVER_ADDRESS_V6","op":"!=","value": "fe80::1"}], "dict session ct id server_address ipv6_addr != 'fe80::1'"],
 
     [[{"type": "LOCAL_ADDRESS","op":"==","value": "1.2.3.4"}], "dict session ct id local_address ipv4_addr '1.2.3.4'"],
     [[{"type": "LOCAL_ADDRESS","op":"!=","value": "1.2.3.4"}], "dict session ct id local_address ipv4_addr != '1.2.3.4'"],
@@ -257,8 +261,9 @@ conditions_tests = [
     [[{"type": "LOCAL_ADDRESS","op":"!=","value": "1.2.3.4/24"}], "dict session ct id local_address ipv4_addr != '1.2.3.4/24'"],
     [[{"type": "LOCAL_ADDRESS","op":"==","value": "1.2.3.4,1.2.3.5/24"}], "dict session ct id local_address ipv4_addr '{1.2.3.4,1.2.3.5/24}'"],
     [[{"type": "LOCAL_ADDRESS","op":"!=","value": "1.2.3.4,1.2.3.5/24"}], "dict session ct id local_address ipv4_addr != '{1.2.3.4,1.2.3.5/24}'"],
-    [[{"type": "LOCAL_ADDRESS","op":"==","value": "fe80::1"}], "dict session ct id local_address ipv6_addr 'fe80::1'"],
-    [[{"type": "LOCAL_ADDRESS","op":"!=","value": "fe80::1"}], "dict session ct id local_address ipv6_addr != 'fe80::1'"],
+
+    [[{"type": "LOCAL_ADDRESS_V6","op":"==","value": "fe80::1"}], "dict session ct id local_address ipv6_addr 'fe80::1'"],
+    [[{"type": "LOCAL_ADDRESS_V6","op":"!=","value": "fe80::1"}], "dict session ct id local_address ipv6_addr != 'fe80::1'"],
 
     [[{"type": "REMOTE_ADDRESS","op":"==","value": "1.2.3.4"}], "dict session ct id remote_address ipv4_addr '1.2.3.4'"],
     [[{"type": "REMOTE_ADDRESS","op":"!=","value": "1.2.3.4"}], "dict session ct id remote_address ipv4_addr != '1.2.3.4'"],
@@ -266,8 +271,9 @@ conditions_tests = [
     [[{"type": "REMOTE_ADDRESS","op":"!=","value": "1.2.3.4/24"}], "dict session ct id remote_address ipv4_addr != '1.2.3.4/24'"],
     [[{"type": "REMOTE_ADDRESS","op":"==","value": "1.2.3.4,1.2.3.5/24"}], "dict session ct id remote_address ipv4_addr '{1.2.3.4,1.2.3.5/24}'"],
     [[{"type": "REMOTE_ADDRESS","op":"!=","value": "1.2.3.4,1.2.3.5/24"}], "dict session ct id remote_address ipv4_addr != '{1.2.3.4,1.2.3.5/24}'"],
-    [[{"type": "REMOTE_ADDRESS","op":"==","value": "fe80::1"}], "dict session ct id remote_address ipv6_addr 'fe80::1'"],
-    [[{"type": "REMOTE_ADDRESS","op":"!=","value": "fe80::1"}], "dict session ct id remote_address ipv6_addr != 'fe80::1'"],
+
+    [[{"type": "REMOTE_ADDRESS_V6","op":"==","value": "fe80::1"}], "dict session ct id remote_address ipv6_addr 'fe80::1'"],
+    [[{"type": "REMOTE_ADDRESS_V6","op":"!=","value": "fe80::1"}], "dict session ct id remote_address ipv6_addr != 'fe80::1'"],
 
     [[{"type": "CLIENT_HOSTNAME","op":"==","value": "hostname"}], "dict session ct id client_hostname long_string 'hostname'"],
     [[{"type": "CLIENT_HOSTNAME","op":"!=","value": "hostname"}], "dict session ct id client_hostname long_string != 'hostname'"],
