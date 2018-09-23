@@ -27,28 +27,28 @@ class NftablesTests(unittest.TestCase):
     def test_100_action_reject(self):
         """Check action REJECT"""
         action = {"type": "REJECT"}
-        str = nftables_util.action_expression(action)
+        str = nftables_util.action_expression(action, "inet")
         print(str)
         assert(str == 'reject')
 
     def test_101_action_accept(self):
         """Check action ACCEPT"""
         action = {"type": "ACCEPT"}
-        str = nftables_util.action_expression(action)
+        str = nftables_util.action_expression(action, "inet")
         print(str)
         assert(str == 'accept')
 
     def test_102_action_jump(self):
         """Check action JUMP"""
         action = {"type": "JUMP", "chain":"target"}
-        str = nftables_util.action_expression(action)
+        str = nftables_util.action_expression(action, "inet")
         print(str)
         assert(str == 'jump target')
 
     def test_103_action_goto(self):
         """Check action GOTO"""
         action = {"type": "GOTO", "chain":"target"}
-        str = nftables_util.action_expression(action)
+        str = nftables_util.action_expression(action, "inet")
         print(str)
         assert(str == 'goto target')
 
@@ -90,7 +90,7 @@ class NftablesTests(unittest.TestCase):
                 "type": "ACCEPT"
             }
         }
-        exp_str = nftables_util.rule_expression(rule)
+        exp_str = nftables_util.rule_expression(rule, "inet")
         print(exp_str)
         rule_str = nftables_util.rule_cmd(rule, "inet", "forward", "forward-filter")
         print(rule_str)
@@ -107,7 +107,7 @@ class NftablesTests(unittest.TestCase):
 def create_conditions_test(conditions_json, expected_str):
     def do_test(self):
         try:
-            str = nftables_util.conditions_expression(conditions_json)
+            str = nftables_util.conditions_expression(conditions_json,"inet")
         except:
             if expected_str == None:
                 assert(True)
