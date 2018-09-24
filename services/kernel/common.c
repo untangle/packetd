@@ -9,7 +9,8 @@
 
 #include "common.h"
 
-static int		g_warehouse = 0;
+static char		*g_warehouse_file = NULL;
+static int		g_warehouse_flag = 0;
 static int		g_shutdown = 0;
 static int		g_debug = 0;
 
@@ -84,10 +85,20 @@ void set_shutdown_flag(int value)
 
 int get_warehouse_flag(void)
 {
-	return(g_warehouse);
+	return(g_warehouse_flag);
 }
 
 void set_warehouse_flag(int value)
 {
-	g_warehouse = value;
+	g_warehouse_flag = value;
+}
+
+void set_warehouse_file(char *filename)
+{
+	g_warehouse_file = filename;
+}
+
+char *get_warehouse_file(void)
+{
+	return(g_warehouse_file);
 }

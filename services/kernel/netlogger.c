@@ -91,7 +91,7 @@ int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct n
 		break;
 	}
 
-	if (get_warehouse_flag() != 0) warehouse_capture('L',&info,sizeof(info),0,0,0);
+	if (get_warehouse_flag() == 'C') warehouse_capture('L',&info,sizeof(info),0,0,0);
 	go_netlogger_callback(&info);
 
 	return(0);

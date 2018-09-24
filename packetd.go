@@ -30,7 +30,6 @@ import (
 
 const rulesScript = "packetd_rules"
 
-var playbackFlag bool
 var localFlag bool
 
 func main() {
@@ -70,8 +69,12 @@ func main() {
 		}()
 	}
 
-	if playbackFlag {
-		kernel.PlaybackWarehouseFile("/tmp/playback.cap")
+	if kernel.GetWarehouseFlag() == 'P' {
+		kernel.PlaybackWarehouseFile()
+	}
+
+	if kernel.GetWarehouseFlag() == 'C' {
+		kernel.StartWarehouseCapture()
 	}
 
 	// Loop until the shutdown flag is set
@@ -97,6 +100,10 @@ func main() {
 		logger.Debug("Memory TotalAlloc: %d\n", mem.TotalAlloc)
 		logger.Debug("Memory HeapAlloc: %d\n", mem.HeapAlloc)
 		logger.Debug("Memory HeapSys: %d\n", mem.HeapSys)
+	}
+
+	if kernel.GetWarehouseFlag() == 'C' {
+		kernel.CloseWarehouseCapture()
 	}
 
 	// Remove netfilter rules
@@ -127,8 +134,8 @@ func parseArguments() {
 	versionPtr := flag.Bool("version", false, "version")
 	localPtr := flag.Bool("local", false, "run on console")
 	debugPtr := flag.Bool("debug", false, "enable debug")
-	playbackPtr := flag.Bool("playback", false, "enable traffic playback")
-	capturePtr := flag.Bool("capture", false, "enable traffic capture")
+	playbackFilePtr := flag.String("playback", "", "playback traffic from specified file")
+	captureFilePtr := flag.String("capture", "", "capture traffic to specified file")
 
 	flag.Parse()
 
@@ -151,13 +158,14 @@ func parseArguments() {
 		kernel.SetDebugFlag()
 	}
 
-	if *playbackPtr {
-		playbackFlag = true
+	if len(*playbackFilePtr) != 0 {
+		kernel.SetWarehouseFile(*playbackFilePtr)
+		kernel.SetWarehouseFlag('P')
 	}
 
-	if *capturePtr {
-		logger.Info("Enabling capture flag")
-		kernel.SetCaptureFlag()
+	if len(*captureFilePtr) != 0 {
+		kernel.SetWarehouseFile(*captureFilePtr)
+		kernel.SetWarehouseFlag('C')
 	}
 }
 

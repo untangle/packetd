@@ -98,9 +98,29 @@ func SetDebugFlag() {
 	debugFlag = true
 }
 
-// SetCaptureFlag sets the warehouse capture flag
-func SetCaptureFlag() {
-	C.set_warehouse_flag(1)
+// GetWarehouseFlag gets the value of the warehouse traffic capture and playback flag
+func GetWarehouseFlag() int {
+	return int(C.get_warehouse_flag())
+}
+
+// SetWarehouseFlag sets the value of the warehouse traffic capture and playback flag
+func SetWarehouseFlag(value int) {
+	C.set_warehouse_flag(C.int(value))
+}
+
+// SetWarehouseFile sets the filename used by the warehouse for traffic capture and playback
+func SetWarehouseFile(filename string) {
+	C.set_warehouse_file(C.CString(filename))
+}
+
+// StartWarehouseCapture initializes the warehouse traffic capture function
+func StartWarehouseCapture() {
+	C.start_warehouse_capture()
+}
+
+// CloseWarehouseCapture closes the warehouse traffic capture function
+func CloseWarehouseCapture() {
+	C.close_warehouse_capture()
 }
 
 // RegisterConntrackCallback registers the global conntrack callback for handling conntrack events
@@ -301,8 +321,8 @@ func UpdateConntrackMark(ctid uint32, mask uint32, value uint32) {
 }
 
 // PlaybackWarehouseFile plays back a warehouse capture file
-func PlaybackWarehouseFile(filename string) {
+func PlaybackWarehouseFile() {
 	go func() {
-		C.warehouse_playback(C.CString(filename))
+		C.warehouse_playback()
 	}()
 }

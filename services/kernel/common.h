@@ -96,6 +96,10 @@ int get_shutdown_flag(void);
 void set_shutdown_flag(int value);
 int get_warehouse_flag(void);
 void set_warehouse_flag(int value);
+void set_warehouse_file(char *filename);
+char *get_warehouse_file(void);
+void start_warehouse_capture(void);
+void close_warehouse_capture(void);
 
 int conntrack_startup(void);
 void conntrack_shutdown(void);
@@ -122,4 +126,4 @@ void netlogger_shutdown(void);
 int warehouse_startup(void);
 void warehouse_shutdown(void);
 void warehouse_capture(const char origin,void *buffer,uint32_t length,uint32_t mark,uint32_t ctid,uint32_t nfid);
-void warehouse_playback(char *filename);
+void warehouse_playback(void);

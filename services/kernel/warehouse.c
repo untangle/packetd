@@ -9,13 +9,12 @@
 * All Rights Reserved
 */
 
-// TODO - open the capture file on startup and close on shutdown
 // TODO - add support for setting playback speed multiplier
-// TODO - get the capture and playback file names from command line arguments
 
 #include "common.h"
 
 static char		*logsrc = "warehouse";
+static FILE		*capfile = NULL;
 
 struct data_header {
 	char			origin;
@@ -26,22 +25,27 @@ struct data_header {
 	u_int32_t		nfid;
 };
 
-int warehouse_startup(void)
+void start_warehouse_capture(void)
 {
-	return(0);
+	logmessage(LOG_INFO,logsrc,"Beginning capture %s\n",get_warehouse_file());
+	if (capfile != NULL) fclose(capfile);
+	capfile = fopen(get_warehouse_file(),"ab");
 }
 
-void warehose_shutdown(void)
+void close_warehouse_capture(void)
 {
+	logmessage(LOG_INFO,logsrc,"Finished capture %s\n",get_warehouse_file());
+	if (capfile != NULL) fclose(capfile);
+	capfile = NULL;
 }
 
 void warehouse_capture(const char origin,void *buffer,uint32_t length,uint32_t mark,uint32_t ctid,uint32_t nfid)
 {
 	struct data_header		dh;
 	struct timespec			ts;
-	FILE					*data;
 
 	if (get_shutdown_flag() != 0) return;
+	if (capfile == NULL) return;
 
 	clock_gettime(CLOCK_MONOTONIC,&ts);
 	dh.stamp = (((uint64_t)1000000000 * (uint64_t)ts.tv_sec) + (uint64_t)ts.tv_nsec);
@@ -50,17 +54,16 @@ void warehouse_capture(const char origin,void *buffer,uint32_t length,uint32_t m
 	dh.mark = mark;
 	dh.ctid = ctid;
 	dh.nfid = nfid;
-	data = fopen("/tmp/warehouse.cap","ab");
-	fwrite(&dh,sizeof(dh),1,data);
-	fwrite(buffer,length,1,data);
-	fclose(data);
+	fwrite(&dh,sizeof(dh),1,capfile);
+	fwrite(buffer,length,1,capfile);
 }
 
-void warehouse_playback(char *filename)
+void warehouse_playback(void)
 {
 	struct conntrack_info	*cinfo;
 	struct netlogger_info   *linfo;
 	struct data_header		dh;
+	char					*filename;
 	char					*buffer;
 	int						buflen;
 	FILE					*data;
@@ -68,6 +71,7 @@ void warehouse_playback(char *filename)
 	uint64_t				pause;
 	uint64_t				last;
 
+	filename = get_warehouse_file();
 	cinfo = (struct conntrack_info *)&buffer;
 	linfo = (struct netlogger_info *)&buffer;
 
@@ -125,7 +129,4 @@ void warehouse_playback(char *filename)
 	fclose(data);
 	free(buffer);
 	logmessage(LOG_INFO,logsrc,"Finished playback %s\n",filename);
-
-	// we have to free the filename since it was allocated with CString
-	free(filename);
 }
