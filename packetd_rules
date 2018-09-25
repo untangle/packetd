@@ -88,6 +88,9 @@ insert_packetd_rules()
     # Local?
     # ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd fib daddr . oif type local return
 
+    # In case we are quickly reusing a conntrack id, flush the session dictionary on new connections
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state new dict session ct id flush
+
     # Don't catch bypassed traffic
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd dict session ct id bypass_packetd bool true counter return
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct mark and 0xf0000000 == 0xf0000000 counter return
