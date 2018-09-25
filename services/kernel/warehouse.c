@@ -9,6 +9,8 @@
 * All Rights Reserved
 */
 
+// TODO - add switch to turn off live traffic processing during capture playback
+
 #include "common.h"
 
 static char		*logsrc = "warehouse";
@@ -58,12 +60,9 @@ void warehouse_capture(const char origin,void *buffer,uint32_t length,uint32_t m
 
 void warehouse_playback(void)
 {
-	struct conntrack_info	*cinfo;
-	struct netlogger_info   *linfo;
 	struct data_header		dh;
 	char					*filename;
 	char					*buffer;
-	int						buflen;
 	FILE					*data;
 	size_t					found;
 	uint64_t				pause;
@@ -71,9 +70,6 @@ void warehouse_playback(void)
 	uint64_t				last;
 
 	filename = get_warehouse_file();
-	cinfo = (struct conntrack_info *)&buffer;
-	linfo = (struct netlogger_info *)&buffer;
-
 	data = fopen(filename,"rb");
 	if (data == NULL) {
 		logmessage(LOG_WARNING,logsrc,"Unable to playback %s\n",filename);
@@ -81,9 +77,6 @@ void warehouse_playback(void)
 	}
 
 	speed = get_warehouse_speed();
-
-	buflen = 4096;
-	buffer = malloc(buflen);
 	last = 0;
 
 	logmessage(LOG_INFO,logsrc,"Beginning playback %s\n",filename);
@@ -95,11 +88,7 @@ void warehouse_playback(void)
 		found = fread(&dh,1,sizeof(dh),data);
 		if (found != sizeof(dh)) break;
 
-		if (dh.length > buflen) {
-			buffer = realloc(buffer,dh.length);
-			buflen = dh.length;
-			}
-
+		buffer = malloc(dh.length);
 		found = fread(buffer,1,dh.length,data);
 		if (found != dh.length) break;
 
@@ -117,15 +106,17 @@ void warehouse_playback(void)
 		switch(dh.origin)
 		{
 			case 'Q':
-				go_nfqueue_callback(dh.mark,buffer,dh.length,dh.ctid,dh.nfid,NULL);
+				go_nfqueue_callback(dh.mark,buffer,dh.length,dh.ctid,dh.nfid,buffer);
 				break;
 
 			case 'C':
-				go_conntrack_callback(cinfo);
+				go_conntrack_callback((struct conntrack_info *)buffer);
+				free(buffer);
 				break;
 
 			case 'L':
-				go_netlogger_callback(linfo);
+				go_netlogger_callback((struct netlogger_info *)buffer);
+				free(buffer);
 				break;
 
 			default:
@@ -134,6 +125,5 @@ void warehouse_playback(void)
 	}
 
 	fclose(data);
-	free(buffer);
 	logmessage(LOG_INFO,logsrc,"Finished playback %s\n",filename);
 }

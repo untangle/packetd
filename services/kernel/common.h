@@ -30,6 +30,8 @@
 #include <libnetfilter_log/libnetfilter_log.h>
 #include <libnfnetlink/libnfnetlink.h>
 
+#define LOG_TRACE	LOG_DEBUG+1
+
 /*
  * We have a single set of variables for the orig and repl source and
  * destination addresses that are large enough to hold either an IPv4

@@ -73,7 +73,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 		logger.Debug("DNS QUERY DETECTED NAME:%s TYPE:%d CLASS:%d\n", query.Name, query.Type, query.Class)
 
-		// save the qname in the session attachments and turn of release flag so we get the response
+		// save the qname in the session attachments and turn off release flag so we get the response
 		dispatch.PutSessionAttachment(mess.Session, "dns_query", string(query.Name))
 		result.SessionRelease = false
 	} else {

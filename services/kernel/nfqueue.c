@@ -304,7 +304,8 @@ int nfqueue_thread(void)
 
 void nfqueue_free_buffer(char *buffer)
 {
-	if (buffer) {
+	if (!buffer)
+		logmessage(LOG_ERR,logsrc,"nfqueue_free_buffer call with NULL\n");
+	else
 		free(buffer);
-	}
 }
