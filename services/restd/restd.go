@@ -1,6 +1,8 @@
 package restd
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
@@ -29,8 +31,8 @@ func Startup() {
 	config.AllowAllOrigins = true
 	engine.Use(cors.New(config))
 
-	// FIXME uses server-side not cookie
-	store := cookie.NewStore([]byte("secret"))
+	// XXX should we use a server-side store instead?
+	store := cookie.NewStore([]byte(generateRandomString(32)))
 	engine.Use(sessions.Sessions("auth_session", store))
 
 	engine.GET("/ping", pingHandler)
@@ -219,4 +221,14 @@ func addHeaders(c *gin.Context) {
 	// c.Header("Access-Control-Allow-Origin", "*")
 	// c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE")
 	// c.Header("Access-Control-Allow-Headers", "X-Custom-Header")
+}
+
+func generateRandomString(n int) string {
+	b := make([]byte, n)
+	_, err := rand.Read(b)
+	if err != nil {
+		logger.Info("Failed to generated secure key: %v\n", err)
+		return "secret"
+	}
+	return base64.URLEncoding.EncodeToString(b)
 }
