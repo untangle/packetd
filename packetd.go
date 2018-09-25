@@ -136,6 +136,7 @@ func parseArguments() {
 	debugPtr := flag.Bool("debug", false, "enable debug")
 	playbackFilePtr := flag.String("playback", "", "playback traffic from specified file")
 	captureFilePtr := flag.String("capture", "", "capture traffic to specified file")
+	playSpeedPtr := flag.Int("playspeed", 1, "traffic playback speed multiplier")
 
 	flag.Parse()
 
@@ -166,6 +167,10 @@ func parseArguments() {
 	if len(*captureFilePtr) != 0 {
 		kernel.SetWarehouseFile(*captureFilePtr)
 		kernel.SetWarehouseFlag('C')
+	}
+
+	if *playSpeedPtr != 1 {
+		kernel.SetWarehouseSpeed(*playSpeedPtr)
 	}
 }
 

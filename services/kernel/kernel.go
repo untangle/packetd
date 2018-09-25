@@ -108,6 +108,11 @@ func SetWarehouseFlag(value int) {
 	C.set_warehouse_flag(C.int(value))
 }
 
+// SetWarehouseSpeed sets the traffic playback speed
+func SetWarehouseSpeed(value int) {
+	C.set_warehouse_speed(C.int(value))
+}
+
 // SetWarehouseFile sets the filename used by the warehouse for traffic capture and playback
 func SetWarehouseFile(filename string) {
 	C.set_warehouse_file(C.CString(filename))

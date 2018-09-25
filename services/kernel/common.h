@@ -98,6 +98,8 @@ int get_warehouse_flag(void);
 void set_warehouse_flag(int value);
 void set_warehouse_file(char *filename);
 char *get_warehouse_file(void);
+int get_warehouse_speed(void);
+void set_warehouse_speed(int value);
 void start_warehouse_capture(void);
 void close_warehouse_capture(void);
 

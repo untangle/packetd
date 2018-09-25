@@ -9,8 +9,6 @@
 * All Rights Reserved
 */
 
-// TODO - add support for setting playback speed multiplier
-
 #include "common.h"
 
 static char		*logsrc = "warehouse";
@@ -69,6 +67,7 @@ void warehouse_playback(void)
 	FILE					*data;
 	size_t					found;
 	uint64_t				pause;
+	uint64_t				speed;
 	uint64_t				last;
 
 	filename = get_warehouse_file();
@@ -80,6 +79,8 @@ void warehouse_playback(void)
 		logmessage(LOG_WARNING,logsrc,"Unable to playback %s\n",filename);
 		return;
 	}
+
+	speed = get_warehouse_speed();
 
 	buflen = 4096;
 	buffer = malloc(buflen);
@@ -105,7 +106,13 @@ void warehouse_playback(void)
 		if (last != 0) pause = (dh.stamp - last);
 		else pause = 0;
 		last = dh.stamp;
-		if (pause > 0) usleep(pause / 1000);
+
+		if ((pause > 0) && (speed > 0))
+		{
+			pause = (pause / speed);	// apply the speed multiplier
+			pause = (pause / 1000);		// convert from nano to micro
+			usleep(pause);
+		}
 
 		switch(dh.origin)
 		{

@@ -10,6 +10,7 @@
 #include "common.h"
 
 static char		*g_warehouse_file = NULL;
+static int		g_warehouse_speed = 1;
 static int		g_warehouse_flag = 0;
 static int		g_shutdown = 0;
 static int		g_debug = 0;
@@ -101,4 +102,14 @@ void set_warehouse_file(char *filename)
 char *get_warehouse_file(void)
 {
 	return(g_warehouse_file);
+}
+
+int get_warehouse_speed(void)
+{
+	return(g_warehouse_speed);
+}
+
+void set_warehouse_speed(int value)
+{
+	g_warehouse_speed = value;
 }
