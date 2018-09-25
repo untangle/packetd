@@ -76,7 +76,7 @@ func authStatus(c *gin.Context) {
 	} else {
 		username := user.(string)
 		credentialsJSON := getCredentials(username)
-		for k, _ := range credentialsJSON {
+		for k := range credentialsJSON {
 			if strings.HasPrefix(k, "password") {
 				delete(credentialsJSON, k)
 			}
