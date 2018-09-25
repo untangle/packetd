@@ -32,7 +32,9 @@ func Startup() {
 	engine.Use(cors.New(config))
 
 	// XXX should we use a server-side store instead?
-	store := cookie.NewStore([]byte(generateRandomString(32)))
+	//store := cookie.NewStore([]byte(generateRandomString(32)))
+	// FIXME use constant secret for now so logins persist reboots
+	store := cookie.NewStore([]byte("secret"))
 	engine.Use(sessions.Sessions("auth_session", store))
 
 	engine.GET("/ping", pingHandler)
