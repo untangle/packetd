@@ -29,16 +29,17 @@ func Startup() {
 	config.AllowAllOrigins = true
 	engine.Use(cors.New(config))
 
-	// FIXME secret
+	// FIXME uses server-side not cookie
 	store := cookie.NewStore([]byte("secret"))
 	engine.Use(sessions.Sessions("auth_session", store))
 
 	engine.GET("/ping", pingHandler)
 
-	engine.POST("/login", login)
-	engine.GET("/login", login)
-	engine.POST("/logout", logout)
-	engine.GET("/logout", logout)
+	engine.POST("/account/login", authLogin)
+	//engine.GET("/account/login", authLogin)
+	engine.POST("/account/logout", authLogout)
+	engine.GET("/account/logout", authLogout)
+	engine.GET("/account/status", authStatus)
 
 	reports := engine.Group("/reports")
 	reports.Use(authRequired(engine))
