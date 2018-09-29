@@ -224,45 +224,23 @@ func obtainSessionEntry(mess NfqueueMessage, ctid uint32) (*SessionEntry, bool) 
 	var newFlag bool
 	var ok bool
 
+	// use the packet tuple to find the session
+	sessionHash := mess.Tuple.String()
+	session, ok = findSessionEntry(sessionHash)
+
+	// if we didn't find the session in the table look again with with the tuple in reverse
+	if !ok {
+		session, ok = findSessionEntry(mess.Tuple.StringReverse())
+	}
+
 	// If we already have a session entry update the existing, otherwise create a new entry for the table.
-	if session, ok = findSessionEntry(ctid); ok {
-		logger.Trace("Session Found %d in table\n", ctid)
+	if ok {
+		logger.Trace("Session Found %d in table\n", session.SessionID)
 		session.LastActivityTime = time.Now()
 		session.PacketCount++
 		session.ByteCount += uint64(mess.Length)
 		session.EventCount++
-
-		// the packet tuple should either match the client side tuple or the server side tuple
-		if !session.ClientSideTuple.Equal(mess.Tuple) && !session.ServerSideTuple.EqualReverse(mess.Tuple) {
-			var logLevel int
-			logLevel = logger.LogLevelDebug
-			if session.ConntrackConfirmed {
-				// if conntrack has been confirmed, this is an error
-				// so increase log level
-				logLevel = logger.LogLevelErr
-			}
-			if logger.IsLogEnabled(logLevel) {
-				logger.LogMessage(logLevel, "Conntrack ID Mismatch! %d\n", ctid)
-				logger.LogMessage(logLevel, "  Packet Tuple: %s\n", mess.Tuple)
-				logger.LogMessage(logLevel, "  Orig   Tuple: %s\n", session.ClientSideTuple.String())
-				logger.LogMessage(logLevel, "  Reply  Tuple: %s\n", session.ServerSideTuple.StringReverse())
-			}
-
-			if session.ConntrackConfirmed {
-				panic("CONNTRACK ID RE-USE DETECTED")
-			}
-			if logger.IsDebugEnabled() {
-				logger.Debug("Removing stale session %d %v\n", ctid, session.ClientSideTuple)
-			}
-			removeSessionEntry(ctid)
-			session = nil
-		}
-
-	}
-
-	// create a new session object
-	if session == nil {
-		logger.Trace("Session Adding %d to table\n", ctid)
+	} else {
 		newFlag = true
 		session = new(SessionEntry)
 		session.SessionID = nextSessionID()
@@ -276,7 +254,8 @@ func obtainSessionEntry(mess NfqueueMessage, ctid uint32) (*SessionEntry, bool) 
 		session.ConntrackConfirmed = false
 		session.attachments = make(map[string]interface{})
 		AttachNfqueueSubscriptions(session)
-		insertSessionEntry(ctid, session)
+		logger.Trace("Session Adding %d to table\n", session.SessionID)
+		insertSessionEntry(sessionHash, session)
 	}
 
 	return session, newFlag

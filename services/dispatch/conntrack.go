@@ -24,7 +24,6 @@ type ConntrackEntry struct {
 	C2Srate          float32
 	S2Crate          float32
 	TotalRate        float32
-	PurgeFlag        bool
 }
 
 //ConntrackHandlerFunction defines a pointer to a conntrack callback function
@@ -60,19 +59,41 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 	c2sBytes uint64, s2cBytes uint64) {
 
 	var conntrackEntry *ConntrackEntry
-	var conntrackEntryFound bool
+	var conntrackFound bool
 
-	// If we already have a conntrackEntry update the existing, otherwise create a new conntrackEntry for the table.
-	conntrackEntry, conntrackEntryFound = findConntrackEntry(ctid)
+	// start by looking for the existing conntrack entry
+	conntrackEntry, conntrackFound = findConntrackEntry(ctid)
 
-	if conntrackEntryFound {
-		conntrackEntry.EventCount++
-		logger.Trace("conntrack event[%d,%c]: %s \n", ctid, eventType, conntrackEntry.ClientSideTuple)
-	} else {
+	// handle DELETE events
+	if eventType == 'D' {
+
+		// do not call subscribers for ID's we don't know about
+		if conntrackFound == false {
+			logger.Debug("Received conntrack delete for unknown id %d\n", ctid)
+			return
+		}
+
+		// delete the client and server side session entries
+		if conntrackEntry.Session != nil {
+			removeSessionEntry(conntrackEntry.ClientSideTuple.String())
+			removeSessionEntry(conntrackEntry.ServerSideTuple.String())
+		}
+
+		removeConntrackEntry(ctid)
+	}
+
+	// handle NEW events
+	if eventType == 'N' {
+		if conntrackFound == true {
+			logger.Warn("Received conntract new for existing id %d\n", ctid)
+		}
+
 		conntrackEntry = new(ConntrackEntry)
 		conntrackEntry.ConntrackID = ctid
 		conntrackEntry.SessionID = nextSessionID()
 		conntrackEntry.CreationTime = time.Now()
+		conntrackEntry.LastActivityTime = time.Now()
+		conntrackEntry.EventCount = 1
 		conntrackEntry.ClientSideTuple.Protocol = protocol
 		conntrackEntry.ClientSideTuple.ClientAddress = dupIP(client)
 		conntrackEntry.ClientSideTuple.ClientPort = clientPort
@@ -83,65 +104,42 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 		conntrackEntry.ServerSideTuple.ClientPort = clientPortNew
 		conntrackEntry.ServerSideTuple.ServerAddress = dupIP(serverNew)
 		conntrackEntry.ServerSideTuple.ServerPort = serverPortNew
-		conntrackEntry.EventCount = 1
 
-		logger.Trace("conntrack event[%d,%c]: %v \n", ctid, eventType, conntrackEntry.ClientSideTuple)
+		// look for the session entry
+		session, ok := findSessionEntry(conntrackEntry.ClientSideTuple.String())
 
-		session, _ := findSessionEntry(uint32(ctid))
-		if session != nil {
-			if session.ClientSideTuple.Equal(conntrackEntry.ClientSideTuple) {
-				session.ServerSideTuple.Protocol = protocol
-				session.ServerSideTuple.ClientAddress = dupIP(clientNew)
-				session.ServerSideTuple.ClientPort = clientPortNew
-				session.ServerSideTuple.ServerAddress = dupIP(serverNew)
-				session.ServerSideTuple.ServerPort = serverPortNew
-				session.ConntrackConfirmed = true
-				conntrackEntry.Session = session
-			} else {
-				//session does not match conntrack event
-				//this happens when we receive packets that never got conntrack confirmed
-				//those conntrack IDs get re-used instantly
-				//however, if this was conntrack confirmed - something is very wrong
-				//and we seem to be re-using conntrack IDs when not expected!
-				var logLevel int
-				logLevel = logger.LogLevelDebug
-				if session.ConntrackConfirmed {
-					// if conntrack has been confirmed, this is an error
-					// so increase log level
-					logLevel = logger.LogLevelErr
-				}
-				if logger.IsLogEnabled(logLevel) {
-					logger.LogMessage(logLevel, "Conntrack Mismatch! %d\n", ctid)
-					logger.LogMessage(logLevel, "  Packet     Tuple: %s\n", conntrackEntry.ClientSideTuple)
-					logger.LogMessage(logLevel, "  ClientSide Tuple: %s\n", session.ClientSideTuple)
-				}
-
-				if session.ConntrackConfirmed {
-					panic("CONNTRACK ID RE-USE DETECTED")
-				}
-				logger.Debug("Removing stale session %d %v\n", ctid, session.ClientSideTuple)
-				removeSessionEntry(ctid)
-				session = nil
-			}
+		// if we find the session entry update with the server side tuple and
+		// create another index for the session using the server side tuple
+		if ok {
+			session.ServerSideTuple.Protocol = protocol
+			session.ServerSideTuple.ClientAddress = dupIP(clientNew)
+			session.ServerSideTuple.ClientPort = clientPortNew
+			session.ServerSideTuple.ServerAddress = dupIP(serverNew)
+			session.ServerSideTuple.ServerPort = serverPortNew
+			session.ConntrackConfirmed = true
+			conntrackEntry.Session = session
+			insertSessionEntry(conntrackEntry.ServerSideTuple.String(), session)
+		} else {
+			// TODO - why would this ever happen if we always expect to see the
+			// nfqueue event first and that's where the session gets created?
+			logger.Warn("Missing session table entry for %v\n", conntrackEntry)
 		}
+
 		insertConntrackEntry(ctid, conntrackEntry)
-	}
-
-	conntrackEntry.LastActivityTime = time.Now()
-
-	// handle DELETE events
-	if eventType == 'D' {
-		conntrackEntry.PurgeFlag = true
-		if conntrackEntry.Session != nil {
-			removeSessionEntry(ctid)
-		}
-		removeConntrackEntry(ctid)
-	} else {
-		conntrackEntry.PurgeFlag = false
 	}
 
 	// handle UPDATE events
 	if eventType == 'U' {
+
+		// do not call subscribers for ID's we don't know about
+		if conntrackFound == false {
+			logger.Debug("Received conntract update for unknown id %d\n", ctid)
+			return
+		}
+
+		conntrackEntry.LastActivityTime = time.Now()
+		conntrackEntry.EventCount++
+
 		oldC2sBytes := conntrackEntry.C2Sbytes
 		oldS2cBytes := conntrackEntry.S2Cbytes
 		oldTotalBytes := conntrackEntry.TotalBytes
@@ -219,6 +217,7 @@ func findConntrackEntry(finder uint32) (*ConntrackEntry, bool) {
 
 // insertConntrackEntry adds an entry to the conntrack table
 func insertConntrackEntry(finder uint32, entry *ConntrackEntry) {
+	logger.Trace("Insert conntrack entry %d\n", finder)
 	conntrackTableMutex.Lock()
 	defer conntrackTableMutex.Unlock()
 	conntrackTable[finder] = entry
@@ -226,25 +225,8 @@ func insertConntrackEntry(finder uint32, entry *ConntrackEntry) {
 
 // removeConntrackEntry removes an entry from the conntrack table
 func removeConntrackEntry(finder uint32) {
-	logger.Trace("Remove conntrack ctid %d\n", finder)
+	logger.Trace("Remove conntrack entry %d\n", finder)
 	conntrackTableMutex.Lock()
 	defer conntrackTableMutex.Unlock()
 	delete(conntrackTable, finder)
-}
-
-// cleanConntrackTable cleans the conntrack table by removing stale entries
-func cleanConntrackTable() {
-	nowtime := time.Now()
-
-	for key, val := range conntrackTable {
-		if val.PurgeFlag == false {
-			continue
-		}
-		if (nowtime.Unix() - val.LastActivityTime.Unix()) < 600 {
-			continue
-		}
-		removeConntrackEntry(key)
-		// this should never happen, so print an error
-		logger.Err("Removing stale conntrack entry %d %v\n", key, val.ClientSideTuple)
-	}
 }

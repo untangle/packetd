@@ -25,7 +25,7 @@ type SessionEntry struct {
 	attLocker          sync.Mutex
 }
 
-var sessionTable map[uint32]*SessionEntry
+var sessionTable map[string]*SessionEntry
 var sessionMutex sync.Mutex
 var sessionIndex uint64
 
@@ -45,28 +45,31 @@ func nextSessionID() uint64 {
 }
 
 // findSessionEntry searches for an entry in the session table
-func findSessionEntry(finder uint32) (*SessionEntry, bool) {
+func findSessionEntry(finder string) (*SessionEntry, bool) {
 	sessionMutex.Lock()
 	entry, status := sessionTable[finder]
-	logger.Trace("Lookup session ctid %d -> %v\n", finder, status)
+	logger.Trace("Lookup session index %s -> %v\n", finder, status)
 	sessionMutex.Unlock()
 	return entry, status
 }
 
 // insertSessionEntry adds an entry to the session table
-func insertSessionEntry(finder uint32, entry *SessionEntry) {
-	logger.Trace("Insert session ctid %d -> %v\n", finder, entry.ClientSideTuple)
+func insertSessionEntry(finder string, entry *SessionEntry) {
+	logger.Trace("Insert session index %s -> %v\n", finder, entry.ClientSideTuple)
 	sessionMutex.Lock()
 	sessionTable[finder] = entry
-	dict.AddSessionEntry(finder, "session_id", entry.SessionID)
+	dict.AddSessionEntry(entry.ConntrackID, "session_id", entry.SessionID)
 	sessionMutex.Unlock()
 }
 
 // removeSessionEntry removes an entry from the session table
-func removeSessionEntry(finder uint32) {
-	logger.Trace("Remove session ctid %d\n", finder)
+func removeSessionEntry(finder string) {
+	logger.Trace("Remove session index %s\n", finder)
 	sessionMutex.Lock()
-	dict.DeleteSession(finder)
+	entry, status := sessionTable[finder]
+	if status {
+		dict.DeleteSession(entry.ConntrackID)
+	}
 	delete(sessionTable, finder)
 	sessionMutex.Unlock()
 }
@@ -101,7 +104,7 @@ func cleanSessionTable() {
 		// get a conntrack new or destroy event
 		// as such this will exist in the table until the conntrack ID gets re-used
 		// or this happens. Since this is condition is expected, just log as debug
-		logger.Debug("Removing stale session entry %d %v\n", key, val.ClientSideTuple)
+		logger.Debug("Removing stale session entry %s %v\n", key, val.ClientSideTuple)
 	}
 }
 
@@ -110,6 +113,6 @@ func printSessionTable() {
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
 	for k, v := range sessionTable {
-		logger.Debug("Session[%d] = %s\n", k, v.ClientSideTuple.String())
+		logger.Debug("Session[%s] = %s\n", k, v.ClientSideTuple.String())
 	}
 }
