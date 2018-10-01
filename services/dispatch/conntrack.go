@@ -119,10 +119,6 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 			session.ConntrackConfirmed = true
 			conntrackEntry.Session = session
 			insertSessionEntry(conntrackEntry.ServerSideTuple.String(), session)
-		} else {
-			// TODO - why would this ever happen if we always expect to see the
-			// nfqueue event first and that's where the session gets created?
-			logger.Warn("Missing session table entry for %v\n", conntrackEntry)
 		}
 
 		insertConntrackEntry(ctid, conntrackEntry)

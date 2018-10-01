@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"bytes"
 	"net"
 	"strconv"
 )
@@ -16,12 +17,38 @@ type Tuple struct {
 
 // String returns string representation of tuple
 func (t Tuple) String() string {
-	return strconv.Itoa(int(t.Protocol)) + "|" + t.ClientAddress.String() + ":" + strconv.Itoa(int(t.ClientPort)) + "->" + t.ServerAddress.String() + ":" + strconv.Itoa(int(t.ServerPort))
+
+	// return strconv.Itoa(int(t.Protocol)) + "|" + t.ClientAddress.String() + ":" + strconv.Itoa(int(t.ClientPort)) + "->" + t.ServerAddress.String() + ":" + strconv.Itoa(int(t.ServerPort))
+
+	var buffer bytes.Buffer
+	buffer.WriteString(strconv.Itoa(int(t.Protocol)))
+	buffer.WriteString("|")
+	buffer.WriteString(t.ClientAddress.String())
+	buffer.WriteString(":")
+	buffer.WriteString(strconv.Itoa(int(t.ClientPort)))
+	buffer.WriteString("->")
+	buffer.WriteString(t.ServerAddress.String())
+	buffer.WriteString(":")
+	buffer.WriteString(strconv.Itoa(int(t.ServerPort)))
+	return buffer.String()
 }
 
 // StringReverse returns string representation of reverse tuple
 func (t Tuple) StringReverse() string {
-	return strconv.Itoa(int(t.Protocol)) + "|" + t.ServerAddress.String() + ":" + strconv.Itoa(int(t.ServerPort)) + "->" + t.ClientAddress.String() + ":" + strconv.Itoa(int(t.ClientPort))
+
+	// return strconv.Itoa(int(t.Protocol)) + "|" + t.ServerAddress.String() + ":" + strconv.Itoa(int(t.ServerPort)) + "->" + t.ClientAddress.String() + ":" + strconv.Itoa(int(t.ClientPort))
+
+	var buffer bytes.Buffer
+	buffer.WriteString(strconv.Itoa(int(t.Protocol)))
+	buffer.WriteString("|")
+	buffer.WriteString(t.ServerAddress.String())
+	buffer.WriteString(":")
+	buffer.WriteString(strconv.Itoa(int(t.ServerPort)))
+	buffer.WriteString("->")
+	buffer.WriteString(t.ClientAddress.String())
+	buffer.WriteString(":")
+	buffer.WriteString(strconv.Itoa(int(t.ClientPort)))
+	return buffer.String()
 }
 
 // Equal returns true if two Tuples are equal, false otherwise
