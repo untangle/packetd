@@ -230,3 +230,16 @@ func removeConntrackEntry(finder uint32) {
 	defer conntrackTableMutex.Unlock()
 	delete(conntrackTable, finder)
 }
+
+// cleanConntrackTable cleans the conntrack table by removing stale entries
+func cleanConntrackTable() {
+	nowtime := time.Now()
+	for key, val := range conntrackTable {
+		if (nowtime.Unix() - val.LastActivityTime.Unix()) < 1800 {
+			continue
+		}
+		removeConntrackEntry(key)
+		// this should never happen, so print an error
+		logger.Err("Removing stale conntrack entry %d: %v\n", key, val)
+	}
+}

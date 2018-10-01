@@ -76,6 +76,7 @@ func cleanerTask() {
 			counter++
 			logger.Debug("Calling cleaner task %d\n", counter)
 			cleanSessionTable()
+			cleanConntrackTable()
 		}
 	}
 }
