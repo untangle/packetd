@@ -61,8 +61,22 @@ var classdMutex sync.Mutex
 // PluginStartup is called to allow plugin specific initialization
 func PluginStartup() {
 	var err error
+	var info os.FileInfo
 
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
+
+	//  make sure the classd binary is available
+	info, err = os.Stat(daemonBinary)
+	if err != nil {
+		logger.Notice("Unable to check status of classify daemon %s (%v)\n", daemonBinary, err)
+		return
+	}
+
+	//  make sure the classd binary is available
+	if (info.Mode() & 0111) == 0 {
+		logger.Notice("Invalid file mode for classify daemon %s (%v)\n", daemonBinary, info.Mode())
+		return
+	}
 
 	// start the classd daemon with the no fork flag
 	if kernel.GetDebugFlag() {
@@ -70,12 +84,14 @@ func PluginStartup() {
 	} else {
 		daemonProcess = exec.Command(daemonBinary, "-f")
 	}
+
 	err = daemonProcess.Start()
 	if err != nil {
-		logger.Err("Error starting classd daemon: %v\n", err)
-	} else {
-		logger.Info("The classd daemon has been started\n")
+		logger.Err("Error starting classify daemon %s (%v)\n", daemonBinary, err)
+		return
 	}
+
+	logger.Info("The classd daemon has been started\n")
 
 	applicationTable = make(map[string]applicationInfo)
 	loadApplicationTable()
@@ -106,17 +122,21 @@ func PluginShutdown() {
 
 	daemonConnection = nil
 
-	// terminate the classd daemon
-	if daemonProcess.Process == nil {
-		logger.Err("The classd daemon process was invalid\n")
-		return
-	}
+	// if the daemon process is valid terminate the running daemon
+	if daemonProcess != nil {
+		if daemonProcess.Process == nil {
+			logger.Err("The classd daemon process was invalid\n")
+			daemonProcess = nil
+			return
+		}
 
-	err := daemonProcess.Process.Signal(os.Interrupt)
-	if err != nil {
-		logger.Err("Error stopping classd daemon: %v\n", err)
-	} else {
-		logger.Info("The classd daemon has been stopped\n")
+		err := daemonProcess.Process.Signal(os.Interrupt)
+		if err != nil {
+			logger.Err("Error stopping classd daemon: %v\n", err)
+		} else {
+			logger.Info("The classd daemon has been stopped\n")
+		}
+		daemonProcess = nil
 	}
 }
 

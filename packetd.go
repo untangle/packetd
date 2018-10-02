@@ -219,7 +219,7 @@ func startPlugins() {
 	// Start Plugins
 	startups := []func(){
 		example.PluginStartup,
-		//classify.PluginStartup,
+		classify.PluginStartup,
 		geoip.PluginStartup,
 		certcache.PluginStartup,
 		dns.PluginStartup,
@@ -242,7 +242,7 @@ func stopPlugins() {
 
 	shutdowns := []func(){
 		example.PluginShutdown,
-		//classify.PluginShutdown,
+		classify.PluginShutdown,
 		geoip.PluginShutdown,
 		certcache.PluginShutdown,
 		dns.PluginShutdown,
