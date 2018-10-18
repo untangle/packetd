@@ -2,6 +2,7 @@ package dns
 
 import (
 	"github.com/google/gopacket/layers"
+	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"net"
@@ -10,11 +11,11 @@ import (
 )
 
 const pluginName = "dns"
-const cleanTimeout = 300
 
 // AddressHolder is used to cache DNS names and IP addresses
 type AddressHolder struct {
 	CreationTime time.Time
+	ExpireTime   time.Time
 	Address      net.IP
 	Name         string
 }
@@ -46,6 +47,22 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	result.Owner = pluginName
 	result.SessionRelease = true
 	result.PacketMark = 0
+
+	// for new sessions we look for the client and server IP in our DNS cache
+	if newSession {
+		var name string
+		var ok bool
+		name, ok = FindAddress(mess.Tuple.ClientAddress)
+		if ok {
+			logger.Debug("Setting client_dns_hint %s for %d\n", name, mess.Session.SessionID)
+			dict.AddSessionEntry(mess.Session.ConntrackID, "client_dns_hint", name)
+		}
+		name, ok = FindAddress(mess.Tuple.ServerAddress)
+		if ok {
+			logger.Debug("Setting server_dns_hint %s for %d\n", name, mess.Session.SessionID)
+			dict.AddSessionEntry(mess.Session.ConntrackID, "server_dns_hint", name)
+		}
+	}
 
 	// get the DNS layer
 	dnsLayer := mess.Packet.Layer(layers.LayerTypeDNS)
@@ -93,8 +110,8 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 			if (val.Type != layers.DNSTypeA) && (val.Type != layers.DNSTypeAAAA) {
 				continue
 			}
-			logger.Debug("DNS REPLY DETECTED NAME:%s IP:%v\n", qname, val.IP)
-			insertAddress(val.IP, qname.(string))
+			logger.Debug("DNS REPLY DETECTED NAME:%s TTL:%d IP:%v\n", qname, val.TTL, val.IP)
+			insertAddress(val.IP, qname.(string), val.TTL)
 		}
 	}
 
@@ -111,9 +128,11 @@ func FindAddress(finder net.IP) (string, bool) {
 }
 
 // insertAddress adds an address and name to the cache
-func insertAddress(finder net.IP, name string) {
+func insertAddress(finder net.IP, name string, ttl uint32) {
 	var holder AddressHolder
 	holder.CreationTime = time.Now()
+	holder.ExpireTime = time.Now()
+	holder.ExpireTime.Add(time.Second * time.Duration(ttl))
 	holder.Address = make(net.IP, len(finder))
 	copy(holder.Address, finder)
 	holder.Name = name
@@ -135,7 +154,7 @@ func cleanAddressTable() {
 	nowtime := time.Now()
 
 	for key, val := range addressTable {
-		if (nowtime.Unix() - val.CreationTime.Unix()) < cleanTimeout {
+		if val.ExpireTime.Unix() < nowtime.Unix() {
 			logger.Debug("DNS Leaving ADDR:%s in table\n", key)
 			continue
 		}
