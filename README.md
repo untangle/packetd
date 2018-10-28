@@ -22,6 +22,7 @@ go get -u github.com/gin-contrib/cors
 go get -u github.com/google/gopacket
 go get -u github.com/mattn/go-sqlite3
 go get -u github.com/oschwald/geoip2-golang
+go get -u github.com/GehirnInc/crypt
 ```
 
 Then build the regular way:
