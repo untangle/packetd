@@ -1,6 +1,7 @@
 package restd
 
 import (
+	"encoding/base64"
 	"fmt"
 	"github.com/GehirnInc/crypt"
 	_ "github.com/GehirnInc/crypt/md5_crypt"
@@ -18,6 +19,7 @@ import (
 
 func authRequired(engine *gin.Engine) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// If alread logged in, continue
 		session := sessions.Default(c)
 		user := session.Get("username")
 		if user != nil {
@@ -25,24 +27,87 @@ func authRequired(engine *gin.Engine) gin.HandlerFunc {
 			return
 		}
 
-		ip, port, err := net.SplitHostPort(c.Request.RemoteAddr)
-		if err == nil && (ip == "::1" || ip == "127.0.0.1") {
-			if isLocalProcessRoot(ip, port) {
-				session := sessions.Default(c)
-				session.Set("username", "root")
-				err := session.Save()
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
-				} else {
-					c.Next()
-					return
-				}
-			}
+		// If the connection is from the local host, check if its authorized
+		if checkAuthLocal(c) {
+			c.Next()
+			return
+		}
+
+		// If the connection is from the local host, check if its authorized
+		if checkBasicHttpAuth(c) {
+			c.Next()
+			return
 		}
 
 		c.JSON(http.StatusForbidden, gin.H{"error": "Authorization failed"})
 		c.Abort()
 	}
+}
+
+// checkBasicHttpAuth checks the basic http auth
+// returns false if request should continue to next auth technique
+// returns true if the auth is valid and the request should be allowed
+func checkBasicHttpAuth(c *gin.Context) bool {
+	authHeader := c.Request.Header.Get("Authorization")
+	if authHeader == "" {
+		// continue, not an error though so don't set an error
+		return false
+	}
+
+	auth := strings.SplitN(c.Request.Header.Get("Authorization"), " ", 2)
+	if len(auth) != 2 || auth[0] != "Basic" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Invalid Authorization Header"})
+		return false
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(auth[1])
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Invalid Base64 Format in Authorization Header"})
+		return false
+	}
+
+	pair := strings.SplitN(string(decoded), ":", 2)
+	if len(pair) != 2 {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Invalid Authorization Header Format"})
+		return false
+	}
+	if !validate(pair[0], pair[1]) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Authorization Failed"})
+		return false
+	}
+
+	session := sessions.Default(c)
+	session.Set("username", pair[0])
+	err = session.Save()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
+		return false
+	} else {
+		return true
+	}
+}
+
+// checkAuthLocal checks if the local connecting process is authorized
+// returns false if request should continue to next auth technique
+// returns true if the auth is valid and the request should be allowed
+func checkAuthLocal(c *gin.Context) bool {
+	// If the connection is from the local host, check if its authorized
+	ip, port, err := net.SplitHostPort(c.Request.RemoteAddr)
+	if err == nil && (ip == "::1" || ip == "127.0.0.1") {
+		if isLocalProcessRoot(ip, port) {
+			session := sessions.Default(c)
+			session.Set("username", "root")
+			err := session.Save()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
+				return false
+			} else {
+				return true
+			}
+		}
+	}
+	// continue, not an error though so don't set an error
+	return false
 }
 
 func authLogin(c *gin.Context) {
