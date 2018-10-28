@@ -142,8 +142,8 @@ func validate(username string, password string) bool {
 		logger.Warn("Failed to find credentials for user %v\n", username)
 		return false
 	}
-	if credentialsJSON["passwordShadowHash"] == nil {
-		logger.Warn("Credentials for %v missing passwordShadowHash\n", username)
+	if credentialsJSON["passwordHashMD5"] == nil {
+		logger.Warn("Credentials for %v missing passwordHashMD5\n", username)
 		return false
 	}
 	if credentialsJSON["username"] != username {
@@ -151,10 +151,10 @@ func validate(username string, password string) bool {
 		return false
 	}
 
-	crypt := crypt.SHA512.New()
-	hash, ok := credentialsJSON["passwordShadowHash"].(string)
+	crypt := crypt.MD5.New()
+	hash, ok := credentialsJSON["passwordHashMD5"].(string)
 	if !ok {
-		logger.Warn("Invalid passwordShadowHash type\n")
+		logger.Warn("Invalid passwordHashMD5 type\n")
 	}
 	err := crypt.Verify(hash, []byte(password))
 
