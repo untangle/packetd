@@ -3,7 +3,7 @@ package restd
 import (
 	"fmt"
 	"github.com/GehirnInc/crypt"
-	_ "github.com/GehirnInc/crypt/sha512_crypt"
+	_ "github.com/GehirnInc/crypt/md5_crypt"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/untangle/packetd/services/logger"
