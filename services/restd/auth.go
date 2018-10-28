@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/GehirnInc/crypt"
+	// MD5 used to verify password
 	_ "github.com/GehirnInc/crypt/md5_crypt"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -34,7 +35,7 @@ func authRequired(engine *gin.Engine) gin.HandlerFunc {
 		}
 
 		// If the connection is from the local host, check if its authorized
-		if checkBasicHttpAuth(c) {
+		if checkBasicHTTPAuth(c) {
 			c.Next()
 			return
 		}
@@ -44,10 +45,10 @@ func authRequired(engine *gin.Engine) gin.HandlerFunc {
 	}
 }
 
-// checkBasicHttpAuth checks the basic http auth
+// checkBasicHTTPAuth checks the basic http auth
 // returns false if request should continue to next auth technique
 // returns true if the auth is valid and the request should be allowed
-func checkBasicHttpAuth(c *gin.Context) bool {
+func checkBasicHTTPAuth(c *gin.Context) bool {
 	authHeader := c.Request.Header.Get("Authorization")
 	if authHeader == "" {
 		// continue, not an error though so don't set an error
@@ -79,12 +80,12 @@ func checkBasicHttpAuth(c *gin.Context) bool {
 	session := sessions.Default(c)
 	session.Set("username", pair[0])
 	err = session.Save()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
-		return false
-	} else {
+	if err == nil {
 		return true
 	}
+
+	c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
+	return false
 }
 
 // checkAuthLocal checks if the local connecting process is authorized
@@ -98,12 +99,12 @@ func checkAuthLocal(c *gin.Context) bool {
 			session := sessions.Default(c)
 			session.Set("username", "root")
 			err := session.Save()
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
-				return false
-			} else {
+			if err == nil {
 				return true
 			}
+
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
+			return false
 		}
 	}
 	// continue, not an error though so don't set an error
@@ -226,9 +227,6 @@ func validate(username string, password string) bool {
 	if err == nil {
 		logger.Info("Successful authentication: %v\n", username)
 		return true
-	} else {
-		logger.Info("Failed authentication: %v\n", err)
-		return false
 	}
 
 	logger.Info("Failed authentication: %v\n", username)
