@@ -2,6 +2,8 @@ package restd
 
 import (
 	"fmt"
+	"github.com/GehirnInc/crypt"
+	_ "github.com/GehirnInc/crypt/sha512_crypt"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/untangle/packetd/services/logger"
@@ -140,9 +142,28 @@ func validate(username string, password string) bool {
 		logger.Warn("Failed to find credentials for user %v\n", username)
 		return false
 	}
-	if credentialsJSON["username"] == username && credentialsJSON["passwordCleartext"] == password {
+	if credentialsJSON["passwordShadowHash"] == nil {
+		logger.Warn("Credentials for %v missing passwordShadowHash\n", username)
+		return false
+	}
+	if credentialsJSON["username"] != username {
+		logger.Warn("Assertion failed: getCredentials returned wrong credentials\n")
+		return false
+	}
+
+	crypt := crypt.SHA512.New()
+	hash, ok := credentialsJSON["passwordShadowHash"].(string)
+	if !ok {
+		logger.Warn("Invalid passwordShadowHash type\n")
+	}
+	err := crypt.Verify(hash, []byte(password))
+
+	if err == nil {
 		logger.Info("Successful authentication: %v\n", username)
 		return true
+	} else {
+		logger.Info("Failed authentication: %v\n", err)
+		return false
 	}
 
 	logger.Info("Failed authentication: %v\n", username)
