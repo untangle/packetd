@@ -89,6 +89,20 @@ func GetSessionAttachment(entry *SessionEntry, name string) interface{} {
 	return value
 }
 
+// DelSessionAttachment is used to safely delete an attachment from a session object
+func DelSessionAttachment(entry *SessionEntry, name string) bool {
+	entry.attLocker.Lock()
+	value := entry.attachments[name]
+	delete(entry.attachments, name)
+	entry.attLocker.Unlock()
+
+	if value == nil {
+		return false
+	}
+
+	return true
+}
+
 // cleanSessionTable cleans the session table by removing stale entries
 func cleanSessionTable() {
 	nowtime := time.Now()

@@ -24,9 +24,10 @@ type NfqueueResult struct {
 // NfqueueMessage is used to pass nfqueue traffic to interested plugins
 type NfqueueMessage struct {
 	Session  *SessionEntry
-	Tuple    Tuple
+	MsgTuple Tuple
 	Packet   gopacket.Packet
 	Length   int
+	CtoS     bool
 	IP4layer *layers.IPv4
 	IP6layer *layers.IPv6
 	TCPlayer *layers.TCP
@@ -101,14 +102,14 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 	if ip4Layer != nil {
 		mess.IP4layer = ip4Layer.(*layers.IPv4)
-		mess.Tuple.Protocol = uint8(mess.IP4layer.Protocol)
-		mess.Tuple.ClientAddress = dupIP(mess.IP4layer.SrcIP)
-		mess.Tuple.ServerAddress = dupIP(mess.IP4layer.DstIP)
+		mess.MsgTuple.Protocol = uint8(mess.IP4layer.Protocol)
+		mess.MsgTuple.ClientAddress = dupIP(mess.IP4layer.SrcIP)
+		mess.MsgTuple.ServerAddress = dupIP(mess.IP4layer.DstIP)
 	} else if ip6Layer != nil {
 		mess.IP6layer = ip6Layer.(*layers.IPv6)
-		mess.Tuple.Protocol = uint8(mess.IP6layer.NextHeader) // FIXME - is this the correct field?
-		mess.Tuple.ClientAddress = dupIP(mess.IP6layer.SrcIP)
-		mess.Tuple.ServerAddress = dupIP(mess.IP6layer.DstIP)
+		mess.MsgTuple.Protocol = uint8(mess.IP6layer.NextHeader) // FIXME - is this the correct field?
+		mess.MsgTuple.ClientAddress = dupIP(mess.IP6layer.SrcIP)
+		mess.MsgTuple.ServerAddress = dupIP(mess.IP6layer.DstIP)
 	} else {
 		return (pmark)
 	}
@@ -117,16 +118,16 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 	tcpLayer := mess.Packet.Layer(layers.LayerTypeTCP)
 	if tcpLayer != nil {
 		mess.TCPlayer = tcpLayer.(*layers.TCP)
-		mess.Tuple.ClientPort = uint16(mess.TCPlayer.SrcPort)
-		mess.Tuple.ServerPort = uint16(mess.TCPlayer.DstPort)
+		mess.MsgTuple.ClientPort = uint16(mess.TCPlayer.SrcPort)
+		mess.MsgTuple.ServerPort = uint16(mess.TCPlayer.DstPort)
 	}
 
 	// get the UDP layer
 	udpLayer := mess.Packet.Layer(layers.LayerTypeUDP)
 	if udpLayer != nil {
 		mess.UDPlayer = udpLayer.(*layers.UDP)
-		mess.Tuple.ClientPort = uint16(mess.UDPlayer.SrcPort)
-		mess.Tuple.ServerPort = uint16(mess.UDPlayer.DstPort)
+		mess.MsgTuple.ClientPort = uint16(mess.UDPlayer.SrcPort)
+		mess.MsgTuple.ServerPort = uint16(mess.UDPlayer.DstPort)
 	}
 
 	// get the Application layer
@@ -135,7 +136,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		mess.Payload = appLayer.Payload()
 	}
 
-	logger.Trace("nfqueue event[%d]: %v \n", ctid, mess.Tuple)
+	logger.Trace("nfqueue event[%d]: %v \n", ctid, mess.MsgTuple)
 
 	session, newflag := obtainSessionEntry(mess, ctid)
 	mess.Session = session
@@ -225,12 +226,12 @@ func obtainSessionEntry(mess NfqueueMessage, ctid uint32) (*SessionEntry, bool) 
 	var ok bool
 
 	// use the packet tuple to find the session
-	sessionHash := mess.Tuple.String()
+	sessionHash := mess.MsgTuple.String()
 	session, ok = findSessionEntry(sessionHash)
 
 	// if we didn't find the session in the table look again with with the tuple in reverse
 	if !ok {
-		session, ok = findSessionEntry(mess.Tuple.StringReverse())
+		session, ok = findSessionEntry(mess.MsgTuple.StringReverse())
 	}
 
 	// If we already have a session entry update the existing, otherwise create a new entry for the table.
@@ -240,6 +241,9 @@ func obtainSessionEntry(mess NfqueueMessage, ctid uint32) (*SessionEntry, bool) 
 		session.PacketCount++
 		session.ByteCount += uint64(mess.Length)
 		session.EventCount++
+		if mess.MsgTuple.ClientAddress.Equal(session.ClientSideTuple.ClientAddress) {
+			mess.CtoS = true
+		}
 	} else {
 		newFlag = true
 		session = new(SessionEntry)
@@ -249,13 +253,14 @@ func obtainSessionEntry(mess NfqueueMessage, ctid uint32) (*SessionEntry, bool) 
 		session.PacketCount = 1
 		session.ByteCount = uint64(mess.Length)
 		session.LastActivityTime = time.Now()
-		session.ClientSideTuple = mess.Tuple
+		session.ClientSideTuple = mess.MsgTuple
 		session.EventCount = 1
 		session.ConntrackConfirmed = false
 		session.attachments = make(map[string]interface{})
 		AttachNfqueueSubscriptions(session)
 		logger.Trace("Session Adding %d to table\n", session.SessionID)
 		insertSessionEntry(sessionHash, session)
+		mess.CtoS = true
 	}
 
 	return session, newFlag

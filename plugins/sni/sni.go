@@ -38,7 +38,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	// We only search for SNI in port 443 traffic. Since the client and server ports
 	// flip back and forth depending on traffic direction, we check both while waiting
 	// for the handshake to finish and the ClientHello packet to arrive.
-	if mess.Tuple.ServerPort != 443 && mess.Tuple.ClientPort != 443 {
+	if mess.MsgTuple.ServerPort != 443 && mess.MsgTuple.ClientPort != 443 {
 		result.SessionRelease = true
 		return result
 	}

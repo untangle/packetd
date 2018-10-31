@@ -333,6 +333,7 @@ func initLoggerConfig() {
 	config["example"] = "INFO"
 	config["reporter"] = "INFO"
 	config["sni"] = "INFO"
+	config["tls"] = "INFO"
 
 	// services
 	config["dict"] = "INFO"

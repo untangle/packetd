@@ -11,6 +11,7 @@ import (
 	"github.com/untangle/packetd/plugins/geoip"
 	"github.com/untangle/packetd/plugins/reporter"
 	"github.com/untangle/packetd/plugins/sni"
+	"github.com/untangle/packetd/plugins/tls"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/kernel"
@@ -224,6 +225,7 @@ func startPlugins() {
 		certcache.PluginStartup,
 		dns.PluginStartup,
 		sni.PluginStartup,
+		tls.PluginStartup,
 		reporter.PluginStartup}
 	for _, f := range startups {
 		wg.Add(1)
@@ -247,6 +249,7 @@ func stopPlugins() {
 		certcache.PluginShutdown,
 		dns.PluginShutdown,
 		sni.PluginShutdown,
+		tls.PluginShutdown,
 		reporter.PluginShutdown}
 	for _, f := range shutdowns {
 		wg.Add(1)

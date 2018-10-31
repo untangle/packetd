@@ -52,12 +52,12 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	if newSession {
 		var name string
 		var ok bool
-		name, ok = FindAddress(mess.Tuple.ClientAddress)
+		name, ok = FindAddress(mess.MsgTuple.ClientAddress)
 		if ok {
 			logger.Debug("Setting client_dns_hint %s for %d\n", name, mess.Session.SessionID)
 			dict.AddSessionEntry(mess.Session.ConntrackID, "client_dns_hint", name)
 		}
-		name, ok = FindAddress(mess.Tuple.ServerAddress)
+		name, ok = FindAddress(mess.MsgTuple.ServerAddress)
 		if ok {
 			logger.Debug("Setting server_dns_hint %s for %d\n", name, mess.Session.SessionID)
 			dict.AddSessionEntry(mess.Session.ConntrackID, "server_dns_hint", name)
