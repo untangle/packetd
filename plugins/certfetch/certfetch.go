@@ -49,7 +49,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		return result
 	}
 
-	server := fmt.Sprintf("%s:%d", mess.MsgTuple.ServerAddress, mess.MsgTuple.ServerPort)
+	findkey := fmt.Sprintf("%s:%d", mess.MsgTuple.ServerAddress, mess.MsgTuple.ServerPort)
 
 	var holder *certcache.CertificateHolder
 	var target string
@@ -57,16 +57,16 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	localMutex.Lock()
 
-	holder, found = certcache.FindCertificate(server)
+	holder, found = certcache.FindCertificate(findkey)
 	if found {
 		localMutex.Unlock()
-		logger.Debug("Loading certificate for %s\n", server)
+		logger.Debug("Loading certificate for %s\n", findkey)
 	} else {
-		logger.Debug("Fetching certificate for %s\n", server)
+		logger.Debug("Fetching certificate for %s\n", findkey)
 
 		holder = new(certcache.CertificateHolder)
 		holder.WaitGroup.Add(1)
-		certcache.InsertCertificate(server, holder)
+		certcache.InsertCertificate(findkey, holder)
 		localMutex.Unlock()
 
 		conf := &tls.Config{
@@ -77,9 +77,9 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		}
 
 		if mess.IP6layer != nil {
-			target = fmt.Sprintf("[%s]:443", server)
+			target = fmt.Sprintf("[%s]:443", mess.MsgTuple.ServerAddress.String())
 		} else {
-			target = fmt.Sprintf("%s:443", server)
+			target = fmt.Sprintf("%s:443", mess.MsgTuple.ServerAddress.String())
 		}
 
 		conn, err := tls.DialWithDialer(dialer, "tcp", target, conf)
@@ -90,11 +90,11 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		}
 
 		if conn != nil && len(conn.ConnectionState().PeerCertificates) > 0 {
-			logger.Debug("Successfully fetched certificate from %s\n", server)
+			logger.Debug("Successfully fetched certificate from %s\n", findkey)
 			holder.Certificate = *conn.ConnectionState().PeerCertificates[0]
 			holder.Available = true
 		} else {
-			logger.Debug("Could not fetch certificate from %s\n", server)
+			logger.Debug("Could not fetch certificate from %s\n", findkey)
 			holder.Available = false
 		}
 		holder.CreationTime = time.Now()
@@ -111,7 +111,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	// this will only happen when two+ sessions requests the same cert at the same time
 	// the first will fetch the cert, and the other threads will wait here
 	holder.WaitGroup.Wait()
-	logger.Debug("Certificate %v found: %v\n", server, holder.Available)
+	logger.Debug("Certificate %v found: %v\n", findkey, holder.Available)
 
 	// if the cert is available for this server attach the cert to the session
 	// and put the details in the dictionary
