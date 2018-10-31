@@ -4,14 +4,15 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"github.com/untangle/packetd/plugins/certcache"
+	"github.com/untangle/packetd/plugins/certfetch"
+	"github.com/untangle/packetd/plugins/certsniff"
 	"github.com/untangle/packetd/plugins/classify"
 	"github.com/untangle/packetd/plugins/dns"
 	"github.com/untangle/packetd/plugins/example"
 	"github.com/untangle/packetd/plugins/geoip"
 	"github.com/untangle/packetd/plugins/reporter"
 	"github.com/untangle/packetd/plugins/sni"
-	"github.com/untangle/packetd/plugins/tls"
+	"github.com/untangle/packetd/services/certcache"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/kernel"
@@ -187,12 +188,14 @@ func startServices() {
 	reports.Startup()
 	dict.Startup()
 	restd.Startup()
+	certcache.Startup()
 }
 
 // stopServices stops all the services
 func stopServices() {
 	c := make(chan bool)
 	go func() {
+		certcache.Shutdown()
 		restd.Shutdown()
 		dict.Shutdown()
 		reports.Shutdown()
@@ -222,10 +225,10 @@ func startPlugins() {
 		example.PluginStartup,
 		classify.PluginStartup,
 		geoip.PluginStartup,
-		certcache.PluginStartup,
+		certfetch.PluginStartup,
+		certsniff.PluginStartup,
 		dns.PluginStartup,
 		sni.PluginStartup,
-		tls.PluginStartup,
 		reporter.PluginStartup}
 	for _, f := range startups {
 		wg.Add(1)
@@ -246,10 +249,10 @@ func stopPlugins() {
 		example.PluginShutdown,
 		classify.PluginShutdown,
 		geoip.PluginShutdown,
-		certcache.PluginShutdown,
+		certfetch.PluginShutdown,
+		certsniff.PluginShutdown,
 		dns.PluginShutdown,
 		sni.PluginShutdown,
-		tls.PluginShutdown,
 		reporter.PluginShutdown}
 	for _, f := range shutdowns {
 		wg.Add(1)

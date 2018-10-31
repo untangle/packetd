@@ -326,7 +326,8 @@ func initLoggerConfig() {
 	config["_ValidLevels_"] = comment
 
 	// plugins
-	config["certcache"] = "INFO"
+	config["certfetch"] = "INFO"
+	config["certsniff"] = "INFO"
 	config["classify"] = "INFO"
 	config["dns"] = "INFO"
 	config["geoip"] = "INFO"
@@ -336,6 +337,7 @@ func initLoggerConfig() {
 	config["tls"] = "INFO"
 
 	// services
+	config["certcache"] = "INFO"
 	config["dict"] = "INFO"
 	config["dispatch"] = "INFO"
 	config["dispatch_timer"] = "INFO"

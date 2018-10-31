@@ -1,13 +1,15 @@
-package tls
+package certsniff
 
 import (
 	"bytes"
 	"crypto/x509"
+	"fmt"
+	"github.com/untangle/packetd/services/certcache"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 )
 
-const pluginName = "tls"
+const pluginName = "certsniff"
 const maxClientCount = 5
 const maxServerCount = 20
 
@@ -22,28 +24,57 @@ func PluginShutdown() {
 	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
 }
 
+// PluginNfqueueHandler is called to handle nfqueue packet data. We only
+// look at TCP traffic without port 443 as destination, and we scan the
+// first few packets looking for a TLS ClientHello message. If we find it,
+// we continue looking at the traffic to see if we can locate and extract
+// the certificate that is returned from the server. When found, we put the
+// certificate in the cache, we attach it to the session, and we extract
+// the interesting subject fields, and put them in the session table.
+
 // PluginNfqueueHandler is called to handle nfqueue packet data.
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
+	var holder *certcache.CertificateHolder
 	var collector *bytes.Buffer
-	var ok bool
+	var found bool
 
 	result.Owner = pluginName
 	result.PacketMark = 0
 	result.SessionRelease = false
 
 	// we only look for certs in TCP traffic not going to server port 443
-	// since those will be handled by the certcache plugin
+	// since those session will be handled by the certfetch plugin
 	if mess.TCPlayer == nil || mess.MsgTuple.ServerPort == 443 {
 		result.SessionRelease = true
 		return result
 	}
 
-	// get the tls_collector from the session attachments
-	collector, ok = dispatch.GetSessionAttachment(mess.Session, "tls_collector").(*bytes.Buffer)
+	// if the session already has a certificate attached we are done
+	check := dispatch.GetSessionAttachment(mess.Session, "certificate")
+	if check != nil {
+		result.SessionRelease = true
+		return result
+	}
+
+	// look in the cache to see if we already have a certificate for this server:port
+	server := fmt.Sprintf("%s:%d", mess.MsgTuple.ServerAddress, mess.MsgTuple.ServerPort)
+	holder, found = certcache.FindCertificate(server)
+	if found {
+		if holder.Available {
+			logger.Debug("Loading certificate for %s\n", server)
+			certcache.AttachCertificateToSession(mess.Session, holder.Certificate)
+		}
+		result.SessionRelease = true
+		return result
+	}
+
+	// the session doesn't have a cert and we didn't find in cache
+	// so get the tls_collector from the session attachments
+	collector, found = dispatch.GetSessionAttachment(mess.Session, "tls_collector").(*bytes.Buffer)
 
 	// if we don't have a collector yet we are still looking for ClientHello
-	if ok == false {
+	if found == false {
 		status := findClientHello(mess.Payload)
 
 		// if we find the ClientHello create and attach a collector and return
