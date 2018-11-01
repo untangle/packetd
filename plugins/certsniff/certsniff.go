@@ -7,11 +7,75 @@ import (
 	"github.com/untangle/packetd/services/certcache"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
+	"sync"
+	"time"
 )
 
 const pluginName = "certsniff"
-const maxClientCount = 5
-const maxServerCount = 20
+const maxClientCount = 5  // number of packets to sniff for ClientHello before giving up
+const maxServerCount = 20 // number of packets to sniff for the server certificate before giving up
+const maxPacketCount = 10 // maximum number of packets we'll store and re-assemble while looking for the server certificate
+
+type dataCollector struct {
+	databuff [maxPacketCount][]byte
+	sequence [maxPacketCount]uint32
+	locker   sync.Mutex
+	total    int
+}
+
+// addPacket adds a packet of server data to the a dataCollector
+func (ME *dataCollector) addPacket(buffer []byte, netseq uint32) {
+	if ME.total == maxPacketCount {
+		logger.Warn("Unable to add more data to collector\n")
+		return
+	}
+
+	// hold the lock long enough to get and increment the current buffer counter
+	ME.locker.Lock()
+	spot := ME.total
+	ME.total++
+	ME.locker.Unlock()
+
+	// copy the argumented buffer and netseq value
+	ME.databuff[spot] = make([]byte, len(buffer))
+	copy(ME.databuff[spot], buffer)
+	ME.sequence[spot] = netseq
+}
+
+// getBuffer assembles all the data packets into a single buffer in the correct order
+func (ME *dataCollector) getBuffer() []byte {
+	var holdData []byte
+	var holdSpot uint32
+	var fullbuff bytes.Buffer
+	var total int
+
+	// hold the lock long enough to gt the current buffer counter
+	ME.locker.Lock()
+	total = ME.total
+	ME.locker.Unlock()
+
+	// sort the buffers using the TCP sequence number
+	for j := 0; j < total-1; j++ {
+		for k := (j + 1); k < total; k++ {
+			if ME.sequence[j] > ME.sequence[k] {
+				holdData = ME.databuff[j]
+				holdSpot = ME.sequence[j]
+				ME.databuff[j] = ME.databuff[k]
+				ME.sequence[j] = ME.sequence[k]
+				ME.databuff[k] = holdData
+				ME.sequence[k] = holdSpot
+			}
+		}
+	}
+
+	// combine the data packets in a single buffer
+	for i := 0; i < total; i++ {
+		fullbuff.Write(ME.databuff[i])
+	}
+
+	// return the buffer as an array of bytes
+	return fullbuff.Bytes()
+}
 
 // PluginStartup function is called to allow plugin specific initialization.
 func PluginStartup() {
@@ -35,8 +99,8 @@ func PluginShutdown() {
 // PluginNfqueueHandler is called to handle nfqueue packet data.
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	var holder *certcache.CertificateHolder
-	var collector *bytes.Buffer
+	var certHolder *certcache.CertificateHolder
+	var dataBucket *dataCollector
 	var found bool
 
 	result.Owner = pluginName
@@ -45,7 +109,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// we only look for certs in TCP traffic not going to server port 443
 	// since those session will be handled by the certfetch plugin
-	if mess.TCPlayer == nil || mess.MsgTuple.ServerPort == 443 {
+	if mess.TCPlayer == nil || mess.Session.ClientSideTuple.ServerPort == 443 {
 		result.SessionRelease = true
 		return result
 	}
@@ -58,12 +122,12 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	// look in the cache to see if we already have a certificate for this server:port
-	server := fmt.Sprintf("%s:%d", mess.MsgTuple.ServerAddress, mess.MsgTuple.ServerPort)
-	holder, found = certcache.FindCertificate(server)
+	findkey := fmt.Sprintf("%s:%d", mess.Session.ClientSideTuple.ServerAddress, mess.Session.ClientSideTuple.ServerPort)
+	certHolder, found = certcache.FindCertificate(findkey)
 	if found {
-		if holder.Available {
-			logger.Debug("Loading certificate for %s\n", server)
-			certcache.AttachCertificateToSession(mess.Session, holder.Certificate)
+		if certHolder.Available {
+			logger.Debug("Loading cached certificate for %s\n", findkey)
+			certcache.AttachCertificateToSession(mess.Session, certHolder.Certificate)
 		}
 		result.SessionRelease = true
 		return result
@@ -71,7 +135,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// the session doesn't have a cert and we didn't find in cache
 	// so get the tls_collector from the session attachments
-	collector, found = dispatch.GetSessionAttachment(mess.Session, "tls_collector").(*bytes.Buffer)
+	dataBucket, found = dispatch.GetSessionAttachment(mess.Session, "tls_collector").(*dataCollector)
 
 	// if we don't have a collector yet we are still looking for ClientHello
 	if found == false {
@@ -80,8 +144,8 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		// if we find the ClientHello create and attach a collector and return
 		if status == true {
 			logger.Debug("Found ClientHello for %d\n", ctid)
-			collector = new(bytes.Buffer)
-			dispatch.PutSessionAttachment(mess.Session, "tls_collector", collector)
+			dataBucket = new(dataCollector)
+			dispatch.PutSessionAttachment(mess.Session, "tls_collector", dataBucket)
 			return result
 		}
 
@@ -103,16 +167,14 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		return result
 	}
 
-	// add the server data to the collector
-	logger.Debug("Adding %d bytes to collector for %d\n", len(mess.Payload), ctid)
-	collector.Write(mess.Payload)
+	// add the packet to our data collector
+	dataBucket.addPacket(mess.Payload, mess.TCPlayer.Seq)
 
 	// look for the server certificate in the collector
-	status := findCertificates(collector.Bytes(), mess.Session)
+	status := findCertificates(dataBucket.getBuffer(), mess)
 
-	// if we find the certificate remove the attachment and release
+	// if we find the certificate remove the collector attachment and release
 	if status == true {
-		logger.Debug("Found server certificate for %d\n", ctid)
 		dispatch.DelSessionAttachment(mess.Session, "tls_collector")
 		result.SessionRelease = true
 	}
@@ -205,7 +267,7 @@ func findClientHello(buffer []byte) bool {
 	return true
 }
 
-func findCertificates(buffer []byte, session *dispatch.SessionEntry) bool {
+func findCertificates(buffer []byte, mess dispatch.NfqueueMessage) bool {
 	var bufflen int
 	var reclen int
 	var msglen int
@@ -268,8 +330,14 @@ func findCertificates(buffer []byte, session *dispatch.SessionEntry) bool {
 				if err != nil {
 					logger.Err("Error %v extracting certificate\n", err)
 				} else {
-					logger.Debug("Found server certificate: %v\n", cert.Subject)
-					dispatch.PutSessionAttachment(session, "certificate", cert)
+					findkey := fmt.Sprintf("%s:%d", mess.Session.ClientSideTuple.ServerAddress, mess.Session.ClientSideTuple.ServerPort)
+					logger.Debug("Creating cached certificate for %s [%v]\n", findkey, cert.Subject)
+					holder := new(certcache.CertificateHolder)
+					holder.CreationTime = time.Now()
+					holder.Certificate = *cert
+					holder.Available = true
+					certcache.InsertCertificate(findkey, holder)
+					certcache.AttachCertificateToSession(mess.Session, *cert)
 				}
 				return true
 			}
