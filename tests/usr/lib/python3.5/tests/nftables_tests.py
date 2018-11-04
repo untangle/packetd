@@ -13,7 +13,6 @@ class NftablesTests(unittest.TestCase):
 
     def setUp(self):
         print()
-        pass
     
     @staticmethod
     def initialSetUp(self):
@@ -52,6 +51,13 @@ class NftablesTests(unittest.TestCase):
         print(str)
         assert(str == 'goto target')
 
+    def test_103_action_return(self):
+        """Check action GOTO"""
+        action = {"type": "RETURN"}
+        str = nftables_util.action_expression(action, "inet")
+        print(str)
+        assert(str == 'return')
+        
 # RULES
 # RULES
 # RULES

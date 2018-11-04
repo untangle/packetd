@@ -19,7 +19,7 @@ class GeoipTests(unittest.TestCase):
         pass
 
     def setUp(self):
-        pass
+        print()
 
     def test_000_client_is_online(self):
         result = remote_control.is_online()

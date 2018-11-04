@@ -31,6 +31,37 @@ type Query struct {
 	Rows *sql.Rows
 }
 
+type QueryCategoriesOptions struct {
+	categoriesGroupColumn   string `json:"categoriesGroupColumn"`
+	categoriesAggregation   string `json:"categoriesAggregation"`
+	categoriesLimit         int    `json:"categoriesLimit"`
+	categoriesOrderByColumn int    `json:"categoriesOrderByColumn"`
+	categoriesOrderAsc      bool   `json:"categoriesOrderAsc"`
+}
+
+type QueryTextOptions struct {
+	TextColumns []string `json:"textColumns"`
+}
+
+type QuerySeriesOptions struct {
+	SeriesColumns             []string `json:"seriesColumns"`
+	SeriesTimeIntervalSeconds int      `json:"seriesTimeIntervalSeconds"`
+}
+
+type ReportEntry struct {
+	UniqueId        string                 `json:"uniqueId"`
+	Name            string                 `json:"name"`
+	Category        string                 `json:"category"`
+	Description     string                 `json:"description"`
+	DisplayOrder    int                    `json:"displayOrder"`
+	ReadOnly        bool                   `json:"readOnly"`
+	Type            string                 `json:"type"`
+	Table           string                 `json:"table"`
+	QueryCategories QueryCategoriesOptions `json:"queryCategories"`
+	QueryText       QueryTextOptions       `json:"queryText"`
+	QuerySeries     QuerySeriesOptions     `json:"querySeries"`
+}
+
 var db *sql.DB
 var queries = make(map[uint64]*Query)
 var queryID uint64
@@ -57,7 +88,21 @@ func Shutdown() {
 }
 
 // CreateQuery submits a database query and returns the results
-func CreateQuery(reportEntry string) (*Query, error) {
+func CreateQuery(reportEntryStr string) (*Query, error) {
+	reportEntry := &ReportEntry{}
+
+	//logger.Warn("XXX Query STRING: %v\n", reportEntryStr)
+
+	err := json.Unmarshal([]byte(reportEntryStr), reportEntry)
+	if err != nil {
+		logger.Err("db.Query error: %s\n", err)
+		return nil, err
+	}
+
+	//logger.Warn("XXX Query OBJECT: %v\n", reportEntry)
+	// HERE
+	// FIXME, convert reportEntry to SQL
+
 	rows, err := db.Query("SELECT * FROM sessions LIMIT 5")
 	if err != nil {
 		logger.Err("db.Query error: %s\n", err)

@@ -74,6 +74,7 @@ func Startup() {
 
 // Shutdown restd
 func Shutdown() {
+	return
 }
 
 func pingHandler(c *gin.Context) {

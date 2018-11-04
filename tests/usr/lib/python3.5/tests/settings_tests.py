@@ -56,7 +56,7 @@ class SettingsTests(unittest.TestCase):
         pass
 
     def setUp(self):
-        pass
+        print()
 
     def test_000_basic_test(self):
         assert(True)
