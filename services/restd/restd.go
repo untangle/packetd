@@ -64,6 +64,9 @@ func Startup() {
 
 	// files
 	engine.Static("/admin", "/www/admin")
+	engine.Static("/settings", "/www/settings")
+	engine.Static("/reports", "/www/reports")
+	engine.Static("/setup", "/www/setup")
 	engine.Static("/static", "/www/static")
 
 	// listen and serve on 0.0.0.0:8080
