@@ -64,7 +64,7 @@ func Startup() {
 
 	// files
 	engine.Static("/admin", "/www/admin")
-	engine.Static("/settings", "/www/settings")
+	engine.Static("/config", "/www/config")
 	engine.Static("/reports", "/www/reports")
 	engine.Static("/setup", "/www/setup")
 	engine.Static("/static", "/www/static")
