@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	_ "github.com/mattn/go-sqlite3" // blank import required for runtime binding
 	"github.com/untangle/packetd/services/logger"
+	"strconv"
 	"sync/atomic"
 	"time"
 )
@@ -31,6 +33,7 @@ type Query struct {
 	Rows *sql.Rows
 }
 
+// QueryCategoriesOptions stores the query options for CATEGORY type reports
 type QueryCategoriesOptions struct {
 	categoriesGroupColumn   string `json:"categoriesGroupColumn"`
 	categoriesAggregation   string `json:"categoriesAggregation"`
@@ -39,17 +42,20 @@ type QueryCategoriesOptions struct {
 	categoriesOrderAsc      bool   `json:"categoriesOrderAsc"`
 }
 
+// QueryTextOptions stores the query options for TEXT type reports
 type QueryTextOptions struct {
 	TextColumns []string `json:"textColumns"`
 }
 
+// QuerySeriesOptions stores the query options for SERIES type reports
 type QuerySeriesOptions struct {
 	SeriesColumns             []string `json:"seriesColumns"`
 	SeriesTimeIntervalSeconds int      `json:"seriesTimeIntervalSeconds"`
 }
 
+// ReportEntry is a report entry as defined in the JSON schema
 type ReportEntry struct {
-	UniqueId        string                 `json:"uniqueId"`
+	UniqueID        string                 `json:"uniqueId"`
 	Name            string                 `json:"name"`
 	Category        string                 `json:"category"`
 	Description     string                 `json:"description"`
@@ -88,22 +94,62 @@ func Shutdown() {
 }
 
 // CreateQuery submits a database query and returns the results
-func CreateQuery(reportEntryStr string) (*Query, error) {
+func CreateQuery(reportEntryStr string, startTimeStr string, endTimeStr string) (*Query, error) {
 	reportEntry := &ReportEntry{}
 
-	//logger.Warn("XXX Query STRING: %v\n", reportEntryStr)
+	var err error
+	var startTime int64
+	var endTime int64
 
-	err := json.Unmarshal([]byte(reportEntryStr), reportEntry)
+	if startTimeStr == "" {
+		startTime = time.Now().Add(-1 * time.Duration(24) * time.Hour).Unix()
+	} else {
+		startTime, err = strconv.ParseInt(startTimeStr, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if endTimeStr == "" {
+		endTime = time.Now().Add(time.Duration(1) * time.Minute).Unix()
+		endTime = time.Now().Unix()
+	} else {
+		endTime, err = strconv.ParseInt(endTimeStr, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = json.Unmarshal([]byte(reportEntryStr), reportEntry)
 	if err != nil {
 		logger.Err("db.Query error: %s\n", err)
 		return nil, err
 	}
+	logger.Debug("ReportEntry: %v\n", reportEntry)
 
-	//logger.Warn("XXX Query OBJECT: %v\n", reportEntry)
-	// HERE
-	// FIXME, convert reportEntry to SQL
+	var rows *sql.Rows
+	var sqlStr string
 
-	rows, err := db.Query("SELECT * FROM sessions LIMIT 5")
+	if reportEntry.Type == "TEXT" {
+		sqlStr = "SELECT"
+		for i, column := range reportEntry.QueryText.TextColumns {
+			if i == 0 {
+				sqlStr += " " + escape(column)
+			} else {
+				sqlStr += ", " + escape(column)
+			}
+		}
+		sqlStr += " FROM"
+		sqlStr += " " + escape(reportEntry.Table)
+		sqlStr += " WHERE " + timeStampConditions(startTime, endTime)
+		// FIXME add conditions
+	} else {
+		// FIXME add other report types
+		sqlStr = "SELECT * FROM sessions LIMIT 5"
+	}
+
+	logger.Info("SQL: %v\n", sqlStr)
+	rows, err = db.Query(sqlStr)
 	if err != nil {
 		logger.Err("db.Query error: %s\n", err)
 		return nil, err
@@ -354,4 +400,62 @@ func createTables() {
 	if err != nil {
 		logger.Err("Failed to create table: %s\n", err.Error())
 	}
+}
+
+// return the SQL conditions/fragment to limit the time_stamp
+// to the specified startTime and endTime
+func timeStampConditions(startTime int64, endTime int64) string {
+	return fmt.Sprintf("time_stamp > %d AND time_stamp < %d", startTime, endTime)
+}
+
+// escape escapes quotes in as string
+// this is a really gross way to handle SQL safety
+// https://github.com/golang/go/issues/18478
+func escape(source string) string {
+	var j int
+	if len(source) == 0 {
+		return ""
+	}
+	tempStr := source[:]
+	desc := make([]byte, len(tempStr)*2)
+	for i := 0; i < len(tempStr); i++ {
+		flag := false
+		var escape byte
+		switch tempStr[i] {
+		case '\r':
+			flag = true
+			escape = '\r'
+			break
+		case '\n':
+			flag = true
+			escape = '\n'
+			break
+		case '\\':
+			flag = true
+			escape = '\\'
+			break
+		case '\'':
+			flag = true
+			escape = '\''
+			break
+		case '"':
+			flag = true
+			escape = '"'
+			break
+		case '\032':
+			flag = true
+			escape = 'Z'
+			break
+		default:
+		}
+		if flag {
+			desc[j] = '\\'
+			desc[j+1] = escape
+			j = j + 2
+		} else {
+			desc[j] = tempStr[i]
+			j = j + 1
+		}
+	}
+	return string(desc[0:j])
 }

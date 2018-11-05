@@ -122,7 +122,11 @@ func reportsCreateQuery(c *gin.Context) {
 		c.JSON(200, gin.H{"error": err})
 		return
 	}
-	q, err := reports.CreateQuery(string(body))
+
+	startTimeStr, _ := c.GetQuery("startTime")
+	endTimeStr, _ := c.GetQuery("endTime")
+
+	q, err := reports.CreateQuery(string(body), startTimeStr, endTimeStr)
 	if err != nil {
 		c.JSON(200, gin.H{"error": err})
 		return

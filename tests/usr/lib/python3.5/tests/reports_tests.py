@@ -7,7 +7,7 @@ import tests.test_registry as test_registry
 initial_settings = None
 
 def create_query(report_entry):
-    """Gets the current settings and returns the JSON Object or None if there is any error"""
+    """Creates a query from the specified report_entry"""
     json_string = json.dumps(report_entry)
     cmd = 'curl -m 5 -X POST -s -o - -H "Content-Type: application/json; charset=utf-8" -d \'%s\' "http://localhost:8080/reports/create_query"' % json_string
     print(cmd)
@@ -16,8 +16,19 @@ def create_query(report_entry):
     if p.returncode != 0:
         return None
     else:
-        return output
+        return int(output)
 
+def get_data(query_id):
+    """Gets the data for the specified query ID"""
+    cmd = 'curl -m 5 -X GET -s -o - "http://localhost:8080/reports/get_data/%s"' % str(query_id)
+    print(cmd)
+    p = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
+    output = p.stdout.decode()
+    if p.returncode != 0:
+        return None
+    else:
+        return json.loads(output)
+    
 class ReportsTests(unittest.TestCase):
 
     @staticmethod
@@ -53,12 +64,12 @@ class ReportsTests(unittest.TestCase):
                 "arbitrary3": "arbitrary3"
             }
         }
-        output = create_query(report_query)
-        try:
-            output_int = int(output)
-        except:
-            assert(False)
-        assert(output != None)
+        query_id = create_query(report_query)
+        assert(query_id != None)
+        results = get_data(query_id)
+        assert(results != None)
+        assert(results[0] != None)
+        assert(results[0]["session_count"] != None)
         
     @staticmethod
     def finalTearDown(self):
