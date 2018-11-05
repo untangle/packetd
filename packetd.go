@@ -25,6 +25,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"runtime/pprof"
 	"sync"
 	"syscall"
 	"time"
@@ -32,6 +33,7 @@ import (
 
 const rulesScript = "packetd_rules"
 
+var memProfileTarget string
 var localFlag bool
 
 func main() {
@@ -122,6 +124,16 @@ func main() {
 
 	// Stop services
 	logger.Info("Stopping services...\n")
+
+	if len(memProfileTarget) > 0 {
+		f, err := os.Create(memProfileTarget)
+		if err == nil {
+			runtime.GC()
+			pprof.WriteHeapProfile(f)
+			f.Close()
+		}
+	}
+
 	stopServices()
 }
 
@@ -139,6 +151,8 @@ func parseArguments() {
 	playbackFilePtr := flag.String("playback", "", "playback traffic from specified file")
 	captureFilePtr := flag.String("capture", "", "capture traffic to specified file")
 	playSpeedPtr := flag.Int("playspeed", 1, "traffic playback speed multiplier")
+	cpuProfilePtr := flag.String("cpuprofile", "", "write cpu profile to file")
+	memProfilePtr := flag.String("memprofile", "", "write memory profile to file")
 
 	flag.Parse()
 
@@ -173,6 +187,21 @@ func parseArguments() {
 
 	if *playSpeedPtr != 1 {
 		kernel.SetWarehouseSpeed(*playSpeedPtr)
+	}
+
+	if *cpuProfilePtr != "" {
+		f, err := os.Create(*cpuProfilePtr)
+		if err != nil {
+			logger.Err("Could not create CPU profile: ", err)
+		}
+		if err := pprof.StartCPUProfile(f); err != nil {
+			logger.Err("Could not start CPU profile: ", err)
+		}
+		defer pprof.StopCPUProfile()
+	}
+
+	if *memProfilePtr != "" {
+		memProfileTarget = *memProfilePtr
 	}
 }
 

@@ -216,6 +216,9 @@ func insertConntrackEntry(finder uint32, entry *ConntrackEntry) {
 	logger.Trace("Insert conntrack entry %d\n", finder)
 	conntrackTableMutex.Lock()
 	defer conntrackTableMutex.Unlock()
+	if conntrackTable[finder] != nil {
+		delete(conntrackTable, finder)
+	}
 	conntrackTable[finder] = entry
 }
 

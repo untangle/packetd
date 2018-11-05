@@ -285,6 +285,11 @@ func findCertificates(buffer []byte, mess dispatch.NfqueueMessage) bool {
 
 	// walk through each TLS record
 	for {
+		// make sure we have enough data to extract the record length
+		if (recoff + 4) >= bufflen {
+			return false
+		}
+
 		// extract the record length
 		reclen = int(buffer[recoff+3])<<8 + int(buffer[recoff+4])
 

@@ -21,7 +21,7 @@ type AddressHolder struct {
 }
 
 var shutdownChannel = make(chan bool)
-var addressTable map[string]AddressHolder
+var addressTable map[string]*AddressHolder
 var addressMutex sync.Mutex
 
 // PluginStartup function is called to allow plugin specific initialization. We
@@ -29,7 +29,7 @@ var addressMutex sync.Mutex
 // our shutdown function to return during shutdown.
 func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
-	addressTable = make(map[string]AddressHolder)
+	addressTable = make(map[string]*AddressHolder)
 	go cleanupTask()
 	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
 }
@@ -51,14 +51,13 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	// for new sessions we look for the client and server IP in our DNS cache
 	if newSession {
 		var name string
-		var ok bool
-		name, ok = FindAddress(mess.MsgTuple.ClientAddress)
-		if ok {
+		name = FindAddress(mess.MsgTuple.ClientAddress)
+		if len(name) > 0 {
 			logger.Debug("Setting client_dns_hint %s for %d\n", name, mess.Session.SessionID)
 			dict.AddSessionEntry(mess.Session.ConntrackID, "client_dns_hint", name)
 		}
-		name, ok = FindAddress(mess.MsgTuple.ServerAddress)
-		if ok {
+		name = FindAddress(mess.MsgTuple.ServerAddress)
+		if len(name) > 0 {
 			logger.Debug("Setting server_dns_hint %s for %d\n", name, mess.Session.SessionID)
 			dict.AddSessionEntry(mess.Session.ConntrackID, "server_dns_hint", name)
 		}
@@ -120,16 +119,19 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 }
 
 // FindAddress fetches the cached name for the argumented address.
-func FindAddress(finder net.IP) (string, bool) {
+func FindAddress(finder net.IP) string {
 	addressMutex.Lock()
-	entry, status := addressTable[finder.String()]
+	entry := addressTable[finder.String()]
 	addressMutex.Unlock()
-	return entry.Name, status
+	if entry != nil {
+		return entry.Name
+	}
+	return ""
 }
 
 // insertAddress adds an address and name to the cache
 func insertAddress(finder net.IP, name string, ttl uint32) {
-	var holder AddressHolder
+	holder := new(AddressHolder)
 	holder.CreationTime = time.Now()
 	holder.ExpireTime = time.Now()
 	holder.ExpireTime.Add(time.Second * time.Duration(ttl))
@@ -137,6 +139,9 @@ func insertAddress(finder net.IP, name string, ttl uint32) {
 	copy(holder.Address, finder)
 	holder.Name = name
 	addressMutex.Lock()
+	if addressTable[finder.String()] != nil {
+		delete(addressTable, finder.String())
+	}
 	addressTable[finder.String()] = holder
 	addressMutex.Unlock()
 }

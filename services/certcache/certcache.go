@@ -11,6 +11,7 @@ import (
 )
 
 const cleanTimeout = 86400
+const cleanInterval = 60
 
 // CertificateHolder is used to cache SSL/TLS certificates
 type CertificateHolder struct {
@@ -113,6 +114,9 @@ func FindCertificate(finder string) (*CertificateHolder, bool) {
 // InsertCertificate adds a certificate to the cache
 func InsertCertificate(finder string, holder *CertificateHolder) {
 	certificateMutex.Lock()
+	if certificateTable[finder] != nil {
+		delete(certificateTable, finder)
+	}
 	certificateTable[finder] = holder
 	certificateMutex.Unlock()
 }
@@ -146,7 +150,7 @@ func cleanupTask() {
 		case <-shutdownChannel:
 			shutdownChannel <- true
 			return
-		case <-time.After(60 * time.Second):
+		case <-time.After(cleanInterval * time.Second):
 			cleanCertificateTable()
 		}
 	}

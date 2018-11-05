@@ -57,21 +57,24 @@ func findSessionEntry(finder string) (*SessionEntry, bool) {
 func insertSessionEntry(finder string, entry *SessionEntry) {
 	logger.Trace("Insert session index %s -> %v\n", finder, entry.ClientSideTuple)
 	sessionMutex.Lock()
+	defer sessionMutex.Unlock()
+	if sessionTable[finder] != nil {
+		delete(sessionTable, finder)
+	}
 	sessionTable[finder] = entry
 	dict.AddSessionEntry(entry.ConntrackID, "session_id", entry.SessionID)
-	sessionMutex.Unlock()
 }
 
 // removeSessionEntry removes an entry from the session table
 func removeSessionEntry(finder string) {
 	logger.Trace("Remove session index %s\n", finder)
 	sessionMutex.Lock()
+	defer sessionMutex.Unlock()
 	entry, status := sessionTable[finder]
 	if status {
 		dict.DeleteSession(entry.ConntrackID)
 	}
 	delete(sessionTable, finder)
-	sessionMutex.Unlock()
 }
 
 // PutSessionAttachment is used to safely add an attachment to a session object
