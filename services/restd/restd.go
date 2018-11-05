@@ -46,11 +46,6 @@ func Startup() {
 	engine.GET("/account/logout", authLogout)
 	engine.GET("/account/status", authStatus)
 
-	reports := engine.Group("/reports")
-	reports.Use(authRequired(engine))
-	reports.POST("/create_query", reportsCreateQuery)
-	reports.GET("/get_data/:query_id", reportsGetData)
-
 	api := engine.Group("/api")
 	api.Use(authRequired(engine))
 	api.GET("/settings", getSettings)
@@ -61,10 +56,12 @@ func Startup() {
 	api.DELETE("/settings/*path", trimSettings)
 	api.GET("/defaults", getDefaultSettings)
 	api.GET("/defaults/*path", getDefaultSettings)
+	api.POST("/reports/create_query", reportsCreateQuery)
+	api.GET("/reports/get_data/:query_id", reportsGetData)
 
 	// files
 	engine.Static("/admin", "/www/admin")
-	engine.Static("/config", "/www/config")
+	engine.Static("/settings", "/www/settings")
 	engine.Static("/reports", "/www/reports")
 	engine.Static("/setup", "/www/setup")
 	engine.Static("/static", "/www/static")
