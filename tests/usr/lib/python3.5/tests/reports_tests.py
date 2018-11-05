@@ -6,6 +6,62 @@ import tests.test_registry as test_registry
 
 initial_settings = None
 
+BASIC_TEXT_REPORT_ENTRY = {
+            "uniqueId": "basic_text_report_entry",
+            "name": "basic_text_report_entry",
+            "category": "category",
+            "description": "description",
+            "displayOrder": 10,
+            "readOnly": True,
+            "type": "TEXT",
+            "table": "sessions",
+            "queryText": {
+                "textColumns": ["count(*) as session_count"]
+            },
+            "rendering": {
+                "arbitrary1": 1,
+                "arbitrary2": True,
+                "arbitrary3": "arbitrary3"
+            }
+        }
+
+BASIC_EVENTS_REPORT_ENTRY = {
+            "uniqueId": "basic_events_report_entry",
+            "name": "basic_events_report_entry",
+            "category": "category",
+            "description": "description",
+            "displayOrder": 10,
+            "readOnly": True,
+            "type": "EVENTS",
+            "table": "sessions",
+            "rendering": {
+                "arbitrary1": 1,
+                "arbitrary2": True,
+                "arbitrary3": "arbitrary3"
+            }
+        }
+
+BASIC_CATEGORY_REPORT_ENTRY = {
+            "uniqueId": "basic_category_report_entry",
+            "name": "basic_category_report_entry",
+            "category": "category",
+            "description": "description",
+            "displayOrder": 10,
+            "readOnly": True,
+            "type": "CATEGORY",
+            "table": "sessions",
+            "queryCategories": {
+                "categoriesGroupColumn": "client_address",
+                "categoriesAggregation": "count(*)"
+            },
+            "rendering": {
+                "arbitrary1": 1,
+                "arbitrary2": True,
+                "arbitrary3": "arbitrary3"
+            }
+        }
+
+
 def create_query(report_entry):
     """Creates a query from the specified report_entry"""
     json_string = json.dumps(report_entry)
@@ -45,31 +101,39 @@ class ReportsTests(unittest.TestCase):
     def test_000_basic_test(self):
         assert(True)
 
-    def test_010_create_query(self):
-        report_query = {
-            "uniqueId": "abcdefghijkl",
-            "name": "create_query",
-            "category": "category",
-            "description": "description",
-            "displayOrder": 10,
-            "readOnly": True,
-            "type": "TEXT",
-            "table": "sessions",
-            "queryText": {
-                "textColumns": ["count(*) as session_count"]
-            },
-            "rendering": {
-                "arbitrary1": 1,
-                "arbitrary2": True,
-                "arbitrary3": "arbitrary3"
-            }
-        }
-        query_id = create_query(report_query)
+    def test_010_text_query(self):
+        global BASIC_TEXT_REPORT_ENTRY
+        query_id = create_query(BASIC_TEXT_REPORT_ENTRY)
         assert(query_id != None)
         results = get_data(query_id)
         assert(results != None)
         assert(results[0] != None)
         assert(results[0]["session_count"] != None)
+
+    def test_011_events_query(self):
+        global BASIC_EVENTS_REPORT_ENTRY
+        query_id = create_query(BASIC_EVENTS_REPORT_ENTRY)
+        assert(query_id != None)
+        results = get_data(query_id)
+        assert(results != None)
+        assert(isinstance(results, list))
+        if len(results) > 0:
+            # Just check some columns that should never be null
+            assert(results[0]["client_address"] != None)
+            assert(results[0]["server_address"] != None)
+            assert(results[0]["client_port"] != None)
+            assert(results[0]["server_port"] != None)
+
+    def test_012_categories_query(self):
+        global BASIC_CATEGORY_REPORT_ENTRY
+        query_id = create_query(BASIC_CATEGORY_REPORT_ENTRY)
+        assert(query_id != None)
+        results = get_data(query_id)
+        assert(results != None)
+        assert(isinstance(results, list))
+        if len(results) > 0:
+            assert(results[0]["client_address"] != None)
+            assert(results[0]["value"] != None)
         
     @staticmethod
     def finalTearDown(self):

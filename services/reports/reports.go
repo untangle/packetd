@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	_ "github.com/mattn/go-sqlite3" // blank import required for runtime binding
 	"github.com/untangle/packetd/services/logger"
 	"strconv"
@@ -35,11 +34,11 @@ type Query struct {
 
 // QueryCategoriesOptions stores the query options for CATEGORY type reports
 type QueryCategoriesOptions struct {
-	categoriesGroupColumn   string `json:"categoriesGroupColumn"`
-	categoriesAggregation   string `json:"categoriesAggregation"`
-	categoriesLimit         int    `json:"categoriesLimit"`
-	categoriesOrderByColumn int    `json:"categoriesOrderByColumn"`
-	categoriesOrderAsc      bool   `json:"categoriesOrderAsc"`
+	CategoriesGroupColumn   string `json:"categoriesGroupColumn"`
+	CategoriesAggregation   string `json:"categoriesAggregation"`
+	CategoriesLimit         int    `json:"categoriesLimit"`
+	CategoriesOrderByColumn int    `json:"categoriesOrderByColumn"`
+	CategoriesOrderAsc      bool   `json:"categoriesOrderAsc"`
 }
 
 // QueryTextOptions stores the query options for TEXT type reports
@@ -98,27 +97,28 @@ func CreateQuery(reportEntryStr string, startTimeStr string, endTimeStr string) 
 	reportEntry := &ReportEntry{}
 
 	var err error
-	var startTime int64
-	var endTime int64
+	var startTimeEpoch int64
+	var endTimeEpoch int64
 
 	if startTimeStr == "" {
-		startTime = time.Now().Add(-1 * time.Duration(24) * time.Hour).Unix()
+		startTimeEpoch = time.Now().Add(-1 * time.Duration(24) * time.Hour).Unix()
 	} else {
-		startTime, err = strconv.ParseInt(startTimeStr, 10, 64)
+		startTimeEpoch, err = strconv.ParseInt(startTimeStr, 10, 64)
 		if err != nil {
 			return nil, err
 		}
 	}
+	startTime := time.Unix(startTimeEpoch, 0)
 
 	if endTimeStr == "" {
-		endTime = time.Now().Add(time.Duration(1) * time.Minute).Unix()
-		endTime = time.Now().Unix()
+		endTimeEpoch = time.Now().Add(time.Duration(1) * time.Minute).Unix()
 	} else {
-		endTime, err = strconv.ParseInt(endTimeStr, 10, 64)
+		endTimeEpoch, err = strconv.ParseInt(endTimeStr, 10, 64)
 		if err != nil {
 			return nil, err
 		}
 	}
+	endTime := time.Unix(endTimeEpoch, 0)
 
 	err = json.Unmarshal([]byte(reportEntryStr), reportEntry)
 	if err != nil {
@@ -130,22 +130,9 @@ func CreateQuery(reportEntryStr string, startTimeStr string, endTimeStr string) 
 	var rows *sql.Rows
 	var sqlStr string
 
-	if reportEntry.Type == "TEXT" {
-		sqlStr = "SELECT"
-		for i, column := range reportEntry.QueryText.TextColumns {
-			if i == 0 {
-				sqlStr += " " + escape(column)
-			} else {
-				sqlStr += ", " + escape(column)
-			}
-		}
-		sqlStr += " FROM"
-		sqlStr += " " + escape(reportEntry.Table)
-		sqlStr += " WHERE " + timeStampConditions(startTime, endTime)
-		// FIXME add conditions
-	} else {
-		// FIXME add other report types
-		sqlStr = "SELECT * FROM sessions LIMIT 5"
+	sqlStr, err = makeSqlString(reportEntry, startTime, endTime) // FIXME add conditions
+	if err != nil {
+		return nil, err
 	}
 
 	logger.Info("SQL: %v\n", sqlStr)
@@ -194,6 +181,7 @@ func LogEvent(event Event) error {
 	return nil
 }
 
+// eventLogger readns from the eventQueue and logs the events to sqlite
 func eventLogger() {
 	var summary string
 	for {
@@ -355,8 +343,8 @@ func createTables() {
 	_, err = db.Exec(
 		`CREATE TABLE IF NOT EXISTS sessions (
                      session_id int8 PRIMARY KEY NOT NULL,
-                     time_stamp datetime NOT NULL,
-                     end_time datetime,
+                     time_stamp timestamp NOT NULL,
+                     end_time timestamp,
                      ip_protocol int,
                      hostname text,
                      username text,
@@ -400,62 +388,4 @@ func createTables() {
 	if err != nil {
 		logger.Err("Failed to create table: %s\n", err.Error())
 	}
-}
-
-// return the SQL conditions/fragment to limit the time_stamp
-// to the specified startTime and endTime
-func timeStampConditions(startTime int64, endTime int64) string {
-	return fmt.Sprintf("time_stamp > %d AND time_stamp < %d", startTime, endTime)
-}
-
-// escape escapes quotes in as string
-// this is a really gross way to handle SQL safety
-// https://github.com/golang/go/issues/18478
-func escape(source string) string {
-	var j int
-	if len(source) == 0 {
-		return ""
-	}
-	tempStr := source[:]
-	desc := make([]byte, len(tempStr)*2)
-	for i := 0; i < len(tempStr); i++ {
-		flag := false
-		var escape byte
-		switch tempStr[i] {
-		case '\r':
-			flag = true
-			escape = '\r'
-			break
-		case '\n':
-			flag = true
-			escape = '\n'
-			break
-		case '\\':
-			flag = true
-			escape = '\\'
-			break
-		case '\'':
-			flag = true
-			escape = '\''
-			break
-		case '"':
-			flag = true
-			escape = '"'
-			break
-		case '\032':
-			flag = true
-			escape = 'Z'
-			break
-		default:
-		}
-		if flag {
-			desc[j] = '\\'
-			desc[j+1] = escape
-			j = j + 2
-		} else {
-			desc[j] = tempStr[i]
-			j = j + 1
-		}
-	}
-	return string(desc[0:j])
 }
