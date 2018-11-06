@@ -41,18 +41,37 @@ BASIC_EVENTS_REPORT_ENTRY = {
             }
         }
 
-BASIC_CATEGORY_REPORT_ENTRY = {
-            "uniqueId": "basic_category_report_entry",
-            "name": "basic_category_report_entry",
+BASIC_CATEGORIES_REPORT_ENTRY = {
+            "uniqueId": "basic_categories_report_entry",
+            "name": "basic_categories_report_entry",
             "category": "category",
             "description": "description",
             "displayOrder": 10,
             "readOnly": True,
-            "type": "CATEGORY",
+            "type": "CATEGORIES",
             "table": "sessions",
             "queryCategories": {
                 "categoriesGroupColumn": "client_address",
                 "categoriesAggregation": "count(*)"
+            },
+            "rendering": {
+                "arbitrary1": 1,
+                "arbitrary2": True,
+                "arbitrary3": "arbitrary3"
+            }
+        }
+
+BASIC_SERIES_REPORT_ENTRY = {
+            "uniqueId": "basic_series_report_entry",
+            "name": "basic_series_report_entry",
+            "category": "category",
+            "description": "description",
+            "displayOrder": 10,
+            "readOnly": True,
+            "type": "SERIES",
+            "table": "sessions",
+            "querySeries": {
+                "seriesColumns": ["count(*) as sessions"]
             },
             "rendering": {
                 "arbitrary1": 1,
@@ -125,8 +144,8 @@ class ReportsTests(unittest.TestCase):
             assert(results[0]["server_port"] != None)
 
     def test_012_categories_query(self):
-        global BASIC_CATEGORY_REPORT_ENTRY
-        query_id = create_query(BASIC_CATEGORY_REPORT_ENTRY)
+        global BASIC_CATEGORIES_REPORT_ENTRY
+        query_id = create_query(BASIC_CATEGORIES_REPORT_ENTRY)
         assert(query_id != None)
         results = get_data(query_id)
         assert(results != None)
@@ -134,6 +153,15 @@ class ReportsTests(unittest.TestCase):
         if len(results) > 0:
             assert(results[0]["client_address"] != None)
             assert(results[0]["value"] != None)
+
+    def test_013_series_query(self):
+        global BASIC_SERIES_REPORT_ENTRY
+        query_id = create_query(BASIC_SERIES_REPORT_ENTRY)
+        assert(query_id != None)
+        results = get_data(query_id)
+        assert(results != None)
+        assert(len(results) > 0)
+        assert(results[0]["time_trunc"] != None)
         
     @staticmethod
     def finalTearDown(self):

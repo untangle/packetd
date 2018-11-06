@@ -130,7 +130,7 @@ func CreateQuery(reportEntryStr string, startTimeStr string, endTimeStr string) 
 	var rows *sql.Rows
 	var sqlStr string
 
-	sqlStr, err = makeSqlString(reportEntry, startTime, endTime) // FIXME add conditions
+	sqlStr, err = makeSQLString(reportEntry, startTime, endTime) // FIXME add conditions
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +226,14 @@ func logInsertEvent(event Event) {
 		sqlStr += k
 		valueStr += "?"
 		first = false
-		values = append(values, v)
+		timestamp, ok := v.(time.Time)
+		if ok {
+			// Special handle time.Time
+			// We want to log these as milliseconds since epoch
+			values = append(values, timestamp.UnixNano()/1e6)
+		} else {
+			values = append(values, v)
+		}
 	}
 	sqlStr += ")"
 	valueStr += ")"
@@ -343,8 +350,8 @@ func createTables() {
 	_, err = db.Exec(
 		`CREATE TABLE IF NOT EXISTS sessions (
                      session_id int8 PRIMARY KEY NOT NULL,
-                     time_stamp timestamp NOT NULL,
-                     end_time timestamp,
+                     time_stamp bigint NOT NULL,
+                     end_time bigint,
                      ip_protocol int,
                      hostname text,
                      username text,

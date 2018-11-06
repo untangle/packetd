@@ -3,26 +3,43 @@ package reports
 import (
 	"errors"
 	"fmt"
-	//	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/logger"
+	"strconv"
 	"time"
 )
 
-func makeSqlString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
+// makeSQLString makes a SQL string from a ReportEntry
+func makeSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
+	if reportEntry.Table == "" {
+		return "", errors.New("Missing required attribute Table")
+	}
+
 	if reportEntry.Type == "TEXT" {
-		return makeTextSqlString(reportEntry, startTime, endTime)
+		return makeTextSQLString(reportEntry, startTime, endTime)
 	} else if reportEntry.Type == "EVENTS" {
-		return makeEventsSqlString(reportEntry, startTime, endTime)
-	} else if reportEntry.Type == "CATEGORY" {
-		return makeCategorySqlString(reportEntry, startTime, endTime)
+		return makeEventsSQLString(reportEntry, startTime, endTime)
+	} else if reportEntry.Type == "CATEGORIES" {
+		return makeCategoriesSQLString(reportEntry, startTime, endTime)
+	} else if reportEntry.Type == "SERIES" {
+		return makeSeriesSQLString(reportEntry, startTime, endTime)
+	} else if reportEntry.Type == "CATEGORIES_SERIES" {
+		return makeCategoriesSeriesSQLString(reportEntry, startTime, endTime)
 	} else {
-		// FIXME add other report types
 		return "", errors.New("Unsupported reportEntry type")
 	}
 }
 
-func makeTextSqlString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
+// makeTextSQLString makes a SQL string from a TEXT type ReportEntry
+func makeTextSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
+	if reportEntry.QueryText.TextColumns == nil {
+		return "", errors.New("Missing required attribute TextColumns")
+	}
+
 	sqlStr := "SELECT"
 	for i, column := range reportEntry.QueryText.TextColumns {
+		if column == "" {
+			return "", errors.New("Missing column name")
+		}
 		if i == 0 {
 			sqlStr += " " + escape(column)
 		} else {
@@ -35,28 +52,30 @@ func makeTextSqlString(reportEntry *ReportEntry, startTime time.Time, endTime ti
 	return sqlStr, nil
 }
 
-func makeEventsSqlString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
+// makeEventsSQLString makes a SQL string from a EVENTS type ReportEntry
+func makeEventsSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
 	sqlStr := "SELECT * FROM"
 	sqlStr += " " + escape(reportEntry.Table)
 	sqlStr += " WHERE " + timeStampConditions(startTime, endTime)
 	return sqlStr, nil
 }
 
-func makeCategorySqlString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
+// makeCategoriesSQLString makes a SQL string from a CATEGORY type ReportEntry
+func makeCategoriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
 	if reportEntry.QueryCategories.CategoriesGroupColumn == "" {
 		return "", errors.New("Missing required attribute categoriesGroupColumn")
 	}
 	if reportEntry.QueryCategories.CategoriesAggregation == "" {
 		return "", errors.New("Missing required attribute categoriesAggregation")
 	}
-	var orderByColumn int = 2
+	var orderByColumn = 2
 	if reportEntry.QueryCategories.CategoriesOrderByColumn < 0 || reportEntry.QueryCategories.CategoriesOrderByColumn > 2 {
 		return "", errors.New("Illegal value for categoriesOrderByColumn")
 	}
 	if reportEntry.QueryCategories.CategoriesOrderByColumn != 0 {
 		orderByColumn = reportEntry.QueryCategories.CategoriesOrderByColumn
 	}
-	var order string = "DESC"
+	var order = "DESC"
 	if reportEntry.QueryCategories.CategoriesOrderAsc {
 		order = "ASC"
 	}
@@ -75,13 +94,54 @@ func makeCategorySqlString(reportEntry *ReportEntry, startTime time.Time, endTim
 	return sqlStr, nil
 }
 
+// makeSeriesSQLString makes a SQL string from a SERIES type ReportEntry
+func makeSeriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
+	var timeIntervalSec = reportEntry.QuerySeries.SeriesTimeIntervalSeconds
+	if timeIntervalSec == 0 {
+		timeIntervalSec = 60
+	}
+	var timeIntervalMilli = int64(timeIntervalSec) * 1000
+
+	tStr, err := makeTimelineSQLString(startTime, endTime, int64(timeIntervalSec))
+	if err != nil {
+		return "", err
+	}
+
+	qStr := "SELECT"
+	qStr += fmt.Sprintf(" (time_stamp/%d*%d) as time_trunc", timeIntervalMilli, timeIntervalMilli)
+	for _, column := range reportEntry.QuerySeries.SeriesColumns {
+		if column == "" {
+			return "", errors.New("Missing column name")
+		}
+		qStr += ", " + escape(column)
+	}
+	qStr += " FROM " + escape(reportEntry.Table)
+	qStr += " WHERE " + timeStampConditions(startTime, endTime)
+	qStr += " GROUP BY time_trunc"
+
+	sqlStr := "SELECT * FROM "
+	sqlStr += " ( " + tStr + " ) as t1 "
+	sqlStr += "LEFT JOIN "
+	sqlStr += " ( " + qStr + " ) as t2 "
+	sqlStr += " USING (time_trunc) "
+	sqlStr += " ORDER BY time_trunc DESC "
+
+	return sqlStr, nil
+}
+
+// makeCategoriesSeriesSQLString makes a SQL string from a CATEGORIES_SERIES type ReportEntry
+func makeCategoriesSeriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
+	// FIXME
+	return "", errors.New("Unsupported reportEntry type")
+}
+
 // return the SQL conditions/fragment to limit the time_stamp
 // to the specified startTime and endTime
 func timeStampConditions(startTime time.Time, endTime time.Time) string {
 	//startTimeStr := startTime.Format("yyyy-MM-dd HH:mm:ss")
-	startTimeStr := startTime.Format(time.RFC3339)
-	endTimeStr := endTime.Format(time.RFC3339)
-	return fmt.Sprintf("time_stamp > '%s' AND time_stamp < '%s'", startTimeStr, endTimeStr)
+	startTimeStr := dateFormat(startTime)
+	endTimeStr := dateFormat(endTime)
+	return fmt.Sprintf("time_stamp > %s AND time_stamp < %s", startTimeStr, endTimeStr)
 }
 
 // escape escapes quotes in as string
@@ -134,4 +194,42 @@ func escape(source string) string {
 		}
 	}
 	return string(desc[0:j])
+}
+
+//makeTimelineSQLString makes a SQL query string to provide the timeline to left join
+//on time-based series reports to provide all datapoints
+func makeTimelineSQLString(startTime time.Time, endTime time.Time, intervalSec int64) (string, error) {
+	divisor := strconv.FormatInt(intervalSec*1000, 10)
+
+	sqlStr := "SELECT DISTINCT (("
+	sqlStr += "(" + dateFormat(startTime) + "/" + divisor + ")"
+	sqlStr += "+a*10000+b*1000+c*100+d*10+e" + ")*" + divisor + ") AS time_trunc FROM"
+	sqlStr += " (" + makeSeqSQLString("a", 9) + "), "
+	sqlStr += " (" + makeSeqSQLString("b", 10) + "), "
+	sqlStr += " (" + makeSeqSQLString("c", 10) + "), "
+	sqlStr += " (" + makeSeqSQLString("d", 10) + "), "
+	sqlStr += " (" + makeSeqSQLString("e", 10) + ") "
+	sqlStr += "WHERE time_trunc < " + dateFormat(endTime)
+	return sqlStr, nil
+}
+
+//makeSeriesSQLString makes a SQL string to get the sequence 0 to max-1
+//example: maxSeriesSQLString("a",5)
+//SELECT 0 as a UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4
+// 0, 1, 2, 3, 4
+func makeSeqSQLString(columnName string, max int) string {
+	if max < 0 {
+		return ""
+	}
+	sqlStr := fmt.Sprintf("SELECT 0 as %s", columnName)
+	for i := 1; i < max; i++ {
+		sqlStr += fmt.Sprintf(" UNION SELECT %d", i)
+	}
+	return sqlStr
+}
+
+//dateFormat returns the proper sql string for the corresponding time
+func dateFormat(t time.Time) string {
+	//return t.Format(time.RFC3339)
+	return strconv.FormatInt(t.UnixNano()/1e6, 10)
 }
