@@ -3,7 +3,7 @@ package reports
 import (
 	"errors"
 	"fmt"
-	"github.com/untangle/packetd/services/logger"
+	//	"github.com/untangle/packetd/services/logger"
 	"strconv"
 	"time"
 )
