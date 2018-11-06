@@ -122,7 +122,7 @@ func CreateQuery(reportEntryStr string, startTimeStr string, endTimeStr string) 
 
 	err = json.Unmarshal([]byte(reportEntryStr), reportEntry)
 	if err != nil {
-		logger.Err("db.Query error: %s\n", err)
+		logger.Err("json.Unmarshal error: %s\n", err)
 		return nil, err
 	}
 	logger.Debug("ReportEntry: %v\n", reportEntry)
@@ -250,6 +250,11 @@ func logInsertEvent(event Event) {
 		logger.Warn("Failed to exec statement: %s %s\n", err.Error(), sqlStr)
 		return
 	}
+
+	err = stmt.Close()
+	if err != nil {
+		logger.Warn("Failed to close statement: %s %s\n", err.Error(), sqlStr)
+	}
 }
 
 func logUpdateEvent(event Event) {
@@ -290,7 +295,11 @@ func logUpdateEvent(event Event) {
 		logger.Warn("Failed to exec statement: %s %s\n", err.Error(), sqlStr)
 		return
 	}
-	return
+
+	err = stmt.Close()
+	if err != nil {
+		logger.Warn("Failed to close statement: %s %s\n", err.Error(), sqlStr)
+	}
 }
 
 func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
