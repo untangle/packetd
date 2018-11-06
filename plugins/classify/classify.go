@@ -178,7 +178,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	// send the data to classd and read reply
-	reply, err = sendCommand(mess, ctid, newSession)
+	reply, err = daemonClassify(mess, ctid, newSession)
 	if err != nil {
 		logger.Err("classd communication error: %v\n", err)
 		result.SessionRelease = true
@@ -224,8 +224,8 @@ func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
 	}
 }
 
-// sendCommand sends classd the commands and returns the reply
-func sendCommand(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) (string, error) {
+// daemonClassify sends classd the commands and returns the reply
+func daemonClassify(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) (string, error) {
 	var proto string
 	var reply string
 	var err error
@@ -317,33 +317,39 @@ func parseReply(replyString string) (string, string, string, string, uint64, str
 	var category string
 	var state int
 
-	catinfo := strings.Split(replyString, "\r\n")
+	rawinfo := strings.Split(replyString, "\r\n")
 
-	for i := 0; i < len(catinfo); i++ {
-		if len(catinfo[i]) < 3 {
+	for i := 0; i < len(rawinfo); i++ {
+		if len(rawinfo[i]) < 3 {
 			continue
 		}
-		catpair := strings.SplitAfter(catinfo[i], ": ")
-		if len(catpair) != 2 {
+		rawpair := strings.SplitAfter(rawinfo[i], ": ")
+		if len(rawpair) != 2 {
 			continue
 		}
 
-		if catpair[0] == "APPLICATION: " {
-			appid = catpair[1]
-		} else if catpair[0] == "PROTOCHAIN: " {
-			protochain = catpair[1]
-		} else if catpair[0] == "DETAIL: " {
-			detail = catpair[1]
-		} else if catpair[0] == "CONFIDENCE: " {
-			confidence, err = strconv.ParseUint(catpair[1], 10, 64)
+		switch rawpair[0] {
+		case "APPLICATION: ":
+			appid = rawpair[1]
+			break
+		case "PROTOCHAIN: ":
+			protochain = rawpair[1]
+			break
+		case "DETAIL: ":
+			detail = rawpair[1]
+			break
+		case "CONFIDENCE: ":
+			confidence, err = strconv.ParseUint(rawpair[1], 10, 64)
 			if err != nil {
 				confidence = 0
 			}
-		} else if catpair[0] == "STATE: " {
-			state, err = strconv.Atoi(catpair[1])
+			break
+		case "STATE: ":
+			state, err = strconv.Atoi(rawpair[1])
 			if err != nil {
 				state = 0
 			}
+			break
 		}
 	}
 
@@ -385,13 +391,13 @@ func logEvent(session *dispatch.SessionEntry, changed []string) {
 
 // daemonCommand will send a command to the untangle-classd daemon and return the result message
 func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, error) {
-	classdMutex.Lock()
-	defer classdMutex.Unlock()
-
 	buffer := make([]byte, 1024)
 	var command string
 	var err error
 	var tot int
+
+	classdMutex.Lock()
+	defer classdMutex.Unlock()
 
 	// if daemon not connected we do throttled reconnect attempts
 	if daemonConnection == nil {
