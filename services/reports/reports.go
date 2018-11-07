@@ -34,23 +34,23 @@ type Query struct {
 
 // QueryCategoriesOptions stores the query options for CATEGORY type reports
 type QueryCategoriesOptions struct {
-	CategoriesGroupColumn         string `json:"categoriesGroupColumn"`
-	CategoriesAggregationFunction string `json:"categoriesAggregationFunction"`
-	CategoriesAggregationValue    string `json:"categoriesAggregationValue"`
-	CategoriesLimit               int    `json:"categoriesLimit"`
-	CategoriesOrderByColumn       int    `json:"categoriesOrderByColumn"`
-	CategoriesOrderAsc            bool   `json:"categoriesOrderAsc"`
+	GroupColumn         string `json:"groupColumn"`
+	AggregationFunction string `json:"aggregationFunction"`
+	AggregationValue    string `json:"aggregationValue"`
+	Limit               int    `json:"limit"`
+	OrderByColumn       int    `json:"orderByColumn"`
+	OrderAsc            bool   `json:"orderAsc"`
 }
 
 // QueryTextOptions stores the query options for TEXT type reports
 type QueryTextOptions struct {
-	TextColumns []string `json:"textColumns"`
+	Columns []string `json:"columns"`
 }
 
 // QuerySeriesOptions stores the query options for SERIES type reports
 type QuerySeriesOptions struct {
-	SeriesColumns             []string `json:"seriesColumns"`
-	SeriesTimeIntervalSeconds int      `json:"seriesTimeIntervalSeconds"`
+	Columns             []string `json:"columns"`
+	TimeIntervalSeconds int      `json:"timeIntervalSeconds"`
 }
 
 // ReportEntry is a report entry as defined in the JSON schema

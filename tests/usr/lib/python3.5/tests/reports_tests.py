@@ -16,7 +16,7 @@ BASIC_TEXT_REPORT_ENTRY = {
             "type": "TEXT",
             "table": "sessions",
             "queryText": {
-                "textColumns": ["count(*) as session_count"]
+                "columns": ["count(*) as session_count"]
             },
             "rendering": {
                 "arbitrary1": 1,
@@ -51,9 +51,9 @@ BASIC_CATEGORIES_REPORT_ENTRY = {
             "type": "CATEGORIES",
             "table": "sessions",
             "queryCategories": {
-                "categoriesGroupColumn": "client_address",
-                "categoriesAggregationFunction": "count",
-                "categoriesAggregationValue": "*"
+                "groupColumn": "client_address",
+                "aggregationFunction": "count",
+                "aggregationValue": "*"
             },
             "rendering": {
                 "arbitrary1": 1,
@@ -72,7 +72,7 @@ BASIC_SERIES_REPORT_ENTRY = {
             "type": "SERIES",
             "table": "sessions",
             "querySeries": {
-                "seriesColumns": ["count(*) as sessions"]
+                "columns": ["count(*) as sessions"]
             },
             "rendering": {
                 "arbitrary1": 1,
@@ -91,10 +91,10 @@ BASIC_CATEGORIES_SERIES_REPORT_ENTRY = {
             "type": "CATEGORIES_SERIES",
             "table": "sessions",
             "queryCategories": {
-                "categoriesGroupColumn": "client_address",
-                "categoriesAggregationFunction": "count",
-                "categoriesAggregationValue": "1",
-                "categoriesLimit": 5
+                "groupColumn": "client_address",
+                "aggregationFunction": "count",
+                "aggregationValue": "1",
+                "limit": 5
             },
             "rendering": {
                 "arbitrary1": 1,

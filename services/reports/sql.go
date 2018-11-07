@@ -31,12 +31,12 @@ func makeSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.T
 
 // makeTextSQLString makes a SQL string from a TEXT type ReportEntry
 func makeTextSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
-	if reportEntry.QueryText.TextColumns == nil {
-		return "", errors.New("Missing required attribute TextColumns")
+	if reportEntry.QueryText.Columns == nil {
+		return "", errors.New("Missing required attribute Columns")
 	}
 
 	sqlStr := "SELECT"
-	for i, column := range reportEntry.QueryText.TextColumns {
+	for i, column := range reportEntry.QueryText.Columns {
 		if column == "" {
 			return "", errors.New("Missing column name")
 		}
@@ -62,45 +62,49 @@ func makeEventsSQLString(reportEntry *ReportEntry, startTime time.Time, endTime 
 
 // makeCategoriesSQLString makes a SQL string from a CATEGORY type ReportEntry
 func makeCategoriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
-	if reportEntry.QueryCategories.CategoriesGroupColumn == "" {
-		return "", errors.New("Missing required attribute categoriesGroupColumn")
+	if reportEntry.QueryCategories.GroupColumn == "" {
+		return "", errors.New("Missing required attribute GroupColumn")
 	}
-	if reportEntry.QueryCategories.CategoriesAggregationFunction == "" {
-		return "", errors.New("Missing required attribute categoriesAggregationFunction")
+	if reportEntry.QueryCategories.AggregationFunction == "" {
+		return "", errors.New("Missing required attribute AggregationFunction")
 	}
-	if reportEntry.QueryCategories.CategoriesAggregationValue == "" {
-		return "", errors.New("Missing required attribute categoriesAggregationValue")
+	if reportEntry.QueryCategories.AggregationValue == "" {
+		return "", errors.New("Missing required attribute AggregationValue")
 	}
 	var orderByColumn = 2
-	if reportEntry.QueryCategories.CategoriesOrderByColumn < 0 || reportEntry.QueryCategories.CategoriesOrderByColumn > 2 {
-		return "", errors.New("Illegal value for categoriesOrderByColumn")
+	if reportEntry.QueryCategories.OrderByColumn < 0 || reportEntry.QueryCategories.OrderByColumn > 2 {
+		return "", errors.New("Illegal value for OrderByColumn")
 	}
-	if reportEntry.QueryCategories.CategoriesOrderByColumn != 0 {
-		orderByColumn = reportEntry.QueryCategories.CategoriesOrderByColumn
+	if reportEntry.QueryCategories.OrderByColumn != 0 {
+		orderByColumn = reportEntry.QueryCategories.OrderByColumn
 	}
 	var order = "DESC"
-	if reportEntry.QueryCategories.CategoriesOrderAsc {
+	if reportEntry.QueryCategories.OrderAsc {
 		order = "ASC"
 	}
 
 	sqlStr := "SELECT"
-	sqlStr += " " + reportEntry.QueryCategories.CategoriesGroupColumn
-	sqlStr += ", " + reportEntry.QueryCategories.CategoriesAggregationFunction + "(" + reportEntry.QueryCategories.CategoriesAggregationValue + ")"
+	sqlStr += " " + reportEntry.QueryCategories.GroupColumn
+	sqlStr += ", " + reportEntry.QueryCategories.AggregationFunction + "(" + reportEntry.QueryCategories.AggregationValue + ")"
 	sqlStr += " as value"
 	sqlStr += " FROM " + escape(reportEntry.Table)
 	sqlStr += " WHERE " + timeStampConditions(startTime, endTime)
-	sqlStr += " GROUP BY " + reportEntry.QueryCategories.CategoriesGroupColumn
+	sqlStr += " GROUP BY " + reportEntry.QueryCategories.GroupColumn
 	sqlStr += fmt.Sprintf(" ORDER BY %d %s", orderByColumn, order)
 
-	if reportEntry.QueryCategories.CategoriesLimit != 0 {
-		sqlStr += fmt.Sprintf(" LIMIT %d", reportEntry.QueryCategories.CategoriesLimit)
+	if reportEntry.QueryCategories.Limit != 0 {
+		sqlStr += fmt.Sprintf(" LIMIT %d", reportEntry.QueryCategories.Limit)
 	}
 	return sqlStr, nil
 }
 
 // makeSeriesSQLString makes a SQL string from a SERIES type ReportEntry
 func makeSeriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
-	var timeIntervalSec = reportEntry.QuerySeries.SeriesTimeIntervalSeconds
+	if reportEntry.QuerySeries.Columns == nil {
+		return "", errors.New("Missing required attribute Columns")
+	}
+
+	var timeIntervalSec = reportEntry.QuerySeries.TimeIntervalSeconds
 	if timeIntervalSec == 0 {
 		timeIntervalSec = 60
 	}
@@ -113,7 +117,7 @@ func makeSeriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime 
 
 	qStr := "SELECT"
 	qStr += fmt.Sprintf(" (time_stamp/%d*%d) as time_trunc", timeIntervalMilli, timeIntervalMilli)
-	for _, column := range reportEntry.QuerySeries.SeriesColumns {
+	for _, column := range reportEntry.QuerySeries.Columns {
 		if column == "" {
 			return "", errors.New("Missing column name")
 		}
@@ -135,8 +139,8 @@ func makeSeriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime 
 
 // makeCategoriesSeriesSQLString makes a SQL string from a CATEGORIES_SERIES type ReportEntry
 func makeCategoriesSeriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
-	if reportEntry.QueryCategories.CategoriesLimit == 0 {
-		return "", errors.New("Missing required attribute CategoriesLimit")
+	if reportEntry.QueryCategories.Limit == 0 {
+		return "", errors.New("Missing required attribute Limit")
 	}
 
 	distinctValues, err := getDistinctValues(reportEntry, startTime, endTime)
@@ -147,13 +151,13 @@ func makeCategoriesSeriesSQLString(reportEntry *ReportEntry, startTime time.Time
 
 	var columns []string
 	for _, column := range distinctValues {
-		columnStr := reportEntry.QueryCategories.CategoriesAggregationFunction + "("
-		columnStr += "CASE WHEN " + reportEntry.QueryCategories.CategoriesGroupColumn + " = '" + column + "'"
-		columnStr += " THEN " + reportEntry.QueryCategories.CategoriesAggregationValue + " END)"
+		columnStr := reportEntry.QueryCategories.AggregationFunction + "("
+		columnStr += "CASE WHEN " + reportEntry.QueryCategories.GroupColumn + " = '" + column + "'"
+		columnStr += " THEN " + reportEntry.QueryCategories.AggregationValue + " END)"
 		columns = append(columns, columnStr)
 	}
 
-	reportEntry.QuerySeries.SeriesColumns = columns
+	reportEntry.QuerySeries.Columns = columns
 
 	return makeSeriesSQLString(reportEntry, startTime, endTime)
 }
@@ -281,7 +285,7 @@ func getDistinctValues(reportEntry *ReportEntry, startTime time.Time, endTime ti
 	if err != nil {
 		return nil, err
 	}
-	categories, err := getRows(rows, reportEntry.QueryCategories.CategoriesLimit)
+	categories, err := getRows(rows, reportEntry.QueryCategories.Limit)
 	if err != nil {
 		return nil, err
 	}
