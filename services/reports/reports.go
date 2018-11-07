@@ -34,11 +34,12 @@ type Query struct {
 
 // QueryCategoriesOptions stores the query options for CATEGORY type reports
 type QueryCategoriesOptions struct {
-	CategoriesGroupColumn   string `json:"categoriesGroupColumn"`
-	CategoriesAggregation   string `json:"categoriesAggregation"`
-	CategoriesLimit         int    `json:"categoriesLimit"`
-	CategoriesOrderByColumn int    `json:"categoriesOrderByColumn"`
-	CategoriesOrderAsc      bool   `json:"categoriesOrderAsc"`
+	CategoriesGroupColumn         string `json:"categoriesGroupColumn"`
+	CategoriesAggregationFunction string `json:"categoriesAggregationFunction"`
+	CategoriesAggregationValue    string `json:"categoriesAggregationValue"`
+	CategoriesLimit               int    `json:"categoriesLimit"`
+	CategoriesOrderByColumn       int    `json:"categoriesOrderByColumn"`
+	CategoriesOrderAsc            bool   `json:"categoriesOrderAsc"`
 }
 
 // QueryTextOptions stores the query options for TEXT type reports

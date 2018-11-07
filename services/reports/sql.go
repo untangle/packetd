@@ -3,7 +3,7 @@ package reports
 import (
 	"errors"
 	"fmt"
-	//	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/logger"
 	"strconv"
 	"time"
 )
@@ -41,9 +41,9 @@ func makeTextSQLString(reportEntry *ReportEntry, startTime time.Time, endTime ti
 			return "", errors.New("Missing column name")
 		}
 		if i == 0 {
-			sqlStr += " " + escape(column)
+			sqlStr += " " + column
 		} else {
-			sqlStr += ", " + escape(column)
+			sqlStr += ", " + column
 		}
 	}
 	sqlStr += " FROM"
@@ -65,8 +65,11 @@ func makeCategoriesSQLString(reportEntry *ReportEntry, startTime time.Time, endT
 	if reportEntry.QueryCategories.CategoriesGroupColumn == "" {
 		return "", errors.New("Missing required attribute categoriesGroupColumn")
 	}
-	if reportEntry.QueryCategories.CategoriesAggregation == "" {
-		return "", errors.New("Missing required attribute categoriesAggregation")
+	if reportEntry.QueryCategories.CategoriesAggregationFunction == "" {
+		return "", errors.New("Missing required attribute categoriesAggregationFunction")
+	}
+	if reportEntry.QueryCategories.CategoriesAggregationValue == "" {
+		return "", errors.New("Missing required attribute categoriesAggregationValue")
 	}
 	var orderByColumn = 2
 	if reportEntry.QueryCategories.CategoriesOrderByColumn < 0 || reportEntry.QueryCategories.CategoriesOrderByColumn > 2 {
@@ -81,11 +84,12 @@ func makeCategoriesSQLString(reportEntry *ReportEntry, startTime time.Time, endT
 	}
 
 	sqlStr := "SELECT"
-	sqlStr += " " + escape(reportEntry.QueryCategories.CategoriesGroupColumn)
-	sqlStr += ", " + escape(reportEntry.QueryCategories.CategoriesAggregation) + " as value"
+	sqlStr += " " + reportEntry.QueryCategories.CategoriesGroupColumn
+	sqlStr += ", " + reportEntry.QueryCategories.CategoriesAggregationFunction + "(" + reportEntry.QueryCategories.CategoriesAggregationValue + ")"
+	sqlStr += " as value"
 	sqlStr += " FROM " + escape(reportEntry.Table)
 	sqlStr += " WHERE " + timeStampConditions(startTime, endTime)
-	sqlStr += " GROUP BY " + escape(reportEntry.QueryCategories.CategoriesGroupColumn)
+	sqlStr += " GROUP BY " + reportEntry.QueryCategories.CategoriesGroupColumn
 	sqlStr += fmt.Sprintf(" ORDER BY %d %s", orderByColumn, order)
 
 	if reportEntry.QueryCategories.CategoriesLimit != 0 {
@@ -113,7 +117,7 @@ func makeSeriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime 
 		if column == "" {
 			return "", errors.New("Missing column name")
 		}
-		qStr += ", " + escape(column)
+		qStr += ", " + column
 	}
 	qStr += " FROM " + escape(reportEntry.Table)
 	qStr += " WHERE " + timeStampConditions(startTime, endTime)
@@ -131,8 +135,27 @@ func makeSeriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime 
 
 // makeCategoriesSeriesSQLString makes a SQL string from a CATEGORIES_SERIES type ReportEntry
 func makeCategoriesSeriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
-	// FIXME
-	return "", errors.New("Unsupported reportEntry type")
+	if reportEntry.QueryCategories.CategoriesLimit == 0 {
+		return "", errors.New("Missing required attribute CategoriesLimit")
+	}
+
+	distinctValues, err := getDistinctValues(reportEntry, startTime, endTime)
+	logger.Debug("Distinct Values: %v\n", distinctValues)
+	if err != nil {
+		return "", err
+	}
+
+	var columns []string
+	for _, column := range distinctValues {
+		columnStr := reportEntry.QueryCategories.CategoriesAggregationFunction + "("
+		columnStr += "CASE WHEN " + reportEntry.QueryCategories.CategoriesGroupColumn + " = '" + column + "'"
+		columnStr += " THEN " + reportEntry.QueryCategories.CategoriesAggregationValue + " END)"
+		columns = append(columns, columnStr)
+	}
+
+	reportEntry.QuerySeries.SeriesColumns = columns
+
+	return makeSeriesSQLString(reportEntry, startTime, endTime)
 }
 
 // return the SQL conditions/fragment to limit the time_stamp
@@ -232,4 +255,45 @@ func makeSeqSQLString(columnName string, max int) string {
 func dateFormat(t time.Time) string {
 	//return t.Format(time.RFC3339)
 	return strconv.FormatInt(t.UnixNano()/1e6, 10)
+}
+
+// getMapValue gets the value for the row for CATEGORIES reports
+func getMapValue(m map[string]interface{}) string {
+	// We don't care about the value
+	// Delete it so we can find the value of the remaining entry
+	delete(m, "value")
+	// Get the value for the only remaining entry and return it
+	for _, v := range m {
+		str := fmt.Sprintf("%v", v)
+		return str
+	}
+	return ""
+}
+
+// getDistinctValues returns the distinct values to be used
+// in a CATEGORIES_SERIES report
+func getDistinctValues(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) ([]string, error) {
+	categoriesSQLStr, err := makeCategoriesSQLString(reportEntry, startTime, endTime)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.Query(categoriesSQLStr)
+	if err != nil {
+		return nil, err
+	}
+	categories, err := getRows(rows, reportEntry.QueryCategories.CategoriesLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	var values []string
+
+	for _, v := range categories {
+		str := getMapValue(v)
+		if str != "" {
+			values = append(values, str)
+		}
+	}
+
+	return values, nil
 }

@@ -52,7 +52,8 @@ BASIC_CATEGORIES_REPORT_ENTRY = {
             "table": "sessions",
             "queryCategories": {
                 "categoriesGroupColumn": "client_address",
-                "categoriesAggregation": "count(*)"
+                "categoriesAggregationFunction": "count",
+                "categoriesAggregationValue": "*"
             },
             "rendering": {
                 "arbitrary1": 1,
@@ -72,6 +73,28 @@ BASIC_SERIES_REPORT_ENTRY = {
             "table": "sessions",
             "querySeries": {
                 "seriesColumns": ["count(*) as sessions"]
+            },
+            "rendering": {
+                "arbitrary1": 1,
+                "arbitrary2": True,
+                "arbitrary3": "arbitrary3"
+            }
+        }
+
+BASIC_CATEGORIES_SERIES_REPORT_ENTRY = {
+            "uniqueId": "basic_series_report_entry",
+            "name": "basic_series_report_entry",
+            "category": "category",
+            "description": "description",
+            "displayOrder": 10,
+            "readOnly": True,
+            "type": "CATEGORIES_SERIES",
+            "table": "sessions",
+            "queryCategories": {
+                "categoriesGroupColumn": "client_address",
+                "categoriesAggregationFunction": "count",
+                "categoriesAggregationValue": "1",
+                "categoriesLimit": 5
             },
             "rendering": {
                 "arbitrary1": 1,
@@ -162,6 +185,14 @@ class ReportsTests(unittest.TestCase):
         assert(results != None)
         assert(len(results) > 0)
         assert(results[0]["time_trunc"] != None)
+
+    def test_014_series_query(self):
+        global BASIC_CATEGORIES_SERIES_REPORT_ENTRY
+        query_id = create_query(BASIC_CATEGORIES_SERIES_REPORT_ENTRY)
+        assert(query_id != None)
+        results = get_data(query_id)
+        print(results)
+        assert(results != None)
         
     @staticmethod
     def finalTearDown(self):
