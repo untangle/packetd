@@ -154,6 +154,7 @@ func makeCategoriesSeriesSQLString(reportEntry *ReportEntry, startTime time.Time
 		columnStr := reportEntry.QueryCategories.AggregationFunction + "("
 		columnStr += "CASE WHEN " + reportEntry.QueryCategories.GroupColumn + " = '" + column + "'"
 		columnStr += " THEN " + reportEntry.QueryCategories.AggregationValue + " END)"
+		columnStr += " AS '" + escapeSingleTick(column) + "'"
 		columns = append(columns, columnStr)
 	}
 
@@ -169,58 +170,6 @@ func timeStampConditions(startTime time.Time, endTime time.Time) string {
 	startTimeStr := dateFormat(startTime)
 	endTimeStr := dateFormat(endTime)
 	return fmt.Sprintf("time_stamp > %s AND time_stamp < %s", startTimeStr, endTimeStr)
-}
-
-// escape escapes quotes in as string
-// this is a really gross way to handle SQL safety
-// https://github.com/golang/go/issues/18478
-func escape(source string) string {
-	var j int
-	if len(source) == 0 {
-		return ""
-	}
-	tempStr := source[:]
-	desc := make([]byte, len(tempStr)*2)
-	for i := 0; i < len(tempStr); i++ {
-		flag := false
-		var escape byte
-		switch tempStr[i] {
-		case '\r':
-			flag = true
-			escape = '\r'
-			break
-		case '\n':
-			flag = true
-			escape = '\n'
-			break
-		case '\\':
-			flag = true
-			escape = '\\'
-			break
-		case '\'':
-			flag = true
-			escape = '\''
-			break
-		case '"':
-			flag = true
-			escape = '"'
-			break
-		case '\032':
-			flag = true
-			escape = 'Z'
-			break
-		default:
-		}
-		if flag {
-			desc[j] = '\\'
-			desc[j+1] = escape
-			j = j + 2
-		} else {
-			desc[j] = tempStr[i]
-			j = j + 1
-		}
-	}
-	return string(desc[0:j])
 }
 
 //makeTimelineSQLString makes a SQL query string to provide the timeline to left join
@@ -300,4 +249,88 @@ func getDistinctValues(reportEntry *ReportEntry, startTime time.Time, endTime ti
 	}
 
 	return values, nil
+}
+
+// escape escapes quotes in as string
+// this is a really gross way to handle SQL safety
+// https://github.com/golang/go/issues/18478
+func escape(source string) string {
+	var j int
+	if len(source) == 0 {
+		return ""
+	}
+	tempStr := source[:]
+	desc := make([]byte, len(tempStr)*2)
+	for i := 0; i < len(tempStr); i++ {
+		flag := false
+		var escape byte
+		switch tempStr[i] {
+		case '\r':
+			flag = true
+			escape = '\r'
+			break
+		case '\n':
+			flag = true
+			escape = '\n'
+			break
+		case '\\':
+			flag = true
+			escape = '\\'
+			break
+		case '\'':
+			flag = true
+			escape = '\''
+			break
+		case '"':
+			flag = true
+			escape = '"'
+			break
+		case '\032':
+			flag = true
+			escape = 'Z'
+			break
+		default:
+		}
+		if flag {
+			desc[j] = '\\'
+			desc[j+1] = escape
+			j = j + 2
+		} else {
+			desc[j] = tempStr[i]
+			j = j + 1
+		}
+	}
+	return string(desc[0:j])
+}
+
+// escape escapes quotes in as string
+// this is a really gross way to handle SQL safety
+// https://github.com/golang/go/issues/18478
+func escapeSingleTick(source string) string {
+	var j int
+	if len(source) == 0 {
+		return ""
+	}
+	tempStr := source[:]
+	desc := make([]byte, len(tempStr)*2)
+	for i := 0; i < len(tempStr); i++ {
+		flag := false
+		var escape byte
+		switch tempStr[i] {
+		case '\'':
+			flag = true
+			escape = '\''
+			break
+		default:
+		}
+		if flag {
+			desc[j] = '\\'
+			desc[j+1] = escape
+			j = j + 2
+		} else {
+			desc[j] = tempStr[i]
+			j = j + 1
+		}
+	}
+	return string(desc[0:j])
 }

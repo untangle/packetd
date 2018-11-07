@@ -126,6 +126,19 @@ def get_data(query_id):
         return None
     else:
         return json.loads(output)
+
+def close_query(query_id):
+    """Closes the specified query ID"""
+    cmd = 'curl -m 5 -X POST -s -o - "http://localhost:8080/api/reports/close_query/%s"' % str(query_id)
+    print(cmd)
+    p = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
+    output = p.stdout.decode()
+    print("XXX:")
+    print(output)
+    if p.returncode != 0:
+        return None
+    else:
+        return output
     
 class ReportsTests(unittest.TestCase):
 
@@ -148,6 +161,7 @@ class ReportsTests(unittest.TestCase):
         query_id = create_query(BASIC_TEXT_REPORT_ENTRY)
         assert(query_id != None)
         results = get_data(query_id)
+        close_query(query_id)
         assert(results != None)
         assert(results[0] != None)
         assert(results[0]["session_count"] != None)
@@ -157,6 +171,7 @@ class ReportsTests(unittest.TestCase):
         query_id = create_query(BASIC_EVENTS_REPORT_ENTRY)
         assert(query_id != None)
         results = get_data(query_id)
+        close_query(query_id)
         assert(results != None)
         assert(isinstance(results, list))
         if len(results) > 0:
@@ -171,6 +186,7 @@ class ReportsTests(unittest.TestCase):
         query_id = create_query(BASIC_CATEGORIES_REPORT_ENTRY)
         assert(query_id != None)
         results = get_data(query_id)
+        close_query(query_id)
         assert(results != None)
         assert(isinstance(results, list))
         if len(results) > 0:
@@ -182,15 +198,17 @@ class ReportsTests(unittest.TestCase):
         query_id = create_query(BASIC_SERIES_REPORT_ENTRY)
         assert(query_id != None)
         results = get_data(query_id)
+        close_query(query_id)
         assert(results != None)
         assert(len(results) > 0)
         assert(results[0]["time_trunc"] != None)
 
-    def test_014_series_query(self):
+    def test_014_categories_series_query(self):
         global BASIC_CATEGORIES_SERIES_REPORT_ENTRY
         query_id = create_query(BASIC_CATEGORIES_SERIES_REPORT_ENTRY)
         assert(query_id != None)
         results = get_data(query_id)
+        close_query(query_id)
         print(results)
         assert(results != None)
         

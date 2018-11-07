@@ -147,7 +147,10 @@ func CreateQuery(reportEntryStr string, startTimeStr string, endTimeStr string) 
 	q.Rows = rows
 
 	queries[q.ID] = q
-	go cleanupQuery(q)
+	go func() {
+		time.Sleep(30 * time.Second)
+		cleanupQuery(q)
+	}()
 	return q, nil
 }
 
@@ -168,6 +171,17 @@ func GetData(queryID uint64) (string, error) {
 	}
 
 	return string(jsonData), nil
+}
+
+// CloseQuery closes the query now
+func CloseQuery(queryID uint64) (string, error) {
+	q := queries[queryID]
+	if q == nil {
+		logger.Warn("Query not found: %d\n", queryID)
+		return "", errors.New("Query ID not found")
+	}
+	cleanupQuery(q)
+	return "Success", nil
 }
 
 // CreateEvent creates an Event
@@ -345,11 +359,11 @@ func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
 }
 
 func cleanupQuery(query *Query) {
-	logger.Debug("cleanupQuery(%d) launched\n", query.ID)
-	time.Sleep(30 * time.Second)
+	logger.Debug("cleanupQuery(%d)\n", query.ID)
 	delete(queries, query.ID)
 	if query.Rows != nil {
 		query.Rows.Close()
+		query.Rows = nil
 	}
 	logger.Debug("cleanupQuery(%d) finished\n", query.ID)
 }

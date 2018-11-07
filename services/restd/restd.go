@@ -58,6 +58,7 @@ func Startup() {
 	api.GET("/defaults/*path", getDefaultSettings)
 	api.POST("/reports/create_query", reportsCreateQuery)
 	api.GET("/reports/get_data/:query_id", reportsGetData)
+	api.POST("/reports/close_query/:query_id", reportsCloseQuery)
 
 	// files
 	engine.Static("/admin", "/www/admin")
@@ -87,13 +88,7 @@ func pingHandler(c *gin.Context) {
 func reportsGetData(c *gin.Context) {
 	addHeaders(c)
 
-	// body, err := ioutil.ReadAll(c.Request.Body)
-	// if err != nil {
-	// 	c.JSON(200, gin.H{"error": err})
-	// 	return
-	// }
 	queryStr := c.Param("query_id")
-	// queryID, err := strconv.ParseUint(string(body), 10, 64)
 	if queryStr == "" {
 		c.JSON(200, gin.H{"error": "query_id not found"})
 		return
@@ -137,6 +132,28 @@ func reportsCreateQuery(c *gin.Context) {
 	// c.JSON(200, gin.H{
 	// 	"queryID": q.ID,
 	// })
+}
+
+func reportsCloseQuery(c *gin.Context) {
+	queryStr := c.Param("query_id")
+	if queryStr == "" {
+		c.JSON(200, gin.H{"error": "query_id not found"})
+		return
+	}
+	queryID, err := strconv.ParseUint(queryStr, 10, 64)
+	if err != nil {
+		c.JSON(200, gin.H{"error": err})
+		return
+	}
+
+	str, err := reports.CloseQuery(queryID)
+	if err != nil {
+		c.JSON(200, gin.H{"error": err})
+		return
+	}
+
+	c.String(200, str)
+	return
 }
 
 func getSettings(c *gin.Context) {
