@@ -3,11 +3,13 @@ package restd
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/settings"
@@ -59,6 +61,8 @@ func Startup() {
 	api.POST("/reports/create_query", reportsCreateQuery)
 	api.GET("/reports/get_data/:query_id", reportsGetData)
 	api.POST("/reports/close_query/:query_id", reportsCloseQuery)
+	api.POST("/warehouse/capture", warehouseCapture)
+	api.POST("/warehouse/playback", warehousePlayback)
 
 	// files
 	engine.Static("/admin", "/www/admin")
@@ -154,6 +158,57 @@ func reportsCloseQuery(c *gin.Context) {
 
 	c.String(200, str)
 	return
+}
+
+func warehousePlayback(c *gin.Context) {
+	var data map[string]string
+	var body []byte
+	var filename string
+	var speedstr string
+	var speedval int
+	var found bool
+	var err error
+
+	body, err = ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(200, gin.H{"error": err})
+		return
+	}
+
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		c.JSON(200, gin.H{"error": err})
+		return
+	}
+
+	filename, found = data["filename"]
+	if found != true {
+		c.JSON(200, gin.H{"error": "filename not found"})
+		return
+	}
+
+	speedstr, found = data["speed"]
+	if found == true {
+		speedval, err = strconv.Atoi(speedstr)
+		if err != nil {
+			speedval = 1
+		}
+	} else {
+		speedval = 1
+	}
+
+	kernel.SetWarehouseFlag('P')
+	kernel.SetWarehouseFile(filename)
+	kernel.SetWarehouseSpeed(speedval)
+
+	logger.Info("Beginning playback of file:%s speed:%d\n", filename, speedval)
+	kernel.PlaybackWarehouseFile()
+
+	c.JSON(200, "Playback started")
+}
+
+func warehouseCapture(c *gin.Context) {
+	c.JSON(200, "THIS FUNCTION IS NOT YET IMPLEMENTED")
 }
 
 func getSettings(c *gin.Context) {
