@@ -111,7 +111,7 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
     }
 
 	if (get_warehouse_flag() == 'C') warehouse_capture('Q',rawpkt,rawlen,mark,ctid,nfid);
-    go_nfqueue_callback(mark,rawpkt,rawlen,ctid,nfid,buffer);
+    if (get_bypass_flag() == 0) go_nfqueue_callback(mark,rawpkt,rawlen,ctid,nfid,buffer);
 
 	return(0);
 }

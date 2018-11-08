@@ -94,8 +94,13 @@ char* itolevel(int value,char *dest);
 void rawmessage(int priority,const char *source,const char *message);
 void logmessage(int priority,const char *source,const char *format,...);
 void hexmessage(int priority,const char *source,const void *buffer,int size);
+
 int get_shutdown_flag(void);
 void set_shutdown_flag(int value);
+
+int get_bypass_flag(void);
+void set_bypass_flag(int value);
+
 int get_warehouse_flag(void);
 void set_warehouse_flag(int value);
 void set_warehouse_file(char *filename);

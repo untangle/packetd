@@ -63,6 +63,7 @@ func Startup() {
 	api.POST("/reports/close_query/:query_id", reportsCloseQuery)
 	api.POST("/warehouse/capture", warehouseCapture)
 	api.POST("/warehouse/playback", warehousePlayback)
+	api.POST("/control/traffic", trafficControl)
 
 	// files
 	engine.Static("/admin", "/www/admin")
@@ -208,7 +209,45 @@ func warehousePlayback(c *gin.Context) {
 }
 
 func warehouseCapture(c *gin.Context) {
-	c.JSON(200, "THIS FUNCTION IS NOT YET IMPLEMENTED")
+	c.JSON(200, "THIS FUNCTION IS NOT YET IMPLEMENTED") // TODO - some day
+}
+
+func trafficControl(c *gin.Context) {
+	var data map[string]string
+	var body []byte
+	var bypass string
+	var found bool
+	var err error
+
+	body, err = ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(200, gin.H{"error": err})
+		return
+	}
+
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		c.JSON(200, gin.H{"error": err})
+		return
+	}
+
+	bypass, found = data["bypass"]
+	if found == true {
+		if strings.EqualFold(bypass, "TRUE") {
+			logger.Info("Setting traffic bypass flag\n")
+			kernel.SetBypassFlag(1)
+			c.JSON(200, "Traffic bypass flag ENABLED")
+		} else if strings.EqualFold(bypass, "FALSE") {
+			logger.Info("Clearing traffic bypass flag\n")
+			kernel.SetBypassFlag(0)
+			c.JSON(200, "Traffic bypass flag CLEARED")
+		} else {
+			c.JSON(200, gin.H{"error": "Parameter must be TRUE or FALSE"})
+		}
+		return
+	}
+
+	c.JSON(200, gin.H{"error": "Invalid or missing traffic control command"})
 }
 
 func getSettings(c *gin.Context) {

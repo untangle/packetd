@@ -148,6 +148,7 @@ func parseArguments() {
 	versionPtr := flag.Bool("version", false, "version")
 	localPtr := flag.Bool("local", false, "run on console")
 	debugPtr := flag.Bool("debug", false, "enable debug")
+	bypassPtr := flag.Bool("bypass", false, "ignore live traffic")
 	playbackFilePtr := flag.String("playback", "", "playback traffic from specified file")
 	captureFilePtr := flag.String("capture", "", "capture traffic to specified file")
 	playSpeedPtr := flag.Int("playspeed", 1, "traffic playback speed multiplier")
@@ -173,6 +174,10 @@ func parseArguments() {
 
 	if *debugPtr {
 		kernel.SetDebugFlag()
+	}
+
+	if *bypassPtr {
+		kernel.SetBypassFlag(1)
 	}
 
 	if len(*playbackFilePtr) != 0 {

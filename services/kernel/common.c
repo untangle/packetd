@@ -13,6 +13,7 @@ static char		*g_warehouse_file = NULL;
 static int		g_warehouse_speed = 1;
 static int		g_warehouse_flag = 0;
 static int		g_shutdown = 0;
+static int		g_bypass = 0;
 static int		g_debug = 0;
 
 char* itolevel(int value,char *dest)
@@ -82,6 +83,16 @@ int get_shutdown_flag(void)
 void set_shutdown_flag(int value)
 {
 	g_shutdown = value;
+}
+
+int get_bypass_flag(void)
+{
+	return(g_bypass);
+}
+
+void set_bypass_flag(int value)
+{
+	g_bypass = value;
 }
 
 int get_warehouse_flag(void)

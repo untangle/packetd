@@ -92,7 +92,7 @@ int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct n
 	}
 
 	if (get_warehouse_flag() == 'C') warehouse_capture('L',&info,sizeof(info),0,0,0);
-	go_netlogger_callback(&info);
+	if (get_bypass_flag() == 0) go_netlogger_callback(&info);
 
 	return(0);
 }

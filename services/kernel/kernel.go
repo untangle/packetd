@@ -98,6 +98,16 @@ func SetDebugFlag() {
 	debugFlag = true
 }
 
+// GetBypassFlag gets the live traffic bypass flag
+func GetBypassFlag() int {
+	return int(C.get_bypass_flag())
+}
+
+// SetBypassFlag flag sets the live traffic bypass flag
+func SetBypassFlag(value int) {
+	C.set_bypass_flag(C.int(value))
+}
+
 // GetWarehouseFlag gets the value of the warehouse traffic capture and playback flag
 func GetWarehouseFlag() int {
 	return int(C.get_warehouse_flag())
