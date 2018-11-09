@@ -85,6 +85,9 @@ insert_packetd_rules()
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state invalid return
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state untracked return
 
+    # FOR TESTING FIXME
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ip daddr != 4.2.2.1 return
+    
     # Local?
     # ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd fib daddr . oif type local return
 

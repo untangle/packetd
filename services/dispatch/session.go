@@ -44,7 +44,7 @@ func (entry *SessionEntry) GetAttachment(name string) interface{} {
 	return value
 }
 
-// DelAttachment is used to safely delete an attachment from a session object
+// DeleteAttachment is used to safely delete an attachment from a session object
 func (entry *SessionEntry) DeleteAttachment(name string) bool {
 	entry.attachmentLock.Lock()
 	value := entry.attachments[name]

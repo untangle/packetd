@@ -11,8 +11,11 @@ import (
 
 const maxAllowedTime = 30 * time.Second
 
-var NF_DROP = 0
-var NF_ACCEPT = 1
+// NfDrop is NF_DROP constant
+var NfDrop = 0
+
+// NfAccept is the NF_ACCEPT constant
+var NfAccept = 1
 
 //NfqueueHandlerFunction defines a pointer to a nfqueue callback function
 type NfqueueHandlerFunction func(NfqueueMessage, uint32, bool) NfqueueResult
@@ -114,7 +117,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		mess.MsgTuple.ClientAddress = dupIP(mess.IP6layer.SrcIP)
 		mess.MsgTuple.ServerAddress = dupIP(mess.IP6layer.DstIP)
 	} else {
-		return NF_ACCEPT, pmark
+		return NfAccept, pmark
 	}
 
 	// get the TCP layer
@@ -239,7 +242,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 	}
 
 	// return the updated mark to be set on the packet
-	return NF_ACCEPT, pmark
+	return NfAccept, pmark
 }
 
 // obtainSessionEntry finds an existing or creates a new Session object

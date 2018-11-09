@@ -18,9 +18,6 @@ import (
 	"unsafe"
 )
 
-var NF_ACCEPT int = int(C.NF_ACCEPT)
-var NF_DROP int = int(C.NF_DROP)
-
 // ConntrackCallback is a function to handle conntrack events
 type ConntrackCallback func(uint32, uint8, uint8, uint8, net.IP, net.IP, uint16, uint16, net.IP, net.IP, uint16, uint16, uint64, uint64)
 
