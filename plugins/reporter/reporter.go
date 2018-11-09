@@ -3,6 +3,7 @@
 package reporter
 
 import (
+	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
@@ -81,7 +82,10 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		"server_port":      session.ClientSideTuple.ServerPort,
 	}
 	reports.LogEvent(reports.CreateEvent("session_new", "sessions", 1, columns, nil))
-	session.PutAttachment("session_new", columns)
+	for k, v := range columns {
+		session.PutAttachment(k, v)
+		dict.AddSessionEntry(session.ConntrackID, k, v)
+	}
 	return result
 }
 
@@ -102,7 +106,10 @@ func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
 				"server_port_new":    session.ServerSideTuple.ServerPort,
 			}
 			reports.LogEvent(reports.CreateEvent("session_nat", "sessions", 2, columns, modifiedColumns))
-			session.PutAttachment("session_nat", modifiedColumns)
+			for k, v := range modifiedColumns {
+				session.PutAttachment(k, v)
+				dict.AddSessionEntry(session.ConntrackID, k, v)
+			}
 		} else {
 			// We should not receive a new conntrack event for something that is not in the session table
 			// However it happens on local outbound sessions, we should handle these diffently

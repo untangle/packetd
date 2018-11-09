@@ -94,13 +94,16 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		serverCountry = DstRecord.Country.IsoCode
 	}
 
-	logger.Debug("SRC: %v = %s\n", srcAddr, clientCountry)
-	logger.Debug("DST: %v = %s\n", dstAddr, serverCountry)
+	//logger.Debug("SRC: %v = %s\n", srcAddr, clientCountry)
+	//logger.Debug("DST: %v = %s\n", dstAddr, serverCountry)
 
 	dict.AddSessionEntry(ctid, "client_country", clientCountry)
 	dict.AddSessionEntry(ctid, "server_country", serverCountry)
 	mess.Session.PutAttachment("client_country", clientCountry)
 	mess.Session.PutAttachment("server_country", serverCountry)
+
+	logger.Warn("SRC: %v = %s\n", srcAddr, clientCountry)
+	logger.Warn("DST: %v = %s\n", dstAddr, serverCountry)
 	logEvent(mess.Session, clientCountry, serverCountry)
 
 	return result
