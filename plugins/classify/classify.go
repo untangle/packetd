@@ -378,15 +378,16 @@ func logEvent(session *dispatch.SessionEntry, changed []string) {
 		modifiedColumns[v] = dispatch.GetSessionAttachment(session, v)
 	}
 
-	allColumns := make(map[string]interface{})
-	allColumns["application_id"] = dispatch.GetSessionAttachment(session, "application_id")
-	allColumns["application_name"] = dispatch.GetSessionAttachment(session, "application_name")
-	allColumns["application_protochain"] = dispatch.GetSessionAttachment(session, "application_protochain")
-	allColumns["application_detail"] = dispatch.GetSessionAttachment(session, "application_detail")
-	allColumns["application_category"] = dispatch.GetSessionAttachment(session, "application_category")
-	allColumns["application_confidence"] = dispatch.GetSessionAttachment(session, "application_confidence")
+	// allColumns := make(map[string]interface{})
+	// allColumns["application_id"] = dispatch.GetSessionAttachment(session, "application_id")
+	// allColumns["application_name"] = dispatch.GetSessionAttachment(session, "application_name")
+	// allColumns["application_protochain"] = dispatch.GetSessionAttachment(session, "application_protochain")
+	// allColumns["application_detail"] = dispatch.GetSessionAttachment(session, "application_detail")
+	// allColumns["application_category"] = dispatch.GetSessionAttachment(session, "application_category")
+	// allColumns["application_confidence"] = dispatch.GetSessionAttachment(session, "application_confidence")
+	// dispatch.PutSessionAttachment(session, "session_classify", allColumns)
+
 	reports.LogEvent(reports.CreateEvent("session_classify", "sessions", 2, columns, modifiedColumns))
-	dispatch.PutSessionAttachment(session, "session_classify", allColumns)
 }
 
 // daemonCommand will send a command to the untangle-classd daemon and return the result message

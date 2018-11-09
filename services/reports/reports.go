@@ -407,14 +407,21 @@ func createTables() {
                      application_flagged boolean,
                      application_confidence integer,
                      application_detail text,
-                     dns_prediction text,
-                     dns_prediction_category text)`)
+                     certificate_subject_cn text,
+                     certificate_subject_o text,
+                     ssl_sni text,
+                     client_dns_hint text,
+                     server_dns_hint text)`)
 
-	// FIXME add cert info
-	// FIXME add SNI
-	// FIXME add domain_prediction (SNI + dns_prediction + cert_prediction)
+	// FIXME add domain (SNI + dns_prediction + cert_prediction)
+	// We need a singular "domain" field that takes all the various domain determination methods into account and chooses the best one
+	// I think the preference order is:
+	//    ssl_sni (preferred because the client specified exactly the domain it is seeking)
+	//    server_dns_hint (use a dns hint if no other method is known)
+	//    certificate_subject_cn (preferred next as its specified by the server, but not exact, this same field is used by both certsniff and certfetch)
+
 	// FIXME add domain_category
-	// FIXME add web_domain (for HTTP host header)
+	// We need to add domain level categorization
 
 	if err != nil {
 		logger.Err("Failed to create table: %s\n", err.Error())

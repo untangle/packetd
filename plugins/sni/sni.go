@@ -4,6 +4,7 @@ import (
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/reports"
 )
 
 const pluginName = "sni"
@@ -50,6 +51,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	if hostname != "" {
 		logger.Debug("Extracted SNI %s for %d\n", hostname, ctid)
 		dict.AddSessionEntry(ctid, "ssl_sni", hostname)
+		logEvent(mess.Session, hostname)
 	}
 
 	// release the session if we don't find SNI in the first few packets
@@ -196,4 +198,17 @@ func extractSNIhostname(buffer []byte) (bool, string) {
 	}
 
 	return true, hostname
+}
+
+// logEvent logs an update event that updates the ssl_sni column
+// provide the session, and the sni string
+func logEvent(session *dispatch.SessionEntry, sslSni string) {
+	columns := map[string]interface{}{
+		"session_id": session.SessionID,
+	}
+
+	modifiedColumns := make(map[string]interface{})
+	modifiedColumns["ssl_sni"] = sslSni
+
+	reports.LogEvent(reports.CreateEvent("session_sni", "sessions", 2, columns, modifiedColumns))
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/reports"
 	"strings"
 	"sync"
 	"time"
@@ -48,40 +49,44 @@ func AttachCertificateToSession(session *dispatch.SessionEntry, certificate x509
 
 	dispatch.PutSessionAttachment(session, "certificate", certificate)
 
-	setSessionEntry("certificate_subject_cn", certificate.Subject.CommonName, session.ConntrackID)
-	setSessionEntry("certificate_subject_sn", certificate.Subject.SerialNumber, session.ConntrackID)
-	setSessionList("certificate_subject_c", certificate.Subject.Country, session.ConntrackID)
-	setSessionList("certificate_subject_o", certificate.Subject.Organization, session.ConntrackID)
-	setSessionList("certificate_subject_ou", certificate.Subject.OrganizationalUnit, session.ConntrackID)
-	setSessionList("certificate_subject_l", certificate.Subject.Locality, session.ConntrackID)
-	setSessionList("certificate_subject_p", certificate.Subject.Province, session.ConntrackID)
-	setSessionList("certificate_subject_sa", certificate.Subject.StreetAddress, session.ConntrackID)
-	setSessionList("certificate_subject_pc", certificate.Subject.PostalCode, session.ConntrackID)
-	setSessionList("certificate_subject_san", certificate.DNSNames, session.ConntrackID)
+	setSessionEntry(session, "certificate_subject_cn", certificate.Subject.CommonName, session.ConntrackID)
+	setSessionEntry(session, "certificate_subject_sn", certificate.Subject.SerialNumber, session.ConntrackID)
+	setSessionList(session, "certificate_subject_c", certificate.Subject.Country, session.ConntrackID)
+	setSessionList(session, "certificate_subject_o", certificate.Subject.Organization, session.ConntrackID)
+	setSessionList(session, "certificate_subject_ou", certificate.Subject.OrganizationalUnit, session.ConntrackID)
+	setSessionList(session, "certificate_subject_l", certificate.Subject.Locality, session.ConntrackID)
+	setSessionList(session, "certificate_subject_p", certificate.Subject.Province, session.ConntrackID)
+	setSessionList(session, "certificate_subject_sa", certificate.Subject.StreetAddress, session.ConntrackID)
+	setSessionList(session, "certificate_subject_pc", certificate.Subject.PostalCode, session.ConntrackID)
+	setSessionList(session, "certificate_subject_san", certificate.DNSNames, session.ConntrackID)
 
-	setSessionEntry("certificate_issuer_cn", certificate.Issuer.CommonName, session.ConntrackID)
-	setSessionEntry("certificate_issuer_sn", certificate.Issuer.SerialNumber, session.ConntrackID)
-	setSessionList("certificate_issuer_c", certificate.Issuer.Country, session.ConntrackID)
-	setSessionList("certificate_issuer_o", certificate.Issuer.Organization, session.ConntrackID)
-	setSessionList("certificate_issuer_ou", certificate.Issuer.OrganizationalUnit, session.ConntrackID)
-	setSessionList("certificate_issuer_l", certificate.Issuer.Locality, session.ConntrackID)
-	setSessionList("certificate_issuer_p", certificate.Issuer.Province, session.ConntrackID)
-	setSessionList("certificate_issuer_sa", certificate.Issuer.StreetAddress, session.ConntrackID)
-	setSessionList("certificate_issuer_pc", certificate.Issuer.PostalCode, session.ConntrackID)
+	setSessionEntry(session, "certificate_issuer_cn", certificate.Issuer.CommonName, session.ConntrackID)
+	setSessionEntry(session, "certificate_issuer_sn", certificate.Issuer.SerialNumber, session.ConntrackID)
+	setSessionList(session, "certificate_issuer_c", certificate.Issuer.Country, session.ConntrackID)
+	setSessionList(session, "certificate_issuer_o", certificate.Issuer.Organization, session.ConntrackID)
+	setSessionList(session, "certificate_issuer_ou", certificate.Issuer.OrganizationalUnit, session.ConntrackID)
+	setSessionList(session, "certificate_issuer_l", certificate.Issuer.Locality, session.ConntrackID)
+	setSessionList(session, "certificate_issuer_p", certificate.Issuer.Province, session.ConntrackID)
+	setSessionList(session, "certificate_issuer_sa", certificate.Issuer.StreetAddress, session.ConntrackID)
+	setSessionList(session, "certificate_issuer_pc", certificate.Issuer.PostalCode, session.ConntrackID)
+
+	logEvent(session)
 }
 
-func setSessionEntry(field string, value string, ctid uint32) {
-
+// setSessionEntry sets the session attachment and dict entry for the specified field to the specified value
+func setSessionEntry(session *dispatch.SessionEntry, field string, value string, ctid uint32) {
 	if len(value) == 0 {
 		return
 	}
 
 	output := strings.Replace(value, ",", "-", -1)
 	dict.AddSessionEntry(ctid, field, output)
+	dispatch.PutSessionAttachment(session, field, output)
 }
 
-func setSessionList(field string, value []string, ctid uint32) {
-
+// setSessionEntry sets the session attachment and dict entry for the specified field to the specified value
+// the value is a list of strings that will be joined into a single string using "|"
+func setSessionList(session *dispatch.SessionEntry, field string, value []string, ctid uint32) {
 	if len(value) == 0 {
 		return
 	}
@@ -99,8 +104,7 @@ func setSessionList(field string, value []string, ctid uint32) {
 		return
 	}
 
-	output := strings.Replace(buffer, ",", "-", -1)
-	dict.AddSessionEntry(ctid, field, output)
+	setSessionEntry(session, field, buffer, ctid)
 }
 
 // FindCertificate fetches the cached certificate for the argumented address.
@@ -154,4 +158,18 @@ func cleanupTask() {
 			cleanCertificateTable()
 		}
 	}
+}
+
+// logEvent logs an update event that updates the certificate columns
+// provide the session, and the client and server country
+func logEvent(session *dispatch.SessionEntry) {
+	columns := map[string]interface{}{
+		"session_id": session.SessionID,
+	}
+
+	modifiedColumns := make(map[string]interface{})
+	modifiedColumns["certificate_subject_cn"] = dispatch.GetSessionAttachment(session, "certificate_subject_cn")
+	modifiedColumns["certificate_subject_o"] = dispatch.GetSessionAttachment(session, "certificate_subject_o")
+
+	reports.LogEvent(reports.CreateEvent("session_cert", "sessions", 2, columns, modifiedColumns))
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/reports"
 	"io"
 	"net"
 	"net/http"
@@ -70,8 +71,8 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	var srcAddr net.IP
 	var dstAddr net.IP
-	var SrcCode = "XX"
-	var DstCode = "XX"
+	var clientCountry = "XX"
+	var serverCountry = "XX"
 
 	if mess.IP6layer != nil {
 		srcAddr = mess.IP6layer.SrcIP
@@ -85,19 +86,22 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	SrcRecord, err := geodb.City(srcAddr)
 	if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
-		SrcCode = SrcRecord.Country.IsoCode
+		clientCountry = SrcRecord.Country.IsoCode
 	}
 
 	DstRecord, err := geodb.City(dstAddr)
 	if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
-		DstCode = DstRecord.Country.IsoCode
+		serverCountry = DstRecord.Country.IsoCode
 	}
 
-	logger.Debug("SRC: %v = %s\n", srcAddr, SrcCode)
-	logger.Debug("DST: %v = %s\n", dstAddr, DstCode)
+	logger.Debug("SRC: %v = %s\n", srcAddr, clientCountry)
+	logger.Debug("DST: %v = %s\n", dstAddr, serverCountry)
 
-	dict.AddSessionEntry(ctid, "client_country", SrcCode)
-	dict.AddSessionEntry(ctid, "server_country", DstCode)
+	dict.AddSessionEntry(ctid, "client_country", clientCountry)
+	dict.AddSessionEntry(ctid, "server_country", serverCountry)
+	dispatch.PutSessionAttachment(mess.Session, "client_country", clientCountry)
+	dispatch.PutSessionAttachment(mess.Session, "server_country", serverCountry)
+	logEvent(mess.Session, clientCountry, serverCountry)
 
 	return result
 }
@@ -176,4 +180,18 @@ func findGeoFile(download bool) string {
 
 	// Not found - just return one
 	return "/tmp/GeoLite2-City.mmdb"
+}
+
+// logEvent logs an update event that updates the *_country columns
+// provide the session, and the client and server country
+func logEvent(session *dispatch.SessionEntry, clientCountry string, serverCountry string) {
+	columns := map[string]interface{}{
+		"session_id": session.SessionID,
+	}
+
+	modifiedColumns := make(map[string]interface{})
+	modifiedColumns["client_country"] = clientCountry
+	modifiedColumns["server_country"] = serverCountry
+
+	reports.LogEvent(reports.CreateEvent("session_geoip", "sessions", 2, columns, modifiedColumns))
 }
