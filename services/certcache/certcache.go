@@ -47,7 +47,7 @@ func Shutdown() {
 // to populate the dictionary  with details about the certificate
 func AttachCertificateToSession(session *dispatch.SessionEntry, certificate x509.Certificate) {
 
-	dispatch.PutSessionAttachment(session, "certificate", certificate)
+	session.PutAttachment("certificate", certificate)
 
 	setSessionEntry(session, "certificate_subject_cn", certificate.Subject.CommonName, session.ConntrackID)
 	setSessionEntry(session, "certificate_subject_sn", certificate.Subject.SerialNumber, session.ConntrackID)
@@ -81,7 +81,7 @@ func setSessionEntry(session *dispatch.SessionEntry, field string, value string,
 
 	output := strings.Replace(value, ",", "-", -1)
 	dict.AddSessionEntry(ctid, field, output)
-	dispatch.PutSessionAttachment(session, field, output)
+	session.PutAttachment(field, output)
 }
 
 // setSessionEntry sets the session attachment and dict entry for the specified field to the specified value
@@ -168,8 +168,8 @@ func logEvent(session *dispatch.SessionEntry) {
 	}
 
 	modifiedColumns := make(map[string]interface{})
-	modifiedColumns["certificate_subject_cn"] = dispatch.GetSessionAttachment(session, "certificate_subject_cn")
-	modifiedColumns["certificate_subject_o"] = dispatch.GetSessionAttachment(session, "certificate_subject_o")
+	modifiedColumns["certificate_subject_cn"] = session.GetAttachment("certificate_subject_cn")
+	modifiedColumns["certificate_subject_o"] = session.GetAttachment("certificate_subject_o")
 
 	reports.LogEvent(reports.CreateEvent("session_cert", "sessions", 2, columns, modifiedColumns))
 }

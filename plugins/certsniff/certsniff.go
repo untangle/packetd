@@ -115,7 +115,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	// if the session already has a certificate attached we are done
-	check := dispatch.GetSessionAttachment(mess.Session, "certificate")
+	check := mess.Session.GetAttachment("certificate")
 	if check != nil {
 		result.SessionRelease = true
 		return result
@@ -135,7 +135,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// the session doesn't have a cert and we didn't find in cache
 	// so get the tls_collector from the session attachments
-	dataBucket, found = dispatch.GetSessionAttachment(mess.Session, "tls_collector").(*dataCollector)
+	dataBucket, found = mess.Session.GetAttachment("tls_collector").(*dataCollector)
 
 	// if we don't have a collector yet we are still looking for ClientHello
 	if found == false {
@@ -145,7 +145,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		if status == true {
 			logger.Debug("Found ClientHello for %d\n", ctid)
 			dataBucket = new(dataCollector)
-			dispatch.PutSessionAttachment(mess.Session, "tls_collector", dataBucket)
+			mess.Session.PutAttachment("tls_collector", dataBucket)
 			return result
 		}
 
@@ -175,7 +175,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// if we find the certificate remove the collector attachment and release
 	if status == true {
-		dispatch.DelSessionAttachment(mess.Session, "tls_collector")
+		mess.Session.DeleteAttachment("tls_collector")
 		result.SessionRelease = true
 	}
 

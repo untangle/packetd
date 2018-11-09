@@ -99,8 +99,8 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	dict.AddSessionEntry(ctid, "client_country", clientCountry)
 	dict.AddSessionEntry(ctid, "server_country", serverCountry)
-	dispatch.PutSessionAttachment(mess.Session, "client_country", clientCountry)
-	dispatch.PutSessionAttachment(mess.Session, "server_country", serverCountry)
+	mess.Session.PutAttachment("client_country", clientCountry)
+	mess.Session.PutAttachment("server_country", serverCountry)
 	logEvent(mess.Session, clientCountry, serverCountry)
 
 	return result

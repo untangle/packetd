@@ -22,12 +22,41 @@ type SessionEntry struct {
 	subscriptions      map[string]SubscriptionHolder
 	subLocker          sync.Mutex
 	attachments        map[string]interface{}
-	attLocker          sync.Mutex
+	attachmentLock     sync.Mutex
 }
 
 var sessionTable map[string]*SessionEntry
 var sessionMutex sync.Mutex
 var sessionIndex uint64
+
+// PutAttachment is used to safely add an attachment to a session object
+func (entry *SessionEntry) PutAttachment(name string, value interface{}) {
+	entry.attachmentLock.Lock()
+	entry.attachments[name] = value
+	entry.attachmentLock.Unlock()
+}
+
+// GetAttachment is used to safely get an attachment from a session object
+func (entry *SessionEntry) GetAttachment(name string) interface{} {
+	entry.attachmentLock.Lock()
+	value := entry.attachments[name]
+	entry.attachmentLock.Unlock()
+	return value
+}
+
+// DelAttachment is used to safely delete an attachment from a session object
+func (entry *SessionEntry) DeleteAttachment(name string) bool {
+	entry.attachmentLock.Lock()
+	value := entry.attachments[name]
+	delete(entry.attachments, name)
+	entry.attachmentLock.Unlock()
+
+	if value == nil {
+		return false
+	}
+
+	return true
+}
 
 // nextSessionID returns the next sequential session ID value
 func nextSessionID() uint64 {
@@ -75,35 +104,6 @@ func removeSessionEntry(finder string) {
 		dict.DeleteSession(entry.ConntrackID)
 	}
 	delete(sessionTable, finder)
-}
-
-// PutSessionAttachment is used to safely add an attachment to a session object
-func PutSessionAttachment(entry *SessionEntry, name string, value interface{}) {
-	entry.attLocker.Lock()
-	entry.attachments[name] = value
-	entry.attLocker.Unlock()
-}
-
-// GetSessionAttachment is used to safely get an attachment from a session object
-func GetSessionAttachment(entry *SessionEntry, name string) interface{} {
-	entry.attLocker.Lock()
-	value := entry.attachments[name]
-	entry.attLocker.Unlock()
-	return value
-}
-
-// DelSessionAttachment is used to safely delete an attachment from a session object
-func DelSessionAttachment(entry *SessionEntry, name string) bool {
-	entry.attLocker.Lock()
-	value := entry.attachments[name]
-	delete(entry.attachments, name)
-	entry.attLocker.Unlock()
-
-	if value == nil {
-		return false
-	}
-
-	return true
 }
 
 // cleanSessionTable cleans the session table by removing stale entries

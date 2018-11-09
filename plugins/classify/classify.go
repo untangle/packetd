@@ -375,7 +375,7 @@ func logEvent(session *dispatch.SessionEntry, changed []string) {
 	}
 	modifiedColumns := make(map[string]interface{})
 	for _, v := range changed {
-		modifiedColumns[v] = dispatch.GetSessionAttachment(session, v)
+		modifiedColumns[v] = session.GetAttachment(v)
 	}
 
 	// allColumns := make(map[string]interface{})
@@ -385,7 +385,7 @@ func logEvent(session *dispatch.SessionEntry, changed []string) {
 	// allColumns["application_detail"] = dispatch.GetSessionAttachment(session, "application_detail")
 	// allColumns["application_category"] = dispatch.GetSessionAttachment(session, "application_category")
 	// allColumns["application_confidence"] = dispatch.GetSessionAttachment(session, "application_confidence")
-	// dispatch.PutSessionAttachment(session, "session_classify", allColumns)
+	// session.PutAttachment("session_classify", allColumns)
 
 	reports.LogEvent(reports.CreateEvent("session_classify", "sessions", 2, columns, modifiedColumns))
 }
@@ -578,9 +578,9 @@ func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname st
 	}
 
 	// if the session doesn't have this attachment yet we add it and write to the dictionary
-	checkdata := dispatch.GetSessionAttachment(mess.Session, pairname)
+	checkdata := mess.Session.GetAttachment(pairname)
 	if checkdata == nil {
-		dispatch.PutSessionAttachment(mess.Session, pairname, pairdata)
+		mess.Session.PutAttachment(pairname, pairdata)
 		dict.AddSessionEntry(ctid, pairname, pairdata)
 		logger.Debug("Setting classification detail %s = %v\n", pairname, pairdata)
 		return true
@@ -595,7 +595,7 @@ func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname st
 	}
 
 	// at this point the session has the attachment but the data has changed so we update the session and the dictionary
-	dispatch.PutSessionAttachment(mess.Session, pairname, pairdata)
+	mess.Session.PutAttachment(pairname, pairdata)
 	dict.AddSessionEntry(ctid, pairname, pairdata)
 	logger.Debug("Updating classification detail %s = %v\n", pairname, pairdata)
 	return true

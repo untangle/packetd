@@ -81,7 +81,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		"server_port":      session.ClientSideTuple.ServerPort,
 	}
 	reports.LogEvent(reports.CreateEvent("session_new", "sessions", 1, columns, nil))
-	dispatch.PutSessionAttachment(session, "session_new", columns)
+	session.PutAttachment("session_new", columns)
 	return result
 }
 
@@ -102,7 +102,7 @@ func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
 				"server_port_new":    session.ServerSideTuple.ServerPort,
 			}
 			reports.LogEvent(reports.CreateEvent("session_nat", "sessions", 2, columns, modifiedColumns))
-			dispatch.PutSessionAttachment(session, "session_nat", modifiedColumns)
+			session.PutAttachment("session_nat", modifiedColumns)
 		} else {
 			// We should not receive a new conntrack event for something that is not in the session table
 			// However it happens on local outbound sessions, we should handle these diffently
