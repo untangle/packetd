@@ -11,6 +11,9 @@ import (
 
 const maxAllowedTime = 30 * time.Second
 
+var NF_DROP = 0
+var NF_ACCEPT = 1
+
 //NfqueueHandlerFunction defines a pointer to a nfqueue callback function
 type NfqueueHandlerFunction func(NfqueueMessage, uint32, bool) NfqueueResult
 
@@ -89,7 +92,7 @@ func ReleaseSession(session *SessionEntry, owner string) {
 
 // nfqueueCallback is the callback for the packet
 // return the mark to set on the packet
-func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmark uint32) uint32 {
+func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmark uint32) (int, uint32) {
 	var mess NfqueueMessage
 	//printSessionTable()
 
@@ -111,7 +114,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		mess.MsgTuple.ClientAddress = dupIP(mess.IP6layer.SrcIP)
 		mess.MsgTuple.ServerAddress = dupIP(mess.IP6layer.DstIP)
 	} else {
-		return (pmark)
+		return NF_ACCEPT, pmark
 	}
 
 	// get the TCP layer
@@ -140,6 +143,26 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 	session, newflag := obtainSessionEntry(mess, ctid)
 	mess.Session = session
+
+	if session.ConntrackID != ctid {
+		if session.ConntrackConfirmed {
+			// if the conntrack is confirmed.
+			// this means we have a packet from a identical tuple, that has been confirmed
+			// that does not match. This is bad and unexpected
+			logger.Err("Conntrack ID mismatch: %s  %d != %d\n", mess.MsgTuple, ctid, session.ConntrackID)
+		} else {
+			// if the conntrack was not confirmed
+			// this likely just means the first packet was dropped/rejected as so the conntrack was never confirmed
+			// in this case subsequent packets from the client get new conntrack IDs.
+
+			// In this case we want to treat this as a brand new session
+			// We only remove the client-side mapping, as the server-side never got added because it was only
+			logger.Info("Conntrack ID mismatch: %s  %d != %d\n", mess.MsgTuple, ctid, session.ConntrackID)
+			removeSessionEntry(mess.MsgTuple.String())
+			session, newflag = obtainSessionEntry(mess, ctid)
+			mess.Session = session
+		}
+	}
 
 	resultsChannel := make(chan NfqueueResult)
 
@@ -216,7 +239,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 	}
 
 	// return the updated mark to be set on the packet
-	return (pmark)
+	return NF_ACCEPT, pmark
 }
 
 // obtainSessionEntry finds an existing or creates a new Session object

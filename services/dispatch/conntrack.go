@@ -111,6 +111,12 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 		// if we find the session entry update with the server side tuple and
 		// create another index for the session using the server side tuple
 		if ok {
+			if session.ConntrackID != ctid {
+				// We found a session, if its conntrackID does not match the one of the event
+				// something has gone wrong
+				logger.Err("Conntrack ID mismatch: %s  %d != %d\n", session.ClientSideTuple.String(), ctid, session.ConntrackID)
+			}
+
 			session.ServerSideTuple.Protocol = protocol
 			session.ServerSideTuple.ClientAddress = dupIP(clientNew)
 			session.ServerSideTuple.ClientPort = clientPortNew

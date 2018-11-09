@@ -84,6 +84,9 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	reports.LogEvent(reports.CreateEvent("session_new", "sessions", 1, columns, nil))
 	for k, v := range columns {
 		session.PutAttachment(k, v)
+		if k == "time_stamp" {
+			continue
+		}
 		dict.AddSessionEntry(session.ConntrackID, k, v)
 	}
 	return result
