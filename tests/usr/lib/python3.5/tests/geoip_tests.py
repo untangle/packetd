@@ -29,11 +29,13 @@ class GeoipTests(unittest.TestCase):
         """verify a block rule works using remote_control"""
         # this test URL should NOT be blocked
         result1 = remote_control.run_command("ping -W5 -c1 4.2.2.1")
+        subprocess.call("nft add rule inet test filter-rules ip daddr 4.2.2.1 counter", shell=True)
+        subprocess.call("nft add rule inet test filter-rules ip daddr 4.2.2.1 dict session ct id server_country long_string US counter", shell=True)
         subprocess.call("nft add rule inet test filter-rules dict session ct id server_country long_string US counter drop", shell=True)
         result2 = remote_control.run_command("ping -W5 -c1 4.2.2.1")
-        subprocess.call("nft flush chain inet test filter-rules", shell=True)
         assert (result1 == 0)
         assert (result2 != 0)
+        subprocess.call("nft flush chain inet test filter-rules", shell=True)
     
     @staticmethod
     def finalTearDown(self):
