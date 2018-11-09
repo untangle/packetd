@@ -489,6 +489,29 @@ func generateKey(key interface{}) string {
 func AddEntry(table string, key interface{}, field string, value interface{}) error {
 	var setstr string
 
+	// FIXME
+	// there is a bug with ints currently
+	// We don't handle <32-bit ints...
+	// kern.log spews "top_write: Insuffient input"
+	// Checking in this awful code for now
+	// XXX do we handled signed vs unsigned?
+	ui8, ok := value.(uint8)
+	if ok {
+		value = uint32(ui8)
+	}
+	ui16, ok := value.(uint16)
+	if ok {
+		value = uint32(ui16)
+	}
+	i8, ok := value.(int8)
+	if ok {
+		value = uint32(i8)
+	}
+	i16, ok := value.(int16)
+	if ok {
+		value = uint32(i16)
+	}
+
 	switch value.(type) {
 	case string:
 		if value.(string) == "" {
