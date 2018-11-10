@@ -56,7 +56,7 @@ func InsertConntrackSubscription(owner string, priority int, function ConntrackH
 func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint8,
 	client net.IP, server net.IP, clientPort uint16, serverPort uint16,
 	clientNew net.IP, serverNew net.IP, clientPortNew uint16, serverPortNew uint16,
-	c2sBytes uint64, s2cBytes uint64, icmpId uint16) {
+	c2sBytes uint64, s2cBytes uint64, icmpID uint16) {
 
 	var conntrackEntry *ConntrackEntry
 	var conntrackFound bool
@@ -70,10 +70,10 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 	// So we can use the standard tuple
 	// FIXME ICMPv6 - we need to do something similar
 	if protocol == 1 {
-		clientPort = icmpId
-		serverPort = icmpId
-		clientPortNew = icmpId
-		serverPortNew = icmpId
+		clientPort = icmpID
+		serverPort = icmpID
+		clientPortNew = icmpID
+		serverPortNew = icmpID
 	}
 
 	// handle DELETE events

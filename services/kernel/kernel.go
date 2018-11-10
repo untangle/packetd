@@ -205,7 +205,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	var serverNew net.IP
 	var clientPortNew uint16
 	var serverPortNew uint16
-	var icmpId uint16
+	var icmpID uint16
 
 	if conntrackCallback == nil {
 		logger.Warn("No conntrack callback registered. Ignoring event.\n")
@@ -218,7 +218,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	c2sBytes = uint64(info.orig_bytes)
 	s2cBytes = uint64(info.repl_bytes)
 	protocol = uint8(info.orig_proto)
-	icmpId = uint16(info.conn_icmp_id)
+	icmpID = uint16(info.conn_icmp_id)
 
 	if family == C.AF_INET {
 		client = make(net.IP, 4)
@@ -262,7 +262,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	conntrackCallback(ctid, family, eventType, protocol,
 		client, server, clientPort, serverPort,
 		clientNew, serverNew, clientPortNew, serverPortNew,
-		c2sBytes, s2cBytes, icmpId)
+		c2sBytes, s2cBytes, icmpID)
 }
 
 //export go_netlogger_callback
