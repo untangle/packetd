@@ -109,7 +109,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// we only look for certs in TCP traffic not going to server port 443
 	// since those session will be handled by the certfetch plugin
-	if mess.TCPlayer == nil || mess.Session.ClientSideTuple.ServerPort == 443 {
+	if mess.TCPLayer == nil || mess.Session.ClientSideTuple.ServerPort == 443 {
 		result.SessionRelease = true
 		return result
 	}
@@ -158,7 +158,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	// we found the collector so now we only care about data from the server
-	if mess.CtoS {
+	if mess.ClientToServer {
 		return result
 	}
 
@@ -168,7 +168,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	// add the packet to our data collector
-	dataBucket.addPacket(mess.Payload, mess.TCPlayer.Seq)
+	dataBucket.addPacket(mess.Payload, mess.TCPLayer.Seq)
 
 	// look for the server certificate in the collector
 	status := findCertificates(dataBucket.getBuffer(), mess)

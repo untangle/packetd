@@ -9,13 +9,16 @@ import (
 	"time"
 )
 
+// maxAllowedTime is the maximum time a plugin is allowed to process a packet.
+// If this time is exceeded. The warning is logged and the packet is passed
+// and the session released on behalf of the offending plugin
 const maxAllowedTime = 30 * time.Second
 
 // NfDrop is NF_DROP constant
-var NfDrop = 0
+const NfDrop = 0
 
 // NfAccept is the NF_ACCEPT constant
-var NfAccept = 1
+const NfAccept = 1
 
 //NfqueueHandlerFunction defines a pointer to a nfqueue callback function
 type NfqueueHandlerFunction func(NfqueueMessage, uint32, bool) NfqueueResult
@@ -29,19 +32,23 @@ type NfqueueResult struct {
 
 // NfqueueMessage is used to pass nfqueue traffic to interested plugins
 type NfqueueMessage struct {
-	Session  *SessionEntry
-	MsgTuple Tuple
-	Packet   gopacket.Packet
-	Length   int
-	CtoS     bool
-	IP4layer *layers.IPv4
-	IP6layer *layers.IPv6
-	TCPlayer *layers.TCP
-	UDPlayer *layers.UDP
-	Payload  []byte
+	Session        *SessionEntry
+	MsgTuple       Tuple
+	Packet         gopacket.Packet
+	Length         int
+	ClientToServer bool
+	IP4Layer       *layers.IPv4
+	IP6Layer       *layers.IPv6
+	TCPLayer       *layers.TCP
+	UDPLayer       *layers.UDP
+	ICMPv4Layer    *layers.ICMPv4
+	Payload        []byte
 }
 
+// nfqueueList holds the nfqueue subscribers
 var nfqueueList map[string]SubscriptionHolder
+
+// nfqueueListMutex is a lock for the nfqueueList
 var nfqueueListMutex sync.Mutex
 
 // InsertNfqueueSubscription adds a subscription for receiving nfqueue messages
@@ -83,14 +90,21 @@ func MirrorNfqueueSubscriptions(session *SessionEntry) map[string]SubscriptionHo
 
 // ReleaseSession is called by a subscriber to stop receiving traffic for a session
 func ReleaseSession(session *SessionEntry, owner string) {
-	logger.Debug("Removing %s session nfqueue subscription for session %d\n", owner, session.SessionID)
 	session.subLocker.Lock()
+	defer session.subLocker.Unlock()
+	origLen := len(session.subscriptions)
+	if origLen == 0 {
+		return
+	}
 	delete(session.subscriptions, owner)
-	if len(session.subscriptions) == 0 {
+	len := len(session.subscriptions)
+	if origLen != len {
+		logger.Debug("Removing %s session nfqueue subscription for session %d\n", owner, session.SessionID)
+	}
+	if len == 0 {
 		logger.Debug("Zero subscribers reached - settings bypass_packetd=true for session %d\n", session.SessionID)
 		dict.AddSessionEntry(session.ConntrackID, "bypass_packetd", true)
 	}
-	session.subLocker.Unlock()
 }
 
 // nfqueueCallback is the callback for the packet
@@ -107,34 +121,48 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 	ip6Layer := mess.Packet.Layer(layers.LayerTypeIPv6)
 
 	if ip4Layer != nil {
-		mess.IP4layer = ip4Layer.(*layers.IPv4)
-		mess.MsgTuple.Protocol = uint8(mess.IP4layer.Protocol)
-		mess.MsgTuple.ClientAddress = dupIP(mess.IP4layer.SrcIP)
-		mess.MsgTuple.ServerAddress = dupIP(mess.IP4layer.DstIP)
+		mess.IP4Layer = ip4Layer.(*layers.IPv4)
+		mess.MsgTuple.Protocol = uint8(mess.IP4Layer.Protocol)
+		mess.MsgTuple.ClientAddress = dupIP(mess.IP4Layer.SrcIP)
+		mess.MsgTuple.ServerAddress = dupIP(mess.IP4Layer.DstIP)
 	} else if ip6Layer != nil {
-		mess.IP6layer = ip6Layer.(*layers.IPv6)
-		mess.MsgTuple.Protocol = uint8(mess.IP6layer.NextHeader) // FIXME - is this the correct field?
-		mess.MsgTuple.ClientAddress = dupIP(mess.IP6layer.SrcIP)
-		mess.MsgTuple.ServerAddress = dupIP(mess.IP6layer.DstIP)
+		mess.IP6Layer = ip6Layer.(*layers.IPv6)
+		mess.MsgTuple.Protocol = uint8(mess.IP6Layer.NextHeader) // FIXME - is this the correct field?
+		mess.MsgTuple.ClientAddress = dupIP(mess.IP6Layer.SrcIP)
+		mess.MsgTuple.ServerAddress = dupIP(mess.IP6Layer.DstIP)
 	} else {
 		return NfAccept, pmark
 	}
 
+	newSession := ((pmark & 0x10000000) != 0)
+
 	// get the TCP layer
 	tcpLayer := mess.Packet.Layer(layers.LayerTypeTCP)
 	if tcpLayer != nil {
-		mess.TCPlayer = tcpLayer.(*layers.TCP)
-		mess.MsgTuple.ClientPort = uint16(mess.TCPlayer.SrcPort)
-		mess.MsgTuple.ServerPort = uint16(mess.TCPlayer.DstPort)
+		mess.TCPLayer = tcpLayer.(*layers.TCP)
+		mess.MsgTuple.ClientPort = uint16(mess.TCPLayer.SrcPort)
+		mess.MsgTuple.ServerPort = uint16(mess.TCPLayer.DstPort)
 	}
 
 	// get the UDP layer
 	udpLayer := mess.Packet.Layer(layers.LayerTypeUDP)
 	if udpLayer != nil {
-		mess.UDPlayer = udpLayer.(*layers.UDP)
-		mess.MsgTuple.ClientPort = uint16(mess.UDPlayer.SrcPort)
-		mess.MsgTuple.ServerPort = uint16(mess.UDPlayer.DstPort)
+		mess.UDPLayer = udpLayer.(*layers.UDP)
+		mess.MsgTuple.ClientPort = uint16(mess.UDPLayer.SrcPort)
+		mess.MsgTuple.ServerPort = uint16(mess.UDPLayer.DstPort)
 	}
+
+	// get the ICMPv4 layer
+	icmpLayerV4 := mess.Packet.Layer(layers.LayerTypeICMPv4)
+	if icmpLayerV4 != nil {
+		mess.ICMPv4Layer = icmpLayerV4.(*layers.ICMPv4)
+		// For ICMP we set the ports to the ICMP ID
+		// So we can use the standard tuple
+		mess.MsgTuple.ClientPort = uint16(mess.ICMPv4Layer.Id)
+		mess.MsgTuple.ServerPort = uint16(mess.ICMPv4Layer.Id)
+	}
+
+	// FIXME ICMPv6
 
 	// get the Application layer
 	appLayer := mess.Packet.ApplicationLayer()
@@ -144,29 +172,55 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 	logger.Trace("nfqueue event[%d]: %v \n", ctid, mess.MsgTuple)
 
-	session, newflag := obtainSessionEntry(mess, ctid)
+	session, clientToServer := lookupSessionEntry(mess, ctid)
 	mess.Session = session
+	mess.ClientToServer = clientToServer
 
-	if session.ConntrackID != ctid {
-		if session.ConntrackConfirmed {
-			// if the conntrack is confirmed.
-			// this means we have a packet from a identical tuple, that has been confirmed
-			// that does not match. This is bad and unexpected
-			logger.Err("Conntrack ID mismatch: %s  %d != %d\n", mess.MsgTuple, ctid, session.ConntrackID)
-		} else {
-			// if the conntrack was not confirmed
-			// this likely just means the first packet was dropped/rejected as so the conntrack was never confirmed
-			// in this case subsequent packets from the client get new conntrack IDs.
+	if session == nil {
+		if !newSession {
+			// If we did not find the session in the session table, and this isn't a new packet
+			// Then we somehow missed the first packet - Just mark the connection as bypassed
+			// and return the packet
+			logger.Info("Ignoring mid-session packet: %s %d\n", mess.MsgTuple, ctid)
+			dict.AddSessionEntry(ctid, "bypass_packetd", true)
+			return NfAccept, pmark
+		}
+		session = createSessionEntry(mess, ctid)
+		mess.Session = session
+	} else {
+		if newSession {
+			// If this is a new session and a session was found, it may have just been an aborted session
+			// (The first packet was dropped before conntrack confirm)
+			// In this case, just drop the old session. However, if the old session was conntrack confirmed
+			// something is not correct.
+			if session.ConntrackConfirmed {
+				logger.Err("Conflicting session tuple: %s  %d != %d\n", mess.MsgTuple, ctid, session.ConntrackID)
+			} else {
+				logger.Debug("Conflicting session tuple: %s  %d != %d\n", mess.MsgTuple, ctid, session.ConntrackID)
+				removeSessionEntry(mess.MsgTuple.String())
+				session = createSessionEntry(mess, ctid)
+				mess.Session = session
+			}
+		}
 
-			// In this case we want to treat this as a brand new session
-			// We only remove the client-side mapping, as the server-side never got added because it was only
-			logger.Info("Conntrack ID mismatch: %s  %d != %d\n", mess.MsgTuple, ctid, session.ConntrackID)
-			removeSessionEntry(mess.MsgTuple.String())
-			session, newflag = obtainSessionEntry(mess, ctid)
-			mess.Session = session
+		// Also check that the conntrack ID matches. Log an error if it does not
+		if session.ConntrackID != ctid {
+			logger.Err("Conntrack ID mismatch: %s  %d != %d %v\n", mess.MsgTuple, ctid, session.ConntrackID, session.ConntrackConfirmed)
 		}
 	}
 
+	// Update some accounting bits
+	session.LastActivityTime = time.Now()
+	session.PacketCount++
+	session.ByteCount += uint64(mess.Length)
+	session.EventCount++
+
+	return callSubscribers(ctid, session, mess, pmark, newSession)
+}
+
+// callSubscribers calls all the nfqueue message subscribers (plugins)
+// and returns a verdict and the new mark
+func callSubscribers(ctid uint32, session *SessionEntry, mess NfqueueMessage, pmark uint32, newSession bool) (int, uint32) {
 	resultsChannel := make(chan NfqueueResult)
 
 	// We loop and increment the priority until all subscriptions have been called
@@ -193,7 +247,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 				c := make(chan NfqueueResult, 1)
 				t1 := getMicroseconds()
 
-				go func() { c <- val.NfqueueFunc(mess, ctid, newflag) }()
+				go func() { c <- val.NfqueueFunc(mess, ctid, newSession) }()
 
 				select {
 				case result := <-c:
@@ -245,51 +299,47 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 	return NfAccept, pmark
 }
 
-// obtainSessionEntry finds an existing or creates a new Session object
-func obtainSessionEntry(mess NfqueueMessage, ctid uint32) (*SessionEntry, bool) {
-	var session *SessionEntry
-	var newFlag bool
-	var ok bool
-
+// lookupSessionEntry looks up a session in the session table
+// returns the session if found and a bool representing the direction
+// true = forward, false = reverse
+func lookupSessionEntry(mess NfqueueMessage, ctid uint32) (*SessionEntry, bool) {
 	// use the packet tuple to find the session
-	sessionHash := mess.MsgTuple.String()
-	session, ok = findSessionEntry(sessionHash)
+	session, ok := findSessionEntry(mess.MsgTuple.String())
+	if ok {
+		logger.Trace("Session Found %d in table\n", session.SessionID)
+		return session, true
+	}
 
 	// if we didn't find the session in the table look again with with the tuple in reverse
-	if !ok {
-		session, ok = findSessionEntry(mess.MsgTuple.StringReverse())
-	}
+	session, ok = findSessionEntry(mess.MsgTuple.StringReverse())
 
 	// If we already have a session entry update the existing, otherwise create a new entry for the table.
 	if ok {
 		logger.Trace("Session Found %d in table\n", session.SessionID)
-		session.LastActivityTime = time.Now()
-		session.PacketCount++
-		session.ByteCount += uint64(mess.Length)
-		session.EventCount++
-		if mess.MsgTuple.ClientAddress.Equal(session.ClientSideTuple.ClientAddress) {
-			mess.CtoS = true
-		}
-	} else {
-		newFlag = true
-		session = new(SessionEntry)
-		session.SessionID = nextSessionID()
-		session.ConntrackID = ctid
-		session.CreationTime = time.Now()
-		session.PacketCount = 1
-		session.ByteCount = uint64(mess.Length)
-		session.LastActivityTime = time.Now()
-		session.ClientSideTuple = mess.MsgTuple
-		session.EventCount = 1
-		session.ConntrackConfirmed = false
-		session.attachments = make(map[string]interface{})
-		AttachNfqueueSubscriptions(session)
-		logger.Trace("Session Adding %d to table\n", session.SessionID)
-		insertSessionEntry(sessionHash, session)
-		mess.CtoS = true
+		return session, false
 	}
 
-	return session, newFlag
+	return nil, true
+}
+
+// createSessionEntry creates a new session and inserts the forward mapping
+// into the session table
+func createSessionEntry(mess NfqueueMessage, ctid uint32) *SessionEntry {
+	session := new(SessionEntry)
+	session.SessionID = nextSessionID()
+	session.ConntrackID = ctid
+	session.CreationTime = time.Now()
+	session.PacketCount = 1
+	session.ByteCount = uint64(mess.Length)
+	session.LastActivityTime = time.Now()
+	session.ClientSideTuple = mess.MsgTuple
+	session.EventCount = 1
+	session.ConntrackConfirmed = false
+	session.attachments = make(map[string]interface{})
+	AttachNfqueueSubscriptions(session)
+	logger.Trace("Session Adding %d to table\n", session.SessionID)
+	insertSessionEntry(mess.MsgTuple.String(), session)
+	return session
 }
 
 // getMicroseconds returns the current clock in microseconds

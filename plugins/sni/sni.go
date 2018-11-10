@@ -31,7 +31,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	result.SessionRelease = false
 
 	// We only search for SNI in TCP traffic
-	if mess.TCPlayer == nil {
+	if mess.TCPLayer == nil {
 		result.SessionRelease = true
 		return result
 	}

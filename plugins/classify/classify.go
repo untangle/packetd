@@ -171,7 +171,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	// make sure we have a valid IPv4 or IPv6 layer
-	if mess.IP4layer == nil && mess.IP6layer == nil {
+	if mess.IP4Layer == nil && mess.IP6Layer == nil {
 		logger.Err("Invalid packet: %v\n", mess.Session.ClientSideTuple.Protocol)
 		result.SessionRelease = true
 		return result
@@ -230,9 +230,9 @@ func daemonClassify(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) 
 	var reply string
 	var err error
 
-	if mess.IP4layer != nil {
+	if mess.IP4Layer != nil {
 		proto = "IP4"
-	} else if mess.IP6layer != nil {
+	} else if mess.IP6Layer != nil {
 		proto = "IP6"
 	} else {
 		return "", errors.New("Unsupported protocol")

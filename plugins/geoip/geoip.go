@@ -57,14 +57,12 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var result dispatch.NfqueueResult
 	result.Owner = pluginName
 	result.PacketMark = 0
-	result.SessionRelease = true
 
 	// release immediately as we only care about the first packet
 	dispatch.ReleaseSession(mess.Session, pluginName)
 	if !newSession {
 		return result
 	}
-
 	if geodb == nil {
 		return result
 	}
@@ -74,14 +72,14 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var clientCountry = "XX"
 	var serverCountry = "XX"
 
-	if mess.IP6layer != nil {
-		srcAddr = mess.IP6layer.SrcIP
-		dstAddr = mess.IP6layer.DstIP
+	if mess.IP6Layer != nil {
+		srcAddr = mess.IP6Layer.SrcIP
+		dstAddr = mess.IP6Layer.DstIP
 	}
 
-	if mess.IP4layer != nil {
-		srcAddr = mess.IP4layer.SrcIP
-		dstAddr = mess.IP4layer.DstIP
+	if mess.IP4Layer != nil {
+		srcAddr = mess.IP4Layer.SrcIP
+		dstAddr = mess.IP4Layer.DstIP
 	}
 
 	SrcRecord, err := geodb.City(srcAddr)

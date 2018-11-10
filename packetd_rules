@@ -85,18 +85,24 @@ insert_packetd_rules()
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state invalid return
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state untracked return
 
-    # FOR TESTING FIXME
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ip daddr != 4.2.2.1 return
-    
     # Local?
     # ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd fib daddr . oif type local return
 
     # In case we are quickly reusing a conntrack id, flush the session dictionary on new connections
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state new dict session ct id flush
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state new counter dict session ct id flush
 
     # Don't catch bypassed traffic
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd dict session ct id bypass_packetd bool true counter return
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct mark and 0xf0000000 == 0xf0000000 counter return
+
+    # Set the new packet mark
+    # We must actually set this mark so that packetd can tell this is a "new" packet
+    # If it tries to predict if its a new packet based on the tuple and/or the conntrack ID it will sometimes fail
+    # This happens when a "new" packet gets dropped before conntrack confirmation. In this case a subsequent packet
+    # that may have the same tuple, and actually may get exactly the same semi-random conntrack ID.
+    # To packetd this will look like a second packet, but netfilter considers this a new packet.
+    # The only reliable way to let packetd know this is a new packet is by setting the mark before queueing
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state new mark set "mark|0x10000000"
 
     # Queue the traffic
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd counter queue num ${PACKETD_QUEUE_NUM} bypass

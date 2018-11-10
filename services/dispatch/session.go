@@ -115,13 +115,14 @@ func cleanSessionTable() {
 			continue
 		}
 		removeSessionEntry(key)
-		// This happens in some corner cases
-		// such as a session that is blocked we will have a session in the session table
-		// but it will never reach the conntrack confirmed state, and thus never
-		// get a conntrack new or destroy event
-		// as such this will exist in the table until the conntrack ID gets re-used
-		// or this happens. Since this is condition is expected, just log as debug
-		logger.Debug("Removing stale session entry %s %v\n", key, val.ClientSideTuple)
+		// Having stale sessions is normal if sessions get blocked
+		// Their conntracks never get confirmed and thus there is never a delete conntrack event
+		// These sessions will hang in the table around and get cleaned up here.
+
+		// However, if we find a a stale conntrack-confirmed session. There is likel an issue
+		if val.ConntrackConfirmed {
+			logger.Warn("Removing confirmed stale session entry %s %v\n", key, val.ClientSideTuple)
+		}
 	}
 }
 

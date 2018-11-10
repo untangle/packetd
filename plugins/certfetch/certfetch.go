@@ -45,7 +45,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	// we only need to fetch certs for TCP traffic going to port 443
-	if mess.TCPlayer == nil || mess.MsgTuple.ServerPort != 443 {
+	if mess.TCPLayer == nil || mess.MsgTuple.ServerPort != 443 {
 		return result
 	}
 
@@ -76,7 +76,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 			Timeout: fetchTimeout,
 		}
 
-		if mess.IP6layer != nil {
+		if mess.IP6Layer != nil {
 			target = fmt.Sprintf("[%s]:443", mess.MsgTuple.ServerAddress.String())
 		} else {
 			target = fmt.Sprintf("%s:443", mess.MsgTuple.ServerAddress.String())
