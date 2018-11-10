@@ -25,18 +25,28 @@ class GeoipTests(unittest.TestCase):
         result = remote_control.is_online()
         assert (result == 0)
 
-    def test_010_block_us(self):
-        """verify a block rule works using remote_control"""
-        # this test URL should NOT be blocked
+    def test_010_reject_us(self):
+        """verify a reject rule works using server_country"""
         result1 = remote_control.run_command("ping -W5 -c1 4.2.2.1")
         subprocess.call("nft add rule inet test filter-rules ip daddr 4.2.2.1 counter", shell=True)
         subprocess.call("nft add rule inet test filter-rules ip daddr 4.2.2.1 dict session ct id server_country long_string US counter", shell=True)
-        subprocess.call("nft add rule inet test filter-rules dict session ct id server_country long_string US counter drop", shell=True)
+        subprocess.call("nft add rule inet test filter-rules dict session ct id server_country long_string US counter reject", shell=True)
         result2 = remote_control.run_command("ping -W5 -c1 4.2.2.1")
         subprocess.call("nft flush chain inet test filter-rules", shell=True)
         assert (result1 == 0)
         assert (result2 != 0)
-    
+
+    def test_011_drop_us(self):
+        """verify a drop rule works using server_country"""
+        result1 = remote_control.run_command("ping -W5 -c1 4.2.2.1")
+        subprocess.call("nft add rule inet test filter-rules ip daddr 4.2.2.1 counter", shell=True)
+        subprocess.call("nft add rule inet test filter-rules ip daddr 4.2.2.1 dict session ct id server_country long_string US counter", shell=True)
+        subprocess.call("nft add rule inet test filter-rules dict session ct id server_country long_string US counter drop", shell=True)
+        result2 = remote_control.run_command("ping -W1 -c1 4.2.2.1")
+        subprocess.call("nft flush chain inet test filter-rules", shell=True)
+        assert (result1 == 0)
+        assert (result2 != 0)
+
     @staticmethod
     def finalTearDown(self):
         subprocess.call("nft flush chain inet test filter-rules", shell=True)
