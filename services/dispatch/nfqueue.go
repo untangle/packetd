@@ -152,18 +152,6 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		mess.MsgTuple.ServerPort = uint16(mess.UDPLayer.DstPort)
 	}
 
-	// get the ICMPv4 layer
-	icmpLayerV4 := mess.Packet.Layer(layers.LayerTypeICMPv4)
-	if icmpLayerV4 != nil {
-		mess.ICMPv4Layer = icmpLayerV4.(*layers.ICMPv4)
-		// For ICMP we set the ports to the ICMP ID
-		// So we can use the standard tuple
-		mess.MsgTuple.ClientPort = uint16(mess.ICMPv4Layer.Id)
-		mess.MsgTuple.ServerPort = uint16(mess.ICMPv4Layer.Id)
-	}
-
-	// FIXME ICMPv6
-
 	// get the Application layer
 	appLayer := mess.Packet.ApplicationLayer()
 	if appLayer != nil {
@@ -172,9 +160,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 	logger.Trace("nfqueue event[%d]: %v \n", ctid, mess.MsgTuple)
 
-	session, clientToServer := lookupSessionEntry(mess, ctid)
-	mess.Session = session
-	mess.ClientToServer = clientToServer
+	session := findSessionEntry(ctid)
 
 	if session == nil {
 		if !newSession {
@@ -197,7 +183,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 				logger.Err("Conflicting session tuple: %s  %d != %d\n", mess.MsgTuple, ctid, session.ConntrackID)
 			} else {
 				logger.Debug("Conflicting session tuple: %s  %d != %d\n", mess.MsgTuple, ctid, session.ConntrackID)
-				removeSessionEntry(mess.MsgTuple.String())
+				removeSessionEntry(ctid)
 				session = createSessionEntry(mess, ctid)
 				mess.Session = session
 			}
@@ -207,6 +193,14 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		if session.ConntrackID != ctid {
 			logger.Err("Conntrack ID mismatch: %s  %d != %d %v\n", mess.MsgTuple, ctid, session.ConntrackID, session.ConntrackConfirmed)
 		}
+	}
+
+	mess.Session = session
+
+	if mess.MsgTuple.ClientAddress.Equal(session.ClientSideTuple.ClientAddress) {
+		mess.ClientToServer = true
+	} else {
+		mess.ClientToServer = false
 	}
 
 	// Update some accounting bits
@@ -299,29 +293,6 @@ func callSubscribers(ctid uint32, session *SessionEntry, mess NfqueueMessage, pm
 	return NfAccept, pmark
 }
 
-// lookupSessionEntry looks up a session in the session table
-// returns the session if found and a bool representing the direction
-// true = forward, false = reverse
-func lookupSessionEntry(mess NfqueueMessage, ctid uint32) (*SessionEntry, bool) {
-	// use the packet tuple to find the session
-	session, ok := findSessionEntry(mess.MsgTuple.String())
-	if ok {
-		logger.Trace("Session Found %d in table\n", session.SessionID)
-		return session, true
-	}
-
-	// if we didn't find the session in the table look again with with the tuple in reverse
-	session, ok = findSessionEntry(mess.MsgTuple.StringReverse())
-
-	// If we already have a session entry update the existing, otherwise create a new entry for the table.
-	if ok {
-		logger.Trace("Session Found %d in table\n", session.SessionID)
-		return session, false
-	}
-
-	return nil, true
-}
-
 // createSessionEntry creates a new session and inserts the forward mapping
 // into the session table
 func createSessionEntry(mess NfqueueMessage, ctid uint32) *SessionEntry {
@@ -338,7 +309,7 @@ func createSessionEntry(mess NfqueueMessage, ctid uint32) *SessionEntry {
 	session.attachments = make(map[string]interface{})
 	AttachNfqueueSubscriptions(session)
 	logger.Trace("Session Adding %d to table\n", session.SessionID)
-	insertSessionEntry(mess.MsgTuple.String(), session)
+	insertSessionEntry(ctid, session)
 	return session
 }
 

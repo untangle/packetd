@@ -28,7 +28,7 @@ var shutdownCleanerTask = make(chan bool)
 // Startup starts the event handling service
 func Startup() {
 	// create the session, conntrack, and certificate tables
-	sessionTable = make(map[string]*SessionEntry)
+	sessionTable = make(map[uint32]*SessionEntry)
 	conntrackTable = make(map[uint32]*ConntrackEntry)
 
 	// create the nfqueue, conntrack, and netlogger subscription tables

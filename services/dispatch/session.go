@@ -25,7 +25,7 @@ type SessionEntry struct {
 	attachmentLock     sync.Mutex
 }
 
-var sessionTable map[string]*SessionEntry
+var sessionTable map[uint32]*SessionEntry
 var sessionMutex sync.Mutex
 var sessionIndex uint64
 
@@ -74,17 +74,20 @@ func nextSessionID() uint64 {
 }
 
 // findSessionEntry searches for an entry in the session table
-func findSessionEntry(finder string) (*SessionEntry, bool) {
+func findSessionEntry(finder uint32) *SessionEntry {
 	sessionMutex.Lock()
 	entry, status := sessionTable[finder]
-	logger.Trace("Lookup session index %s -> %v\n", finder, status)
+	logger.Trace("Lookup session index %v -> %v\n", finder, status)
 	sessionMutex.Unlock()
-	return entry, status
+	if status == false {
+		return nil
+	}
+	return entry
 }
 
 // insertSessionEntry adds an entry to the session table
-func insertSessionEntry(finder string, entry *SessionEntry) {
-	logger.Trace("Insert session index %s -> %v\n", finder, entry.ClientSideTuple)
+func insertSessionEntry(finder uint32, entry *SessionEntry) {
+	logger.Trace("Insert session index %v -> %v\n", finder, entry.ClientSideTuple)
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
 	if sessionTable[finder] != nil {
@@ -95,8 +98,8 @@ func insertSessionEntry(finder string, entry *SessionEntry) {
 }
 
 // removeSessionEntry removes an entry from the session table
-func removeSessionEntry(finder string) {
-	logger.Trace("Remove session index %s\n", finder)
+func removeSessionEntry(finder uint32) {
+	logger.Trace("Remove session index %v\n", finder)
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
 	entry, status := sessionTable[finder]
@@ -121,7 +124,7 @@ func cleanSessionTable() {
 
 		// However, if we find a a stale conntrack-confirmed session. There is likel an issue
 		if val.ConntrackConfirmed {
-			logger.Warn("Removing confirmed stale session entry %s %v\n", key, val.ClientSideTuple)
+			logger.Warn("Removing confirmed stale session entry %v %v\n", key, val.ClientSideTuple)
 		}
 	}
 }
@@ -131,6 +134,6 @@ func printSessionTable() {
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
 	for k, v := range sessionTable {
-		logger.Debug("Session[%s] = %s\n", k, v.ClientSideTuple.String())
+		logger.Debug("Session[%v] = %s\n", k, v.ClientSideTuple.String())
 	}
 }

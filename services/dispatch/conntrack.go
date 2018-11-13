@@ -85,12 +85,7 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 			return
 		}
 
-		// delete the client and server side session entries
-		if conntrackEntry.Session != nil {
-			removeSessionEntry(conntrackEntry.ClientSideTuple.String())
-			removeSessionEntry(conntrackEntry.ServerSideTuple.String())
-		}
-
+		removeSessionEntry(ctid)
 		removeConntrackEntry(ctid)
 	}
 
@@ -119,11 +114,11 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 		conntrackEntry.ServerSideTuple.ServerPort = serverPortNew
 
 		// look for the session entry
-		session, ok := findSessionEntry(conntrackEntry.ClientSideTuple.String())
+		session := findSessionEntry(ctid)
 
 		// if we find the session entry update with the server side tuple and
 		// create another index for the session using the server side tuple
-		if ok {
+		if session != nil {
 			if session.ConntrackID != ctid {
 				// We found a session, if its conntrackID does not match the one of the event
 				// something has gone wrong
@@ -137,7 +132,6 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 			session.ServerSideTuple.ServerPort = serverPortNew
 			session.ConntrackConfirmed = true
 			conntrackEntry.Session = session
-			insertSessionEntry(conntrackEntry.ServerSideTuple.String(), session)
 		}
 
 		insertConntrackEntry(ctid, conntrackEntry)
