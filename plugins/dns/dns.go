@@ -53,12 +53,12 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		var name string
 		name = FindAddress(mess.MsgTuple.ClientAddress)
 		if len(name) > 0 {
-			logger.Debug("Setting client_dns_hint %s for %d\n", name, mess.Session.SessionID)
+			logger.Debug("Setting client_dns_hint %s ctid:%d\n", name, ctid)
 			dict.AddSessionEntry(mess.Session.ConntrackID, "client_dns_hint", name)
 		}
 		name = FindAddress(mess.MsgTuple.ServerAddress)
 		if len(name) > 0 {
-			logger.Debug("Setting server_dns_hint %s for %d\n", name, mess.Session.SessionID)
+			logger.Debug("Setting server_dns_hint %s ctid:%d\n", name, ctid)
 			dict.AddSessionEntry(mess.Session.ConntrackID, "server_dns_hint", name)
 		}
 	}
@@ -87,7 +87,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 			return result
 		}
 
-		logger.Debug("DNS QUERY DETECTED NAME:%s TYPE:%d CLASS:%d\n", query.Name, query.Type, query.Class)
+		logger.Debug("DNS QUERY DETECTED NAME:%s TYPE:%d CLASS:%d ctid:%d\n", query.Name, query.Type, query.Class, ctid)
 
 		// save the qname in the session attachments and turn off release flag so we get the response
 		mess.Session.PutAttachment("dns_query", string(query.Name))
@@ -109,7 +109,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 			if (val.Type != layers.DNSTypeA) && (val.Type != layers.DNSTypeAAAA) {
 				continue
 			}
-			logger.Debug("DNS REPLY DETECTED NAME:%s TTL:%d IP:%v\n", qname, val.TTL, val.IP)
+			logger.Debug("DNS REPLY DETECTED NAME:%s TTL:%d IP:%v ctid:%d\n", qname, val.TTL, val.IP, ctid)
 			insertAddress(val.IP, qname.(string), val.TTL)
 		}
 	}

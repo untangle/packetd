@@ -44,19 +44,23 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		return result
 	}
 
-	// look for SNI hostname in the packet
+	// Look for SNI hostname in the packet and get the release flag
+	// The extract function will set the release once it finds a valid
+	// ClientHello, but hostname could still be nil if SNI isn't found
 	release, hostname := extractSNIhostname(mess.Payload)
 
 	// if we found the hostname write to the dictionary and release the session
 	if hostname != "" {
-		logger.Debug("Extracted SNI %s for %d\n", hostname, ctid)
+		logger.Debug("Extracted SNI %s ctid:%d\n", hostname, ctid)
 		dict.AddSessionEntry(ctid, "ssl_sni", hostname)
 		logEvent(mess.Session, hostname)
+		result.SessionRelease = true
+		return result
 	}
 
 	// release the session if we don't find SNI in the first few packets
 	if mess.Session.PacketCount >= maxPacketCount {
-		logger.Debug("Missing SNI for %d\n", ctid)
+		logger.Debug("Exceeded SNI packet limit ctid:%d\n", ctid)
 		release = true
 	}
 

@@ -51,7 +51,6 @@ struct conntrack_info {
 	u_int16_t		orig_dport;
 	u_int16_t		repl_sport;
 	u_int16_t		repl_dport;
-	u_int16_t		conn_icmp_id;
 	u_int64_t		orig_bytes;
 	u_int64_t		repl_bytes;
 };

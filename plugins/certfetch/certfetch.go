@@ -60,9 +60,9 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	holder, found = certcache.FindCertificate(findkey)
 	if found {
 		localMutex.Unlock()
-		logger.Debug("Loading certificate for %s\n", findkey)
+		logger.Debug("Loading certificate for %s ctid:%d\n", findkey, ctid)
 	} else {
-		logger.Debug("Fetching certificate for %s\n", findkey)
+		logger.Debug("Fetching certificate for %s ctid:%d\n", findkey, ctid)
 
 		holder = new(certcache.CertificateHolder)
 		holder.WaitGroup.Add(1)
@@ -90,11 +90,11 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		}
 
 		if conn != nil && len(conn.ConnectionState().PeerCertificates) > 0 {
-			logger.Debug("Successfully fetched certificate from %s\n", findkey)
+			logger.Debug("Successfully fetched certificate from %s ctid:%d\n", findkey, ctid)
 			holder.Certificate = *conn.ConnectionState().PeerCertificates[0]
 			holder.Available = true
 		} else {
-			logger.Debug("Could not fetch certificate from %s\n", findkey)
+			logger.Debug("Could not fetch certificate from %s ctid:%d\n", findkey, ctid)
 			holder.Available = false
 		}
 		holder.CreationTime = time.Now()
@@ -111,7 +111,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	// this will only happen when two+ sessions requests the same cert at the same time
 	// the first will fetch the cert, and the other threads will wait here
 	holder.WaitGroup.Wait()
-	logger.Debug("Certificate %v found: %v\n", findkey, holder.Available)
+	logger.Debug("Certificate %v found: %v ctid:%d\n", findkey, holder.Available, ctid)
 
 	// if the cert is available for this server attach the cert to the session
 	// and put the details in the dictionary

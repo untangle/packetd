@@ -126,7 +126,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	certHolder, found = certcache.FindCertificate(findkey)
 	if found {
 		if certHolder.Available {
-			logger.Debug("Loading cached certificate for %s\n", findkey)
+			logger.Debug("Loading cached certificate for %s ctid:%d\n", findkey, ctid)
 			certcache.AttachCertificateToSession(mess.Session, certHolder.Certificate)
 		}
 		result.SessionRelease = true
@@ -143,7 +143,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 		// if we find the ClientHello create and attach a collector and return
 		if status == true {
-			logger.Debug("Found ClientHello for %d\n", ctid)
+			logger.Debug("Found ClientHello for ctid:%d\n", ctid)
 			dataBucket = new(dataCollector)
 			mess.Session.PutAttachment("tls_collector", dataBucket)
 			return result

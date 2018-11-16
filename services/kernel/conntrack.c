@@ -147,9 +147,6 @@ static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrac
 	info.repl_sport = be16toh(nfct_get_attr_u16(ct,ATTR_REPL_PORT_SRC));
 	info.repl_dport = be16toh(nfct_get_attr_u16(ct,ATTR_REPL_PORT_DST));
 
-    // get the icmp id
-	info.conn_icmp_id = be16toh(nfct_get_attr_u16(ct,ATTR_ICMP_ID));
-
 	// get the byte counts
 	info.orig_bytes = nfct_get_attr_u64(ct,ATTR_ORIG_COUNTER_BYTES);
 	info.repl_bytes = nfct_get_attr_u64(ct,ATTR_REPL_COUNTER_BYTES);

@@ -99,10 +99,10 @@ func ReleaseSession(session *SessionEntry, owner string) {
 	delete(session.subscriptions, owner)
 	len := len(session.subscriptions)
 	if origLen != len {
-		logger.Debug("Removing %s session nfqueue subscription for session %d\n", owner, session.SessionID)
+		logger.Debug("Removing %s session nfqueue subscription for session %d\n", owner, session.ConntrackID)
 	}
 	if len == 0 {
-		logger.Debug("Zero subscribers reached - settings bypass_packetd=true for session %d\n", session.SessionID)
+		logger.Debug("Zero subscribers reached - settings bypass_packetd=true for session %d\n", session.ConntrackID)
 		dict.AddSessionEntry(session.ConntrackID, "bypass_packetd", true)
 	}
 }
@@ -235,7 +235,7 @@ func callSubscribers(ctid uint32, session *SessionEntry, mess NfqueueMessage, pm
 			if val.Priority != priority {
 				continue
 			}
-			logger.Trace("Calling nfqueue  plugin:%s priority:%d session_id:%d\n", key, priority, session.SessionID)
+			logger.Trace("Calling nfqueue  plugin:%s priority:%d conntracksession_id:%d\n", key, priority, session.SessionID)
 			go func(key string, val SubscriptionHolder) {
 				timeoutTimer := time.NewTimer(maxAllowedTime)
 				c := make(chan NfqueueResult, 1)
@@ -308,7 +308,7 @@ func createSessionEntry(mess NfqueueMessage, ctid uint32) *SessionEntry {
 	session.ConntrackConfirmed = false
 	session.attachments = make(map[string]interface{})
 	AttachNfqueueSubscriptions(session)
-	logger.Trace("Session Adding %d to table\n", session.SessionID)
+	logger.Trace("Session Adding %d to table\n", ctid)
 	insertSessionEntry(ctid, session)
 	return session
 }
