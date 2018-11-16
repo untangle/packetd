@@ -22,6 +22,10 @@ class PlaybackTests(unittest.TestCase):
 
     def test_010_check_empty_table(self):
         '''make sure the ctid does not yet exist in the table'''
+        dict = open("/proc/net/dict/delete","r+")
+        dict.write("table=session,key_int=4095221248")
+        rawdata = dict.read()
+        dict.close
         dict = open("/proc/net/dict/read","r+")
         dict.write("table=session,key_int=4095221248")
         rawdata = dict.read()
@@ -29,6 +33,7 @@ class PlaybackTests(unittest.TestCase):
         assert "table: session key_int: 4095221248" not in rawdata
 
     def test_020_playback_capture_file(self):
+        '''playback the capture file and wait for it to finish'''
         subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"filename\":\"/temp/japan.cap\",\"speed\":\"2\"}' 'http://localhost:8080/api/warehouse/playback' >> /tmp/subproc.out", shell=True)
         counter = 0
         busy = 1
@@ -43,6 +48,7 @@ class PlaybackTests(unittest.TestCase):
         assert busy == 0
 
     def test_030_check_country_code(self):
+        '''check for the country code in the dictionary'''
         dict = open("/proc/net/dict/read","r+")
         dict.write("table=session,key_int=4095221248")
         rawdata = dict.read()
