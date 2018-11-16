@@ -9,8 +9,6 @@
 * All Rights Reserved
 */
 
-// TODO - add switch to turn off live traffic processing during capture playback
-
 #include "common.h"
 
 static char		*logsrc = "warehouse";
@@ -125,5 +123,6 @@ void warehouse_playback(void)
 	}
 
 	fclose(data);
+	set_warehouse_flag('I');
 	logmessage(LOG_INFO,logsrc,"Finished playback %s\n",filename);
 }

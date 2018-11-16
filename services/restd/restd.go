@@ -63,6 +63,7 @@ func Startup() {
 	api.POST("/reports/close_query/:query_id", reportsCloseQuery)
 	api.POST("/warehouse/capture", warehouseCapture)
 	api.POST("/warehouse/playback", warehousePlayback)
+	api.GET("/warehouse/status", warehouseStatus)
 	api.POST("/control/traffic", trafficControl)
 
 	// files
@@ -209,7 +210,26 @@ func warehousePlayback(c *gin.Context) {
 }
 
 func warehouseCapture(c *gin.Context) {
-	c.JSON(200, "THIS FUNCTION IS NOT YET IMPLEMENTED") // TODO - some day
+	c.JSON(200, "THIS FUNCTION IS NOT YET IMPLEMENTED") // FIXME - some day
+}
+
+func warehouseStatus(c *gin.Context) {
+	var status string
+
+	status = "UNKNOWN"
+	flag := kernel.GetWarehouseFlag()
+	switch flag {
+	case 'I':
+		status = "IDLE"
+		break
+	case 'P':
+		status = "PLAYBACK"
+		break
+	case 'C':
+		status = "CAPTURE"
+		break
+	}
+	c.JSON(200, status)
 }
 
 func trafficControl(c *gin.Context) {
