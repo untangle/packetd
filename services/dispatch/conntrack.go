@@ -245,3 +245,19 @@ func cleanConntrackTable() {
 		logger.Err("Removing stale conntrack entry %d: %v\n", key, val)
 	}
 }
+
+// flushConntrackTable cleans the conntrack table by removing all entries
+func flushConntrackTable() int {
+	var counter int
+
+	conntrackTableMutex.Lock()
+	defer conntrackTableMutex.Unlock()
+
+	for key, val := range conntrackTable {
+		logger.Debug("Flushing conntrack %d\n", val.ConntrackID)
+		delete(conntrackTable, key)
+		counter++
+	}
+
+	return (counter)
+}

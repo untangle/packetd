@@ -14,7 +14,10 @@ class PlaybackTests(unittest.TestCase):
 
     @staticmethod
     def initialSetUp(self):
+        # turn on the traffic bypass flag
         subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"bypass\":\"TRUE\"}' 'http://localhost:8080/api/control/traffic' >> /tmp/subproc.out", shell=True)
+        # flush the system tables
+        subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{}' 'http://localhost:8080/api/control/flush' >> /tmp/subproc.out", shell=True)
         pass
 
     def setUp(self):

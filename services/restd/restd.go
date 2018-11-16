@@ -9,6 +9,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
@@ -65,6 +66,7 @@ func Startup() {
 	api.POST("/warehouse/playback", warehousePlayback)
 	api.GET("/warehouse/status", warehouseStatus)
 	api.POST("/control/traffic", trafficControl)
+	api.POST("/control/flush", tableFlush)
 
 	// files
 	engine.Static("/admin", "/www/admin")
@@ -185,7 +187,7 @@ func warehousePlayback(c *gin.Context) {
 
 	filename, found = data["filename"]
 	if found != true {
-		c.JSON(200, gin.H{"error": "filename not found"})
+		c.JSON(200, gin.H{"error": "filename not specified"})
 		return
 	}
 
@@ -268,6 +270,11 @@ func trafficControl(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"error": "Invalid or missing traffic control command"})
+}
+
+func tableFlush(c *gin.Context) {
+	dispatch.FlushSystemTables()
+	c.JSON(200, "System tables FLUSHED\n")
 }
 
 func getSettings(c *gin.Context) {

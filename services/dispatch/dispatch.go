@@ -63,6 +63,14 @@ func Shutdown() {
 	}
 }
 
+// FlushSystemTables is called to clear all system tables and is normally only used by automated tests
+func FlushSystemTables() {
+	logger.Alert("Flushing system tables...\n")
+	stot := flushSessionTable()
+	ctot := flushConntrackTable()
+	logger.Alert("Flushed %d session and %d conntrack entries\n", stot, ctot)
+}
+
 // cleanerTask is a periodic task to cleanup conntrack and session tables
 func cleanerTask() {
 	var counter int
