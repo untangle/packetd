@@ -32,7 +32,7 @@ class PlaybackTests(unittest.TestCase):
         subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"filename\":\"/temp/japan.cap\",\"speed\":\"2\"}' 'http://localhost:8080/api/warehouse/playback' >> /tmp/subproc.out", shell=True)
         counter = 0
         busy = 1
-        while busy != 0 and counter < 30:
+        while busy != 0 and counter < 10:
             counter += 1
             time.sleep(1)
             check = subprocess.Popen(["curl","http://localhost:8080/api/warehouse/status"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -40,7 +40,7 @@ class PlaybackTests(unittest.TestCase):
             print(result)
             if "IDLE" in result:
                 busy = 0
-        pass
+        assert busy == 0
 
     def test_030_check_country_code(self):
         dict = open("/proc/net/dict/read","r+")
