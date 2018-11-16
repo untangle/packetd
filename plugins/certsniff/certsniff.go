@@ -352,6 +352,4 @@ func findCertificates(buffer []byte, mess dispatch.NfqueueMessage) bool {
 		// skip over the record header and length
 		recoff += (reclen + 5)
 	}
-
-	return false
 }
