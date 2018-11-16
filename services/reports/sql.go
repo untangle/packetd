@@ -14,19 +14,20 @@ func makeSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.T
 		return "", errors.New("Missing required attribute Table")
 	}
 
-	if reportEntry.Type == "TEXT" {
+	switch reportEntry.Type {
+	case "TEXT":
 		return makeTextSQLString(reportEntry, startTime, endTime)
-	} else if reportEntry.Type == "EVENTS" {
+	case "EVENTS":
 		return makeEventsSQLString(reportEntry, startTime, endTime)
-	} else if reportEntry.Type == "CATEGORIES" {
+	case "CATEGORIES":
 		return makeCategoriesSQLString(reportEntry, startTime, endTime)
-	} else if reportEntry.Type == "SERIES" {
+	case "SERIES":
 		return makeSeriesSQLString(reportEntry, startTime, endTime)
-	} else if reportEntry.Type == "CATEGORIES_SERIES" {
+	case "CATEGORIES_SERIES":
 		return makeCategoriesSeriesSQLString(reportEntry, startTime, endTime)
-	} else {
-		return "", errors.New("Unsupported reportEntry type")
 	}
+
+	return "", errors.New("Unsupported reportEntry type")
 }
 
 // makeTextSQLString makes a SQL string from a TEXT type ReportEntry
