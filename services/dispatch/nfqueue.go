@@ -23,13 +23,6 @@ const NfAccept = 1
 //NfqueueHandlerFunction defines a pointer to a nfqueue callback function
 type NfqueueHandlerFunction func(NfqueueMessage, uint32, bool) NfqueueResult
 
-// NfqueueResult returns status and other information from a subscription handler function
-type NfqueueResult struct {
-	Owner          string
-	PacketMark     uint32
-	SessionRelease bool
-}
-
 // NfqueueMessage is used to pass nfqueue traffic to interested plugins
 type NfqueueMessage struct {
 	Session        *SessionEntry
@@ -45,47 +38,11 @@ type NfqueueMessage struct {
 	Payload        []byte
 }
 
-// nfqueueList holds the nfqueue subscribers
-var nfqueueList map[string]SubscriptionHolder
-
-// nfqueueListMutex is a lock for the nfqueueList
-var nfqueueListMutex sync.Mutex
-
-// InsertNfqueueSubscription adds a subscription for receiving nfqueue messages
-func InsertNfqueueSubscription(owner string, priority int, function NfqueueHandlerFunction) {
-	var holder SubscriptionHolder
-	logger.Info("Adding NFQueue Event Subscription (%s, %d)\n", owner, priority)
-
-	holder.Owner = owner
-	holder.Priority = priority
-	holder.NfqueueFunc = function
-	nfqueueListMutex.Lock()
-	nfqueueList[owner] = holder
-	nfqueueListMutex.Unlock()
-}
-
-// AttachNfqueueSubscriptions attaches active nfqueue subscriptions to the argumented SessionEntry
-func AttachNfqueueSubscriptions(session *SessionEntry) {
-	session.subLocker.Lock()
-	session.subscriptions = make(map[string]SubscriptionHolder)
-
-	for index, element := range nfqueueList {
-		session.subscriptions[index] = element
-	}
-	session.subLocker.Unlock()
-}
-
-// MirrorNfqueueSubscriptions creates a copy of the subscriptions for the argumented SessionEntry
-func MirrorNfqueueSubscriptions(session *SessionEntry) map[string]SubscriptionHolder {
-	mirror := make(map[string]SubscriptionHolder)
-	session.subLocker.Lock()
-
-	for k, v := range session.subscriptions {
-		mirror[k] = v
-	}
-
-	session.subLocker.Unlock()
-	return (mirror)
+// NfqueueResult returns status and other information from a subscription handler function
+type NfqueueResult struct {
+	Owner          string
+	PacketMark     uint32
+	SessionRelease bool
 }
 
 // ReleaseSession is called by a subscriber to stop receiving traffic for a session

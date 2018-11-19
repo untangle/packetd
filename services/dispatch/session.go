@@ -129,22 +129,6 @@ func cleanSessionTable() {
 	}
 }
 
-// flushSessionTable cleans the session table by removing all entries
-func flushSessionTable() int {
-	var counter int
-
-	sessionMutex.Lock()
-	defer sessionMutex.Unlock()
-
-	for key, val := range sessionTable {
-		logger.Debug("Flushing session %d\n", val.ConntrackID)
-		delete(sessionTable, key)
-		counter++
-	}
-
-	return (counter)
-}
-
 // printSessionTable prints the session table
 func printSessionTable() {
 	sessionMutex.Lock()

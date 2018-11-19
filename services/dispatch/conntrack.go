@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+// ConntrackHandlerFunction defines a pointer to a conntrack callback function
+type ConntrackHandlerFunction func(int, *ConntrackEntry)
+
 // ConntrackEntry stores the details of a conntrack entry
 type ConntrackEntry struct {
 	ConntrackID      uint32
@@ -26,30 +29,12 @@ type ConntrackEntry struct {
 	TotalRate        float32
 }
 
-//ConntrackHandlerFunction defines a pointer to a conntrack callback function
-type ConntrackHandlerFunction func(int, *ConntrackEntry)
-
-var conntrackList map[string]SubscriptionHolder
-var conntrackListMutex sync.Mutex
 var conntrackTable map[uint32]*ConntrackEntry
 var conntrackTableMutex sync.Mutex
 
 // String returns string representation of conntrack
 func (c ConntrackEntry) String() string {
 	return strconv.Itoa(int(c.ConntrackID)) + "|" + c.ClientSideTuple.String()
-}
-
-// InsertConntrackSubscription adds a subscription for receiving conntrack messages
-func InsertConntrackSubscription(owner string, priority int, function ConntrackHandlerFunction) {
-	var holder SubscriptionHolder
-	logger.Info("Adding Conntrack Event Subscription (%s, %d)\n", owner, priority)
-
-	holder.Owner = owner
-	holder.Priority = priority
-	holder.ConntrackFunc = function
-	conntrackListMutex.Lock()
-	conntrackList[owner] = holder
-	conntrackListMutex.Unlock()
 }
 
 // conntrackCallback is the global conntrack event handler
@@ -175,7 +160,7 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 	}
 
 	// We loop and increment the priority until all subscriptions have been called
-	sublist := conntrackList
+	sublist := conntrackSubList
 	subtotal := len(sublist)
 	subcount := 0
 	priority := 0
@@ -244,20 +229,4 @@ func cleanConntrackTable() {
 		// this should never happen, so print an error
 		logger.Err("Removing stale conntrack entry %d: %v\n", key, val)
 	}
-}
-
-// flushConntrackTable cleans the conntrack table by removing all entries
-func flushConntrackTable() int {
-	var counter int
-
-	conntrackTableMutex.Lock()
-	defer conntrackTableMutex.Unlock()
-
-	for key, val := range conntrackTable {
-		logger.Debug("Flushing conntrack %d\n", val.ConntrackID)
-		delete(conntrackTable, key)
-		counter++
-	}
-
-	return (counter)
 }

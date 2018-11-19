@@ -23,22 +23,6 @@ type NetloggerMessage struct {
 	Prefix       string
 }
 
-var netloggerList map[string]SubscriptionHolder
-var netloggerListMutex sync.Mutex
-
-// InsertNetloggerSubscription adds a subscription for receiving netlogger messages
-func InsertNetloggerSubscription(owner string, priority int, function NetloggerHandlerFunction) {
-	var holder SubscriptionHolder
-	logger.Info("Adding Netlogger Event Subscription (%s, %d)\n", owner, priority)
-
-	holder.Owner = owner
-	holder.Priority = priority
-	holder.NetloggerFunc = function
-	netloggerListMutex.Lock()
-	netloggerList[owner] = holder
-	netloggerListMutex.Unlock()
-}
-
 func netloggerCallback(version uint8,
 	protocol uint8, icmpType uint16,
 	srcInterface uint8, dstInterface uint8,
@@ -61,7 +45,7 @@ func netloggerCallback(version uint8,
 	logger.Trace("netlogger event: %v \n", netlogger)
 
 	// We loop and increment the priority until all subscriptions have been called
-	sublist := netloggerList
+	sublist := netloggerSubList
 	subtotal := len(sublist)
 	subcount := 0
 	priority := 0

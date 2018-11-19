@@ -11,6 +11,8 @@ import (
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 	"net"
+	"runtime"
+	"sync"
 	"time"
 )
 
@@ -23,6 +25,16 @@ type SubscriptionHolder struct {
 	NetloggerFunc NetloggerHandlerFunction
 }
 
+// list of subscribers to each of the three data sources
+var nfqueueSubList map[string]SubscriptionHolder
+var conntrackSubList map[string]SubscriptionHolder
+var netloggerSubList map[string]SubscriptionHolder
+
+// mutexes to protect each of the subscribtion lists
+var nfqueueSubMutex sync.Mutex
+var conntrackSubMutex sync.Mutex
+var netloggerSubMutex sync.Mutex
+
 var shutdownCleanerTask = make(chan bool)
 
 // Startup starts the event handling service
@@ -32,9 +44,9 @@ func Startup() {
 	conntrackTable = make(map[uint32]*ConntrackEntry)
 
 	// create the nfqueue, conntrack, and netlogger subscription tables
-	nfqueueList = make(map[string]SubscriptionHolder)
-	conntrackList = make(map[string]SubscriptionHolder)
-	netloggerList = make(map[string]SubscriptionHolder)
+	nfqueueSubList = make(map[string]SubscriptionHolder)
+	conntrackSubList = make(map[string]SubscriptionHolder)
+	netloggerSubList = make(map[string]SubscriptionHolder)
 
 	// initialize the sessionIndex counter
 	// highest 16 bits are zero
@@ -65,10 +77,18 @@ func Shutdown() {
 
 // FlushSystemTables is called to clear all system tables and is normally only used by automated tests
 func FlushSystemTables() {
-	logger.Alert("Flushing system tables...\n")
-	stot := flushSessionTable()
-	ctot := flushConntrackTable()
+	var stot, ctot int
+	logger.Alert("Flushing session and conntrack tables...\n")
+	sessionMutex.Lock()
+	defer sessionMutex.Unlock()
+	conntrackTableMutex.Lock()
+	defer conntrackTableMutex.Unlock()
+	stot = len(sessionTable)
+	ctot = len(conntrackTable)
+	sessionTable = make(map[uint32]*SessionEntry)
+	conntrackTable = make(map[uint32]*ConntrackEntry)
 	logger.Alert("Flushed %d session and %d conntrack entries\n", stot, ctot)
+	runtime.GC()
 }
 
 // cleanerTask is a periodic task to cleanup conntrack and session tables
@@ -94,4 +114,67 @@ func dupIP(ip net.IP) net.IP {
 	dup := make(net.IP, len(ip))
 	copy(dup, ip)
 	return dup
+}
+
+// InsertNfqueueSubscription adds a subscription for receiving nfqueue messages
+func InsertNfqueueSubscription(owner string, priority int, function NfqueueHandlerFunction) {
+	var holder SubscriptionHolder
+	logger.Info("Adding NFQueue Event Subscription (%s, %d)\n", owner, priority)
+
+	holder.Owner = owner
+	holder.Priority = priority
+	holder.NfqueueFunc = function
+	nfqueueSubMutex.Lock()
+	nfqueueSubList[owner] = holder
+	nfqueueSubMutex.Unlock()
+}
+
+// AttachNfqueueSubscriptions attaches active nfqueue subscriptions to the argumented SessionEntry
+func AttachNfqueueSubscriptions(session *SessionEntry) {
+	session.subLocker.Lock()
+	session.subscriptions = make(map[string]SubscriptionHolder)
+
+	for index, element := range nfqueueSubList {
+		session.subscriptions[index] = element
+	}
+	session.subLocker.Unlock()
+}
+
+// MirrorNfqueueSubscriptions creates a copy of the subscriptions for the argumented SessionEntry
+func MirrorNfqueueSubscriptions(session *SessionEntry) map[string]SubscriptionHolder {
+	mirror := make(map[string]SubscriptionHolder)
+	session.subLocker.Lock()
+
+	for k, v := range session.subscriptions {
+		mirror[k] = v
+	}
+
+	session.subLocker.Unlock()
+	return (mirror)
+}
+
+// InsertConntrackSubscription adds a subscription for receiving conntrack messages
+func InsertConntrackSubscription(owner string, priority int, function ConntrackHandlerFunction) {
+	var holder SubscriptionHolder
+	logger.Info("Adding Conntrack Event Subscription (%s, %d)\n", owner, priority)
+
+	holder.Owner = owner
+	holder.Priority = priority
+	holder.ConntrackFunc = function
+	conntrackSubMutex.Lock()
+	conntrackSubList[owner] = holder
+	conntrackSubMutex.Unlock()
+}
+
+// InsertNetloggerSubscription adds a subscription for receiving netlogger messages
+func InsertNetloggerSubscription(owner string, priority int, function NetloggerHandlerFunction) {
+	var holder SubscriptionHolder
+	logger.Info("Adding Netlogger Event Subscription (%s, %d)\n", owner, priority)
+
+	holder.Owner = owner
+	holder.Priority = priority
+	holder.NetloggerFunc = function
+	netloggerSubMutex.Lock()
+	netloggerSubList[owner] = holder
+	netloggerSubMutex.Unlock()
 }
