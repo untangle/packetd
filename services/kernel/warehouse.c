@@ -12,7 +12,15 @@
 #include "common.h"
 
 static char		*logsrc = "warehouse";
+static char		*filesig = "UTPDCF";
 static FILE		*capfile = NULL;
+
+struct file_header {
+	char			description[48];
+	char			signature[8];
+	u_int32_t		majver;
+	u_int32_t		minver;
+};
 
 struct data_header {
 	char			origin;
@@ -25,9 +33,17 @@ struct data_header {
 
 void start_warehouse_capture(void)
 {
+	struct file_header		header;
+
 	logmessage(LOG_INFO,logsrc,"Beginning capture %s\n",get_warehouse_file());
 	if (capfile != NULL) fclose(capfile);
-	capfile = fopen(get_warehouse_file(),"ab");
+	capfile = fopen(get_warehouse_file(),"wb");
+	memset(&header,0,sizeof(header));
+	strcpy(header.description,"Untangle Packet Daemon Traffic Capture\r\n");
+	strcpy(header.signature,filesig);
+	header.majver = 1;
+	header.minver = 0;
+	fwrite(&header,sizeof(header),1,capfile);
 }
 
 void close_warehouse_capture(void)
@@ -58,6 +74,7 @@ void warehouse_capture(const char origin,void *buffer,uint32_t length,uint32_t m
 
 void warehouse_playback(void)
 {
+	struct file_header		fh;
 	struct data_header		dh;
 	char					*filename;
 	char					*buffer;
@@ -68,16 +85,24 @@ void warehouse_playback(void)
 	uint64_t				last;
 
 	filename = get_warehouse_file();
+
 	data = fopen(filename,"rb");
 	if (data == NULL) {
 		logmessage(LOG_WARNING,logsrc,"Unable to playback %s\n",filename);
 		return;
 	}
 
+	fread(&fh,sizeof(fh),1,data);
+	if (strncmp(fh.signature,filesig,strlen(filesig)) != 0) {
+		logmessage(LOG_WARNING,logsrc,"Invalid signature in %s\n",filename);
+		fclose(data);
+		return;
+	}
+
 	speed = get_warehouse_speed();
 	last = 0;
 
-	logmessage(LOG_INFO,logsrc,"Beginning playback %s\n",filename);
+	logmessage(LOG_INFO,logsrc,"Beginning playback %s version %d.%d\n",filename,fh.majver,fh.minver);
 
 	for(;;)
 	{

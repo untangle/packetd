@@ -8,6 +8,8 @@ import tests.remote_control as remote_control
 
 class PlaybackTests(unittest.TestCase):
 
+    geoip_ctid = "697959424"
+
     @staticmethod
     def moduleName():
         return "playback"
@@ -26,14 +28,14 @@ class PlaybackTests(unittest.TestCase):
     def test_010_check_empty_table(self):
         '''make sure the ctid does not yet exist in the table'''
         dict = open("/proc/net/dict/delete","r+")
-        dict.write("table=session,key_int=4095221248")
+        dict.write("table=session,key_int=" + PlaybackTests.geoip_ctid)
         rawdata = dict.read()
         dict.close
         dict = open("/proc/net/dict/read","r+")
-        dict.write("table=session,key_int=4095221248")
+        dict.write("table=session,key_int=" + PlaybackTests.geoip_ctid)
         rawdata = dict.read()
         dict.close
-        assert "table: session key_int: 4095221248" not in rawdata
+        assert "table: session key_int: " + PlaybackTests.geoip_ctid not in rawdata
 
     def test_020_playback_capture_file(self):
         '''playback the capture file and wait for it to finish'''
@@ -53,11 +55,11 @@ class PlaybackTests(unittest.TestCase):
     def test_030_check_country_code(self):
         '''check for the country code in the dictionary'''
         dict = open("/proc/net/dict/read","r+")
-        dict.write("table=session,key_int=4095221248")
+        dict.write("table=session,key_int=" + PlaybackTests.geoip_ctid)
         rawdata = dict.read()
         dict.close
         assert "field: server_country string: JP" in rawdata
-        assert "table: session key_int: 4095221248" in rawdata
+        assert "table: session key_int: " + PlaybackTests.geoip_ctid in rawdata
 
     @staticmethod
     def finalTearDown(self):
