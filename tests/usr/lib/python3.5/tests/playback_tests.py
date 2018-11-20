@@ -3,6 +3,7 @@ import unittest
 import json
 import time
 import sys
+import os
 import tests.test_registry as test_registry
 import tests.remote_control as remote_control
 
@@ -37,9 +38,14 @@ class PlaybackTests(unittest.TestCase):
         dict.close
         assert "table: session key_int: " + PlaybackTests.geoip_ctid not in rawdata
 
-    def test_020_playback_capture_file(self):
+    def test_020_download_capture_file(self):
+        '''download the playback file needed for our tests'''
+        result = subprocess.call("wget -q -P /tmp http://proxy.intersafe.net/packetd/japan.cap", shell=True)
+        assert result == 0
+
+    def test_030_playback_capture_file(self):
         '''playback the capture file and wait for it to finish'''
-        subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"filename\":\"/temp/japan.cap\",\"speed\":\"2\"}' 'http://localhost:8080/api/warehouse/playback' >> /tmp/subproc.out", shell=True)
+        subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"filename\":\"/tmp/japan.cap\",\"speed\":\"1\"}' 'http://localhost:8080/api/warehouse/playback' >> /tmp/subproc.out", shell=True)
         counter = 0
         busy = 1
         while busy != 0 and counter < 10:
@@ -52,7 +58,7 @@ class PlaybackTests(unittest.TestCase):
                 busy = 0
         assert busy == 0
 
-    def test_030_check_country_code(self):
+    def test_040_check_country_code(self):
         '''check for the country code in the dictionary'''
         dict = open("/proc/net/dict/read","r+")
         dict.write("table=session,key_int=" + PlaybackTests.geoip_ctid)
@@ -64,6 +70,8 @@ class PlaybackTests(unittest.TestCase):
     @staticmethod
     def finalTearDown(self):
         subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"bypass\":\"FALSE\"}' 'http://localhost:8080/api/control/traffic' >> /tmp/subproc.out", shell=True)
+        if os.path.exists("/tmp/japan.cap"):
+            os.remove("/tmp/japan.cap")
         pass
 
 test_registry.register_module("playback", PlaybackTests)
