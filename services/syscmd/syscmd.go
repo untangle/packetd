@@ -1,9 +1,10 @@
 package syscmd
 
 import (
-	"github.com/untangle/packetd/services/logger"
 	"os/exec"
 	"strings"
+
+	"github.com/untangle/packetd/services/logger"
 )
 
 // Startup is called during daemon startup to handle initialization

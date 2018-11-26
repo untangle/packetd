@@ -1,8 +1,9 @@
 package dispatch
 
 import (
-	"github.com/untangle/packetd/services/logger"
 	"sync"
+
+	"github.com/untangle/packetd/services/logger"
 )
 
 //NetloggerHandlerFunction defines a pointer to a netlogger callback function

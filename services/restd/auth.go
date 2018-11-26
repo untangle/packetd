@@ -3,19 +3,20 @@ package restd
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/GehirnInc/crypt"
-	// MD5 used to verify password
-	_ "github.com/GehirnInc/crypt/md5_crypt"
-	"github.com/gin-contrib/sessions"
-	"github.com/gin-gonic/gin"
-	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/settings"
+
 	"io/ioutil"
 	"net"
 	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/GehirnInc/crypt"
+	_ "github.com/GehirnInc/crypt/md5_crypt" // MD5 used to verify password
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-gonic/gin"
+	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/settings"
 )
 
 func authRequired(engine *gin.Engine) gin.HandlerFunc {

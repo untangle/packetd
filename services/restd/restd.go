@@ -5,6 +5,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"strconv"
+	"strings"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -14,9 +18,6 @@ import (
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/settings"
-	"io/ioutil"
-	"strconv"
-	"strings"
 )
 
 var engine *gin.Engine

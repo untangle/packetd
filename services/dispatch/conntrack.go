@@ -1,11 +1,12 @@
 package dispatch
 
 import (
-	"github.com/untangle/packetd/services/logger"
 	"net"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/untangle/packetd/services/logger"
 )
 
 // ConntrackHandlerFunction defines a pointer to a conntrack callback function

@@ -8,14 +8,15 @@ package kernel
 import "C"
 
 import (
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/untangle/packetd/services/logger"
 	"net"
 	"sync"
 	"syscall"
 	"time"
 	"unsafe"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/untangle/packetd/services/logger"
 )
 
 // ConntrackCallback is a function to handle conntrack events

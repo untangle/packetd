@@ -3,9 +3,10 @@ package reports
 import (
 	"errors"
 	"fmt"
-	"github.com/untangle/packetd/services/logger"
 	"strconv"
 	"time"
+
+	"github.com/untangle/packetd/services/logger"
 )
 
 // makeSQLString makes a SQL string from a ReportEntry

@@ -3,13 +3,14 @@ package dict
 import (
 	"bufio"
 	"fmt"
-	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/syscmd"
 	"net"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/syscmd"
 )
 
 const pathBase string = "/proc/net/dict"

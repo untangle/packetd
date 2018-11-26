@@ -8,12 +8,13 @@
 package dispatch
 
 import (
-	"github.com/untangle/packetd/services/kernel"
-	"github.com/untangle/packetd/services/logger"
 	"net"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/untangle/packetd/services/kernel"
+	"github.com/untangle/packetd/services/logger"
 )
 
 // SubscriptionHolder stores the details of a data callback subscription

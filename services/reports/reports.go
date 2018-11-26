@@ -4,11 +4,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	_ "github.com/mattn/go-sqlite3" // blank import required for runtime binding
-	"github.com/untangle/packetd/services/logger"
 	"strconv"
 	"sync/atomic"
 	"time"
+
+	_ "github.com/mattn/go-sqlite3" // blank import required for runtime binding
+	"github.com/untangle/packetd/services/logger"
 )
 
 // Event stores an arbitrary event

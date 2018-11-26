@@ -1,12 +1,13 @@
 package dispatch
 
 import (
+	"sync"
+	"time"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/logger"
-	"sync"
-	"time"
 )
 
 // maxAllowedTime is the maximum time a plugin is allowed to process a packet.

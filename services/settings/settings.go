@@ -3,9 +3,10 @@ package settings
 import (
 	"encoding/json"
 	"errors"
-	"github.com/untangle/packetd/services/logger"
 	"io/ioutil"
 	"strconv"
+
+	"github.com/untangle/packetd/services/logger"
 )
 
 const settingsFile = "/etc/config/settings.json"
