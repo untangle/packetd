@@ -1,10 +1,11 @@
 package dispatch
 
 import (
-	"github.com/untangle/packetd/services/dict"
-	"github.com/untangle/packetd/services/logger"
 	"sync"
 	"time"
+
+	"github.com/untangle/packetd/services/dict"
+	"github.com/untangle/packetd/services/logger"
 )
 
 // SessionEntry stores details related to a session
