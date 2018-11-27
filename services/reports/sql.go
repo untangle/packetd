@@ -369,17 +369,17 @@ func escapeSingleTick(source string) string {
 // operatorSQL returns the sql equivalent of a condition operator
 func operatorSQL(operator string) (string, error) {
 	switch operator {
-	case "EQUALS":
+	case "EQ":
 		return "=", nil
-	case "NOT_EQUALS":
+	case "NE":
 		return "!=", nil
-	case "GREATER_THAN":
+	case "GT":
 		return ">", nil
-	case "LESS_THAN":
+	case "LT":
 		return "<", nil
-	case "GREATER_THAN_OR_EQUAL":
+	case "GE":
 		return ">=", nil
-	case "LESS_THAN_OR_EQUAL":
+	case "LE":
 		return "<=", nil
 	case "LIKE":
 		return "like", nil

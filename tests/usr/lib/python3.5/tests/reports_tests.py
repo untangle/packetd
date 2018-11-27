@@ -9,7 +9,7 @@ initial_settings = None
 SESSIONS_ONE_CONDITION = {
     "conditions": [{
         "column": "ip_protocol",
-        "operator": "EQUALS",
+        "operator": "EQ",
         "value": "17"
     }]
 }
@@ -17,111 +17,111 @@ SESSIONS_ONE_CONDITION = {
 SESSIONS_TWO_CONDITION = {
     "conditions": [{
         "column": "ip_protocol",
-        "operator": "EQUALS",
+        "operator": "EQ",
         "value": "17"
-    },{
+    }, {
         "column": "c2s_bytes",
-        "operator": "GREATER_THAN",
+        "operator": "GT",
         "value": "0"
     }]
 }
 
 BASIC_TEXT_REPORT_ENTRY = {
-            "uniqueId": "basic_text_report_entry",
-            "name": "basic_text_report_entry",
-            "category": "category",
-            "description": "description",
-            "displayOrder": 10,
-            "readOnly": True,
-            "type": "TEXT",
-            "table": "sessions",
-            "queryText": {
-                "columns": ["count(*) as session_count"]
-            },
-            "rendering": {
-                "arbitrary1": 1,
-                "arbitrary2": True,
-                "arbitrary3": "arbitrary3"
-            }
-        }
+    "uniqueId": "basic_text_report_entry",
+    "name": "basic_text_report_entry",
+    "category": "category",
+    "description": "description",
+    "displayOrder": 10,
+    "readOnly": True,
+    "type": "TEXT",
+    "table": "sessions",
+    "queryText": {
+        "columns": ["count(*) as session_count"]
+    },
+    "rendering": {
+        "arbitrary1": 1,
+        "arbitrary2": True,
+        "arbitrary3": "arbitrary3"
+    }
+}
 
 BASIC_EVENTS_REPORT_ENTRY = {
-            "uniqueId": "basic_events_report_entry",
-            "name": "basic_events_report_entry",
-            "category": "category",
-            "description": "description",
-            "displayOrder": 10,
-            "readOnly": True,
-            "type": "EVENTS",
-            "table": "sessions",
-            "rendering": {
-                "arbitrary1": 1,
-                "arbitrary2": True,
-                "arbitrary3": "arbitrary3"
-            }
-        }
+    "uniqueId": "basic_events_report_entry",
+    "name": "basic_events_report_entry",
+    "category": "category",
+    "description": "description",
+    "displayOrder": 10,
+    "readOnly": True,
+    "type": "EVENTS",
+    "table": "sessions",
+    "rendering": {
+        "arbitrary1": 1,
+        "arbitrary2": True,
+        "arbitrary3": "arbitrary3"
+    }
+}
 
 BASIC_CATEGORIES_REPORT_ENTRY = {
-            "uniqueId": "basic_categories_report_entry",
-            "name": "basic_categories_report_entry",
-            "category": "category",
-            "description": "description",
-            "displayOrder": 10,
-            "readOnly": True,
-            "type": "CATEGORIES",
-            "table": "sessions",
-            "queryCategories": {
-                "groupColumn": "client_address",
-                "aggregationFunction": "count",
-                "aggregationValue": "*"
-            },
-            "rendering": {
-                "arbitrary1": 1,
-                "arbitrary2": True,
-                "arbitrary3": "arbitrary3"
-            }
-        }
+    "uniqueId": "basic_categories_report_entry",
+    "name": "basic_categories_report_entry",
+    "category": "category",
+    "description": "description",
+    "displayOrder": 10,
+    "readOnly": True,
+    "type": "CATEGORIES",
+    "table": "sessions",
+    "queryCategories": {
+        "groupColumn": "client_address",
+        "aggregationFunction": "count",
+        "aggregationValue": "*"
+    },
+    "rendering": {
+        "arbitrary1": 1,
+        "arbitrary2": True,
+        "arbitrary3": "arbitrary3"
+    }
+}
 
 BASIC_SERIES_REPORT_ENTRY = {
-            "uniqueId": "basic_series_report_entry",
-            "name": "basic_series_report_entry",
-            "category": "category",
-            "description": "description",
-            "displayOrder": 10,
-            "readOnly": True,
-            "type": "SERIES",
-            "table": "sessions",
-            "querySeries": {
-                "columns": ["count(*) as sessions"]
-            },
-            "rendering": {
-                "arbitrary1": 1,
-                "arbitrary2": True,
-                "arbitrary3": "arbitrary3"
-            }
-        }
+    "uniqueId": "basic_series_report_entry",
+    "name": "basic_series_report_entry",
+    "category": "category",
+    "description": "description",
+    "displayOrder": 10,
+    "readOnly": True,
+    "type": "SERIES",
+    "table": "sessions",
+    "querySeries": {
+        "columns": ["count(*) as sessions"]
+    },
+    "rendering": {
+        "arbitrary1": 1,
+        "arbitrary2": True,
+        "arbitrary3": "arbitrary3"
+    }
+}
 
 BASIC_CATEGORIES_SERIES_REPORT_ENTRY = {
-            "uniqueId": "basic_series_report_entry",
-            "name": "basic_series_report_entry",
-            "category": "category",
-            "description": "description",
-            "displayOrder": 10,
-            "readOnly": True,
-            "type": "CATEGORIES_SERIES",
-            "table": "sessions",
-            "queryCategories": {
-                "groupColumn": "client_address",
-                "aggregationFunction": "count",
-                "aggregationValue": "1",
-                "limit": 5
-            },
-            "rendering": {
-                "arbitrary1": 1,
-                "arbitrary2": True,
-                "arbitrary3": "arbitrary3"
-            }
-        }
+    "uniqueId": "basic_series_report_entry",
+    "name": "basic_series_report_entry",
+    "category": "category",
+    "description": "description",
+    "displayOrder": 10,
+    "readOnly": True,
+    "type": "CATEGORIES_SERIES",
+    "table": "sessions",
+    "queryCategories": {
+        "groupColumn": "client_address",
+        "aggregationFunction": "count",
+        "aggregationValue": "1",
+        "limit": 5
+    },
+    "rendering": {
+        "arbitrary1": 1,
+        "arbitrary2": True,
+        "arbitrary3": "arbitrary3"
+    }
+}
 
 def merge(dict1, dict2):
     res = {**dict1, **dict2}
@@ -160,13 +160,11 @@ def close_query(query_id):
     print(cmd)
     p = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
     output = p.stdout.decode()
-    print("XXX:")
-    print(output)
     if p.returncode != 0:
         return None
     else:
         return output
-    
+
 class ReportsTests(unittest.TestCase):
 
     @staticmethod
@@ -219,7 +217,7 @@ class ReportsTests(unittest.TestCase):
             assert(results[0]["server_port"] != None)
 
     def test_021_events_query_condition1(self):
-        report_entry = merge(BASIC_EVENTS_REPORT_ENTRY,SESSIONS_ONE_CONDITION)
+        report_entry = merge(BASIC_EVENTS_REPORT_ENTRY, SESSIONS_ONE_CONDITION)
         query_id = create_query(report_entry)
         assert(query_id != None)
         results = get_data(query_id)
@@ -246,7 +244,7 @@ class ReportsTests(unittest.TestCase):
             assert(results[0]["value"] != None)
 
     def test_031_categories_query_condition1(self):
-        report_entry = merge(BASIC_CATEGORIES_REPORT_ENTRY,SESSIONS_ONE_CONDITION)
+        report_entry = merge(BASIC_CATEGORIES_REPORT_ENTRY, SESSIONS_ONE_CONDITION)
         query_id = create_query(report_entry)
         assert(query_id != None)
         results = get_data(query_id)
@@ -268,7 +266,7 @@ class ReportsTests(unittest.TestCase):
         assert(results[0]["time_trunc"] != None)
 
     def test_041_series_query_condition1(self):
-        report_entry = merge(BASIC_SERIES_REPORT_ENTRY,SESSIONS_ONE_CONDITION)
+        report_entry = merge(BASIC_SERIES_REPORT_ENTRY, SESSIONS_ONE_CONDITION)
         query_id = create_query(report_entry)
         assert(query_id != None)
         results = get_data(query_id)
@@ -287,7 +285,7 @@ class ReportsTests(unittest.TestCase):
         assert(results != None)
 
     def test_051_categories_series_query_condition1(self):
-        report_entry = merge(BASIC_CATEGORIES_SERIES_REPORT_ENTRY,SESSIONS_ONE_CONDITION)
+        report_entry = merge(BASIC_CATEGORIES_SERIES_REPORT_ENTRY, SESSIONS_ONE_CONDITION)
         query_id = create_query(report_entry)
         assert(query_id != None)
         results = get_data(query_id)
