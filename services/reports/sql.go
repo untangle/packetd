@@ -51,6 +51,13 @@ func makeTextSQLString(reportEntry *ReportEntry, startTime time.Time, endTime ti
 	sqlStr += " FROM"
 	sqlStr += " " + escape(reportEntry.Table)
 	sqlStr += " WHERE " + timeStampConditions(startTime, endTime)
+	for _, condition := range reportEntry.Conditions {
+		opStr, err := operatorSQL(condition.Operator)
+		if err != nil {
+			return "", err
+		}
+		sqlStr += " AND " + condition.Column + " " + opStr + " ? "
+	}
 	return sqlStr, nil
 }
 
@@ -59,6 +66,13 @@ func makeEventsSQLString(reportEntry *ReportEntry, startTime time.Time, endTime 
 	sqlStr := "SELECT * FROM"
 	sqlStr += " " + escape(reportEntry.Table)
 	sqlStr += " WHERE " + timeStampConditions(startTime, endTime)
+	for _, condition := range reportEntry.Conditions {
+		opStr, err := operatorSQL(condition.Operator)
+		if err != nil {
+			return "", err
+		}
+		sqlStr += " AND " + condition.Column + " " + opStr + " ? "
+	}
 	return sqlStr, nil
 }
 
@@ -91,6 +105,13 @@ func makeCategoriesSQLString(reportEntry *ReportEntry, startTime time.Time, endT
 	sqlStr += " as value"
 	sqlStr += " FROM " + escape(reportEntry.Table)
 	sqlStr += " WHERE " + timeStampConditions(startTime, endTime)
+	for _, condition := range reportEntry.Conditions {
+		opStr, err := operatorSQL(condition.Operator)
+		if err != nil {
+			return "", err
+		}
+		sqlStr += " AND " + condition.Column + " " + opStr + " ? "
+	}
 	sqlStr += " GROUP BY " + reportEntry.QueryCategories.GroupColumn
 	sqlStr += fmt.Sprintf(" ORDER BY %d %s", orderByColumn, order)
 
@@ -127,6 +148,13 @@ func makeSeriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime 
 	}
 	qStr += " FROM " + escape(reportEntry.Table)
 	qStr += " WHERE " + timeStampConditions(startTime, endTime)
+	for _, condition := range reportEntry.Conditions {
+		opStr, err := operatorSQL(condition.Operator)
+		if err != nil {
+			return "", err
+		}
+		qStr += " AND " + condition.Column + " " + opStr + " ? "
+	}
 	qStr += " GROUP BY time_trunc"
 
 	sqlStr := "SELECT * FROM "
@@ -232,8 +260,9 @@ func getDistinctValues(reportEntry *ReportEntry, startTime time.Time, endTime ti
 	if err != nil {
 		return nil, err
 	}
-	rows, err := db.Query(categoriesSQLStr)
+	rows, err := db.Query(categoriesSQLStr, conditionValues(reportEntry.Conditions)...)
 	if err != nil {
+		logger.Warn("Failed to get Distinct values: %v\n", err)
 		return nil, err
 	}
 	categories, err := getRows(rows, reportEntry.QueryCategories.Limit)
@@ -335,4 +364,45 @@ func escapeSingleTick(source string) string {
 		}
 	}
 	return string(desc[0:j])
+}
+
+// operatorSQL returns the sql equivalent of a condition operator
+func operatorSQL(operator string) (string, error) {
+	switch operator {
+	case "EQUALS":
+		return "=", nil
+	case "NOT_EQUALS":
+		return "!=", nil
+	case "GREATER_THAN":
+		return ">", nil
+	case "LESS_THAN":
+		return "<", nil
+	case "GREATER_THAN_OR_EQUAL":
+		return ">=", nil
+	case "LESS_THAN_OR_EQUAL":
+		return "<=", nil
+	case "LIKE":
+		return "like", nil
+	case "NOT_LIKE":
+		return "not like", nil
+	case "IS":
+		return "is", nil
+	case "IS_NOT":
+		return "is not", nil
+	case "IN":
+		return "in", nil
+	case "NOT_IN":
+		return "not in", nil
+	default:
+		return "", errors.New("Invalid condition operator" + operator)
+	}
+}
+
+// conditionValues returns a slice of the condition values of slice of ReportConditions
+func conditionValues(conditions []ReportCondition) []interface{} {
+	values := make([]interface{}, len(conditions))
+	for i, condition := range conditions {
+		values[i] = condition.Value
+	}
+	return values
 }

@@ -54,6 +54,13 @@ type QuerySeriesOptions struct {
 	TimeIntervalSeconds int      `json:"timeIntervalSeconds"`
 }
 
+// ReportCondition holds a SQL reporting condition (ie client = 1.2.3.4)
+type ReportCondition struct {
+	Column   string      `json:"column"`
+	Operator string      `json:"operator"`
+	Value    interface{} `json:"value"`
+}
+
 // ReportEntry is a report entry as defined in the JSON schema
 type ReportEntry struct {
 	UniqueID        string                 `json:"uniqueId"`
@@ -64,6 +71,7 @@ type ReportEntry struct {
 	ReadOnly        bool                   `json:"readOnly"`
 	Type            string                 `json:"type"`
 	Table           string                 `json:"table"`
+	Conditions      []ReportCondition      `json:"conditions"`
 	QueryCategories QueryCategoriesOptions `json:"queryCategories"`
 	QueryText       QueryTextOptions       `json:"queryText"`
 	QuerySeries     QuerySeriesOptions     `json:"querySeries"`
@@ -136,9 +144,10 @@ func CreateQuery(reportEntryStr string, startTimeStr string, endTimeStr string) 
 	if err != nil {
 		return nil, err
 	}
+	values := conditionValues(reportEntry.Conditions)
 
-	logger.Info("SQL: %v\n", sqlStr)
-	rows, err = db.Query(sqlStr)
+	logger.Info("SQL: %v %v\n", sqlStr, values)
+	rows, err = db.Query(sqlStr, values...)
 	if err != nil {
 		logger.Err("db.Query error: %s\n", err)
 		return nil, err

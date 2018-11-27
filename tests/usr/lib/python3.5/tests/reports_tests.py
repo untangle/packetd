@@ -6,6 +6,26 @@ import tests.test_registry as test_registry
 
 initial_settings = None
 
+SESSIONS_ONE_CONDITION = {
+    "conditions": [{
+        "column": "ip_protocol",
+        "operator": "EQUALS",
+        "value": "17"
+    }]
+}
+
+SESSIONS_TWO_CONDITION = {
+    "conditions": [{
+        "column": "ip_protocol",
+        "operator": "EQUALS",
+        "value": "17"
+    },{
+        "column": "c2s_bytes",
+        "operator": "GREATER_THAN",
+        "value": "0"
+    }]
+}
+
 BASIC_TEXT_REPORT_ENTRY = {
             "uniqueId": "basic_text_report_entry",
             "name": "basic_text_report_entry",
@@ -103,6 +123,9 @@ BASIC_CATEGORIES_SERIES_REPORT_ENTRY = {
             }
         }
 
+def merge(dict1, dict2):
+    res = {**dict1, **dict2}
+    return res
 
 def create_query(report_entry):
     """Creates a query from the specified report_entry"""
@@ -114,7 +137,11 @@ def create_query(report_entry):
     if p.returncode != 0:
         return None
     else:
-        return int(output)
+        try:
+            return int(output)
+        except Exception as e:
+            print("OUTPUT: " + output)
+            raise e
 
 def get_data(query_id):
     """Gets the data for the specified query ID"""
@@ -157,8 +184,8 @@ class ReportsTests(unittest.TestCase):
         assert(True)
 
     def test_010_text_query(self):
-        global BASIC_TEXT_REPORT_ENTRY
-        query_id = create_query(BASIC_TEXT_REPORT_ENTRY)
+        report_entry = BASIC_TEXT_REPORT_ENTRY
+        query_id = create_query(report_entry)
         assert(query_id != None)
         results = get_data(query_id)
         close_query(query_id)
@@ -166,9 +193,19 @@ class ReportsTests(unittest.TestCase):
         assert(results[0] != None)
         assert(results[0]["session_count"] != None)
 
-    def test_011_events_query(self):
-        global BASIC_EVENTS_REPORT_ENTRY
-        query_id = create_query(BASIC_EVENTS_REPORT_ENTRY)
+    def test_011_text_queryo_condition1(self):
+        report_entry = merge(BASIC_TEXT_REPORT_ENTRY, SESSIONS_TWO_CONDITION)
+        query_id = create_query(report_entry)
+        assert(query_id != None)
+        results = get_data(query_id)
+        close_query(query_id)
+        assert(results != None)
+        assert(results[0] != None)
+        assert(results[0]["session_count"] != None)
+
+    def test_020_events_query(self):
+        report_entry = BASIC_EVENTS_REPORT_ENTRY
+        query_id = create_query(report_entry)
         assert(query_id != None)
         results = get_data(query_id)
         close_query(query_id)
@@ -181,9 +218,24 @@ class ReportsTests(unittest.TestCase):
             assert(results[0]["client_port"] != None)
             assert(results[0]["server_port"] != None)
 
-    def test_012_categories_query(self):
-        global BASIC_CATEGORIES_REPORT_ENTRY
-        query_id = create_query(BASIC_CATEGORIES_REPORT_ENTRY)
+    def test_021_events_query_condition1(self):
+        report_entry = merge(BASIC_EVENTS_REPORT_ENTRY,SESSIONS_ONE_CONDITION)
+        query_id = create_query(report_entry)
+        assert(query_id != None)
+        results = get_data(query_id)
+        close_query(query_id)
+        assert(results != None)
+        assert(isinstance(results, list))
+        if len(results) > 0:
+            # Just check some columns that should never be null
+            assert(results[0]["client_address"] != None)
+            assert(results[0]["server_address"] != None)
+            assert(results[0]["client_port"] != None)
+            assert(results[0]["server_port"] != None)
+
+    def test_030_categories_query(self):
+        report_entry = BASIC_CATEGORIES_REPORT_ENTRY
+        query_id = create_query(report_entry)
         assert(query_id != None)
         results = get_data(query_id)
         close_query(query_id)
@@ -193,9 +245,21 @@ class ReportsTests(unittest.TestCase):
             assert(results[0]["client_address"] != None)
             assert(results[0]["value"] != None)
 
-    def test_013_series_query(self):
-        global BASIC_SERIES_REPORT_ENTRY
-        query_id = create_query(BASIC_SERIES_REPORT_ENTRY)
+    def test_031_categories_query_condition1(self):
+        report_entry = merge(BASIC_CATEGORIES_REPORT_ENTRY,SESSIONS_ONE_CONDITION)
+        query_id = create_query(report_entry)
+        assert(query_id != None)
+        results = get_data(query_id)
+        close_query(query_id)
+        assert(results != None)
+        assert(isinstance(results, list))
+        if len(results) > 0:
+            assert(results[0]["client_address"] != None)
+            assert(results[0]["value"] != None)
+
+    def test_040_series_query(self):
+        report_entry = BASIC_SERIES_REPORT_ENTRY
+        query_id = create_query(report_entry)
         assert(query_id != None)
         results = get_data(query_id)
         close_query(query_id)
@@ -203,15 +267,34 @@ class ReportsTests(unittest.TestCase):
         assert(len(results) > 0)
         assert(results[0]["time_trunc"] != None)
 
-    def test_014_categories_series_query(self):
-        global BASIC_CATEGORIES_SERIES_REPORT_ENTRY
-        query_id = create_query(BASIC_CATEGORIES_SERIES_REPORT_ENTRY)
+    def test_041_series_query_condition1(self):
+        report_entry = merge(BASIC_SERIES_REPORT_ENTRY,SESSIONS_ONE_CONDITION)
+        query_id = create_query(report_entry)
+        assert(query_id != None)
+        results = get_data(query_id)
+        close_query(query_id)
+        assert(results != None)
+        assert(len(results) > 0)
+        assert(results[0]["time_trunc"] != None)
+
+    def test_050_categories_series_query(self):
+        report_entry = BASIC_CATEGORIES_SERIES_REPORT_ENTRY
+        query_id = create_query(report_entry)
         assert(query_id != None)
         results = get_data(query_id)
         close_query(query_id)
         print(results)
         assert(results != None)
-        
+
+    def test_051_categories_series_query_condition1(self):
+        report_entry = merge(BASIC_CATEGORIES_SERIES_REPORT_ENTRY,SESSIONS_ONE_CONDITION)
+        query_id = create_query(report_entry)
+        assert(query_id != None)
+        results = get_data(query_id)
+        close_query(query_id)
+        print(results)
+        assert(results != None)
+
     @staticmethod
     def finalTearDown(self):
         pass
