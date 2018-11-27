@@ -40,7 +40,7 @@ class PlaybackTests(unittest.TestCase):
 
     def test_020_download_capture_file(self):
         '''download the playback file needed for our tests'''
-        result = subprocess.call("wget -q -P /tmp http://proxy.intersafe.net/packetd/japan.cap", shell=True)
+        result = subprocess.call("wget -q -P /tmp http://test.untangle.com/packetd/japan.cap", shell=True)
         assert result == 0
 
     def test_030_playback_capture_file(self):
