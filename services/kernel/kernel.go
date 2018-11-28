@@ -36,6 +36,9 @@ var nfqueueCallback NfqueueCallback
 var netloggerCallback NetloggerCallback
 var debugFlag bool
 
+var nfCleanList map[uint32]bool
+var ctCleanList map[uint32]bool
+
 // Startup starts kernel services
 func Startup() {
 }
@@ -155,12 +158,17 @@ func RegisterNetloggerCallback(cb NetloggerCallback) {
 }
 
 //export go_nfqueue_callback
-func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.char) {
+func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.char, playflag C.int) {
 	if nfqueueCallback == nil {
 		logger.Warn("No queue callback registered. Ignoring packet.\n")
 		C.nfqueue_set_verdict(nfid, C.NF_ACCEPT, mark)
 		C.nfqueue_free_buffer(buffer)
 		return
+	}
+
+	// if the playback flag is set add the ctid to our cleanup list
+	if playflag != 0 && nfCleanList != nil {
+		nfCleanList[uint32(C.int(ctid))] = true
 	}
 
 	go func(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.char) {
@@ -191,7 +199,7 @@ func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint
 }
 
 //export go_conntrack_callback
-func go_conntrack_callback(info *C.struct_conntrack_info) {
+func go_conntrack_callback(info *C.struct_conntrack_info, playflag C.int) {
 	var ctid uint32
 	var family uint8
 	var eventType uint8
@@ -213,6 +221,12 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 	}
 
 	ctid = uint32(info.conn_id)
+
+	// if the playback flag is set add the ctid to our cleanup list
+	if playflag != 0 && ctCleanList != nil {
+		ctCleanList[ctid] = true
+	}
+
 	family = uint8(info.family)
 	eventType = uint8(info.msg_type)
 	c2sBytes = uint64(info.orig_bytes)
@@ -265,7 +279,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info) {
 }
 
 //export go_netlogger_callback
-func go_netlogger_callback(info *C.struct_netlogger_info) {
+func go_netlogger_callback(info *C.struct_netlogger_info, playflag C.int) {
 	var version uint8 = uint8(info.version)
 	var protocol uint8 = uint8(info.protocol)
 	var icmpType uint16 = uint16(info.icmp_type)
@@ -336,9 +350,11 @@ func UpdateConntrackMark(ctid uint32, mask uint32, value uint32) {
 	C.conntrack_update_mark(C.uint32_t(ctid), C.uint32_t(mask), C.uint32_t(value))
 }
 
-// PlaybackWarehouseFile plays back a warehouse capture file
-func PlaybackWarehouseFile() {
-	go func() {
-		C.warehouse_playback()
-	}()
+// WarehousePlaybackFile plays a warehouse capture file and returns the list of netfilter
+// conntrack sessions that were detected so the caller can clean them up
+func WarehousePlaybackFile() (map[uint32]bool, map[uint32]bool) {
+	nfCleanList = make(map[uint32]bool)
+	ctCleanList = make(map[uint32]bool)
+	C.warehouse_playback()
+	return nfCleanList, ctCleanList
 }

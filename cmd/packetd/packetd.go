@@ -75,7 +75,7 @@ func main() {
 	}
 
 	if kernel.GetWarehouseFlag() == 'P' {
-		kernel.PlaybackWarehouseFile()
+		dispatch.HandleWarehousePlayback()
 	}
 
 	if kernel.GetWarehouseFlag() == 'C' {

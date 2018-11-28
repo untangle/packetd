@@ -81,9 +81,10 @@ struct nfq_data {
 	struct nfattr	**data;
 };
 
-extern void go_nfqueue_callback(uint32_t mark,unsigned char* data,int len,uint32_t ctid,uint32_t nfid,char* memory);
-extern void go_netlogger_callback(struct netlogger_info* info);
-extern void go_conntrack_callback(struct conntrack_info* info);
+extern void go_nfqueue_callback(uint32_t mark,unsigned char* data,int len,uint32_t ctid,uint32_t nfid,char* memory,int playflag);
+extern void go_netlogger_callback(struct netlogger_info* info,int playflag);
+extern void go_conntrack_callback(struct conntrack_info* info,int playflag);
+
 extern void go_child_startup(void);
 extern void go_child_shutdown(void);
 extern void go_child_message(int level,char *source,char *message);

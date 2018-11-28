@@ -9,7 +9,8 @@ import tests.remote_control as remote_control
 
 class PlaybackTests(unittest.TestCase):
 
-    geoip_ctid = "697959424"
+#    geoip_ctid = "4288283904"
+    geoip_ctid = "4187620608"
 
     @staticmethod
     def moduleName():
@@ -19,8 +20,6 @@ class PlaybackTests(unittest.TestCase):
     def initialSetUp(self):
         # turn on the traffic bypass flag
         subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"bypass\":\"TRUE\"}' 'http://localhost:8080/api/control/traffic' >> /tmp/subproc.out", shell=True)
-        # flush the system tables
-        subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{}' 'http://localhost:8080/api/control/flush' >> /tmp/subproc.out", shell=True)
         pass
 
     def setUp(self):
@@ -29,11 +28,10 @@ class PlaybackTests(unittest.TestCase):
     def test_010_check_empty_table(self):
         '''make sure the ctid does not yet exist in the table'''
         dict = open("/proc/net/dict/delete","r+")
-        dict.write("table=session,key_int=" + PlaybackTests.geoip_ctid)
-        rawdata = dict.read()
+        dict.write("table=session,key_int=" + PlaybackTests.geoip_ctid + ",")
         dict.close
         dict = open("/proc/net/dict/read","r+")
-        dict.write("table=session,key_int=" + PlaybackTests.geoip_ctid)
+        dict.write("table=session,key_int=" + PlaybackTests.geoip_ctid + ",")
         rawdata = dict.read()
         dict.close
         assert "table: session key_int: " + PlaybackTests.geoip_ctid not in rawdata
@@ -58,14 +56,18 @@ class PlaybackTests(unittest.TestCase):
                 busy = 0
         assert busy == 0
 
-    def test_040_check_country_code(self):
+    def test_031_check_country_code(self):
         '''check for the country code in the dictionary'''
         dict = open("/proc/net/dict/read","r+")
-        dict.write("table=session,key_int=" + PlaybackTests.geoip_ctid)
+        dict.write("table=session,key_int=" + PlaybackTests.geoip_ctid + ",")
         rawdata = dict.read()
         dict.close
         assert "field: server_country string: JP" in rawdata
         assert "table: session key_int: " + PlaybackTests.geoip_ctid in rawdata
+
+    def test_032_playback_cleanup(self):
+        subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{}' 'http://localhost:8080/api/warehouse/cleanup' >> /tmp/subproc.out", shell=True)
+        pass
 
     @staticmethod
     def finalTearDown(self):

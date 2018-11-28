@@ -9,7 +9,6 @@ package dispatch
 
 import (
 	"net"
-	"runtime"
 	"sync"
 	"time"
 
@@ -35,6 +34,10 @@ var netloggerSubList map[string]SubscriptionHolder
 var nfqueueSubMutex sync.Mutex
 var conntrackSubMutex sync.Mutex
 var netloggerSubMutex sync.Mutex
+
+// maps to hold the netfilter and conntrack cleanup lists returned from warehouse playback
+var nfCleanupHolder map[uint32]bool
+var ctCleanupHolder map[uint32]bool
 
 var shutdownCleanerTask = make(chan bool)
 
@@ -74,22 +77,6 @@ func Shutdown() {
 	case <-time.After(10 * time.Second):
 		logger.Err("Failed to properly shutdown cleanerTask\n")
 	}
-}
-
-// FlushSystemTables is called to clear all system tables and is normally only used by automated tests
-func FlushSystemTables() {
-	var stot, ctot int
-	logger.Alert("Flushing session and conntrack tables...\n")
-	sessionMutex.Lock()
-	defer sessionMutex.Unlock()
-	conntrackTableMutex.Lock()
-	defer conntrackTableMutex.Unlock()
-	stot = len(sessionTable)
-	ctot = len(conntrackTable)
-	sessionTable = make(map[uint32]*SessionEntry)
-	conntrackTable = make(map[uint32]*ConntrackEntry)
-	logger.Alert("Flushed %d session and %d conntrack entries\n", stot, ctot)
-	runtime.GC()
 }
 
 // cleanerTask is a periodic task to cleanup conntrack and session tables
@@ -178,4 +165,33 @@ func InsertNetloggerSubscription(owner string, priority int, function NetloggerH
 	netloggerSubMutex.Lock()
 	netloggerSubList[owner] = holder
 	netloggerSubMutex.Unlock()
+}
+
+// HandleWarehousePlayback spins up a goroutine that will playback a warehouse capture
+// file, wait until the playback is finished, and save the netfilter and conntrack
+// cleanup lists that are returned from the playback function
+func HandleWarehousePlayback() {
+	go func() {
+		nfCleanupHolder, ctCleanupHolder = kernel.WarehousePlaybackFile()
+	}()
+}
+
+// HandleWarehouseCleanup removes the nfqueue and conntrack entries that
+// were created by the previous warehouse playback operation
+func HandleWarehouseCleanup() {
+	if nfCleanupHolder != nil {
+		for val := range nfCleanupHolder {
+			logger.Debug("Removing playback session for %d\n", val)
+			removeSessionEntry(val)
+		}
+		nfCleanupHolder = nil
+	}
+
+	if ctCleanupHolder != nil {
+		for val := range ctCleanupHolder {
+			logger.Debug("Removing playback conntrack for %d\n", val)
+			removeConntrackEntry(val)
+		}
+		ctCleanupHolder = nil
+	}
 }

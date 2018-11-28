@@ -74,6 +74,8 @@ void warehouse_capture(const char origin,void *buffer,uint32_t length,uint32_t m
 
 void warehouse_playback(void)
 {
+	struct conntrack_info	*ctptr;
+	struct netlogger_info	*nlptr;
 	struct file_header		fh;
 	struct data_header		dh;
 	char					*filename;
@@ -112,6 +114,9 @@ void warehouse_playback(void)
 		if (found != sizeof(dh)) break;
 
 		buffer = malloc(dh.length);
+		ctptr = (struct conntrack_info *)buffer;
+		nlptr = (struct netlogger_info *)buffer;
+
 		found = fread(buffer,1,dh.length,data);
 		if (found != dh.length) break;
 
@@ -129,16 +134,18 @@ void warehouse_playback(void)
 		switch(dh.origin)
 		{
 			case 'Q':
-				go_nfqueue_callback(dh.mark,buffer,dh.length,dh.ctid,dh.nfid,buffer);
+				dh.ctid |= 0xF0000000;
+				go_nfqueue_callback(dh.mark,buffer,dh.length,dh.ctid,dh.nfid,buffer,1);
 				break;
 
 			case 'C':
-				go_conntrack_callback((struct conntrack_info *)buffer);
+				ctptr->conn_id |= 0xF0000000;
+				go_conntrack_callback(ctptr,1);
 				free(buffer);
 				break;
 
 			case 'L':
-				go_netlogger_callback((struct netlogger_info *)buffer);
+				go_netlogger_callback(nlptr,1);
 				free(buffer);
 				break;
 

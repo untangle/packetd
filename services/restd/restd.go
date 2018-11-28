@@ -65,9 +65,9 @@ func Startup() {
 	api.POST("/reports/close_query/:query_id", reportsCloseQuery)
 	api.POST("/warehouse/capture", warehouseCapture)
 	api.POST("/warehouse/playback", warehousePlayback)
+	api.POST("/warehouse/cleanup", warehouseCleanup)
 	api.GET("/warehouse/status", warehouseStatus)
 	api.POST("/control/traffic", trafficControl)
-	api.POST("/control/flush", tableFlush)
 
 	// files
 	engine.Static("/admin", "/www/admin")
@@ -207,13 +207,18 @@ func warehousePlayback(c *gin.Context) {
 	kernel.SetWarehouseSpeed(speedval)
 
 	logger.Info("Beginning playback of file:%s speed:%d\n", filename, speedval)
-	kernel.PlaybackWarehouseFile()
+	dispatch.HandleWarehousePlayback()
 
 	c.JSON(200, "Playback started")
 }
 
 func warehouseCapture(c *gin.Context) {
 	c.JSON(200, "THIS FUNCTION IS NOT YET IMPLEMENTED") // FIXME - some day
+}
+
+func warehouseCleanup(c *gin.Context) {
+	dispatch.HandleWarehouseCleanup()
+	c.JSON(200, "Cleanup success\n")
 }
 
 func warehouseStatus(c *gin.Context) {
@@ -271,11 +276,6 @@ func trafficControl(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"error": "Invalid or missing traffic control command"})
-}
-
-func tableFlush(c *gin.Context) {
-	dispatch.FlushSystemTables()
-	c.JSON(200, "System tables FLUSHED\n")
 }
 
 func getSettings(c *gin.Context) {
