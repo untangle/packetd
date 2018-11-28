@@ -14,7 +14,7 @@ before_install:
 - cd "${DIR}/packetd"
 script:
 - docker-compose -f cmd/packetd/docker-compose.build.yml up --build $TARGET || travis_terminate 1
-- file ./cmd/packetd/packetd | $TEST
+- test -f ./cmd/packetd/packetd && file ./cmd/packetd/packetd | $TEST
 notifications:
   email: false
   slack:
