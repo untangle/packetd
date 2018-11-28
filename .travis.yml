@@ -13,7 +13,7 @@ before_install:
 - mv "$TRAVIS_BUILD_DIR" "${DIR}/packetd"
 - cd "${DIR}/packetd"
 script:
-- docker-compose -f docker-compose.build.yml up --build $TARGET || travis_terminate 1
+- cmd/packetd/docker-compose -f docker-compose.build.yml up --build $TARGET || travis_terminate 1
 - file ./packetd | $TEST
 notifications:
   email: false

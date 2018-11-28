@@ -191,7 +191,7 @@ class ReportsTests(unittest.TestCase):
         assert(results[0] != None)
         assert(results[0]["session_count"] != None)
 
-    def test_011_text_queryo_condition1(self):
+    def test_011_text_query_condition1(self):
         report_entry = merge(BASIC_TEXT_REPORT_ENTRY, SESSIONS_TWO_CONDITION)
         query_id = create_query(report_entry)
         assert(query_id != None)
