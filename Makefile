@@ -1,5 +1,4 @@
 build:
-	go get -d -v ./...
-	go build -ldflags "-X main.Version=$(shell git describe --tags --always --long --dirty)"
+	$(MAKE) -C cmd/packetd
 
 .PHONY: build
