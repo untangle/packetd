@@ -10,29 +10,29 @@ import (
 )
 
 // makeSQLString makes a SQL string from a ReportEntry
-func makeSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
+func makeSQLString(reportEntry *ReportEntry) (string, error) {
 	if reportEntry.Table == "" {
 		return "", errors.New("Missing required attribute Table")
 	}
 
 	switch reportEntry.Type {
 	case "TEXT":
-		return makeTextSQLString(reportEntry, startTime, endTime)
+		return makeTextSQLString(reportEntry)
 	case "EVENTS":
-		return makeEventsSQLString(reportEntry, startTime, endTime)
+		return makeEventsSQLString(reportEntry)
 	case "CATEGORIES":
-		return makeCategoriesSQLString(reportEntry, startTime, endTime)
+		return makeCategoriesSQLString(reportEntry)
 	case "SERIES":
-		return makeSeriesSQLString(reportEntry, startTime, endTime)
+		return makeSeriesSQLString(reportEntry)
 	case "CATEGORIES_SERIES":
-		return makeCategoriesSeriesSQLString(reportEntry, startTime, endTime)
+		return makeCategoriesSeriesSQLString(reportEntry)
 	}
 
 	return "", errors.New("Unsupported reportEntry type")
 }
 
 // makeTextSQLString makes a SQL string from a TEXT type ReportEntry
-func makeTextSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
+func makeTextSQLString(reportEntry *ReportEntry) (string, error) {
 	if reportEntry.QueryText.Columns == nil {
 		return "", errors.New("Missing required attribute Columns")
 	}
@@ -50,34 +50,40 @@ func makeTextSQLString(reportEntry *ReportEntry, startTime time.Time, endTime ti
 	}
 	sqlStr += " FROM"
 	sqlStr += " " + escape(reportEntry.Table)
-	sqlStr += " WHERE " + timeStampConditions(startTime, endTime)
-	for _, condition := range reportEntry.Conditions {
+	sqlStr += " WHERE"
+	for i, condition := range reportEntry.Conditions {
 		opStr, err := operatorSQL(condition.Operator)
 		if err != nil {
 			return "", err
 		}
-		sqlStr += " AND " + condition.Column + " " + opStr + " ? "
+		if i != 0 {
+			sqlStr += " AND"
+		}
+		sqlStr += " " + condition.Column + " " + opStr + " ?"
 	}
 	return sqlStr, nil
 }
 
 // makeEventsSQLString makes a SQL string from a EVENTS type ReportEntry
-func makeEventsSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
+func makeEventsSQLString(reportEntry *ReportEntry) (string, error) {
 	sqlStr := "SELECT * FROM"
 	sqlStr += " " + escape(reportEntry.Table)
-	sqlStr += " WHERE " + timeStampConditions(startTime, endTime)
-	for _, condition := range reportEntry.Conditions {
+	sqlStr += " WHERE"
+	for i, condition := range reportEntry.Conditions {
 		opStr, err := operatorSQL(condition.Operator)
 		if err != nil {
 			return "", err
 		}
-		sqlStr += " AND " + condition.Column + " " + opStr + " ? "
+		if i != 0 {
+			sqlStr += " AND"
+		}
+		sqlStr += " " + condition.Column + " " + opStr + " ?"
 	}
 	return sqlStr, nil
 }
 
 // makeCategoriesSQLString makes a SQL string from a CATEGORY type ReportEntry
-func makeCategoriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
+func makeCategoriesSQLString(reportEntry *ReportEntry) (string, error) {
 	if reportEntry.QueryCategories.GroupColumn == "" {
 		return "", errors.New("Missing required attribute GroupColumn")
 	}
@@ -104,13 +110,16 @@ func makeCategoriesSQLString(reportEntry *ReportEntry, startTime time.Time, endT
 	sqlStr += ", " + reportEntry.QueryCategories.AggregationFunction + "(" + reportEntry.QueryCategories.AggregationValue + ")"
 	sqlStr += " as value"
 	sqlStr += " FROM " + escape(reportEntry.Table)
-	sqlStr += " WHERE " + timeStampConditions(startTime, endTime)
-	for _, condition := range reportEntry.Conditions {
+	sqlStr += " WHERE"
+	for i, condition := range reportEntry.Conditions {
 		opStr, err := operatorSQL(condition.Operator)
 		if err != nil {
 			return "", err
 		}
-		sqlStr += " AND " + condition.Column + " " + opStr + " ? "
+		if i != 0 {
+			sqlStr += " AND"
+		}
+		sqlStr += " " + condition.Column + " " + opStr + " ?"
 	}
 	sqlStr += " GROUP BY " + reportEntry.QueryCategories.GroupColumn
 	sqlStr += fmt.Sprintf(" ORDER BY %d %s", orderByColumn, order)
@@ -122,7 +131,7 @@ func makeCategoriesSQLString(reportEntry *ReportEntry, startTime time.Time, endT
 }
 
 // makeSeriesSQLString makes a SQL string from a SERIES type ReportEntry
-func makeSeriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
+func makeSeriesSQLString(reportEntry *ReportEntry) (string, error) {
 	if reportEntry.QuerySeries.Columns == nil {
 		return "", errors.New("Missing required attribute Columns")
 	}
@@ -132,6 +141,18 @@ func makeSeriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime 
 		timeIntervalSec = 60
 	}
 	var timeIntervalMilli = int64(timeIntervalSec) * 1000
+
+	startTime, err := findStartTime(*reportEntry)
+	if err != nil {
+		logger.Warn("start time condition not found: %v\n", reportEntry.Conditions)
+		return "", err
+	}
+
+	endTime, err := findEndTime(*reportEntry)
+	if err != nil {
+		logger.Warn("end time condition not found\n")
+		return "", err
+	}
 
 	tStr, err := makeTimelineSQLString(startTime, endTime, int64(timeIntervalSec))
 	if err != nil {
@@ -147,13 +168,16 @@ func makeSeriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime 
 		qStr += ", " + column
 	}
 	qStr += " FROM " + escape(reportEntry.Table)
-	qStr += " WHERE " + timeStampConditions(startTime, endTime)
-	for _, condition := range reportEntry.Conditions {
+	qStr += " WHERE"
+	for i, condition := range reportEntry.Conditions {
 		opStr, err := operatorSQL(condition.Operator)
 		if err != nil {
 			return "", err
 		}
-		qStr += " AND " + condition.Column + " " + opStr + " ? "
+		if i != 0 {
+			qStr += " AND"
+		}
+		qStr += " " + condition.Column + " " + opStr + " ?"
 	}
 	qStr += " GROUP BY time_trunc"
 
@@ -168,12 +192,12 @@ func makeSeriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime 
 }
 
 // makeCategoriesSeriesSQLString makes a SQL string from a CATEGORIES_SERIES type ReportEntry
-func makeCategoriesSeriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) (string, error) {
+func makeCategoriesSeriesSQLString(reportEntry *ReportEntry) (string, error) {
 	if reportEntry.QueryCategories.Limit == 0 {
 		return "", errors.New("Missing required attribute Limit")
 	}
 
-	distinctValues, err := getDistinctValues(reportEntry, startTime, endTime)
+	distinctValues, err := getDistinctValues(reportEntry)
 	logger.Debug("Distinct Values: %v\n", distinctValues)
 	if err != nil {
 		return "", err
@@ -187,10 +211,9 @@ func makeCategoriesSeriesSQLString(reportEntry *ReportEntry, startTime time.Time
 		columnStr += " AS '" + escapeSingleTick(column) + "'"
 		columns = append(columns, columnStr)
 	}
-
 	reportEntry.QuerySeries.Columns = columns
 
-	return makeSeriesSQLString(reportEntry, startTime, endTime)
+	return makeSeriesSQLString(reportEntry)
 }
 
 // return the SQL conditions/fragment to limit the time_stamp
@@ -204,18 +227,18 @@ func timeStampConditions(startTime time.Time, endTime time.Time) string {
 
 //makeTimelineSQLString makes a SQL query string to provide the timeline to left join
 //on time-based series reports to provide all datapoints
-func makeTimelineSQLString(startTime time.Time, endTime time.Time, intervalSec int64) (string, error) {
+func makeTimelineSQLString(startTime string, endTime string, intervalSec int64) (string, error) {
 	divisor := strconv.FormatInt(intervalSec*1000, 10)
 
 	sqlStr := "SELECT DISTINCT (("
-	sqlStr += "(" + dateFormat(startTime) + "/" + divisor + ")"
+	sqlStr += "(" + startTime + "/" + divisor + ")"
 	sqlStr += "+a*10000+b*1000+c*100+d*10+e" + ")*" + divisor + ") AS time_trunc FROM"
 	sqlStr += " (" + makeSeqSQLString("a", 9) + "), "
 	sqlStr += " (" + makeSeqSQLString("b", 10) + "), "
 	sqlStr += " (" + makeSeqSQLString("c", 10) + "), "
 	sqlStr += " (" + makeSeqSQLString("d", 10) + "), "
 	sqlStr += " (" + makeSeqSQLString("e", 10) + ") "
-	sqlStr += "WHERE time_trunc < " + dateFormat(endTime)
+	sqlStr += "WHERE time_trunc < " + endTime
 	return sqlStr, nil
 }
 
@@ -255,8 +278,8 @@ func getMapValue(m map[string]interface{}) string {
 
 // getDistinctValues returns the distinct values to be used
 // in a CATEGORIES_SERIES report
-func getDistinctValues(reportEntry *ReportEntry, startTime time.Time, endTime time.Time) ([]string, error) {
-	categoriesSQLStr, err := makeCategoriesSQLString(reportEntry, startTime, endTime)
+func getDistinctValues(reportEntry *ReportEntry) ([]string, error) {
+	categoriesSQLStr, err := makeCategoriesSQLString(reportEntry)
 	if err != nil {
 		return nil, err
 	}
@@ -405,4 +428,28 @@ func conditionValues(conditions []ReportCondition) []interface{} {
 		values[i] = condition.Value
 	}
 	return values
+}
+
+// findStartTime returns the time value for the time_stamp > (GT) condition
+func findStartTime(reportEntry ReportEntry) (string, error) {
+	return findTime(reportEntry, "GT")
+}
+
+// findEndTime returns the time value for the time_stamp < (LT) condition
+func findEndTime(reportEntry ReportEntry) (string, error) {
+	return findTime(reportEntry, "LT")
+}
+
+// findTime returns the time value for the time_stamp operator condition
+func findTime(reportEntry ReportEntry, operator string) (string, error) {
+	for _, cond := range reportEntry.Conditions {
+		if cond.Column == "time_stamp" && cond.Operator == operator {
+			t, ok := cond.Value.(string)
+			if ok {
+				return t, nil
+			}
+		}
+	}
+
+	return "", errors.New("time not found")
 }

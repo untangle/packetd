@@ -72,6 +72,7 @@ type ReportEntry struct {
 	Type            string                 `json:"type"`
 	Table           string                 `json:"table"`
 	Conditions      []ReportCondition      `json:"conditions"`
+	UserConditions  []ReportCondition      `json:"userConditions"`
 	QueryCategories QueryCategoriesOptions `json:"queryCategories"`
 	QueryText       QueryTextOptions       `json:"queryText"`
 	QuerySeries     QuerySeriesOptions     `json:"querySeries"`
@@ -103,32 +104,9 @@ func Shutdown() {
 }
 
 // CreateQuery submits a database query and returns the results
-func CreateQuery(reportEntryStr string, startTimeStr string, endTimeStr string) (*Query, error) {
-	reportEntry := &ReportEntry{}
-
+func CreateQuery(reportEntryStr string) (*Query, error) {
 	var err error
-	var startTimeEpoch int64
-	var endTimeEpoch int64
-
-	if startTimeStr == "" {
-		startTimeEpoch = time.Now().Add(-1 * time.Duration(24) * time.Hour).Unix()
-	} else {
-		startTimeEpoch, err = strconv.ParseInt(startTimeStr, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-	}
-	startTime := time.Unix(startTimeEpoch, 0)
-
-	if endTimeStr == "" {
-		endTimeEpoch = time.Now().Add(time.Duration(1) * time.Minute).Unix()
-	} else {
-		endTimeEpoch, err = strconv.ParseInt(endTimeStr, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-	}
-	endTime := time.Unix(endTimeEpoch, 0)
+	reportEntry := &ReportEntry{}
 
 	err = json.Unmarshal([]byte(reportEntryStr), reportEntry)
 	if err != nil {
@@ -137,11 +115,19 @@ func CreateQuery(reportEntryStr string, startTimeStr string, endTimeStr string) 
 	}
 	logger.Debug("ReportEntry: %v\n", reportEntry)
 
+	mergeConditions(reportEntry)
+	err = addOrUpdateTimestampConditions(reportEntry)
+	if err != nil {
+		logger.Err("Timestamp condition error: %s\n", err)
+		return nil, err
+	}
+
 	var rows *sql.Rows
 	var sqlStr string
 
-	sqlStr, err = makeSQLString(reportEntry, startTime, endTime) // FIXME add conditions
+	sqlStr, err = makeSQLString(reportEntry)
 	if err != nil {
+		logger.Warn("Failed to make SQL: %v\n", err)
 		return nil, err
 	}
 	values := conditionValues(reportEntry.Conditions)
@@ -436,4 +422,69 @@ func createTables() {
 	if err != nil {
 		logger.Err("Failed to create table: %s\n", err.Error())
 	}
+}
+
+// addDefaultTimestampConditions adds time_stamp > X and time_stamp < Y
+// to userConditions if they are not already present
+func addOrUpdateTimestampConditions(reportEntry *ReportEntry) error {
+	var err error
+	err = addOrUpdateTimestampCondition(reportEntry, "GT", time.Now().Add(-1*time.Duration(100)*time.Hour))
+	if err != nil {
+		return err
+	}
+
+	err = addOrUpdateTimestampCondition(reportEntry, "LT", time.Now().Add(time.Duration(1)*time.Minute))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func addOrUpdateTimestampCondition(reportEntry *ReportEntry, operator string, defaultTime time.Time) error {
+	var err error
+	var condition *ReportCondition
+
+	for _, cond := range reportEntry.Conditions {
+		if cond.Column == "time_stamp" && cond.Operator == operator {
+			condition = &cond
+		}
+	}
+
+	if condition == nil {
+		// if no time found, set defaultTime
+		newCondition := ReportCondition{Column: "time_stamp", Operator: operator, Value: dateFormat(defaultTime)}
+		reportEntry.Conditions = append(reportEntry.Conditions, newCondition)
+	} else {
+		// if a condition is found, set the condition value to a time.Time
+		// check if its a string or int
+		var timeEpoch int64
+		valueInt, ok := condition.Value.(int)
+		if ok {
+			timeEpoch = int64(valueInt)
+		} else {
+			valueStr, ok := condition.Value.(string)
+			if ok {
+				// otherwise just convert the epoch value to a time.Time
+				timeEpoch, err = strconv.ParseInt(valueStr, 10, 64)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		// update value to actual Time value expected by sqlite3
+		condition.Value = dateFormat(time.Unix(timeEpoch, 0))
+	}
+
+	return nil
+}
+
+// mergeConditions moves any user specified conditions in UserConditions
+// to Conditions
+func mergeConditions(reportEntry *ReportEntry) {
+	if len(reportEntry.UserConditions) > 0 {
+		reportEntry.Conditions = append(reportEntry.Conditions, reportEntry.UserConditions...)
+	}
+	reportEntry.UserConditions = []ReportCondition{}
 }

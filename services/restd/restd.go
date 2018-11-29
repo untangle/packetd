@@ -123,16 +123,13 @@ func reportsCreateQuery(c *gin.Context) {
 
 	body, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(200, gin.H{"error": err})
+		c.JSON(200, gin.H{"error": err.Error()})
 		return
 	}
 
-	startTimeStr, _ := c.GetQuery("startTime")
-	endTimeStr, _ := c.GetQuery("endTime")
-
-	q, err := reports.CreateQuery(string(body), startTimeStr, endTimeStr)
+	q, err := reports.CreateQuery(string(body))
 	if err != nil {
-		c.JSON(200, gin.H{"error": err})
+		c.JSON(200, gin.H{"error": err.Error()})
 		return
 	}
 	str := fmt.Sprintf("%v", q.ID)
