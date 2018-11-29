@@ -162,7 +162,7 @@ func makeSeriesSQLString(reportEntry *ReportEntry, startTime time.Time, endTime 
 	sqlStr += "LEFT JOIN "
 	sqlStr += " ( " + qStr + " ) as t2 "
 	sqlStr += " USING (time_trunc) "
-	sqlStr += " ORDER BY time_trunc DESC "
+	sqlStr += " ORDER BY time_trunc ASC "
 
 	return sqlStr, nil
 }
