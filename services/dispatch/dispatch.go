@@ -30,7 +30,7 @@ var nfqueueSubList map[string]SubscriptionHolder
 var conntrackSubList map[string]SubscriptionHolder
 var netloggerSubList map[string]SubscriptionHolder
 
-// mutexes to protect each of the subscribtion lists
+// mutexes to protect each of the subscription lists
 var nfqueueSubMutex sync.Mutex
 var conntrackSubMutex sync.Mutex
 var netloggerSubMutex sync.Mutex
