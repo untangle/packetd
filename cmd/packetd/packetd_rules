@@ -54,7 +54,7 @@ remove_packetd_rules()
     ${NFT} delete chain inet ${TABLE_NAME} prerouting-packetd 2>/dev/null
     ${NFT} delete chain inet ${TABLE_NAME} input-packetd 2>/dev/null
     ${NFT} delete chain inet ${TABLE_NAME} output-packetd 2>/dev/null
-    ${NFT} delete table inet ${TABLE_NAME}
+    ${NFT} delete table inet ${TABLE_NAME} 2>/dev/null
 }
 
 insert_packetd_rules()
