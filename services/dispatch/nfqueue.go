@@ -193,7 +193,7 @@ func callSubscribers(ctid uint32, session *SessionEntry, mess NfqueueMessage, pm
 			if val.Priority != priority {
 				continue
 			}
-			logger.Trace("Calling nfqueue  plugin:%s priority:%d conntracksession_id:%d\n", key, priority, session.SessionID)
+			logger.Trace("Calling nfqueue PLUGIN:%s PRI:%d CTID:%d\n", key, priority, ctid)
 			go func(key string, val SubscriptionHolder) {
 				timeoutTimer := time.NewTimer(maxAllowedTime)
 				c := make(chan NfqueueResult, 1)
@@ -215,7 +215,7 @@ func callSubscribers(ctid uint32, session *SessionEntry, mess NfqueueMessage, pm
 				timeMap[val.Owner] = timediff
 				timeMapLock.Unlock()
 
-				logger.Trace("Finished nfqueue plugin:%s PRI:%d SID:%d ms:%.1f\n", key, priority, session.SessionID, timediff)
+				logger.Trace("Finished nfqueue PLUGIN:%s PRI:%d CTID:%d ms:%.1f\n", key, priority, ctid, timediff)
 			}(key, val)
 			hitcount++
 			subcount++
