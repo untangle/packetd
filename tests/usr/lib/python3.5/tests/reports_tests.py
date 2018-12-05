@@ -1,11 +1,10 @@
 """Reports tests"""
-
+# pylint: disable=no-self-use
 import subprocess
 import unittest
 import json
 import tests.test_registry as test_registry
 
-# pylint: disable=no-self-use
 
 SESSIONS_ONE_CONDITION = {
     "conditions": [{
@@ -291,7 +290,7 @@ class ReportsTests(unittest.TestCase):
         assert results[0]["time_trunc"] != None
 
     def test_050_categories_series_query(self):
-        """Tests SERIES reports"""
+        """Tests CATEGORY_SERIES query"""
         report_entry = BASIC_CATEGORIES_SERIES_REPORT_ENTRY
         query_id = create_query(report_entry)
         assert query_id != None
@@ -305,7 +304,7 @@ class ReportsTests(unittest.TestCase):
         assert result.get('time_trunc') != None
 
     def test_051_categories_series_query_condition1(self):
-        """Tests SERIES reports with condition"""
+        """Tests CATEGORY_SERIES query with condition"""
         report_entry = merge(BASIC_CATEGORIES_SERIES_REPORT_ENTRY, SESSIONS_ONE_CONDITION)
         query_id = create_query(report_entry)
         assert query_id != None
