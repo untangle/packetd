@@ -37,7 +37,7 @@ func Startup() {
 
 	// A server-side store would be better IMO, but I can't find one.
 	// -dmorris
-	store := cookie.NewStore([]byte(generateRandomString(32)))
+	store := cookie.NewStore([]byte(GenerateRandomString(32)))
 	// store := cookie.NewStore([]byte("secret"))
 
 	engine.Use(sessions.Sessions("auth_session", store))
@@ -87,16 +87,37 @@ func Shutdown() {
 	return
 }
 
+// GenerateRandomString generates a random string of the specified length
+func GenerateRandomString(n int) string {
+	b := make([]byte, n)
+	_, err := rand.Read(b)
+	if err != nil {
+		logger.Info("Failed to generated secure key: %v\n", err)
+		return "secret"
+	}
+	return base64.URLEncoding.EncodeToString(b)
+}
+
+// RemoveEmptyStrings removes and empty strings from the string slice and returns a new slice
+func RemoveEmptyStrings(strings []string) []string {
+	b := strings[:0]
+	for _, x := range strings {
+		if x != "" {
+			b = append(b, x)
+		}
+	}
+	return b
+}
+
 func pingHandler(c *gin.Context) {
-	addHeaders(c)
+	//addHeaders(c)
 	c.JSON(200, gin.H{
 		"message": "pong",
 	})
 }
 
 func reportsGetData(c *gin.Context) {
-	addHeaders(c)
-
+	//addHeaders(c)
 	queryStr := c.Param("query_id")
 	if queryStr == "" {
 		c.JSON(200, gin.H{"error": "query_id not found"})
@@ -119,8 +140,7 @@ func reportsGetData(c *gin.Context) {
 }
 
 func reportsCreateQuery(c *gin.Context) {
-	addHeaders(c)
-
+	//addHeaders(c)
 	body, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
 		c.JSON(200, gin.H{"error": err.Error()})
@@ -276,8 +296,7 @@ func trafficControl(c *gin.Context) {
 }
 
 func getSettings(c *gin.Context) {
-	addHeaders(c)
-
+	//addHeaders(c)
 	var segments []string
 
 	path := c.Param("path")
@@ -285,7 +304,7 @@ func getSettings(c *gin.Context) {
 	if path == "" {
 		segments = nil
 	} else {
-		segments = removeEmptyStrings(strings.Split(path, "/"))
+		segments = RemoveEmptyStrings(strings.Split(path, "/"))
 	}
 
 	jsonResult := settings.GetSettings(segments)
@@ -294,8 +313,7 @@ func getSettings(c *gin.Context) {
 }
 
 func getDefaultSettings(c *gin.Context) {
-	addHeaders(c)
-
+	//addHeaders(c)
 	var segments []string
 
 	path := c.Param("path")
@@ -303,7 +321,7 @@ func getDefaultSettings(c *gin.Context) {
 	if path == "" {
 		segments = nil
 	} else {
-		segments = removeEmptyStrings(strings.Split(path, "/"))
+		segments = RemoveEmptyStrings(strings.Split(path, "/"))
 	}
 
 	jsonResult := settings.GetDefaultSettings(segments)
@@ -312,15 +330,14 @@ func getDefaultSettings(c *gin.Context) {
 }
 
 func setSettings(c *gin.Context) {
-	addHeaders(c)
-
+	//addHeaders(c)
 	var segments []string
 	path := c.Param("path")
 
 	if path == "" {
 		segments = nil
 	} else {
-		segments = removeEmptyStrings(strings.Split(path, "/"))
+		segments = RemoveEmptyStrings(strings.Split(path, "/"))
 	}
 
 	body, err := ioutil.ReadAll(c.Request.Body)
@@ -328,21 +345,27 @@ func setSettings(c *gin.Context) {
 		c.JSON(200, gin.H{"error": err})
 		return
 	}
-	jsonResult := settings.SetSettingsParse(segments, body)
+
+	var bodyJSONObject interface{}
+	err = json.Unmarshal(body, &bodyJSONObject)
+	if err != nil {
+		c.JSON(200, gin.H{"error": err})
+	}
+
+	jsonResult := settings.SetSettings(segments, body)
 	c.JSON(200, jsonResult)
 	return
 }
 
 func trimSettings(c *gin.Context) {
-	addHeaders(c)
-
+	//addHeaders(c)
 	var segments []string
 	path := c.Param("path")
 
 	if path == "" {
 		segments = nil
 	} else {
-		segments = removeEmptyStrings(strings.Split(path, "/"))
+		segments = RemoveEmptyStrings(strings.Split(path, "/"))
 	}
 
 	jsonResult := settings.TrimSettings(segments)
@@ -350,29 +373,9 @@ func trimSettings(c *gin.Context) {
 	return
 }
 
-func removeEmptyStrings(strings []string) []string {
-	b := strings[:0]
-	for _, x := range strings {
-		if x != "" {
-			b = append(b, x)
-		}
-	}
-	return b
-}
-
 func addHeaders(c *gin.Context) {
 	// c.Header("Example-Header", "foo")
 	// c.Header("Access-Control-Allow-Origin", "*")
 	// c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE")
 	// c.Header("Access-Control-Allow-Headers", "X-Custom-Header")
-}
-
-func generateRandomString(n int) string {
-	b := make([]byte, n)
-	_, err := rand.Read(b)
-	if err != nil {
-		logger.Info("Failed to generated secure key: %v\n", err)
-		return "secret"
-	}
-	return base64.URLEncoding.EncodeToString(b)
 }

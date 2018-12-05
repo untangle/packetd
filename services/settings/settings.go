@@ -5,33 +5,13 @@ import (
 	"errors"
 	"io/ioutil"
 	"strconv"
-
-	"github.com/untangle/packetd/services/logger"
 )
 
 const settingsFile = "/etc/config/settings.json"
 const defaultsFile = "/etc/config/defaults.json"
 
-// settings stores the current system settings
-var settings map[string]interface{}
-
-// Startup initializes all settings objects
+// Startup settings service
 func Startup() {
-	var err error
-	settings, err = readSettingsFileJSON(settingsFile)
-	if err != nil {
-		logger.Warn("Error reading settings file: %s\n", err.Error())
-	}
-	if settings == nil {
-		logger.Err("Failed to read settings file.\n")
-	}
-
-	// jsonString, err := json.MarshalIndent(settings, "", "  ")
-	// if err != nil {
-	// logger.Warn("Error reading settings file: %s\n", err.Error())
-	// } else {
-	// logger.Debug("settings: %s\n", jsonString)
-	// }
 }
 
 // Shutdown settings service
@@ -41,35 +21,69 @@ func Shutdown() {
 
 // GetSettings returns the settings from the specified path
 func GetSettings(segments []string) interface{} {
-	return getSettings(segments, settingsFile)
-}
-
-// SetSettingsParse updates the settings from a parsed JSON object
-func SetSettingsParse(segments []string, byteSlice []byte) interface{} {
-	var err error
-	var bodyJSONObject interface{}
-
-	err = json.Unmarshal(byteSlice, &bodyJSONObject)
-	if err != nil {
-		return createJSONErrorObject(err)
-	}
-
-	return SetSettings(segments, bodyJSONObject)
+	return GetSettingsFile(segments, settingsFile)
 }
 
 // SetSettings updates the settings
 func SetSettings(segments []string, value interface{}) interface{} {
-	return setSettings(segments, value, settingsFile)
+	return SetSettingsFile(segments, value, settingsFile)
 }
 
 // TrimSettings trims the settings
 func TrimSettings(segments []string) interface{} {
-	return trimSettings(segments, settingsFile)
+	return TrimSettingsFile(segments, settingsFile)
 }
 
 // GetDefaultSettings returns the default settings from the specified path
 func GetDefaultSettings(segments []string) interface{} {
-	return getSettings(segments, defaultsFile)
+	return GetSettingsFile(segments, defaultsFile)
+}
+
+// GetSettingsFile returns the settings from the specified path of the specified filename
+func GetSettingsFile(segments []string, filename string) interface{} {
+	var err error
+	var jsonObject interface{}
+
+	jsonObject, err = readSettingsFileJSON(filename)
+	if err != nil {
+		return createJSONErrorObject(err)
+	}
+
+	jsonObject, err = getSettingsFromJSON(jsonObject, segments)
+	if err != nil {
+		return createJSONErrorObject(err)
+	}
+
+	return jsonObject
+}
+
+// SetSettingsFile updates the settings
+func SetSettingsFile(segments []string, value interface{}, filename string) interface{} {
+	var ok bool
+	var err error
+	var jsonSettings map[string]interface{}
+	var newSettings interface{}
+
+	jsonSettings, err = readSettingsFileJSON(filename)
+	if err != nil {
+		return createJSONErrorObject(err)
+	}
+
+	newSettings, err = setSettingsInJSON(jsonSettings, segments, value)
+	if err != nil {
+		return createJSONErrorObject(err)
+	}
+	jsonSettings, ok = newSettings.(map[string]interface{})
+	if !ok {
+		return createJSONErrorObject(errors.New("Invalid global settings object"))
+	}
+
+	_, err = writeSettingsFileJSON(jsonSettings)
+	if err != nil {
+		return createJSONErrorObject(err)
+	}
+
+	return createJSONObject("result", "OK")
 }
 
 // readSettingsFileJSON reads the settings file and return the corresponding JSON object
@@ -188,8 +202,8 @@ func setObjectIndex(obj interface{}, idx string, value interface{}) (interface{}
 	return nil, errors.New("unknown type")
 }
 
-// trimSettings trims the settings
-func trimSettings(segments []string, filename string) interface{} {
+// TrimSettingsFile trims the settings in the specified file
+func TrimSettingsFile(segments []string, filename string) interface{} {
 	var ok bool
 	var err error
 	var iterJSONObject map[string]interface{}
@@ -243,35 +257,6 @@ func trimSettings(segments []string, filename string) interface{} {
 	return createJSONObject("result", "OK")
 }
 
-// setSettings updates the settings
-func setSettings(segments []string, value interface{}, filename string) interface{} {
-	var ok bool
-	var err error
-	var jsonSettings map[string]interface{}
-	var newSettings interface{}
-
-	jsonSettings, err = readSettingsFileJSON(filename)
-	if err != nil {
-		return createJSONErrorObject(err)
-	}
-
-	newSettings, err = setSettingsInJSON(jsonSettings, segments, value)
-	if err != nil {
-		return createJSONErrorObject(err)
-	}
-	jsonSettings, ok = newSettings.(map[string]interface{})
-	if !ok {
-		return createJSONErrorObject(errors.New("Invalid global settings object"))
-	}
-
-	_, err = writeSettingsFileJSON(jsonSettings)
-	if err != nil {
-		return createJSONErrorObject(err)
-	}
-
-	return createJSONObject("result", "OK")
-}
-
 // setSettingsInJSON sets the value attribute specified of the segments path to the specified value
 func setSettingsInJSON(jsonObject interface{}, segments []string, value interface{}) (interface{}, error) {
 	var err error
@@ -301,24 +286,6 @@ func setSettingsInJSON(jsonObject interface{}, segments []string, value interfac
 		mapObject[element], err = setSettingsInJSON(mapObject[element], newSegments, value)
 		return jsonObject, err
 	}
-}
-
-// getSettings returns the settings from the specified path of the specified filename
-func getSettings(segments []string, filename string) interface{} {
-	var err error
-	var jsonObject interface{}
-
-	jsonObject, err = readSettingsFileJSON(filename)
-	if err != nil {
-		return createJSONErrorObject(err)
-	}
-
-	jsonObject, err = getSettingsFromJSON(jsonObject, segments)
-	if err != nil {
-		return createJSONErrorObject(err)
-	}
-
-	return jsonObject
 }
 
 // getSettingsFromJSON gets the value attribute specified by the segments string from the specified json object
