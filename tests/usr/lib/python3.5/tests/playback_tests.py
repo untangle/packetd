@@ -9,9 +9,9 @@ import tests.remote_control as remote_control
 
 class PlaybackTests(unittest.TestCase):
 
-    file_hash = "fa0831b34e4e7fa5e6d56370dcd6d0be".encode('UTF-8')
-    http_ctid = "4071800832"
-    https_ctid = "4071803136"
+    file_hash = "d78e8173fdb9f06ac3e3cbfd9038996a".encode('UTF-8')
+    https_ctid = "4093949184"
+    http_ctid = "4093948928"
 
     @staticmethod
     def moduleName():
@@ -60,7 +60,7 @@ class PlaybackTests(unittest.TestCase):
 
     def test_030_playback_capture_file(self):
         '''playback the capture file and wait for it to finish'''
-        subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"filename\":\"/tmp/playtest.cap\",\"speed\":\"1\"}' 'http://localhost:8080/api/warehouse/playback' >> /tmp/subproc.out", shell=True)
+        subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"filename\":\"/tmp/playtest.cap\",\"speed\":\"100\"}' 'http://localhost:8080/api/warehouse/playback' >> /tmp/subproc.out", shell=True)
         counter = 0
         busy = 1
         while busy != 0 and counter < 10:

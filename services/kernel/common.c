@@ -10,7 +10,7 @@
 #include "common.h"
 
 static char		*g_warehouse_file = NULL;
-static int		g_warehouse_speed = 1;
+static int		g_warehouse_speed = 100;
 static int		g_warehouse_flag = 'I';
 static int		g_shutdown = 0;
 static int		g_bypass = 0;

@@ -137,3 +137,4 @@ int warehouse_startup(void);
 void warehouse_shutdown(void);
 void warehouse_capture(const char origin,void *buffer,uint32_t length,uint32_t mark,uint32_t ctid,uint32_t nfid);
 void warehouse_playback(void);
+struct timespec calculate_pause(struct timespec start,struct timespec end,int speed);

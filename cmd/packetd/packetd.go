@@ -152,7 +152,7 @@ func parseArguments() {
 	bypassPtr := flag.Bool("bypass", false, "ignore live traffic")
 	playbackFilePtr := flag.String("playback", "", "playback traffic from specified file")
 	captureFilePtr := flag.String("capture", "", "capture traffic to specified file")
-	playSpeedPtr := flag.Int("playspeed", 1, "traffic playback speed multiplier")
+	playSpeedPtr := flag.Int("playspeed", 100, "traffic playback speed percentage")
 	cpuProfilePtr := flag.String("cpuprofile", "", "write cpu profile to file")
 	memProfilePtr := flag.String("memprofile", "", "write memory profile to file")
 
