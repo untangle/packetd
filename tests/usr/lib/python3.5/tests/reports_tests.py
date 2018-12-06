@@ -6,7 +6,7 @@ import json
 import tests.test_registry as test_registry
 
 
-SESSIONS_ONE_CONDITION = {
+ONE_CONDITION = {
     "conditions": [{
         "column": "ip_protocol",
         "operator": "EQ",
@@ -14,7 +14,7 @@ SESSIONS_ONE_CONDITION = {
     }]
 }
 
-SESSIONS_TWO_CONDITION = {
+TWO_CONDITION = {
     "conditions": [{
         "column": "ip_protocol",
         "operator": "EQ",
@@ -23,6 +23,22 @@ SESSIONS_TWO_CONDITION = {
         "column": "c2s_bytes",
         "operator": "GT",
         "value": "0"
+    }]
+}
+
+TIME_CONDITION = {
+    "conditions": [{
+        "column": "time_stamp",
+        "operator": "GT",
+        "value": 1544133600000
+    }]
+}
+
+TIME_CONDITION2 = {
+    "conditions": [{
+        "column": "time_stamp",
+        "operator": "GT",
+        "value": "1544133600000"
     }]
 }
 
@@ -199,7 +215,7 @@ class ReportsTests(unittest.TestCase):
 
     def test_011_text_query_condition1(self):
         """Tests TEXT query with condition"""
-        report_entry = merge(BASIC_TEXT_REPORT_ENTRY, SESSIONS_TWO_CONDITION)
+        report_entry = merge(BASIC_TEXT_REPORT_ENTRY, TWO_CONDITION)
         query_id = create_query(report_entry)
         assert query_id != None
         results = get_data(query_id)
@@ -226,7 +242,7 @@ class ReportsTests(unittest.TestCase):
 
     def test_021_events_query_condition1(self):
         """Tests EVENTS query with condition"""
-        report_entry = merge(BASIC_EVENTS_REPORT_ENTRY, SESSIONS_ONE_CONDITION)
+        report_entry = merge(BASIC_EVENTS_REPORT_ENTRY, ONE_CONDITION)
         query_id = create_query(report_entry)
         assert query_id != None
         results = get_data(query_id)
@@ -256,7 +272,7 @@ class ReportsTests(unittest.TestCase):
 
     def test_031_categories_query_condition1(self):
         """Tests CATEGORIES query with condition"""
-        report_entry = merge(BASIC_CATEGORIES_REPORT_ENTRY, SESSIONS_ONE_CONDITION)
+        report_entry = merge(BASIC_CATEGORIES_REPORT_ENTRY, ONE_CONDITION)
         query_id = create_query(report_entry)
         assert query_id != None
         results = get_data(query_id)
@@ -280,7 +296,29 @@ class ReportsTests(unittest.TestCase):
 
     def test_041_series_query_condition1(self):
         """Tests SERIES query with condition"""
-        report_entry = merge(BASIC_SERIES_REPORT_ENTRY, SESSIONS_ONE_CONDITION)
+        report_entry = merge(BASIC_SERIES_REPORT_ENTRY, ONE_CONDITION)
+        query_id = create_query(report_entry)
+        assert query_id != None
+        results = get_data(query_id)
+        close_query(query_id)
+        assert results != None
+        assert len(results) > 0
+        assert results[0]["time_trunc"] != None
+
+    def test_042_series_query_condition_time(self):
+        """Tests SERIES query with a time condition"""
+        report_entry = merge(BASIC_SERIES_REPORT_ENTRY, TIME_CONDITION)
+        query_id = create_query(report_entry)
+        assert query_id != None
+        results = get_data(query_id)
+        close_query(query_id)
+        assert results != None
+        assert len(results) > 0
+        assert results[0]["time_trunc"] != None
+
+    def test_043_series_query_condition_time2(self):
+        """Tests SERIES query with a time condition as a string"""
+        report_entry = merge(BASIC_SERIES_REPORT_ENTRY, TIME_CONDITION2)
         query_id = create_query(report_entry)
         assert query_id != None
         results = get_data(query_id)
@@ -305,7 +343,7 @@ class ReportsTests(unittest.TestCase):
 
     def test_051_categories_series_query_condition1(self):
         """Tests CATEGORY_SERIES query with condition"""
-        report_entry = merge(BASIC_CATEGORIES_SERIES_REPORT_ENTRY, SESSIONS_ONE_CONDITION)
+        report_entry = merge(BASIC_CATEGORIES_SERIES_REPORT_ENTRY, ONE_CONDITION)
         query_id = create_query(report_entry)
         assert query_id != None
         results = get_data(query_id)

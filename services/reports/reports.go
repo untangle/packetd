@@ -443,39 +443,38 @@ func addOrUpdateTimestampConditions(reportEntry *ReportEntry) error {
 
 func addOrUpdateTimestampCondition(reportEntry *ReportEntry, operator string, defaultTime time.Time) error {
 	var err error
-	var condition *ReportCondition
 
-	for _, cond := range reportEntry.Conditions {
+	for i, cond := range reportEntry.Conditions {
 		if cond.Column == "time_stamp" && cond.Operator == operator {
-			condition = &cond
-		}
-	}
+			var condition = &reportEntry.Conditions[i]
 
-	if condition == nil {
-		// if no time found, set defaultTime
-		newCondition := ReportCondition{Column: "time_stamp", Operator: operator, Value: dateFormat(defaultTime)}
-		reportEntry.Conditions = append(reportEntry.Conditions, newCondition)
-	} else {
-		// if a condition is found, set the condition value to a time.Time
-		// check if its a string or int
-		var timeEpoch int64
-		valueInt, ok := condition.Value.(int)
-		if ok {
-			timeEpoch = int64(valueInt)
-		} else {
-			valueStr, ok := condition.Value.(string)
+			// if a condition is found, set the condition value to a time.Time
+			// check if its a string or int
+			var timeEpochSec int64
+			valueFloat, ok := condition.Value.(float64)
 			if ok {
-				// otherwise just convert the epoch value to a time.Time
-				timeEpoch, err = strconv.ParseInt(valueStr, 10, 64)
-				if err != nil {
-					return err
+				// time is specified in milliseconds, lets just use seconds
+				timeEpochSec = int64(valueFloat) / 1000
+			} else {
+				valueStr, ok := condition.Value.(string)
+				if ok {
+					// otherwise just convert the epoch value to a time.Time
+					timeEpochSec, err = strconv.ParseInt(valueStr, 10, 64)
+					if err != nil {
+						return err
+					}
 				}
 			}
-		}
 
-		// update value to actual Time value expected by sqlite3
-		condition.Value = dateFormat(time.Unix(timeEpoch, 0))
+			// update value to actual Time value expected by sqlite3
+			condition.Value = dateFormat(time.Unix(timeEpochSec, 0))
+			return nil
+		}
 	}
+
+	// if no time found, set defaultTime
+	newCondition := ReportCondition{Column: "time_stamp", Operator: operator, Value: dateFormat(defaultTime)}
+	reportEntry.Conditions = append(reportEntry.Conditions, newCondition)
 
 	return nil
 }
