@@ -20,7 +20,7 @@ class PlaybackTests(unittest.TestCase):
     @staticmethod
     def initialSetUp(self):
         # turn on the traffic bypass flag
-        subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"bypass\":\"TRUE\"}' 'http://localhost:8080/api/control/traffic' >> /tmp/subproc.out", shell=True)
+        subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"bypass\":\"TRUE\"}' 'http://localhost/api/control/traffic' >> /tmp/subproc.out", shell=True)
         pass
 
     def setUp(self):
@@ -60,13 +60,13 @@ class PlaybackTests(unittest.TestCase):
 
     def test_030_playback_capture_file(self):
         '''playback the capture file and wait for it to finish'''
-        subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"filename\":\"/tmp/playtest.cap\",\"speed\":\"100\"}' 'http://localhost:8080/api/warehouse/playback' >> /tmp/subproc.out", shell=True)
+        subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"filename\":\"/tmp/playtest.cap\",\"speed\":\"100\"}' 'http://localhost/api/warehouse/playback' >> /tmp/subproc.out", shell=True)
         counter = 0
         busy = 1
         while busy != 0 and counter < 10:
             counter += 1
             time.sleep(1)
-            check = subprocess.Popen(["curl","http://localhost:8080/api/warehouse/status"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            check = subprocess.Popen(["curl","http://localhost/api/warehouse/status"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             result = str(check.communicate()[0])
             if "IDLE" in result:
                 busy = 0
@@ -93,12 +93,12 @@ class PlaybackTests(unittest.TestCase):
         assert "field: application_protochain string: /IP/TCP/SSL" in rawdata
 
     def test_050_playback_cleanup(self):
-        subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{}' 'http://localhost:8080/api/warehouse/cleanup' >> /tmp/subproc.out", shell=True)
+        subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{}' 'http://localhost/api/warehouse/cleanup' >> /tmp/subproc.out", shell=True)
         pass
 
     @staticmethod
     def finalTearDown(self):
-        subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"bypass\":\"FALSE\"}' 'http://localhost:8080/api/control/traffic' >> /tmp/subproc.out", shell=True)
+        subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"bypass\":\"FALSE\"}' 'http://localhost/api/control/traffic' >> /tmp/subproc.out", shell=True)
         pass
 
 test_registry.register_module("playback", PlaybackTests)

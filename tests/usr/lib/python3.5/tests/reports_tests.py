@@ -147,7 +147,7 @@ def merge(dict1, dict2):
 def create_query(report_entry):
     """Creates a query from the specified report_entry"""
     json_string = json.dumps(report_entry)
-    cmd = 'curl -m 5 -X POST -s -o - -H "Content-Type: application/json; charset=utf-8" -d \'%s\' "http://localhost:8080/api/reports/create_query"' % json_string
+    cmd = 'curl -m 5 -X POST -s -o - -H "Content-Type: application/json; charset=utf-8" -d \'%s\' "http://localhost/api/reports/create_query"' % json_string
     print(cmd)
     p = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
     output = p.stdout.decode()
@@ -162,7 +162,7 @@ def create_query(report_entry):
 
 def get_data(query_id):
     """Gets the data for the specified query ID"""
-    cmd = 'curl -m 5 -X GET -s -o - "http://localhost:8080/api/reports/get_data/%s"' % str(query_id)
+    cmd = 'curl -m 5 -X GET -s -o - "http://localhost/api/reports/get_data/%s"' % str(query_id)
     print(cmd)
     p = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
     output = p.stdout.decode()
@@ -173,7 +173,7 @@ def get_data(query_id):
 
 def close_query(query_id):
     """Closes the specified query ID"""
-    cmd = 'curl -m 5 -X POST -s -o - "http://localhost:8080/api/reports/close_query/%s"' % str(query_id)
+    cmd = 'curl -m 5 -X POST -s -o - "http://localhost/api/reports/close_query/%s"' % str(query_id)
     print(cmd)
     p = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
     output = p.stdout.decode()

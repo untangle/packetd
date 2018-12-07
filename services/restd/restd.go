@@ -76,8 +76,8 @@ func Startup() {
 	engine.Static("/setup", "/www/setup")
 	engine.Static("/static", "/www/static")
 
-	// listen and serve on 0.0.0.0:8080
-	go engine.Run()
+	// listen and serve on 0.0.0.0:80
+	go engine.Run(":80")
 
 	logger.Info("The RestD engine has been started\n")
 }
