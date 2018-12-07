@@ -202,7 +202,7 @@ void warehouse_playback(void)
 struct timespec calculate_pause(struct timespec start,struct timespec end,int speed)
 {
 	struct timespec		calc;
-	unsigned __int128	value;
+	u_int64_t         	value;
 
 	if ((end.tv_nsec - start.tv_nsec) < 0) {
 		calc.tv_sec = end.tv_sec - start.tv_sec - 1;
