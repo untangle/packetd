@@ -333,6 +333,10 @@ func insertRules() {
 		logger.Err("Error determining directory: %s\n", err.Error())
 		return
 	}
+	home, ok := os.LookupEnv("PACKETD_HOME")
+	if ok && home != "" {
+		dir = home
+	}
 	syscmd.SystemCommand(dir+"/"+rulesScript, []string{})
 }
 
@@ -342,6 +346,10 @@ func removeRules() {
 	if err != nil {
 		logger.Err("Error determining directory: %s\n", err.Error())
 		return
+	}
+	home, ok := os.LookupEnv("PACKETD_HOME")
+	if ok && home != "" {
+		dir = home
 	}
 	syscmd.SystemCommand(dir+"/"+rulesScript, []string{"-r"})
 }

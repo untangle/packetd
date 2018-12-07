@@ -9,9 +9,9 @@ import tests.remote_control as remote_control
 
 class PlaybackTests(unittest.TestCase):
 
-    file_hash = "d78e8173fdb9f06ac3e3cbfd9038996a".encode('UTF-8')
-    https_ctid = "4093949184"
-    http_ctid = "4093948928"
+    file_hash = "f8388c823679da7db0a4cb7856bf717c".encode('UTF-8')
+    https_ctid = "4073347072"   # session traffic for wget https://www.japan.go.jp
+    http_ctid = "4073346816"    # session traffic for wget http://www.neverssl.com
 
     @staticmethod
     def moduleName():
@@ -63,7 +63,7 @@ class PlaybackTests(unittest.TestCase):
         subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"filename\":\"/tmp/playtest.cap\",\"speed\":\"100\"}' 'http://localhost/api/warehouse/playback' >> /tmp/subproc.out", shell=True)
         counter = 0
         busy = 1
-        while busy != 0 and counter < 10:
+        while busy != 0 and counter < 30:
             counter += 1
             time.sleep(1)
             check = subprocess.Popen(["curl","http://localhost/api/warehouse/status"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -78,7 +78,7 @@ class PlaybackTests(unittest.TestCase):
         dict.write("table=session,key_int=" + PlaybackTests.http_ctid + ",")
         rawdata = dict.read()
         dict.close()
-        assert "field: server_country string: US" in rawdata
+        # check classify plugin
         assert "field: application_name string: HTTP" in rawdata
         assert "field: application_protochain string: /IP/TCP/HTTP" in rawdata
 
@@ -88,9 +88,11 @@ class PlaybackTests(unittest.TestCase):
         dict.write("table=session,key_int=" + PlaybackTests.https_ctid + ",")
         rawdata = dict.read()
         dict.close()
+        # check goip, sni, cert, and dns plugins
         assert "field: server_country string: JP" in rawdata
-        assert "field: application_name string: SSL" in rawdata
-        assert "field: application_protochain string: /IP/TCP/SSL" in rawdata
+        assert "field: ssl_sni string: www.japan.go.jp" in rawdata
+        assert "field: certificate_subject_cn string: www.japan.go.jp" in rawdata
+        assert "field: server_dns_hint string: www.japan.go.jp" in rawdata
 
     def test_050_playback_cleanup(self):
         subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{}' 'http://localhost/api/warehouse/cleanup' >> /tmp/subproc.out", shell=True)

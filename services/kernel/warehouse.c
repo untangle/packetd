@@ -215,6 +215,9 @@ struct timespec calculate_pause(struct timespec start,struct timespec end,int sp
 	// if playback speed is 100 return the exact difference
 	if (speed == 100) return(calc);
 
+	// FIXME - using a 64 bit variable may cause problems if the calculated pause is
+	// large because timespec uses 64 bits for seconds and 32 bits for nanoseconds
+
 	// playback speed is not 100 so calculate the pause using the speed as percentage
 	value = ((calc.tv_sec * 1000000000) + calc.tv_nsec);
 	value = (value * 100);
