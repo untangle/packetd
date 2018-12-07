@@ -3,6 +3,7 @@ package settings
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"strconv"
 )
@@ -179,7 +180,7 @@ func getObjectIndex(obj interface{}, idx string) (interface{}, error) {
 	if ok {
 		return getArrayIndex(jsonArray, idx)
 	}
-	return nil, errors.New("unknown type")
+	return nil, fmt.Errorf("unknown type: %T", obj)
 }
 
 // setObjectIndex takes an object that is either a []interface{} or map[string]interface{}

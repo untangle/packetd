@@ -352,7 +352,7 @@ func setSettings(c *gin.Context) {
 		c.JSON(200, gin.H{"error": err})
 	}
 
-	jsonResult := settings.SetSettings(segments, body)
+	jsonResult := settings.SetSettings(segments, bodyJSONObject)
 	c.JSON(200, jsonResult)
 	return
 }

@@ -144,7 +144,6 @@ class SettingsTests(unittest.TestCase):
         """Set the fakepart1 attribute of the root settings object to an array"""
         result1 = set_settings(['fakepart1'],[1,"abc"])
         result2 = get_settings()
-        print(result2)
         assert result1 != None
         assert result1.get('result') == 'OK'
         assert result2 != None
@@ -194,11 +193,8 @@ class SettingsTests(unittest.TestCase):
         """Set the fakepart1 attribute of the root settings object to an array"""
         result1 = set_settings(['fakearray1'],[0,1,2,3,4,5,6])
         result2 = get_settings(['fakearray1'])
-        print(result2)
         result3 = set_settings(['fakearray1',2],"foo")
         result4 = get_settings(['fakearray1'])
-        print(result4)
-        print("XXX")
         assert result1 != None
         assert result1.get('result') == 'OK'
         assert result2 != None
