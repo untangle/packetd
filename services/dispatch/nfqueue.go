@@ -138,9 +138,10 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			// In this case, just drop the old session. However, if the old session was conntrack confirmed
 			// something is not correct.
 			if session.ConntrackConfirmed {
-				logger.Err("Conflicting session tuple: %s  %d != %d\n", mess.MsgTuple, ctid, session.ConntrackID)
+				logger.Err("Conflicting session tuple [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
+				logger.Err("Existing session: %v\n", session)
 			} else {
-				logger.Debug("Conflicting session tuple: %s  %d != %d\n", mess.MsgTuple, ctid, session.ConntrackID)
+				logger.Debug("Conflicting session tuple [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
 				removeSessionEntry(ctid)
 				session = createSessionEntry(mess, ctid)
 				mess.Session = session
