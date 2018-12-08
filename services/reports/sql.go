@@ -283,6 +283,8 @@ func getDistinctValues(reportEntry *ReportEntry) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	logger.Info("Categories SQL: %v %v\n", categoriesSQLStr, conditionValues(reportEntry.Conditions))
 	rows, err := db.Query(categoriesSQLStr, conditionValues(reportEntry.Conditions)...)
 	if err != nil {
 		logger.Warn("Failed to get Distinct values: %v\n", err)
