@@ -133,18 +133,26 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		mess.Session = session
 	} else {
 		if newSession {
-			// If this is a new session and a session was found, it may have just been an aborted session
-			// (The first packet was dropped before conntrack confirm)
-			// In this case, just drop the old session. However, if the old session was conntrack confirmed
-			// something is not correct.
-			if session.ConntrackConfirmed {
-				logger.Err("Conflicting session tuple [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
-				logger.Err("Existing session: %v\n", session)
-			} else {
+
+			if mess.MsgTuple.Equal(session.ClientSideTuple) {
+				// netfilter considers this a "new" session, but the tuple is identical.
+				// this happens often when a second SYN packet is sent
+				// in this case, we don't count it as a new session, just reuse the old one
 				logger.Debug("Conflicting session tuple [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
-				removeSessionEntry(ctid)
-				session = createSessionEntry(mess, ctid)
-				mess.Session = session
+				newSession = false
+			} else {
+				// If this is a new session and a session was found, it may have just been an aborted session
+				// (The first packet was dropped before conntrack confirm)
+				// In this case, just drop the old session. However, if the old session was conntrack confirmed
+				// something is not correct.
+				if session.ConntrackConfirmed {
+					logger.Err("Conflicting session tuple [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
+				} else {
+					logger.Debug("Conflicting session tuple [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
+					removeSessionEntry(ctid)
+					session = createSessionEntry(mess, ctid)
+					mess.Session = session
+				}
 			}
 		}
 
