@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -103,12 +104,23 @@ func Shutdown() {
 	db.Close()
 }
 
+func unmarshall(reportEntryStr string, reportEntry *ReportEntry) error {
+	decoder := json.NewDecoder(strings.NewReader(reportEntryStr))
+	decoder.UseNumber()
+	err := decoder.Decode(reportEntry)
+	// err := json.Unmarshal(reportEntryBytes, reportEntry)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // CreateQuery submits a database query and returns the results
 func CreateQuery(reportEntryStr string) (*Query, error) {
 	var err error
 	reportEntry := &ReportEntry{}
 
-	err = json.Unmarshal([]byte(reportEntryStr), reportEntry)
+	err = unmarshall(reportEntryStr, reportEntry)
 	if err != nil {
 		logger.Err("json.Unmarshal error: %s\n", err)
 		return nil, err
@@ -451,16 +463,22 @@ func addOrUpdateTimestampCondition(reportEntry *ReportEntry, operator string, de
 			// if a condition is found, set the condition value to a time.Time
 			// check if its a string or int
 			var timeEpochSec int64
-			valueFloat, ok := condition.Value.(float64)
+			jsonNumber, ok := condition.Value.(json.Number)
 			if ok {
 				// time is specified in milliseconds, lets just use seconds
-				timeEpochSec = int64(valueFloat) / 1000
+				timeEpochMillisecond, err := jsonNumber.Int64()
+				timeEpochSec = timeEpochMillisecond / 1000
+				if err != nil {
+					logger.Warn("Invalid JSON number for time_stamp condition: %v\n", condition.Value)
+					return err
+				}
 			} else {
 				valueStr, ok := condition.Value.(string)
 				if ok {
 					// otherwise just convert the epoch value to a time.Time
 					timeEpochSec, err = strconv.ParseInt(valueStr, 10, 64)
 					if err != nil {
+						logger.Warn("Invalid JSON number for time_stamp condition: %v\n", condition.Value)
 						return err
 					}
 				}

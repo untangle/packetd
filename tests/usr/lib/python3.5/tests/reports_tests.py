@@ -34,6 +34,14 @@ TIME_CONDITION = {
     }]
 }
 
+TIME_USER_CONDITION = {
+    "userConditions": [{
+        "column": "time_stamp",
+        "operator": "GT",
+        "value": 1544133600000
+    }]
+}
+
 TIME_CONDITION2 = {
     "conditions": [{
         "column": "time_stamp",
@@ -319,6 +327,17 @@ class ReportsTests(unittest.TestCase):
     def test_043_series_query_condition_time2(self):
         """Tests SERIES query with a time condition as a string"""
         report_entry = merge(BASIC_SERIES_REPORT_ENTRY, TIME_CONDITION2)
+        query_id = create_query(report_entry)
+        assert query_id != None
+        results = get_data(query_id)
+        close_query(query_id)
+        assert results != None
+        assert len(results) > 0
+        assert results[0]["time_trunc"] != None
+
+    def test_044_series_query_condition_user_condition(self):
+        """Tests SERIES query with a time condition"""
+        report_entry = merge(BASIC_SERIES_REPORT_ENTRY, TIME_USER_CONDITION)
         query_id = create_query(report_entry)
         assert query_id != None
         results = get_data(query_id)
