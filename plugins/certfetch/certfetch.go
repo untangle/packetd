@@ -3,12 +3,13 @@ package certfetch
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/untangle/packetd/services/certcache"
-	"github.com/untangle/packetd/services/dispatch"
-	"github.com/untangle/packetd/services/logger"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/untangle/packetd/services/certcache"
+	"github.com/untangle/packetd/services/dispatch"
+	"github.com/untangle/packetd/services/logger"
 )
 
 const pluginName = "certfetch"
@@ -84,7 +85,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 		conn, err := tls.DialWithDialer(dialer, "tcp", target, conf)
 		if err != nil {
-			logger.Warn("TLS ERROR: %s\n", err)
+			logger.Info("TLS error: %s\n", err)
 		} else {
 			defer conn.Close()
 		}
