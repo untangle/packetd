@@ -206,12 +206,6 @@ func makeCategoriesSeriesSQLString(reportEntry *ReportEntry) (string, error) {
 	var columns []string
 	aggFunc := reportEntry.QueryCategories.AggregationFunction
 	aggValue := reportEntry.QueryCategories.AggregationValue
-	// this is a special case for just counting rows
-	// if we are doing count(*) categories, then we want to count each case as 1, not "*"
-	// if we are doing sum(foobar), then we don't ened to change anything
-	if aggFunc == "count" && aggValue == "*" {
-		aggValue = "1"
-	}
 	for _, column := range distinctValues {
 		columnStr := aggFunc + "("
 		columnStr += "CASE WHEN " + reportEntry.QueryCategories.GroupColumn + " = '" + column + "'"
