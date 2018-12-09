@@ -107,6 +107,8 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 			session.ServerSideTuple.ServerAddress = dupIP(serverNew)
 			session.ServerSideTuple.ServerPort = serverPortNew
 			session.ConntrackConfirmed = true
+			session.LastActivityTime = time.Now()
+			session.EventCount++
 			conntrackEntry.Session = session
 		}
 
@@ -124,6 +126,8 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 
 		conntrackEntry.LastActivityTime = time.Now()
 		conntrackEntry.EventCount++
+		conntrackEntry.Session.LastActivityTime = time.Now()
+		conntrackEntry.Session.EventCount++
 
 		oldC2sBytes := conntrackEntry.C2Sbytes
 		oldS2cBytes := conntrackEntry.S2Cbytes
@@ -226,8 +230,13 @@ func cleanConntrackTable() {
 		if (nowtime.Unix() - val.LastActivityTime.Unix()) < 1800 {
 			continue
 		}
-		removeConntrackEntry(key)
-		// this should never happen, so print an error
+		// This should never happen, log an error
+		// entries should be removed by DELETE events
+		// otherwise they should be getting UPDATE events and the LastActivityTime
+		// would be at least within 60 seconds.
+		// The the entry exists, the LastActivityTime is a long time ago
+		// some constraint has failed
 		logger.Err("Removing stale conntrack entry %d: %v\n", key, val)
+		removeConntrackEntry(key)
 	}
 }

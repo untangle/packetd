@@ -9,11 +9,6 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
-	"github.com/untangle/packetd/services/dict"
-	"github.com/untangle/packetd/services/dispatch"
-	"github.com/untangle/packetd/services/kernel"
-	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/reports"
 	"io"
 	"net"
 	"os"
@@ -22,6 +17,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/untangle/packetd/services/dict"
+	"github.com/untangle/packetd/services/dispatch"
+	"github.com/untangle/packetd/services/kernel"
+	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/reports"
 )
 
 // applicationInfo stores the details for each know application

@@ -8,26 +8,62 @@ import (
 	"github.com/untangle/packetd/services/logger"
 )
 
-// SessionEntry stores details related to a session
+// SessionEntry stores information of a packetd session
 type SessionEntry struct {
-	SessionID          uint64
-	ConntrackID        uint32
-	PacketCount        uint64
-	ByteCount          uint64
-	CreationTime       time.Time
-	LastActivityTime   time.Time
-	ClientSideTuple    Tuple
-	ServerSideTuple    Tuple
+
+	// SessionID is the globally unique ID for this session (created in packetd)
+	SessionID uint64
+
+	// ConntrackID is the conntrack ID. ConntrackIDs (ctid) are unique but reused.
+	ConntrackID uint32
+
+	// CreationTime stores the creation time of the session
+	CreationTime time.Time
+
+	// LastActivityTime stores the last time we got any nfqueue/conntrack event for this session
+	LastActivityTime time.Time
+
+	// ClientSideTuple stores the client-side (pre-NAT) session tuple
+	ClientSideTuple Tuple
+
+	// ServerSideTuple stores the server-side (post-NAT) session tuple
+	ServerSideTuple Tuple
+
+	// ConntrackConfirmed is true if this session has been confirmed by conntrack. false otherwise
+	// A session becomes confirmed by conntrack once its packet reaches the final CONNTRACK_CONFIRM
+	// priority in netfilter, and we get an conntrack "NEW" event for it.
+	// Packets that never reach this point (blocked packets) often never get confirmed
 	ConntrackConfirmed bool
-	EventCount         uint64
-	subscriptions      map[string]SubscriptionHolder
-	subLocker          sync.Mutex
-	attachments        map[string]interface{}
-	attachmentLock     sync.Mutex
+
+	// PacketdCount stores the number of packets queued to packetd for this session
+	PacketCount uint64
+
+	// ByteCount stores the number of bytes of packets queued to packetd for this session
+	ByteCount uint64
+
+	// EventCount stores the number of nfqueue/conntrack events for this session
+	EventCount uint64
+
+	// subscriptions stores the nfqueue subscribers
+	subscriptions map[string]SubscriptionHolder
+
+	// subLocker is the lock for subscriptions
+	subLocker sync.Mutex
+
+	// attachments stores the metadata attachments
+	attachments map[string]interface{}
+
+	// attachmentLock is the lock for attachments
+	attachmentLock sync.Mutex
 }
 
+// sessionTable is the global session table
 var sessionTable map[uint32]*SessionEntry
+
+// sessionMutex is the lock for sessionTable
 var sessionMutex sync.Mutex
+
+// sessionIndex stores the next available unique SessionID
 var sessionIndex uint64
 
 // PutAttachment is used to safely add an attachment to a session object
@@ -118,19 +154,13 @@ func cleanSessionTable() {
 		// Having stale sessions is normal if sessions get blocked
 		// Their conntracks never get confirmed and thus there is never a delete conntrack event
 		// These sessions will hang in the table around and get cleaned up here.
-		// However, if we find a a stale conntrack-confirmed session. There is likely an issue
-		// We keep confirmed sessions are longer just in case
-		if session.ConntrackConfirmed {
-			if (nowtime.Unix() - session.LastActivityTime.Unix()) > 3600 {
-				logger.Warn("Removing confirmed stale session entry %v %v\n", key, session.ClientSideTuple)
-				removeSessionEntry(key)
+		// However, if we find a a stale conntrack-confirmed session.
+		if (nowtime.Unix() - session.LastActivityTime.Unix()) > 600 {
+			if session.ConntrackConfirmed {
+				logger.Err("Removing confirmed stale session entry %v %v\n", key, session.ClientSideTuple)
 			}
-		} else {
-			if (nowtime.Unix() - session.LastActivityTime.Unix()) > 600 {
-				removeSessionEntry(key)
-			}
+			removeSessionEntry(key)
 		}
-
 	}
 }
 
