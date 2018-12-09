@@ -126,8 +126,10 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 
 		conntrackEntry.LastActivityTime = time.Now()
 		conntrackEntry.EventCount++
-		conntrackEntry.Session.LastActivityTime = time.Now()
-		conntrackEntry.Session.EventCount++
+		if conntrackEntry.Session != nil {
+			conntrackEntry.Session.LastActivityTime = time.Now()
+			conntrackEntry.Session.EventCount++
+		}
 
 		oldC2sBytes := conntrackEntry.C2Sbytes
 		oldS2cBytes := conntrackEntry.S2Cbytes
