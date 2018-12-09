@@ -372,7 +372,10 @@ func findCaller() (string, string, string, int) {
 	// start with 1 because this is not public
 	for depth := 1; depth < 15; depth++ {
 		_, filename, line, ok := runtime.Caller(depth)
-		if ok && !strings.HasSuffix(filename, "logger.go") && !strings.HasSuffix(filename, "log.go") {
+		if ok &&
+			!strings.HasSuffix(filename, "print.go") &&
+			!strings.HasSuffix(filename, "logger.go") &&
+			!strings.HasSuffix(filename, "log.go") {
 			var split = strings.Split(filename, "/")
 			var shortname string
 			if len(split) > 1 {

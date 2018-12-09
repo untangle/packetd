@@ -25,9 +25,16 @@ var engine *gin.Engine
 // Startup is called to start the rest daemon
 func Startup() {
 
+	gin.SetMode(gin.ReleaseMode)
 	gin.DisableConsoleColor()
 	gin.DefaultWriter = logger.NewLogWriter()
-	engine = gin.Default()
+	gin.DebugPrintRouteFunc = func(httpMethod, absolutePath, handlerName string, nuHandlers int) {
+		logger.Info("GIN: %v %v %v %v\n", httpMethod, absolutePath, handlerName, nuHandlers)
+	}
+
+	engine = gin.New()
+	engine.Use(gin.Logger())
+	engine.Use(gin.Recovery())
 
 	config := cors.DefaultConfig()
 
