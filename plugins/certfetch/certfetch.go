@@ -85,7 +85,10 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 		conn, err := tls.DialWithDialer(dialer, "tcp", target, conf)
 		if err != nil {
-			logger.Info("TLS error: %s\n", err)
+			//TLS errors are quite common in the real world
+			//anytime a non SSL based TCP connection goes over port 443 it causes this
+			//Log this at just debug level
+			logger.Debug("TLS error: %s\n", err)
 		} else {
 			defer conn.Close()
 		}
