@@ -126,6 +126,12 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			// Then we somehow missed the first packet - Just mark the connection as bypassed
 			// and return the packet
 			logger.Info("Ignoring mid-session packet: %s %d\n", mess.MsgTuple, ctid)
+			if mess.TCPLayer != nil {
+				logger.Info("TCP Layer SYN: %v\n", mess.TCPLayer.SYN)
+				logger.Info("TCP Layer FIN: %v\n", mess.TCPLayer.FIN)
+				logger.Info("TCP Layer RST: %v\n", mess.TCPLayer.RST)
+			}
+
 			dict.AddSessionEntry(ctid, "bypass_packetd", true)
 			return NfAccept, pmark
 		}
