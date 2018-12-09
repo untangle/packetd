@@ -114,19 +114,23 @@ func removeSessionEntry(finder uint32) {
 func cleanSessionTable() {
 	nowtime := time.Now()
 
-	for key, val := range sessionTable {
-		if (nowtime.Unix() - val.LastActivityTime.Unix()) < 600 {
-			continue
-		}
-		removeSessionEntry(key)
+	for key, session := range sessionTable {
 		// Having stale sessions is normal if sessions get blocked
 		// Their conntracks never get confirmed and thus there is never a delete conntrack event
 		// These sessions will hang in the table around and get cleaned up here.
-
-		// However, if we find a a stale conntrack-confirmed session. There is likel an issue
-		if val.ConntrackConfirmed {
-			logger.Warn("Removing confirmed stale session entry %v %v\n", key, val.ClientSideTuple)
+		// However, if we find a a stale conntrack-confirmed session. There is likely an issue
+		// We keep confirmed sessions are longer just in case
+		if session.ConntrackConfirmed {
+			if (nowtime.Unix() - session.LastActivityTime.Unix()) > 3600 {
+				logger.Warn("Removing confirmed stale session entry %v %v\n", key, session.ClientSideTuple)
+				removeSessionEntry(key)
+			}
+		} else {
+			if (nowtime.Unix() - session.LastActivityTime.Unix()) > 600 {
+				removeSessionEntry(key)
+			}
 		}
+
 	}
 }
 
