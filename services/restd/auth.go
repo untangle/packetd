@@ -130,7 +130,6 @@ func authLogin(c *gin.Context) {
 	// This is a POST, with a username/password. Try to login
 	session := sessions.Default(c)
 	if validate(username, password) {
-		logger.Info("Login: %s\n", username)
 		session.Set("username", username)
 		err := session.Save()
 		if err != nil {
@@ -139,7 +138,6 @@ func authLogin(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"message": "Successfully authenticated user"})
 		}
 	} else {
-		logger.Info("Login Failed: %s\n", username)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization failed: Invalid username/password"})
 	}
 }
