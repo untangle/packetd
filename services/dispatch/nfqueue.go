@@ -125,11 +125,15 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			// If we did not find the session in the session table, and this isn't a new packet
 			// Then we somehow missed the first packet - Just mark the connection as bypassed
 			// and return the packet
-			logger.Info("Ignoring mid-session packet: %s %d\n", mess.MsgTuple, ctid)
-			if mess.TCPLayer != nil {
-				logger.Info("TCP Layer SYN: %v\n", mess.TCPLayer.SYN)
-				logger.Info("TCP Layer FIN: %v\n", mess.TCPLayer.FIN)
-				logger.Info("TCP Layer RST: %v\n", mess.TCPLayer.RST)
+			// This is common with RST packets after the session ends. Just log those at debug
+			if mess.TCPLayer != nil && mess.TCPLayer.RST {
+				logger.Debug("Ignoring mid-session RST packet: %s %d\n", mess.MsgTuple, ctid)
+			} else {
+				logger.Info("Ignoring mid-session packet: %s %d\n", mess.MsgTuple, ctid)
+				if mess.TCPLayer != nil {
+					logger.Info("TCP Layer SYN: %v\n", mess.TCPLayer.SYN)
+					logger.Info("TCP Layer FIN: %v\n", mess.TCPLayer.FIN)
+				}
 			}
 
 			dict.AddSessionEntry(ctid, "bypass_packetd", true)
