@@ -116,7 +116,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		mess.Payload = appLayer.Payload()
 	}
 
-	logger.Trace("nfqueue event[%d]: %v \n", ctid, mess.MsgTuple)
+	logger.Trace("nfqueue event[%d]: %v 0x%08x\n", ctid, mess.MsgTuple, pmark)
 
 	session := findSessionEntry(ctid)
 
