@@ -85,7 +85,7 @@ class PlaybackTests(unittest.TestCase):
     https_ctid = "4073347072"   # session traffic for wget https://www.japan.go.jp
     http_ctid = "4073346816"    # session traffic for wget http://www.neverssl.com
     speedup_multiplier = 100
-    
+
     @staticmethod
     def moduleName():
         """moduleName unittest method"""

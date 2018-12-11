@@ -50,15 +50,18 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	// this is the first packet so source interface = client interface
 	var clientInterface uint8
 	var serverInterface uint8
-	var clientIsOnLan bool
+	var clientInterfaceType uint8
+	var serverInterfaceType uint8
 	var localAddress net.IP
 	var remoteAddress net.IP
 
 	clientInterface = uint8((mess.PacketMark & 0x000000FF))
 	serverInterface = uint8((mess.PacketMark & 0x0000FF00) >> 8)
-	clientIsOnLan = (((mess.PacketMark & 0x03000000) >> 24) == 2)
+	clientInterfaceType = uint8((mess.PacketMark & 0x03000000) >> 24)
+	serverInterfaceType = uint8((mess.PacketMark & 0x0c000000) >> 26)
 
-	if clientIsOnLan {
+	// if client is on LAN (type 2)
+	if clientInterfaceType == 2 {
 		localAddress = session.ClientSideTuple.ClientAddress
 		// the server may not actually be on a WAN, but we consider it remote if the client is on a LAN
 		remoteAddress = session.ClientSideTuple.ServerAddress
@@ -69,17 +72,19 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		localAddress = session.ClientSideTuple.ServerAddress
 	}
 	columns := map[string]interface{}{
-		"time_stamp":       time.Now(),
-		"session_id":       session.SessionID,
-		"ip_protocol":      session.ClientSideTuple.Protocol,
-		"client_interface": clientInterface,
-		"server_interface": serverInterface,
-		"local_address":    localAddress.String(),
-		"remote_address":   remoteAddress.String(),
-		"client_address":   session.ClientSideTuple.ClientAddress.String(),
-		"server_address":   session.ClientSideTuple.ServerAddress.String(),
-		"client_port":      session.ClientSideTuple.ClientPort,
-		"server_port":      session.ClientSideTuple.ServerPort,
+		"time_stamp":            time.Now(),
+		"session_id":            session.SessionID,
+		"ip_protocol":           session.ClientSideTuple.Protocol,
+		"client_interface":      clientInterface,
+		"server_interface":      serverInterface,
+		"client_interface_type": clientInterfaceType,
+		"server_interface_type": serverInterfaceType,
+		"local_address":         localAddress.String(),
+		"remote_address":        remoteAddress.String(),
+		"client_address":        session.ClientSideTuple.ClientAddress.String(),
+		"server_address":        session.ClientSideTuple.ServerAddress.String(),
+		"client_port":           session.ClientSideTuple.ClientPort,
+		"server_port":           session.ClientSideTuple.ServerPort,
 	}
 	reports.LogEvent(reports.CreateEvent("session_new", "sessions", 1, columns, nil))
 	for k, v := range columns {

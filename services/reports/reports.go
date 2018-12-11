@@ -389,6 +389,8 @@ func createTables() {
                      username text,
                      client_interface int,
                      server_interface int,
+                     client_interface_type int1,
+                     server_interface_type int1,
                      local_address  inet,
                      remote_address inet,
                      client_address inet,
