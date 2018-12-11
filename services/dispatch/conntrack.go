@@ -129,7 +129,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		conntrackEntry.LastActivityTime = time.Now()
 		conntrackEntry.EventCount++
 		if connmark != conntrackEntry.ConnMark {
-			logger.Info("Conntrack change [%v] %x != %x\n", ctid, connmark, conntrackEntry.ConnMark)
+			logger.Info("Conntrack change [%v] 0x%08x != 0x%08x\n", ctid, connmark, conntrackEntry.ConnMark)
 			conntrackEntry.ConnMark = connmark
 		}
 		if conntrackEntry.Session != nil {
