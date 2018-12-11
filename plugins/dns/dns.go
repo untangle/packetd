@@ -1,13 +1,14 @@
 package dns
 
 import (
+	"net"
+	"sync"
+	"time"
+
 	"github.com/google/gopacket/layers"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
-	"net"
-	"sync"
-	"time"
 )
 
 const pluginName = "dns"
@@ -46,7 +47,6 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var result dispatch.NfqueueResult
 	result.Owner = pluginName
 	result.SessionRelease = true
-	result.PacketMark = 0
 
 	// for new sessions we look for the client and server IP in our DNS cache
 	if newSession {

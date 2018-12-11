@@ -2,6 +2,7 @@ package example
 
 import (
 	"encoding/hex"
+
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 )
@@ -41,7 +42,6 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var result dispatch.NfqueueResult
 	result.Owner = pluginName
 	result.SessionRelease = true
-	result.PacketMark = 0
 
 	return result
 }

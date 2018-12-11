@@ -3,12 +3,13 @@
 package reporter
 
 import (
+	"net"
+	"time"
+
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
-	"net"
-	"time"
 )
 
 const pluginName = "reporter"
@@ -32,7 +33,6 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var result dispatch.NfqueueResult
 	result.Owner = pluginName
 	result.SessionRelease = true
-	result.PacketMark = 0
 
 	var session *dispatch.SessionEntry
 	session = mess.Session
@@ -54,9 +54,9 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var localAddress net.IP
 	var remoteAddress net.IP
 
-	clientInterface = uint8((result.PacketMark & 0x000000FF))
-	serverInterface = uint8((result.PacketMark & 0x0000FF00) >> 8)
-	clientIsOnLan = ((result.PacketMark & 0x01000000) == 0)
+	clientInterface = uint8((mess.PacketMark & 0x000000FF))
+	serverInterface = uint8((mess.PacketMark & 0x0000FF00) >> 8)
+	clientIsOnLan = (((mess.PacketMark & 0x03000000) >> 24) == 2)
 
 	if clientIsOnLan {
 		localAddress = session.ClientSideTuple.ClientAddress

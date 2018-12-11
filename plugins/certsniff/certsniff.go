@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"crypto/x509"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/untangle/packetd/services/certcache"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
-	"sync"
-	"time"
 )
 
 const pluginName = "certsniff"
@@ -104,7 +105,6 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var found bool
 
 	result.Owner = pluginName
-	result.PacketMark = 0
 	result.SessionRelease = false
 
 	// we only look for certs in TCP traffic not going to server port 443

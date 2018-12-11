@@ -23,7 +23,7 @@ import (
 type ConntrackCallback func(uint32, uint32, uint8, uint8, uint8, net.IP, net.IP, uint16, uint16, net.IP, net.IP, uint16, uint16, uint64, uint64)
 
 // NfqueueCallback is a function to handle nfqueue events
-type NfqueueCallback func(uint32, gopacket.Packet, int, uint32) (int, uint32)
+type NfqueueCallback func(uint32, gopacket.Packet, int, uint32) int
 
 // NetloggerCallback is a function to handle netlogger events
 type NetloggerCallback func(uint8, uint8, uint16, uint8, uint8, string, string, uint16, uint16, uint32, string)
@@ -161,7 +161,7 @@ func RegisterNetloggerCallback(cb NetloggerCallback) {
 func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.char, playflag C.int) {
 	if nfqueueCallback == nil {
 		logger.Warn("No queue callback registered. Ignoring packet.\n")
-		C.nfqueue_set_verdict(nfid, C.NF_ACCEPT, mark)
+		C.nfqueue_set_verdict(nfid, C.NF_ACCEPT)
 		C.nfqueue_free_buffer(buffer)
 		return
 	}
@@ -189,8 +189,8 @@ func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint
 
 		packetLength = int(size)
 
-		verdict, newMark := nfqueueCallback(conntrackID, packet, packetLength, pmark)
-		C.nfqueue_set_verdict(nfid, C.uint32_t(verdict), C.uint32_t(newMark))
+		verdict := nfqueueCallback(conntrackID, packet, packetLength, pmark)
+		C.nfqueue_set_verdict(nfid, C.uint32_t(verdict))
 		C.nfqueue_free_buffer(buffer)
 
 	}(mark, data, size, ctid, nfid, buffer)

@@ -2,16 +2,17 @@ package geoip
 
 import (
 	"compress/gzip"
-	"github.com/oschwald/geoip2-golang"
-	"github.com/untangle/packetd/services/dict"
-	"github.com/untangle/packetd/services/dispatch"
-	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/reports"
 	"io"
 	"net"
 	"net/http"
 	"os"
 	"strings"
+
+	geoip2 "github.com/oschwald/geoip2-golang"
+	"github.com/untangle/packetd/services/dict"
+	"github.com/untangle/packetd/services/dispatch"
+	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/reports"
 )
 
 const pluginName = "geoip"
@@ -24,6 +25,7 @@ var geodb *geoip2.Reader
 // argumented WaitGroup so the main process can wait for our shutdown function
 // to return during shutdown.
 func PluginStartup() {
+
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
 
 	var filename string
@@ -56,7 +58,6 @@ func PluginShutdown() {
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
 	result.Owner = pluginName
-	result.PacketMark = 0
 
 	// release immediately as we only care about the first packet
 	dispatch.ReleaseSession(mess.Session, pluginName)

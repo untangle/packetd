@@ -27,7 +27,6 @@ func PluginShutdown() {
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
 	result.Owner = pluginName
-	result.PacketMark = 0
 	result.SessionRelease = false
 
 	// We only search for SNI in TCP traffic

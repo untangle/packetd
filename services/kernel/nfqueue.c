@@ -105,7 +105,7 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
             ip_addr.s_addr = iphead->daddr;
             logmessage(LOG_DEBUG,logsrc,"Error: dst IP: %s\n", inet_ntoa(ip_addr));
         }
-		nfqueue_set_verdict(nfid, NF_ACCEPT, mark);
+		nfqueue_set_verdict(nfid, NF_ACCEPT);
         nfqueue_free_buffer(buffer);
         return 0;
     }
@@ -116,7 +116,7 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 	return(0);
 }
 
-int nfqueue_set_verdict(uint32_t nfid, uint32_t verdict, uint32_t mark)
+int nfqueue_set_verdict(uint32_t nfid, uint32_t verdict)
 {
     if (nfqqh == NULL)
         return -1;
@@ -126,13 +126,6 @@ int nfqueue_set_verdict(uint32_t nfid, uint32_t verdict, uint32_t mark)
         logmessage(LOG_ERR,logsrc,"nfq_set_verdict2(): %s\n",strerror(errno));
     }
 
-    // FIXME - do we need to set the mark?
-    // I don't believe there is any reason for packetd to update the mark
-    
-	/* int ret = nfq_set_verdict2(nfqqh,nfid,verdict,mark,0,NULL); */
-    /* if (ret < 1) { */
-    /*     logmessage(LOG_ERR,logsrc,"nfq_set_verdict2(): %s\n",strerror(errno)); */
-    /* } */
     return ret;
 }
 

@@ -36,7 +36,6 @@ func PluginShutdown() {
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
 	result.Owner = pluginName
-	result.PacketMark = 0
 	result.SessionRelease = true
 
 	// release immediately as we only care about the first packet
