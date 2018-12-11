@@ -151,6 +151,9 @@ static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrac
 	info.orig_bytes = nfct_get_attr_u64(ct,ATTR_ORIG_COUNTER_BYTES);
 	info.repl_bytes = nfct_get_attr_u64(ct,ATTR_REPL_COUNTER_BYTES);
 
+    // get the mark
+	info.conn_mark = nfct_get_attr_u32(ct,ATTR_MARK);
+
 	if (get_warehouse_flag() == 'C') warehouse_capture('C',&info,sizeof(info),0,0,0);
 	if (get_bypass_flag() == 0) go_conntrack_callback(&info,0);
 

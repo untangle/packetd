@@ -15,6 +15,7 @@ type ConntrackHandlerFunction func(int, *ConntrackEntry)
 // ConntrackEntry stores the details of a conntrack entry
 type ConntrackEntry struct {
 	ConntrackID      uint32
+	ConnMark         uint32
 	Session          *SessionEntry
 	SessionID        uint64
 	CreationTime     time.Time
@@ -39,7 +40,7 @@ func (c ConntrackEntry) String() string {
 }
 
 // conntrackCallback is the global conntrack event handler
-func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint8,
+func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uint8, protocol uint8,
 	client net.IP, server net.IP, clientPort uint16, serverPort uint16,
 	clientNew net.IP, serverNew net.IP, clientPortNew uint16, serverPortNew uint16,
 	c2sBytes uint64, s2cBytes uint64) {
@@ -50,7 +51,7 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 	// start by looking for the existing conntrack entry
 	conntrackEntry, conntrackFound = findConntrackEntry(ctid)
 
-	logger.Trace("conntrack event[%v]: %v \n", eventType, ctid)
+	logger.Trace("conntrack event[%v]: %v %v\n", eventType, ctid, connmark)
 
 	// handle DELETE events
 	if eventType == 'D' {
@@ -74,6 +75,7 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 
 		conntrackEntry = new(ConntrackEntry)
 		conntrackEntry.ConntrackID = ctid
+		conntrackEntry.ConnMark = connmark
 		conntrackEntry.SessionID = nextSessionID()
 		conntrackEntry.CreationTime = time.Now()
 		conntrackEntry.LastActivityTime = time.Now()
@@ -126,6 +128,10 @@ func conntrackCallback(ctid uint32, family uint8, eventType uint8, protocol uint
 
 		conntrackEntry.LastActivityTime = time.Now()
 		conntrackEntry.EventCount++
+		if connmark != conntrackEntry.ConnMark {
+			logger.Info("Conntrack change [%v] %x != %x\n", ctid, connmark, conntrackEntry.ConnMark)
+			conntrackEntry.ConnMark = connmark
+		}
 		if conntrackEntry.Session != nil {
 			conntrackEntry.Session.LastActivityTime = time.Now()
 			conntrackEntry.Session.EventCount++

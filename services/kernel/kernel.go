@@ -20,7 +20,7 @@ import (
 )
 
 // ConntrackCallback is a function to handle conntrack events
-type ConntrackCallback func(uint32, uint8, uint8, uint8, net.IP, net.IP, uint16, uint16, net.IP, net.IP, uint16, uint16, uint64, uint64)
+type ConntrackCallback func(uint32, uint32, uint8, uint8, uint8, net.IP, net.IP, uint16, uint16, net.IP, net.IP, uint16, uint16, uint64, uint64)
 
 // NfqueueCallback is a function to handle nfqueue events
 type NfqueueCallback func(uint32, gopacket.Packet, int, uint32) (int, uint32)
@@ -214,6 +214,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info, playflag C.int) {
 	var serverNew net.IP
 	var clientPortNew uint16
 	var serverPortNew uint16
+	var connmark uint32
 
 	if conntrackCallback == nil {
 		logger.Warn("No conntrack callback registered. Ignoring event.\n")
@@ -232,6 +233,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info, playflag C.int) {
 	c2sBytes = uint64(info.orig_bytes)
 	s2cBytes = uint64(info.repl_bytes)
 	protocol = uint8(info.orig_proto)
+	connmark = uint32(info.conn_mark)
 
 	if family == C.AF_INET {
 		client = make(net.IP, 4)
@@ -272,7 +274,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info, playflag C.int) {
 	clientPortNew = uint16(info.repl_dport)
 	serverPortNew = uint16(info.repl_sport)
 
-	conntrackCallback(ctid, family, eventType, protocol,
+	conntrackCallback(ctid, connmark, family, eventType, protocol,
 		client, server, clientPort, serverPort,
 		clientNew, serverNew, clientPortNew, serverPortNew,
 		c2sBytes, s2cBytes)
