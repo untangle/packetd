@@ -71,8 +71,8 @@ insert_packetd_rules()
     ${NFT} flush chain inet ${TABLE_NAME} input-packetd
 
     # Set bypass bit on local traffic
-    ${NFT} add rule inet ${TABLE_NAME} output-packetd ct mark set "mark|0xf0000000"
-    ${NFT} add rule inet ${TABLE_NAME} input-packetd ct mark set "mark|0xf0000000"
+    ${NFT} add rule inet ${TABLE_NAME} output-packetd ct mark set "mark|0x80000000"
+    ${NFT} add rule inet ${TABLE_NAME} input-packetd ct mark set "mark|0x80000000"
 
     # Don't catch loopback traffic
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ip saddr 127.0.0.1/8 return
@@ -93,7 +93,7 @@ insert_packetd_rules()
 
     # Don't catch bypassed traffic
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd dict session ct id bypass_packetd bool true counter return
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct mark and 0xf0000000 == 0xf0000000 counter return
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct mark and 0x80000000 == 0x80000000 counter return
 
     # Set the new packet mark
     # We must actually set this mark so that packetd can tell this is a "new" packet
