@@ -20,9 +20,9 @@ def download_playback_file():
     result = subprocess.call("wget -q -P /tmp http://test.untangle.com/packetd/playtest.cap", shell=True)
     return result
 
-def playback_start(filename, speedup_multiplier=1):
+def playback_start(filename, playspeed):
     """start the playback file"""
-    result = subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"filename\":\"%s\",\"speed\":\"%i\"}' 'http://localhost/api/warehouse/playback' >> /tmp/subproc.out" % (filename, speedup_multiplier*100), shell=True)
+    result = subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"filename\":\"%s\",\"speed\":\"%i\"}' 'http://localhost/api/warehouse/playback' >> /tmp/subproc.out" % (filename, playspeed), shell=True)
     return result
 
 def playback_cleanup():
@@ -84,7 +84,6 @@ class PlaybackTests(unittest.TestCase):
     file_hash = "f8388c823679da7db0a4cb7856bf717c".encode('UTF-8')
     https_ctid = "4073347072"   # session traffic for wget https://www.japan.go.jp
     http_ctid = "4073346816"    # session traffic for wget http://www.neverssl.com
-    speedup_multiplier = 100
 
     @staticmethod
     def moduleName():
@@ -117,9 +116,9 @@ class PlaybackTests(unittest.TestCase):
         print(self.file_hash)
         assert md5sum == self.file_hash
 
-    def test_030_playback_capture_file(self):
+    def test_030_playback_capture_file_normal(self):
         '''playback the capture file and wait for it to finish'''
-        assert playback_start("/tmp/playtest.cap") == 0
+        assert playback_start("/tmp/playtest.cap", 100) == 0
         assert playback_wait() == 0
         rawdata = read_dict_session(PlaybackTests.http_ctid)
         playback_cleanup()
@@ -127,7 +126,15 @@ class PlaybackTests(unittest.TestCase):
 
     def test_031_playback_capture_file_speedup(self):
         '''playback the capture file and wait for it to finish'''
-        assert playback_start("/tmp/playtest.cap", self.speedup_multiplier) == 0
+        assert playback_start("/tmp/playtest.cap", 200) == 0
+        assert playback_wait() == 0
+        rawdata = read_dict_session(PlaybackTests.http_ctid)
+        playback_cleanup()
+        assert rawdata != ""
+
+    def test_032_playback_capture_file_slowdown(self):
+        '''playback the capture file and wait for it to finish'''
+        assert playback_start("/tmp/playtest.cap", 50) == 0
         assert playback_wait() == 0
         rawdata = read_dict_session(PlaybackTests.http_ctid)
         playback_cleanup()
@@ -135,7 +142,7 @@ class PlaybackTests(unittest.TestCase):
 
     def test_040_check_http_classify(self):
         '''check classify HTTP session details in the dictionary'''
-        assert playback_start("/tmp/playtest.cap", self.speedup_multiplier) == 0
+        assert playback_start("/tmp/playtest.cap", 0) == 0
         assert playback_wait() == 0
         rawdata = read_dict_session(PlaybackTests.http_ctid)
         playback_cleanup()
@@ -145,7 +152,7 @@ class PlaybackTests(unittest.TestCase):
 
     def test_041_check_https_geoip(self):
         '''check HTTPS session geoip details in the dictionary'''
-        assert playback_start("/tmp/playtest.cap", self.speedup_multiplier) == 0
+        assert playback_start("/tmp/playtest.cap", 0) == 0
         assert playback_wait() == 0
         rawdata = read_dict_session(PlaybackTests.https_ctid)
         playback_cleanup()
@@ -153,7 +160,7 @@ class PlaybackTests(unittest.TestCase):
 
     def test_042_check_https_sni(self):
         '''check HTTPS session sni details in the dictionary'''
-        assert playback_start("/tmp/playtest.cap", self.speedup_multiplier) == 0
+        assert playback_start("/tmp/playtest.cap", 0) == 0
         assert playback_wait() == 0
         rawdata = read_dict_session(PlaybackTests.https_ctid)
         playback_cleanup()
@@ -161,7 +168,7 @@ class PlaybackTests(unittest.TestCase):
 
     def test_043_check_https_cert(self):
         '''check HTTPS session cert details in the dictionary'''
-        assert playback_start("/tmp/playtest.cap", self.speedup_multiplier) == 0
+        assert playback_start("/tmp/playtest.cap", 0) == 0
         assert playback_wait() == 0
         rawdata = read_dict_session(PlaybackTests.https_ctid)
         playback_cleanup()

@@ -204,6 +204,13 @@ struct timespec calculate_pause(struct timespec start,struct timespec end,int sp
 	struct timespec		calc;
 	u_int64_t         	value;
 
+	// if playback speed is zero return zero
+	if (speed == 0) {
+		calc.tv_sec = 0;
+		calc.tv_nsec = 0;
+		return(calc);
+	}
+
 	if ((end.tv_nsec - start.tv_nsec) < 0) {
 		calc.tv_sec = end.tv_sec - start.tv_sec - 1;
 		calc.tv_nsec = 1000000000 + end.tv_nsec - start.tv_nsec;
