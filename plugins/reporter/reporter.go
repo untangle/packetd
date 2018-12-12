@@ -48,17 +48,13 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	// this is the first packet so source interface = client interface
+	// we don't know the server interface information yet - nfqueue is prerouting
 	var clientInterface uint8
-	var serverInterface uint8
 	var clientInterfaceType uint8
-	var serverInterfaceType uint8
 	var localAddress net.IP
 	var remoteAddress net.IP
-
 	clientInterface = uint8((mess.PacketMark & 0x000000FF))
-	serverInterface = uint8((mess.PacketMark & 0x0000FF00) >> 8)
 	clientInterfaceType = uint8((mess.PacketMark & 0x03000000) >> 24)
-	serverInterfaceType = uint8((mess.PacketMark & 0x0c000000) >> 26)
 
 	// if client is on LAN (type 2)
 	if clientInterfaceType == 2 {
@@ -76,9 +72,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		"session_id":            session.SessionID,
 		"ip_protocol":           session.ClientSideTuple.Protocol,
 		"client_interface":      clientInterface,
-		"server_interface":      serverInterface,
 		"client_interface_type": clientInterfaceType,
-		"server_interface_type": serverInterfaceType,
 		"local_address":         localAddress.String(),
 		"remote_address":        remoteAddress.String(),
 		"client_address":        session.ClientSideTuple.ClientAddress.String(),
@@ -104,14 +98,21 @@ func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
 	session = entry.Session
 	if message == 'N' {
 		if session != nil {
+			var serverInterface uint8
+			var serverInterfaceType uint8
+			serverInterface = uint8((entry.ConnMark & 0x0000FF00))
+			serverInterfaceType = uint8((entry.ConnMark & 0x0c000000) >> 26)
+
 			columns := map[string]interface{}{
 				"session_id": session.SessionID,
 			}
 			modifiedColumns := map[string]interface{}{
-				"client_address_new": session.ServerSideTuple.ClientAddress.String(),
-				"server_address_new": session.ServerSideTuple.ServerAddress.String(),
-				"client_port_new":    session.ServerSideTuple.ClientPort,
-				"server_port_new":    session.ServerSideTuple.ServerPort,
+				"client_address_new":    session.ServerSideTuple.ClientAddress.String(),
+				"server_address_new":    session.ServerSideTuple.ServerAddress.String(),
+				"client_port_new":       session.ServerSideTuple.ClientPort,
+				"server_port_new":       session.ServerSideTuple.ServerPort,
+				"server_interface":      serverInterface,
+				"server_interface_type": serverInterfaceType,
 			}
 			reports.LogEvent(reports.CreateEvent("session_nat", "sessions", 2, columns, modifiedColumns))
 			for k, v := range modifiedColumns {
