@@ -333,6 +333,7 @@ func initLoggerConfig() {
 	config["geoip"] = "INFO"
 	config["example"] = "INFO"
 	config["reporter"] = "INFO"
+	config["revdns"] = "INFO"
 	config["sni"] = "INFO"
 	config["tls"] = "INFO"
 

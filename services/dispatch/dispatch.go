@@ -113,8 +113,13 @@ func InsertNfqueueSubscription(owner string, priority int, function NfqueueHandl
 	holder.Priority = priority
 	holder.NfqueueFunc = function
 	nfqueueSubMutex.Lock()
+	_, existing := nfqueueSubList[owner]
 	nfqueueSubList[owner] = holder
 	nfqueueSubMutex.Unlock()
+
+	if existing {
+		panic("DUPLICATE NFQUEUE SUBSCRIPTION DETECTED!")
+	}
 }
 
 // AttachNfqueueSubscriptions attaches active nfqueue subscriptions to the argumented SessionEntry
