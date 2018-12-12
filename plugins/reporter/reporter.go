@@ -103,7 +103,7 @@ func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
 		if session != nil {
 			var serverInterface uint8
 			var serverInterfaceType uint8
-			serverInterface = uint8((entry.ConnMark & 0x0000FF00))
+			serverInterface = uint8((entry.ConnMark & 0x0000FF00) >> 8)
 			serverInterfaceType = uint8((entry.ConnMark & 0x0c000000) >> 26)
 
 			columns := map[string]interface{}{
