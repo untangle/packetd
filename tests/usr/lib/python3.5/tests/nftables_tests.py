@@ -161,6 +161,15 @@ conditions_tests = [
     [[{"type": "DESTINATION_ADDRESS_V6","op":"==","value": "fe80::1"}], "ip6 daddr 'fe80::1'"],
     [[{"type": "DESTINATION_ADDRESS_V6","op":"!=","value": "fe80::1"}], "ip6 daddr != 'fe80::1'"],
 
+    [[{"type": "SOURCE_ADDRESS_TYPE","op":"==","value": "local"}], "fib saddr type 'local'"],
+    [[{"type": "SOURCE_ADDRESS_TYPE","op":"!=","value": "local"}], "fib saddr type != 'local'"],
+    [[{"type": "SOURCE_ADDRESS_TYPE","op":"==","value": "unicast"}], "fib saddr type 'unicast'"],
+    [[{"type": "SOURCE_ADDRESS_TYPE","op":"==","value": "invalid_type"}], None],
+    [[{"type": "DESTINATION_ADDRESS_TYPE","op":"==","value": "local"}], "fib daddr type 'local'"],
+    [[{"type": "DESTINATION_ADDRESS_TYPE","op":"!=","value": "local"}], "fib daddr type != 'local'"],
+    [[{"type": "DESTINATION_ADDRESS_TYPE","op":"==","value": "unicast"}], "fib daddr type 'unicast'"],
+    [[{"type": "DESTINATION_ADDRESS_TYPE","op":"==","value": "invalid_type"}], None],
+
     [[{"type": "SOURCE_PORT","op":"==","value": "1234"}], None],
     [[{"type": "SOURCE_PORT","op":"==","value": "1234"}], None],
     [[{"type": "SOURCE_PORT","op":"==","value": "1234"}], None],
