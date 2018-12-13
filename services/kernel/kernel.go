@@ -171,7 +171,7 @@ func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint
 		nfCleanList[uint32(C.int(ctid))] = true
 	}
 
-	go func(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.char) {
+	f := func(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.char) {
 
 		var packet gopacket.Packet
 		var packetLength int
@@ -193,7 +193,23 @@ func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint
 		C.nfqueue_set_verdict(nfid, C.uint32_t(verdict))
 		C.nfqueue_free_buffer(buffer)
 
-	}(mark, data, size, ctid, nfid, buffer)
+	}
+
+	// if playflag != 0 then we are doing a warehouse recording playback
+	// in this case we often speed up these playbacks, and as such
+	// if we launch this asynchronously and return the next packet will
+	// immediately be handled. This means we essentially handle all packets
+	// simultaneously which means the plugins will get all the packets
+	// out of order depending on the scheduler. If in a playback
+	// call synchronously to ensure the packets come in the correct order
+
+	// if this is not a playback, handle this packet is a goroutine
+	// and return the main thread immediately so it can handle more packets
+	if playflag != 0 {
+		f(mark, data, size, ctid, nfid, buffer)
+	} else {
+		go f(mark, data, size, ctid, nfid, buffer)
+	}
 
 	return
 }
