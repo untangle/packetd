@@ -109,7 +109,15 @@ void warehouse_playback(void)
 	}
 
 	// read the file header
-	fread(&fh,sizeof(fh),1,data);
+	found = fread(&fh,1,sizeof(fh),data);
+
+	// make sure we got a full header
+	if (found != sizeof(fh)) {
+		logmessage(LOG_WARNING,logsrc,"Invalid size reading file header %d\n",found);
+		fclose(data);
+		return;
+	}
+
 	if (strncmp(fh.signature,fileSignature,strlen(fileSignature)) != 0) {
 		logmessage(LOG_WARNING,logsrc,"Invalid signature in %s\n",filename);
 		fclose(data);
@@ -133,7 +141,10 @@ void warehouse_playback(void)
 	{
 		// read the packet header from the file
 		found = fread(&dh,1,sizeof(dh),data);
-		if (found != sizeof(dh)) break;
+		if (found != sizeof(dh)) {
+			logmessage(LOG_WARNING,logsrc,"Invalid size reading packet header %d\n",found);
+			break;
+		}
 
 		// make sure the length is reasonable
 		if ((dh.length < 0x0001) || (dh.length > 0xFFFF)) {
