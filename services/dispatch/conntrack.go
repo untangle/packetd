@@ -128,7 +128,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 
 		conntrackEntry.LastActivityTime = time.Now()
 		conntrackEntry.EventCount++
-		if connmark != conntrackEntry.ConnMark {
+		if (connmark & 0x0fffffff) != (conntrackEntry.ConnMark & 0x0fffffff) {
 			logger.Info("Connmark change [%v] 0x%08x != 0x%08x\n", conntrackEntry.ClientSideTuple, connmark, conntrackEntry.ConnMark)
 			conntrackEntry.ConnMark = connmark
 		}
