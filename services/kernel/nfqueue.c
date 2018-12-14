@@ -265,7 +265,10 @@ int nfqueue_thread(void)
 
 		// handle poll errors
 		if (ret < 0) {
-			if (errno == EINTR)	continue;
+			if (errno == EINTR) {
+				logmessage(LOG_ALERT,logsrc,"Detected EINTR waiting for messages\n");
+				continue;
+			}
 			logmessage(LOG_ERR,logsrc,"Error %d (%s) returned from poll()\n",errno,strerror(errno));
 			break;
 		}
@@ -284,7 +287,10 @@ int nfqueue_thread(void)
         }
 
         if (ret < 0) {
-            if ((errno == EAGAIN) || (errno == EINTR) || (errno == ENOBUFS)) break;
+			if ((errno == EAGAIN) || (errno == EINTR) || (errno == ENOBUFS)) {
+				logmessage(LOG_WARNING,logsrc,"Detected error %d (%s) while calling recv()\n",errno,strerror(errno));
+				continue;
+			}
             logmessage(LOG_ERR,logsrc,"Error %d (%s) returned from recv()\n",errno,strerror(errno));
 			set_shutdown_flag(1);
 			nfqueue_free_buffer(buffer);

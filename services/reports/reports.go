@@ -84,6 +84,7 @@ var queries = make(map[uint64]*Query)
 var queryID uint64
 var eventQueue = make(chan Event, 1000)
 
+// EventsLogged records the number of events logged
 var EventsLogged = 0
 
 // Startup starts the reports service
