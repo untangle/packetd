@@ -85,6 +85,7 @@ class PlaybackTests(unittest.TestCase):
     file_hash = "f8388c823679da7db0a4cb7856bf717c".encode('UTF-8')
     https_ctid = "4073347072"   # session traffic for wget https://www.japan.go.jp
     http_ctid = "4073346816"    # session traffic for wget http://www.neverssl.com
+    normtime = 0.0
 
     @staticmethod
     def module_name():
@@ -110,17 +111,21 @@ class PlaybackTests(unittest.TestCase):
         """download the playback file needed for our tests"""
         md5sum = get_file_md5("/tmp/playtest.cap")
         print(md5sum)
-        if md5sum != self.file_hash:
+        if md5sum != PlaybackTests.file_hash:
             assert download_playback_file() == 0
         md5sum = get_file_md5("/tmp/playtest.cap")
         print(md5sum)
-        print(self.file_hash)
-        assert md5sum == self.file_hash
+        print(PlaybackTests.file_hash)
+        assert md5sum == PlaybackTests.file_hash
 
     def test_030_playback_capture_file_normal(self):
         """playback the capture file and wait for it to finish"""
         assert playback_start("/tmp/playtest.cap", 100) == 0
+        begtime = time.time()
         assert playback_wait() == 0
+        endtime = time.time()
+        PlaybackTests.normtime = (endtime - begtime)
+        print("NORMTIME: " + str(PlaybackTests.normtime))
         rawdata = read_dict_session(PlaybackTests.http_ctid)
         playback_cleanup()
         assert rawdata != ""
@@ -128,7 +133,14 @@ class PlaybackTests(unittest.TestCase):
     def test_031_playback_capture_file_speedup(self):
         """playback the capture file and wait for it to finish"""
         assert playback_start("/tmp/playtest.cap", 200) == 0
+        begtime = time.time()
         assert playback_wait() == 0
+        endtime = time.time()
+        fasttime = (endtime - begtime)
+        calctime = (PlaybackTests.normtime / 2)
+        print("FASTTIME:" + str(fasttime) + "  TARGET:" + str(calctime))
+        assert fasttime < calctime + 2
+        assert fasttime > calctime - 2
         rawdata = read_dict_session(PlaybackTests.http_ctid)
         playback_cleanup()
         assert rawdata != ""
@@ -136,7 +148,14 @@ class PlaybackTests(unittest.TestCase):
     def test_032_playback_capture_file_slowdown(self):
         """playback the capture file and wait for it to finish"""
         assert playback_start("/tmp/playtest.cap", 50) == 0
+        begtime = time.time()
         assert playback_wait() == 0
+        endtime = time.time()
+        slowtime = (endtime - begtime)
+        calctime = (PlaybackTests.normtime * 2)
+        print("SLOWTIME:" + str(slowtime) + "  TARGET:" + str(calctime))
+        assert slowtime < calctime + 2
+        assert slowtime > calctime - 2
         rawdata = read_dict_session(PlaybackTests.http_ctid)
         playback_cleanup()
         assert rawdata != ""

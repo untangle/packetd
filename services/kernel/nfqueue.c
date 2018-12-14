@@ -11,7 +11,7 @@
 
 static struct nfq_q_handle		*nfqqh;
 static struct nfq_handle		*nfqh;
-static int						cfg_sock_buffer = 1048576;
+static int						cfg_sock_buffer = (1024 * 1024 * 4);
 static int						cfg_net_maxlen = 10240;
 static int						cfg_net_buffer = 32768;
 static int						cfg_net_queue = 1818;
@@ -234,20 +234,11 @@ int nfqueue_thread(void)
 		return(1);
 	}
 
+	// set the socket receive buffer size
+	ret = nfnl_rcvbufsiz(nfq_nfnlh(nfqh),cfg_sock_buffer);
+
 	// get the socket descriptor for the netlink queue
 	netsock = nfnl_fd(nfq_nfnlh(nfqh));
-
-	// set the socket receive buffer size if config value is not zero
-	if (cfg_sock_buffer != 0) {
-		val = cfg_sock_buffer;
-		ret = setsockopt(netsock,SOL_SOCKET,SO_RCVBUF,&val,sizeof(val));
-
-		if (ret != 0) {
-			logmessage(LOG_ERR,logsrc,"Error %d returned from setsockopt(SO_RCVBUF)\n",errno);
-			set_shutdown_flag(1);
-			return(1);
-		}
-	}
 
 	// set up the network poll structure
 	network.fd = netsock;
