@@ -1,6 +1,7 @@
 #!/bin/sh -x
 
 echo 1 > /proc/sys/net/ipv4/ip_forward
+echo 1 > /proc/sys/net/netfilter/nf_conntrack_acct
 
 modprobe nft_chain_nat_ipv4
 modprobe nft_chain_nat_ipv6

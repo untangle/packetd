@@ -23,12 +23,15 @@ type ConntrackEntry struct {
 	ClientSideTuple  Tuple
 	ServerSideTuple  Tuple
 	EventCount       uint64
-	C2Sbytes         uint64
-	S2Cbytes         uint64
+	C2SBytes         uint64
+	S2CBytes         uint64
 	TotalBytes       uint64
-	C2Srate          float32
-	S2Crate          float32
-	TotalRate        float32
+	C2SBytesDiff     uint64  // the C2SBytes diff since last update
+	S2CBytesDiff     uint64  // the S2CBytes diff since last update
+	TotalBytesDiff   uint64  // the TotalBytes diff since last update
+	C2SRate          float32 // the c2s byte rate site the last update
+	S2CRate          float32 // the s2c byte rate site the last update
+	TotalRate        float32 // the total byte rate site the last update
 }
 
 var conntrackTable map[uint32]*ConntrackEntry
@@ -137,8 +140,8 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			conntrackEntry.Session.EventCount++
 		}
 
-		oldC2sBytes := conntrackEntry.C2Sbytes
-		oldS2cBytes := conntrackEntry.S2Cbytes
+		oldC2sBytes := conntrackEntry.C2SBytes
+		oldS2cBytes := conntrackEntry.S2CBytes
 		oldTotalBytes := conntrackEntry.TotalBytes
 		newC2sBytes := c2sBytes
 		newS2cBytes := s2cBytes
@@ -148,7 +151,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		diffTotalBytes := (newTotalBytes - oldTotalBytes)
 
 		// In some cases, specifically UDP, a new session takes the place of an old session with the same tuple.
-		// In this case the counts go down because its actually a new session. If the total bytes is low, this
+		// In this case the counts go down because its actually a new session. If the total Bytes is low, this
 		// is probably the case so treat it as a new conntrackEntry.
 		if (diffC2sBytes < 0) || (diffS2cBytes < 0) {
 			newC2sBytes = c2sBytes
@@ -157,18 +160,20 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			diffS2cBytes = newS2cBytes
 			newTotalBytes = (newC2sBytes + newS2cBytes)
 			diffTotalBytes = newTotalBytes
-			return
 		}
 
 		c2sRate := float32(diffC2sBytes / 60)
 		s2cRate := float32(diffS2cBytes / 60)
 		totalRate := float32(diffTotalBytes / 60)
 
-		conntrackEntry.C2Sbytes = newC2sBytes
-		conntrackEntry.S2Cbytes = newS2cBytes
+		conntrackEntry.C2SBytes = newC2sBytes
+		conntrackEntry.S2CBytes = newS2cBytes
 		conntrackEntry.TotalBytes = newTotalBytes
-		conntrackEntry.C2Srate = c2sRate
-		conntrackEntry.S2Crate = s2cRate
+		conntrackEntry.C2SBytesDiff = diffC2sBytes
+		conntrackEntry.S2CBytesDiff = diffS2cBytes
+		conntrackEntry.TotalBytesDiff = diffTotalBytes
+		conntrackEntry.C2SRate = c2sRate
+		conntrackEntry.S2CRate = s2cRate
 		conntrackEntry.TotalRate = totalRate
 	}
 

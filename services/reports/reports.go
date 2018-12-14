@@ -433,6 +433,14 @@ func createTables() {
 	// FIXME add domain_category
 	// We need to add domain level categorization
 
+	_, err = db.Exec(
+		`CREATE TABLE IF NOT EXISTS session_minutes (
+                     session_id int8 NOT NULL,
+                     time_stamp bigint NOT NULL,
+                     c2s_bytes int,
+                     s2c_bytes int,
+                     bytes int)`)
+
 	if err != nil {
 		logger.Err("Failed to create table: %s\n", err.Error())
 	}

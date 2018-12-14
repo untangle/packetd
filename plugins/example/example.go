@@ -58,8 +58,8 @@ func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
 		entry.ClientSideTuple.ClientPort,
 		entry.ClientSideTuple.ServerAddress,
 		entry.ClientSideTuple.ServerPort,
-		entry.C2Sbytes,
-		entry.S2Cbytes,
+		entry.C2SBytes,
+		entry.S2CBytes,
 		entry.EventCount)
 }
 

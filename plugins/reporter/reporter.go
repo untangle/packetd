@@ -122,6 +122,7 @@ func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
 				session.PutAttachment(k, v)
 				dict.AddSessionEntry(session.ConntrackID, k, v)
 			}
+
 		} else {
 			// We should not receive a new conntrack event for something that is not in the session table
 			// However it happens on local outbound sessions, we should handle these diffently
@@ -130,7 +131,9 @@ func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
 	}
 
 	if message == 'U' {
-		// FIXME log session_minutes event
+		if session != nil {
+			doAccounting(entry, session.SessionID)
+		}
 	}
 }
 
@@ -138,4 +141,16 @@ func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
 func PluginNetloggerHandler(netlogger *dispatch.NetloggerMessage) {
 	// FIXME
 	// IMPLEMENT ME
+}
+
+// doAccounting does the session_minutes accounting
+func doAccounting(entry *dispatch.ConntrackEntry, sessionID uint64) {
+	columns := map[string]interface{}{
+		"time_stamp": time.Now(),
+		"session_id": sessionID,
+		"c2s_bytes":  entry.C2SBytesDiff,
+		"s2c_bytes":  entry.S2CBytesDiff,
+		"bytes":      entry.TotalBytesDiff,
+	}
+	reports.LogEvent(reports.CreateEvent("session_minute", "session_minutes", 1, columns, nil))
 }
