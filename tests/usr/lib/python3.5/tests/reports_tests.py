@@ -194,12 +194,12 @@ class ReportsTests(unittest.TestCase):
     """ReportsTests"""
 
     @staticmethod
-    def moduleName():
-        """moduleName unittest method"""
+    def module_name():
+        """module_name unittest method"""
         return "settings"
 
     def initialSetUp(self):
-        """initialSetup unittest method"""
+        """initial_setup unittest method"""
         pass
 
     def setUp(self):
@@ -374,8 +374,8 @@ class ReportsTests(unittest.TestCase):
         assert result != None
         assert result.get('time_trunc') != None
 
-    def finalTearDown(self):
-        """finalTearDown unittest method"""
+    def final_tear_down(self):
+        """final_tear_down unittest method"""
         pass
 
 test_registry.register_module("reports", ReportsTests)

@@ -49,7 +49,7 @@ class SettingsTests(unittest.TestCase):
     """SettingsTests tests the settings API"""
 
     @staticmethod
-    def moduleName():
+    def module_name():
         return "settings"
 
     @staticmethod
@@ -241,7 +241,7 @@ class SettingsTests(unittest.TestCase):
         assert result3.get('error') != None
         
     @staticmethod
-    def finalTearDown(self):
+    def final_tear_down(self):
         global initial_settings
         set_settings(None, initial_settings)
         pass

@@ -8,7 +8,7 @@ import sync.nftables_util as nftables_util
 class NftablesTests(unittest.TestCase):
 
     @staticmethod
-    def moduleName():
+    def module_name():
         return "nftables_util"
 
     def setUp(self):
@@ -106,7 +106,7 @@ class NftablesTests(unittest.TestCase):
 
 
     @staticmethod
-    def finalTearDown(self):
+    def final_tear_down(self):
         pass
 
 

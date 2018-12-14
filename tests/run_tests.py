@@ -156,7 +156,7 @@ def run_test_suite(suite):
     if exit_flag:
         return
     
-    print("== testing %s ==" % suite.moduleName())
+    print("== testing %s ==" % suite.module_name())
     tests_list = unittest.TestLoader().loadTestsFromTestCase(suite)
     failCount = 0
     skipCount = 0  # number of skipped tests.
@@ -215,7 +215,7 @@ def run_test_suite(suite):
             if (parser.fastfail):
                 exit_flag = True
                 # we return here, don't break because we dont
-                # want to run finalTearDown
+                # want to run final_tear_down
                 return failCount, skipCount, totalCount
         elif (len(results.skipped) > 0):
             print("Test skipped : %s %s" % (test_name, timeString))
@@ -223,15 +223,15 @@ def run_test_suite(suite):
         else:
             print("Test success : %s %s " % (test_name, timeString))
 
-    if "finalTearDown" in dir(suite):
+    if "final_tear_down" in dir(suite):
         try:
-            suite.finalTearDown(suite)
+            suite.final_tear_down(suite)
         except Exception as e:
-            print("finalTearDown exception: ")
+            print("final_tear_down exception: ")
             traceback.print_exc( e )
 
     suiteElapsedTime = time.time() - suiteStartTime
-    print("== testing %s [%.1fs] ==" % (suite.moduleName(),suiteElapsedTime))
+    print("== testing %s [%.1fs] ==" % (suite.module_name(),suiteElapsedTime))
     return failCount, skipCount, totalCount
 
 # Verify the test enviroment is setup correctly

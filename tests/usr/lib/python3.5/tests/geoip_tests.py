@@ -8,7 +8,7 @@ import tests.remote_control as remote_control
 class GeoipTests(unittest.TestCase):
 
     @staticmethod
-    def moduleName():
+    def module_name():
         return "geoip"
 
     @staticmethod
@@ -48,7 +48,7 @@ class GeoipTests(unittest.TestCase):
         assert (result2 != 0)
 
     @staticmethod
-    def finalTearDown(self):
+    def final_tear_down(self):
         subprocess.call("nft flush chain inet test filter-rules", shell=True)
         pass
     

@@ -87,12 +87,12 @@ class PlaybackTests(unittest.TestCase):
     http_ctid = "4073346816"    # session traffic for wget http://www.neverssl.com
 
     @staticmethod
-    def moduleName():
-        """moduleName unittest method"""
+    def module_name():
+        """module_name unittest method"""
         return "playback"
 
     def initialSetUp(self):
-        """initialSetup unittest method"""
+        """initial_setup unittest method"""
         packetd_traffic_bypass()
 
     def setUp(self):
@@ -101,13 +101,13 @@ class PlaybackTests(unittest.TestCase):
         clear_dict()
 
     def test_010_check_empty_table(self):
-        '''verify the ctids aren't in the dictionary'''
+        """verify the ctids aren't in the dictionary"""
         rawdata = read_dict()
         assert "table: session key_int: " + PlaybackTests.http_ctid not in rawdata
         assert "table: session key_int: " + PlaybackTests.https_ctid not in rawdata
 
     def test_020_check_capture_file(self):
-        '''download the playback file needed for our tests'''
+        """download the playback file needed for our tests"""
         md5sum = get_file_md5("/tmp/playtest.cap")
         print(md5sum)
         if md5sum != self.file_hash:
@@ -118,7 +118,7 @@ class PlaybackTests(unittest.TestCase):
         assert md5sum == self.file_hash
 
     def test_030_playback_capture_file_normal(self):
-        '''playback the capture file and wait for it to finish'''
+        """playback the capture file and wait for it to finish"""
         assert playback_start("/tmp/playtest.cap", 100) == 0
         assert playback_wait() == 0
         rawdata = read_dict_session(PlaybackTests.http_ctid)
@@ -126,7 +126,7 @@ class PlaybackTests(unittest.TestCase):
         assert rawdata != ""
 
     def test_031_playback_capture_file_speedup(self):
-        '''playback the capture file and wait for it to finish'''
+        """playback the capture file and wait for it to finish"""
         assert playback_start("/tmp/playtest.cap", 200) == 0
         assert playback_wait() == 0
         rawdata = read_dict_session(PlaybackTests.http_ctid)
@@ -134,7 +134,7 @@ class PlaybackTests(unittest.TestCase):
         assert rawdata != ""
 
     def test_032_playback_capture_file_slowdown(self):
-        '''playback the capture file and wait for it to finish'''
+        """playback the capture file and wait for it to finish"""
         assert playback_start("/tmp/playtest.cap", 50) == 0
         assert playback_wait() == 0
         rawdata = read_dict_session(PlaybackTests.http_ctid)
@@ -142,7 +142,7 @@ class PlaybackTests(unittest.TestCase):
         assert rawdata != ""
 
     def test_040_check_http_classify(self):
-        '''check classify HTTP session details in the dictionary'''
+        """check classify HTTP session details in the dictionary"""
         assert playback_start("/tmp/playtest.cap", 0) == 0
         assert playback_wait() == 0
         rawdata = read_dict_session(PlaybackTests.http_ctid)
@@ -152,7 +152,7 @@ class PlaybackTests(unittest.TestCase):
         assert "field: application_protochain string: /IP/TCP/HTTP" in rawdata
 
     def test_041_check_https_geoip(self):
-        '''check HTTPS session geoip details in the dictionary'''
+        """check HTTPS session geoip details in the dictionary"""
         assert playback_start("/tmp/playtest.cap", 0) == 0
         assert playback_wait() == 0
         rawdata = read_dict_session(PlaybackTests.https_ctid)
@@ -160,7 +160,7 @@ class PlaybackTests(unittest.TestCase):
         assert "field: server_country string: JP" in rawdata
 
     def test_042_check_https_sni(self):
-        '''check HTTPS session sni details in the dictionary'''
+        """check HTTPS session sni details in the dictionary"""
         assert playback_start("/tmp/playtest.cap", 0) == 0
         assert playback_wait() == 0
         rawdata = read_dict_session(PlaybackTests.https_ctid)
@@ -168,14 +168,15 @@ class PlaybackTests(unittest.TestCase):
         assert "field: ssl_sni string: www.japan.go.jp" in rawdata
 
     def test_043_check_https_cert(self):
-        '''check HTTPS session cert details in the dictionary'''
+        """check HTTPS session cert details in the dictionary"""
         assert playback_start("/tmp/playtest.cap", 0) == 0
         assert playback_wait() == 0
         rawdata = read_dict_session(PlaybackTests.https_ctid)
         playback_cleanup()
         assert "field: certificate_subject_cn string: www.japan.go.jp" in rawdata
 
-    def finalTearDown(self):
+    def final_tear_down(self):
+        """final_tear_down"""
         playback_cleanup()
         packetd_traffic_resume()
 
