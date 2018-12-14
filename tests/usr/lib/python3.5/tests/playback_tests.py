@@ -34,9 +34,10 @@ def playback_wait():
     """wait on a playback to finish, returns 0 on success, 1 if timeout before 30 seconds"""
     counter = 0
     busy = 1
-    while busy != 0 and counter < 30:
+    end_time = time.time()+30
+    while busy != 0 and time.time() < end_time:
         counter += 1
-        time.sleep(1)
+        time.sleep(.05)
         check = subprocess.Popen(["curl", "http://localhost/api/warehouse/status"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         result = str(check.communicate()[0])
         if "IDLE" in result:
