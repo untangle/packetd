@@ -173,21 +173,21 @@ func authStatus(c *gin.Context) {
 }
 
 func getCredentials(username string) map[string]interface{} {
-	credentialsJSON := settings.GetSettings([]string{"admin", "credentials"})
+	credentialsJSON := settings.GetSettings([]string{"accounts", "credentials"})
 	if credentialsJSON == nil {
-		logger.Warn("Failed to read admin settings: %v\n", credentialsJSON)
+		logger.Warn("Failed to read accounts settings: %v\n", credentialsJSON)
 		return nil
 	}
 	credentialsSlice, ok := credentialsJSON.([]interface{})
 	if !ok {
-		logger.Warn("Invalid type of admin settings: %v %v\n", credentialsJSON, reflect.TypeOf(credentialsJSON))
+		logger.Warn("Invalid type of accounts settings: %v %v\n", credentialsJSON, reflect.TypeOf(credentialsJSON))
 		return nil
 	}
 
 	for _, json := range credentialsSlice {
 		cred, ok := json.(map[string]interface{})
 		if !ok {
-			logger.Warn("Invalid type of admin credentials settings: %v %v\n", json, reflect.TypeOf(json))
+			logger.Warn("Invalid type of accounts credentials settings: %v %v\n", json, reflect.TypeOf(json))
 			continue
 		}
 		if cred["username"] == username {
