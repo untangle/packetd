@@ -106,6 +106,8 @@ func main() {
 		logger.Debug("Memory TotalAlloc: %d\n", mem.TotalAlloc)
 		logger.Debug("Memory HeapAlloc: %d\n", mem.HeapAlloc)
 		logger.Debug("Memory HeapSys: %d\n", mem.HeapSys)
+
+		logger.Debug("Reports EventsLogged: %d\n", reports.EventsLogged)
 	}
 
 	if kernel.GetWarehouseFlag() == 'C' {

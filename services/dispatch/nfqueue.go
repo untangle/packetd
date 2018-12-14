@@ -134,8 +134,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			} else {
 				logger.Info("Ignoring mid-session packet: %s %d\n", mess.MsgTuple, ctid)
 				if mess.TCPLayer != nil {
-					logger.Info("TCP Layer SYN: %v\n", mess.TCPLayer.SYN)
-					logger.Info("TCP Layer FIN: %v\n", mess.TCPLayer.FIN)
+					logger.Info("TCP flags: [SYN: %v FIN: %v RST: %v ACK: %v]\n", mess.TCPLayer.SYN, mess.TCPLayer.FIN, mess.TCPLayer.RST, mess.TCPLayer.ACK)
 				}
 			}
 

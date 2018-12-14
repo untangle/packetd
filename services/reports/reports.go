@@ -84,6 +84,8 @@ var queries = make(map[uint64]*Query)
 var queryID uint64
 var eventQueue = make(chan Event, 1000)
 
+var EventsLogged = 0
+
 // Startup starts the reports service
 func Startup() {
 	var err error
@@ -225,6 +227,7 @@ func eventLogger() {
 			}
 		}
 		logger.Debug("Log Event: %s %v\n", summary, event.SQLOp)
+		EventsLogged++
 
 		if event.SQLOp == 1 {
 			logInsertEvent(event)
