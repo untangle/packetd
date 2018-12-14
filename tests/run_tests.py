@@ -166,13 +166,13 @@ def run_test_suite(suite):
 
     sys.stdout = logfile
     sys.stderr = logfile
-    if "initialSetUp" in dir(suite):
+    if "initial_setup" in dir(suite):
         try:
-            suite.initialSetUp(suite)
+            suite.initial_setup(suite)
         except Exception as e:
-            print("initialSetUp exception: ")
+            print("initial_setup exception: ")
             traceback.print_exc()
-            unittest.skip("initialSetUp exception: ")(suite)
+            unittest.skip("initial_setup exception: ")(suite)
     sys.stdout = orig_stdout
     sys.stderr = orig_stderr
 

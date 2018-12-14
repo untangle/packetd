@@ -91,7 +91,7 @@ class PlaybackTests(unittest.TestCase):
         """module_name unittest method"""
         return "playback"
 
-    def initialSetUp(self):
+    def initial_setup(self):
         """initial_setup unittest method"""
         packetd_traffic_bypass()
 

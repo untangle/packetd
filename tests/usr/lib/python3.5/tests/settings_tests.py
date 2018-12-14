@@ -53,7 +53,7 @@ class SettingsTests(unittest.TestCase):
         return "settings"
 
     @staticmethod
-    def initialSetUp(self):
+    def initial_setup(self):
         global initial_settings
         initial_settings = get_settings()
         pass

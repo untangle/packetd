@@ -12,7 +12,7 @@ class GeoipTests(unittest.TestCase):
         return "geoip"
 
     @staticmethod
-    def initialSetUp(self):
+    def initial_setup(self):
         subprocess.call("nft flush table inet test 2>/dev/null || true", shell=True)
         subprocess.call("nft add table inet test", shell=True)
         subprocess.call('nft add chain inet test filter-rules "{ type filter hook forward priority 0 ; }"', shell=True)

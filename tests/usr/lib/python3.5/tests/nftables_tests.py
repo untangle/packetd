@@ -15,7 +15,7 @@ class NftablesTests(unittest.TestCase):
         print()
     
     @staticmethod
-    def initialSetUp(self):
+    def initial_setup(self):
         pass
 
 

@@ -198,7 +198,7 @@ class ReportsTests(unittest.TestCase):
         """module_name unittest method"""
         return "settings"
 
-    def initialSetUp(self):
+    def initial_setup(self):
         """initial_setup unittest method"""
         pass
 
