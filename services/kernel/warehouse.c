@@ -111,6 +111,12 @@ void warehouse_playback(void)
 	// read the file header
 	found = fread(&fh,1,sizeof(fh),data);
 
+    // handle EOF
+    if (found == 0) {
+		fclose(data);
+		return;
+    }
+
 	// make sure we got a full header
 	if (found != sizeof(fh)) {
 		logmessage(LOG_WARNING,logsrc,"Invalid size reading file header %d\n",found);
