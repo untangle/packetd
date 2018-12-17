@@ -147,6 +147,12 @@ void warehouse_playback(void)
 	{
 		// read the packet header from the file
 		found = fread(&dh,1,sizeof(dh),data);
+
+        // EOF
+        if (found == 0) {
+            break;
+        }
+
 		if (found != sizeof(dh)) {
 			logmessage(LOG_WARNING,logsrc,"Invalid size reading packet header %d\n",found);
 			break;
