@@ -161,6 +161,7 @@ class DictTests(unittest.TestCase):
             add_entry("test_session", "1234", "field", itrstr, "string", "string")
             result = get_dict("test_session", "1234", "string")
             assert itrstr in result
+        delete_dict("test_session", "1234", "string")
 
     def load_test(self):
         """Tests saving a mac type value"""
@@ -179,6 +180,7 @@ class DictTests(unittest.TestCase):
         for t in threads:
             t.join()
         result = get_dict("test_session", "1234", "string")
+        delete_dict("test_session", "1234", "string")
         assert "load_test999" in result
 
     def final_tear_down(self):
