@@ -1,11 +1,19 @@
 package settings
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"os"
+	"os/exec"
 	"strconv"
+	"strings"
+
+	"github.com/untangle/packetd/services/logger"
 )
 
 const settingsFile = "/etc/config/settings.json"
@@ -79,7 +87,7 @@ func SetSettingsFile(segments []string, value interface{}, filename string) inte
 		return createJSONErrorObject(errors.New("Invalid global settings object"))
 	}
 
-	_, err = writeSettingsFileJSON(jsonSettings)
+	err = syncAndSave(jsonSettings, filename)
 	if err != nil {
 		return createJSONErrorObject(err)
 	}
@@ -107,20 +115,21 @@ func readSettingsFileJSON(filename string) (map[string]interface{}, error) {
 }
 
 // writeSettingsFileJSON writes the specified JSON object to the settings file
-func writeSettingsFileJSON(jsonObject map[string]interface{}) (bool, error) {
+func writeSettingsFileJSON(jsonObject map[string]interface{}, file *os.File) (bool, error) {
 	var err error
 
 	// Marshal it back to a string (with ident)
-	var jsonString []byte
-	jsonString, err = json.MarshalIndent(jsonObject, "", "  ")
+	var jsonBytes []byte
+	jsonBytes, err = json.MarshalIndent(jsonObject, "", "  ")
 	if err != nil {
 		return false, err
 	}
 
-	err = ioutil.WriteFile("/etc/config/settings.json", jsonString, 0644)
+	_, err = file.Write(jsonBytes)
 	if err != nil {
 		return false, err
 	}
+	file.Sync()
 
 	return true, nil
 }
@@ -250,7 +259,7 @@ func TrimSettingsFile(segments []string, filename string) interface{} {
 		}
 	}
 
-	_, err = writeSettingsFileJSON(jsonSettings)
+	err = syncAndSave(jsonSettings, filename)
 	if err != nil {
 		return createJSONErrorObject(err)
 	}
@@ -307,4 +316,66 @@ func getSettingsFromJSON(jsonObject interface{}, segments []string) (interface{}
 		}
 		return getSettingsFromJSON(newObject, newSegments)
 	}
+}
+
+// runSyncSettings runs sync-settings on the specified filename
+func runSyncSettings(filename string) (string, error) {
+	cmd := exec.Command("/usr/bin/sync-settings", "-o", "openwrt", "-f", filename)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	outStr, errStr := string(stdout.Bytes()), string(stderr.Bytes())
+	if err != nil {
+		logger.Warn("Failed to run sync-settings: %v\n", err.Error())
+		return outStr, errors.New(errStr)
+	}
+	return outStr, nil
+}
+
+// syncAndSave writes the jsonObject to a tmp file
+// calls sync-settings on the tmp file, and if the sync-settings returns 0
+// it copies the tmp file to the destination specified in filename
+// if sync-settings does not succeed it returns the error and output
+func syncAndSave(jsonObject map[string]interface{}, filename string) error {
+	tmpfile, err := ioutil.TempFile("", "settings.json.")
+	if err != nil {
+		logger.Warn("Failed to generate tmpfile: %v\n", err.Error())
+		return err
+	}
+	defer tmpfile.Close()
+
+	logger.Info("Writing settings to %v\n", tmpfile.Name())
+	_, syncError := writeSettingsFileJSON(jsonObject, tmpfile)
+	if syncError != nil {
+		logger.Warn("Failed to write settings file: %v\n", err.Error())
+		return err
+	}
+
+	stdout, err := runSyncSettings(tmpfile.Name())
+	scanner := bufio.NewScanner(strings.NewReader(stdout))
+	for scanner.Scan() {
+		logger.Info("sync-settings: %v\n", scanner.Text())
+	}
+	if err != nil {
+		logger.Warn("sync-settings return an error: %v\n", err.Error())
+		return err
+	}
+
+	logger.Info("Copy settings from %v to  %v\n", tmpfile.Name(), filename)
+	outfile, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer outfile.Close()
+
+	tmpfile.Seek(0, 0) // go back to start of file
+	_, err = io.Copy(outfile, tmpfile)
+	if err != nil {
+		logger.Warn("Failed to copy file: %v\n", err.Error())
+		return err
+	}
+
+	return nil
 }
