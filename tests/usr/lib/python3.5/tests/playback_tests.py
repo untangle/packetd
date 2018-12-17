@@ -139,8 +139,8 @@ class PlaybackTests(unittest.TestCase):
         fasttime = (endtime - begtime)
         calctime = (PlaybackTests.normtime / 2)
         print("FASTTIME:" + str(fasttime) + "  TARGET:" + str(calctime))
-        assert fasttime < calctime + 2
-        assert fasttime > calctime - 2
+        assert fasttime < calctime + 4
+        assert fasttime > calctime - 4
         rawdata = read_dict_session(PlaybackTests.http_ctid)
         playback_cleanup()
         assert rawdata != ""
@@ -154,8 +154,8 @@ class PlaybackTests(unittest.TestCase):
         slowtime = (endtime - begtime)
         calctime = (PlaybackTests.normtime * 2)
         print("SLOWTIME:" + str(slowtime) + "  TARGET:" + str(calctime))
-        assert slowtime < calctime + 2
-        assert slowtime > calctime - 2
+        assert slowtime < calctime + 4
+        assert slowtime > calctime - 4
         rawdata = read_dict_session(PlaybackTests.http_ctid)
         playback_cleanup()
         assert rawdata != ""
