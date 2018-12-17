@@ -2,6 +2,7 @@ import subprocess
 import unittest
 import json
 import sys
+import traceback
 import tests.test_registry as test_registry
 import sync.nftables_util as nftables_util
 
@@ -115,15 +116,17 @@ def create_conditions_test(conditions_json, expected_str):
         try:
             str = nftables_util.conditions_expression(conditions_json,"inet")
         except:
+            traceback.print_exc()
+            traceback.print_stack()
             if expected_str == None:
-                assert(True)
+                assert True
                 return
             else:
-                assert(False)
+                assert False
                 return
-        print(str)
-        print(expected_str)
-        assert(str == expected_str)
+        print("Actual   : " + str)
+        print("Expected : " + expected_str)
+        assert str == expected_str
     return do_test
 
 conditions_tests = [
@@ -173,6 +176,8 @@ conditions_tests = [
     [[{"type": "SOURCE_PORT","op":"==","value": "1234"}], None],
     [[{"type": "SOURCE_PORT","op":"==","value": "1234"}], None],
     [[{"type": "SOURCE_PORT","op":"==","value": "1234"}], None],
+    [[{"type": "SOURCE_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": 6}], "tcp sport '1234' ip protocol '6'"],
+    [[{"type": "SOURCE_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "6"}], "tcp sport '1234' ip protocol '6'"],
     [[{"type": "SOURCE_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp sport '1234' ip protocol 'tcp'"],
     [[{"type": "SOURCE_PORT","op":"!=","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp sport != '1234' ip protocol 'tcp'"],
     [[{"type": "SOURCE_PORT","op":"==","value": "1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp sport '1235-1236' ip protocol 'tcp'"],
@@ -183,6 +188,8 @@ conditions_tests = [
     [[{"type": "DESTINATION_PORT","op":"==","value": "1234"}], None],
     [[{"type": "DESTINATION_PORT","op":"==","value": "1234"}], None],
     [[{"type": "DESTINATION_PORT","op":"==","value": "1234"}], None],
+    [[{"type": "DESTINATION_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": 6}], "tcp dport '1234' ip protocol '6'"],
+    [[{"type": "DESTINATION_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "6"}], "tcp dport '1234' ip protocol '6'"],
     [[{"type": "DESTINATION_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp dport '1234' ip protocol 'tcp'"],
     [[{"type": "DESTINATION_PORT","op":"!=","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp dport != '1234' ip protocol 'tcp'"],
     [[{"type": "DESTINATION_PORT","op":"==","value": "1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp dport '1235-1236' ip protocol 'tcp'"],
