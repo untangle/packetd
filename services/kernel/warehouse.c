@@ -13,8 +13,8 @@
 
 const char		*logsrc = "warehouse";
 const char		*fileSignature = "UTPDCF";
-const int		majorVersion = 2;
-const int		minorVersion = 0;
+const uint		majorVersion = 2;
+const uint		minorVersion = 0;
 
 static FILE		*capfile = NULL;
 
