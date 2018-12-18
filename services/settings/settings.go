@@ -2,7 +2,6 @@ package settings
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +11,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/untangle/packetd/services/logger"
 )
@@ -87,12 +87,12 @@ func SetSettingsFile(segments []string, value interface{}, filename string) inte
 		return createJSONErrorObject(errors.New("Invalid global settings object"))
 	}
 
-	err = syncAndSave(jsonSettings, filename)
+	output, err := syncAndSave(jsonSettings, filename)
 	if err != nil {
-		return createJSONErrorObject(err)
+		return map[string]interface{}{"error": err.Error(), "output": output}
 	}
 
-	return createJSONObject("result", "OK")
+	return map[string]interface{}{"result": "OK", "output": output}
 }
 
 // readSettingsFileJSON reads the settings file and return the corresponding JSON object
@@ -259,12 +259,12 @@ func TrimSettingsFile(segments []string, filename string) interface{} {
 		}
 	}
 
-	err = syncAndSave(jsonSettings, filename)
+	output, err := syncAndSave(jsonSettings, filename)
 	if err != nil {
-		return createJSONErrorObject(err)
+		return map[string]interface{}{"error": err.Error(), "output": output}
 	}
 
-	return createJSONObject("result", "OK")
+	return map[string]interface{}{"result": "OK", "output": output}
 }
 
 // setSettingsInJSON sets the value attribute specified of the segments path to the specified value
@@ -321,28 +321,35 @@ func getSettingsFromJSON(jsonObject interface{}, segments []string) (interface{}
 // runSyncSettings runs sync-settings on the specified filename
 func runSyncSettings(filename string) (string, error) {
 	cmd := exec.Command("/usr/bin/sync-settings", "-o", "openwrt", "-f", filename)
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	outStr, errStr := string(stdout.Bytes()), string(stderr.Bytes())
+	outbytes, err := cmd.CombinedOutput()
+	output := string(outbytes)
 	if err != nil {
+		// if just a non-zero exit code, just use standard language
+		// otherwise use the real error message
+		if exiterr, ok := err.(*exec.ExitError); ok {
+			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+				if status.ExitStatus() != 0 {
+					logger.Warn("Failed to run sync-settings: %v\n", err.Error())
+					return output, errors.New("Failed to save settings")
+				}
+			}
+		}
 		logger.Warn("Failed to run sync-settings: %v\n", err.Error())
-		return outStr, errors.New(errStr)
+		return output, err
 	}
-	return outStr, nil
+	return output, nil
 }
 
 // syncAndSave writes the jsonObject to a tmp file
 // calls sync-settings on the tmp file, and if the sync-settings returns 0
 // it copies the tmp file to the destination specified in filename
 // if sync-settings does not succeed it returns the error and output
-func syncAndSave(jsonObject map[string]interface{}, filename string) error {
+// returns stdout, stderr, and an error
+func syncAndSave(jsonObject map[string]interface{}, filename string) (string, error) {
 	tmpfile, err := ioutil.TempFile("", "settings.json.")
 	if err != nil {
 		logger.Warn("Failed to generate tmpfile: %v\n", err.Error())
-		return err
+		return "Failed to generate tmpfile.", err
 	}
 	defer tmpfile.Close()
 
@@ -350,23 +357,23 @@ func syncAndSave(jsonObject map[string]interface{}, filename string) error {
 	_, syncError := writeSettingsFileJSON(jsonObject, tmpfile)
 	if syncError != nil {
 		logger.Warn("Failed to write settings file: %v\n", err.Error())
-		return err
+		return "Failed to write settings.", err
 	}
 
-	stdout, err := runSyncSettings(tmpfile.Name())
-	scanner := bufio.NewScanner(strings.NewReader(stdout))
+	output, err := runSyncSettings(tmpfile.Name())
+	scanner := bufio.NewScanner(strings.NewReader(output))
 	for scanner.Scan() {
 		logger.Info("sync-settings: %v\n", scanner.Text())
 	}
 	if err != nil {
 		logger.Warn("sync-settings return an error: %v\n", err.Error())
-		return err
+		return output, err
 	}
 
 	logger.Info("Copy settings from %v to  %v\n", tmpfile.Name(), filename)
 	outfile, err := os.Create(filename)
 	if err != nil {
-		return err
+		return output, err
 	}
 	defer outfile.Close()
 
@@ -374,8 +381,8 @@ func syncAndSave(jsonObject map[string]interface{}, filename string) error {
 	_, err = io.Copy(outfile, tmpfile)
 	if err != nil {
 		logger.Warn("Failed to copy file: %v\n", err.Error())
-		return err
+		return output, err
 	}
 
-	return nil
+	return output, nil
 }
