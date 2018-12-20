@@ -94,12 +94,17 @@ class PlaybackTests(unittest.TestCase):
 
     play_file_name = "playtest.cap"
     play_file_hash = "f8388c823679da7db0a4cb7856bf717c".encode('UTF-8')
+
     hint_file_name = "dnshint.cap"
     hint_file_hash = "33e7c4182a233ad689811467a4d92608".encode('UTF-8')
 
-    https_ctid = "4073347072"   # session traffic for wget https://www.japan.go.jp
-    http_ctid = "4073346816"    # session traffic for wget http://www.neverssl.com
+    revd_file_name = "dnsreverse.cap"
+    revd_file_hash = "be323000b89a2b6c29591832c895c850".encode('UTF-8')
+
+    https_ctid = "4073347072"
+    http_ctid = "4073346816"
     hint_ctid = "4107412992"
+    revd_ctid = "4107413760"
     normtime = 0.0
 
     @staticmethod
@@ -206,6 +211,14 @@ class PlaybackTests(unittest.TestCase):
         rawdata = read_dict_session(PlaybackTests.hint_ctid)
         playback_cleanup()
         assert "field: server_dns_hint string: www.yahoo.com" in rawdata
+
+    def test_050_check_dns_reverse(self):
+        """check for reverse DNS in the dictionary"""
+        assert playback_start(PlaybackTests.revd_file_name, PlaybackTests.revd_file_hash, 0) == 0
+        assert playback_wait() == 0
+        rawdata = read_dict_session(PlaybackTests.revd_ctid)
+        playback_cleanup()
+        assert "field: server_reverse_dns string: google-public-dns-a.google.com" in rawdata
 
     def final_tear_down(self):
         """final_tear_down"""
