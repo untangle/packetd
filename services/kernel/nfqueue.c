@@ -111,7 +111,9 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
     }
 
 	if (get_warehouse_flag() == 'C') warehouse_capture('Q',rawpkt,rawlen,mark,ctid,nfid);
-    if (get_bypass_flag() == 0) go_nfqueue_callback(mark,rawpkt,rawlen,ctid,nfid,buffer,0);
+
+	if (get_bypass_flag() == 0) go_nfqueue_callback(mark,rawpkt,rawlen,ctid,nfid,buffer,0);
+	else nfqueue_set_verdict(nfid, NF_ACCEPT);
 
 	return(0);
 }
@@ -123,7 +125,7 @@ int nfqueue_set_verdict(uint32_t nfid, uint32_t verdict)
 
 	int ret = nfq_set_verdict(nfqqh,nfid,verdict,0,NULL);
     if (ret < 1) {
-        logmessage(LOG_ERR,logsrc,"nfq_set_verdict2(): %s\n",strerror(errno));
+        logmessage(LOG_ERR,logsrc,"nfq_set_verdict(): %s\n",strerror(errno));
     }
 
     return ret;
