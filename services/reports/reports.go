@@ -441,9 +441,9 @@ func createTables() {
 		`CREATE TABLE IF NOT EXISTS session_minutes (
                      session_id int8 NOT NULL,
                      time_stamp bigint NOT NULL,
-                     c2s_bytes int,
-                     s2c_bytes int,
-                     bytes int)`)
+                     c2s_bytes int4,
+                     s2c_bytes int4,
+                     bytes int4)`)
 
 	if err != nil {
 		logger.Err("Failed to create table: %s\n", err.Error())
