@@ -105,6 +105,11 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 				// something has gone wrong
 				logger.Err("Conntrack ID mismatch: %s  %d != %d\n", session.ClientSideTuple.String(), ctid, session.ConntrackID)
 			}
+			if !session.ClientSideTuple.Equal(conntrackEntry.ClientSideTuple) {
+				// We found a session, but the tuple is not what we expect.
+				// something has gone wrong
+				logger.Err("Conntrack tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
+			}
 
 			session.ServerSideTuple.Protocol = protocol
 			session.ServerSideTuple.ClientAddress = dupIP(clientNew)
