@@ -58,28 +58,50 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 
 	// handle DELETE events
 	if eventType == 'D' {
-
 		// do not call subscribers for ID's we don't know about
 		if conntrackFound == false {
 			logger.Debug("Received conntrack delete for unknown id %d\n", ctid)
 			return
 		}
 
-		removeSessionEntry(ctid)
+		var clientSideTuple Tuple
+		clientSideTuple.Protocol = protocol
+		clientSideTuple.ClientAddress = dupIP(client)
+		clientSideTuple.ClientPort = clientPort
+		clientSideTuple.ServerAddress = dupIP(server)
+		clientSideTuple.ServerPort = serverPort
+
+		if !clientSideTuple.Equal(conntrackEntry.ClientSideTuple) {
+			// We found a session, but the tuple is not what we expect.
+			// something has gone wrong
+			logger.Err("Conntrack DELETE tuple mismatch: %v  %s != %s\n", ctid, clientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
+			return
+		}
 		removeConntrackEntry(ctid)
+
+		// look for the session entry
+		session := findSessionEntry(ctid)
+		if session != conntrackEntry.Session {
+			logger.Err("Conntrack DELETE session mismatch: %v  %v != %s\n", ctid, session, conntrackEntry.Session)
+			return
+		}
+
+		if session != nil {
+			if !clientSideTuple.Equal(session.ClientSideTuple) {
+				logger.Err("Conntrack DELETE session tuple mismatch: %v  %s != %s\n", ctid, clientSideTuple.String(), session.ClientSideTuple.String())
+				return
+			}
+			removeSessionEntry(ctid)
+		}
 	}
 
 	// handle NEW events
 	if eventType == 'N' {
 
-		if conntrackFound == true {
-			logger.Warn("Received conntract new for existing id %d\n", ctid)
-		}
-
+		origConntrackEntry := conntrackEntry
 		conntrackEntry = new(ConntrackEntry)
 		conntrackEntry.ConntrackID = ctid
 		conntrackEntry.ConnMark = connmark
-		conntrackEntry.SessionID = nextSessionID()
 		conntrackEntry.CreationTime = time.Now()
 		conntrackEntry.LastActivityTime = time.Now()
 		conntrackEntry.EventCount = 1
@@ -97,18 +119,42 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		// look for the session entry
 		session := findSessionEntry(ctid)
 
+		// if this is a NEW event, and we already had a conntrackEntry for this ctid
+		// something has gone wrong
+		if conntrackFound == true {
+			logger.Err("Received conntract NEW event for existing ctid %d\n", ctid)
+			logger.Err("Old vs New %v %v\n", origConntrackEntry.ClientSideTuple, conntrackEntry.ClientSideTuple)
+			logger.Err("Old conntrackEntry:\n")
+			logger.Err("Creation Time: %v ago\n", time.Now().Sub(origConntrackEntry.CreationTime))
+			logger.Err("Last Activity Time: %v ago\n", time.Now().Sub(origConntrackEntry.LastActivityTime))
+			logger.Err("Conntrack ID: %v\n", origConntrackEntry.SessionID)
+			if session != nil {
+				logger.Err("Session Tuple: %v %v\n", session.ClientSideTuple, session.ServerSideTuple)
+				logger.Err("Session ID: %v\n", session.SessionID)
+			}
+			return
+		}
+
 		// if we find the session entry update with the server side tuple and
 		// create another index for the session using the server side tuple
 		if session != nil {
 			if session.ConntrackID != ctid {
 				// We found a session, if its conntrackID does not match the one of the event
 				// something has gone wrong
-				logger.Err("Conntrack ID mismatch: %s  %d != %d\n", session.ClientSideTuple.String(), ctid, session.ConntrackID)
+				logger.Err("Conntrack NEW ID mismatch: %s  %d != %d\n", session.ClientSideTuple.String(), ctid, session.ConntrackID)
+				return
+			}
+			if session.ConntrackConfirmed {
+				// if the session we found is already conntrack confirmed
+				// something has gone wrong
+				logger.Err("Conntrack NEW for confirmed session: %v %v %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
+				return
 			}
 			if !session.ClientSideTuple.Equal(conntrackEntry.ClientSideTuple) {
 				// We found a session, but the tuple is not what we expect.
 				// something has gone wrong
-				logger.Err("Conntrack tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
+				logger.Err("Conntrack NEW tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
+				return
 			}
 
 			session.ServerSideTuple.Protocol = protocol
@@ -117,9 +163,13 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			session.ServerSideTuple.ServerAddress = dupIP(serverNew)
 			session.ServerSideTuple.ServerPort = serverPortNew
 			session.ConntrackConfirmed = true
+			session.ConntrackEntry = conntrackEntry
 			session.LastActivityTime = time.Now()
 			session.EventCount++
 			conntrackEntry.Session = session
+			conntrackEntry.SessionID = session.SessionID
+		} else {
+			conntrackEntry.SessionID = nextSessionID()
 		}
 
 		insertConntrackEntry(ctid, conntrackEntry)

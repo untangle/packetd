@@ -35,6 +35,9 @@ type SessionEntry struct {
 	// Packets that never reach this point (blocked packets) often never get confirmed
 	ConntrackConfirmed bool
 
+	// The conntrack entry associated with this session
+	ConntrackEntry *ConntrackEntry
+
 	// PacketdCount stores the number of packets queued to packetd for this session
 	PacketCount uint64
 
