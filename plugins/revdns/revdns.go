@@ -19,6 +19,8 @@ type ReverseHolder struct {
 }
 
 const pluginName = "revdns"
+const clientSuffix = "_client"
+const serverSuffix = "_server"
 const reverseTimeout = 3600
 
 var shutdownChannel = make(chan bool)
@@ -32,8 +34,8 @@ func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
 	reverseTable = make(map[string]*ReverseHolder)
 	go cleanupTask()
-	dispatch.InsertNfqueueSubscription(pluginName+"_client", 2, PluginNfqueueClientHandler)
-	dispatch.InsertNfqueueSubscription(pluginName+"_server", 2, PluginNfqueueServerHandler)
+	dispatch.InsertNfqueueSubscription(pluginName+clientSuffix, 2, PluginNfqueueClientHandler)
+	dispatch.InsertNfqueueSubscription(pluginName+serverSuffix, 2, PluginNfqueueServerHandler)
 }
 
 // PluginShutdown function called when the daemon is shutting down.
@@ -48,11 +50,11 @@ func PluginShutdown() {
 // store them in the cache.
 func PluginNfqueueClientHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	result.Owner = pluginName
+	result.Owner = pluginName + clientSuffix
 	result.SessionRelease = true
 
 	// release immediately as we only care about the first packet
-	dispatch.ReleaseSession(mess.Session, pluginName)
+	dispatch.ReleaseSession(mess.Session, pluginName+clientSuffix)
 
 	if !newSession {
 		return result
@@ -118,11 +120,11 @@ func PluginNfqueueClientHandler(mess dispatch.NfqueueMessage, ctid uint32, newSe
 // store them in the cache.
 func PluginNfqueueServerHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	result.Owner = pluginName
+	result.Owner = pluginName + serverSuffix
 	result.SessionRelease = true
 
 	// release immediately as we only care about the first packet
-	dispatch.ReleaseSession(mess.Session, pluginName)
+	dispatch.ReleaseSession(mess.Session, pluginName+serverSuffix)
 
 	if !newSession {
 		return result
