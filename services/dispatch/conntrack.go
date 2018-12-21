@@ -110,24 +110,36 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		conntrackEntry.ServerSideTuple.ServerAddress = dupIP(serverNew)
 		conntrackEntry.ServerSideTuple.ServerPort = serverPortNew
 
-		// look for the session entry
-		session := findSessionEntry(ctid)
-
 		// if this is a NEW event, and we already had a conntrackEntry for this ctid
 		// something has gone wrong
 		if conntrackFound == true {
 			logger.Err("Received conntract NEW event for existing ctid %d\n", ctid)
-			logger.Err("Old vs New %v %v\n", origConntrackEntry.ClientSideTuple, conntrackEntry.ClientSideTuple)
-			logger.Err("Old conntrackEntry:\n")
-			logger.Err("Creation Time: %v ago\n", time.Now().Sub(origConntrackEntry.CreationTime))
-			logger.Err("Last Activity Time: %v ago\n", time.Now().Sub(origConntrackEntry.LastActivityTime))
-			logger.Err("Conntrack ID: %v\n", origConntrackEntry.SessionID)
-			if session != nil {
-				logger.Err("Session Tuple: %v %v\n", session.ClientSideTuple, session.ServerSideTuple)
-				logger.Err("Session ID: %v\n", session.SessionID)
+			logger.Err("New:\n")
+			logger.Err("ClientSideTuple: %v\n", conntrackEntry.ClientSideTuple)
+			logger.Err("ServerSideTuple: %v\n", conntrackEntry.ServerSideTuple)
+			logger.Err("Old:\n")
+			logger.Err("ClientSideTuple: %v\n", origConntrackEntry.ClientSideTuple)
+			logger.Err("ServerSideTuple: %v\n", origConntrackEntry.ServerSideTuple)
+			logger.Err("CreationTime: %v ago\n", time.Now().Sub(origConntrackEntry.CreationTime))
+			logger.Err("LastActivityTime: %v ago\n", time.Now().Sub(origConntrackEntry.LastActivityTime))
+			logger.Err("ConntrackID: %v\n", origConntrackEntry.ConntrackID)
+			logger.Err("SessionID: %v\n", origConntrackEntry.SessionID)
+			if origConntrackEntry.Session != nil {
+				logger.Err("Session ClientSideTuple: %v\n", origConntrackEntry.Session.ClientSideTuple)
+				logger.Err("Session ServerSideTuple: %v\n", origConntrackEntry.Session.ServerSideTuple)
+				logger.Err("Session SessionID: %v\n", origConntrackEntry.Session.SessionID)
 			}
-			return
+
+			// remove the old entry as if we got a delete event
+			removeConntrackEntry(ctid)
+			if origConntrackEntry.Session != nil {
+				removeSessionEntrySpecific(origConntrackEntry.Session)
+			}
+			conntrackFound = false
 		}
+
+		// look for the session entry
+		session := findSessionEntry(ctid)
 
 		// Do some sanity checks on the session we just found
 		if session != nil {
