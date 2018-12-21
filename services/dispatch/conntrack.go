@@ -302,6 +302,7 @@ func removeConntrackEntry(finder uint32) {
 // cleanConntrackTable cleans the conntrack table by removing stale entries
 func cleanConntrackTable() {
 	nowtime := time.Now()
+	conntrackTableMutex.Lock()
 	for key, val := range conntrackTable {
 		if (nowtime.Unix() - val.LastActivityTime.Unix()) < 1800 {
 			continue
@@ -315,4 +316,6 @@ func cleanConntrackTable() {
 		logger.Err("Removing stale conntrack entry %d: %v\n", key, val)
 		removeConntrackEntry(key)
 	}
+	conntrackTableMutex.Unlock()
+
 }
