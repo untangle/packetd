@@ -80,21 +80,6 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			return
 		}
 		removeConntrackEntry(ctid)
-
-		// look for the session entry
-		session := findSessionEntry(ctid)
-		if session != conntrackEntry.Session {
-			logger.Err("Conntrack DELETE session mismatch: %v  %v != %s\n", ctid, session, conntrackEntry.Session)
-			return
-		}
-
-		if session != nil {
-			if !clientSideTuple.Equal(session.ClientSideTuple) {
-				logger.Err("Conntrack DELETE session tuple mismatch: %v  %s != %s\n", ctid, clientSideTuple.String(), session.ClientSideTuple.String())
-				return
-			}
-			removeSessionEntry(ctid)
-		}
 	}
 
 	// handle NEW events
