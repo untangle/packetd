@@ -80,24 +80,12 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			return
 		}
 		removeConntrackEntry(ctid)
+
 		// We only want to remove the specific session
 		// There is a race, we may get this DELETE event after the ctid has been reused by a new session
-		// and we don't want to remove that mapping from the table
+		// and we don't want to remove that mapping from the session table
 		if conntrackEntry.Session != nil {
 			removeSessionEntrySpecific(ctid, conntrackEntry.Session)
-		}
-
-		// This is just a sanity check so that we print something
-		// when we lose the race condition
-		session := findSessionEntry(ctid)
-		if session != nil {
-			logger.Warn("Conntrack DELETE session tuple mismatch: %v\n", ctid)
-			logger.Warn("Conntrack ClientSideTuple: %s\n", conntrackEntry.ClientSideTuple.String())
-			logger.Warn("Conntrack ServerSideTuple: %s\n", conntrackEntry.ServerSideTuple.String())
-			logger.Warn("Session ClientSideTuple:   %s\n", session.ClientSideTuple.String())
-			logger.Warn("Session ServerSideTuple:   %s\n", session.ServerSideTuple.String())
-			logger.Warn("Session CreationTime: %v\n", time.Now().Sub(session.CreationTime))
-			logger.Warn("Session LastActivityTime: %v\n", time.Now().Sub(session.LastActivityTime))
 		}
 	}
 

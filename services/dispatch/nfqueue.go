@@ -158,32 +158,21 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 				// in this case, we don't count it as a new session, just reuse the old one
 				newSession = false
 			} else {
-				// If this is a new session and a session was found, it may have just been an aborted session
-				// (The first packet was dropped before conntrack confirm)
-				// In this case, just drop the old session. However, if the old session was conntrack confirmed
-				// something is not correct.
-				if session.ConntrackConfirmed {
-					logger.Err("Conflicting session tuple [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
-					logger.Err("Packet Tuple: %v\n", mess.MsgTuple)
-					logger.Err("Previous Session Information:\n")
-					logger.Err("ClientSideTuple: %v\n", session.ClientSideTuple)
-					logger.Err("ServerSideTuple: %v\n", session.ServerSideTuple)
-					logger.Err("CreationTime: %v ago\n", time.Now().Sub(session.CreationTime))
-					logger.Err("LastActivityTime: %v ago\n", time.Now().Sub(session.LastActivityTime))
-					logger.Err("Packets: %v\n", session.PacketCount)
-					logger.Err("Bytes: %v\n", session.ByteCount)
-					logger.Err("Events: %v\n", session.EventCount)
-					if session.ConntrackEntry != nil {
-						logger.Err("Conntrack ID: %v\n", session.ConntrackEntry.ConntrackID)
-						logger.Err("Conntrack ClientSideTuple: %v\n", session.ConntrackEntry.ClientSideTuple)
-						logger.Err("Conntrack ServerSideTuple: %v\n", session.ConntrackEntry.ServerSideTuple)
-						logger.Err("Conntrack CreationTime: %v\n", time.Now().Sub(session.ConntrackEntry.CreationTime))
-						logger.Err("Conntrack LastActivityTime: %v\n", time.Now().Sub(session.ConntrackEntry.LastActivityTime))
-					}
-				} else {
-					logger.Debug("Conflicting session tuple [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
-				}
+				// the packet tuple does not match the session tuple
+				// this happens in several cases:
 
+				// 1) This is actually a different session with the same ctid
+				// the previous session/ctid never reached the conntrack confirmed state
+				// either because it was dropped or it got merged with another conntrack id
+				// either way - this new session is the official session of the ctid and the old one is dead
+
+				// 2) This is a new session/ctid that is being reused for a session
+				// that has just died but we have not yet processed a the conntrack event
+				// nothing guarantees that we get the conntrack DELETE event before ctid gets reused in a new session
+				// in this case we can also just delete the old mapping from the session table, but leave
+				// it in the conntrack table for the conntrack handle to handle
+
+				logger.Debug("Conflicting session [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
 				removeSessionEntry(ctid)
 				session = createSessionEntry(mess, ctid)
 				mess.Session = session
