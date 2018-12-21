@@ -16,6 +16,8 @@ static int		g_shutdown = 0;
 static int		g_bypass = 0;
 static int		g_debug = 0;
 
+static char		*logsrc = "common";
+
 char* itolevel(int value,char *dest)
 {
 	if (value == LOG_EMERG)		return(strcpy(dest,"EMERGENCY"));
@@ -61,6 +63,12 @@ void hexmessage(int priority,const char *source,const void *buffer,int size)
 	if ((priority == LOG_DEBUG) && (g_debug == 0)) return;
 
 	message = (char *)malloc((size * 3) + 4);
+
+	if (message == NULL ) {
+		logmessage(LOG_ERR,logsrc,"Unable to allocate memory for message\n");
+		return;
+	}
+
 	data = (const unsigned char *)buffer;
 
 	for (x = 0;x < size;x++) {
@@ -82,6 +90,7 @@ int get_shutdown_flag(void)
 
 void set_shutdown_flag(int value)
 {
+	logmessage(LOG_INFO,logsrc,"The shutdown flag has been set: %d\n", value);
 	g_shutdown = value;
 }
 

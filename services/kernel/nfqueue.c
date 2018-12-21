@@ -269,6 +269,12 @@ int nfqueue_thread(void)
 		// allocate a buffer to hold the packet
 		buffer = (char *)malloc(cfg_net_buffer);
 
+		if (buffer == NULL) {
+			logmessage(LOG_ERR,logsrc,"Unable to allocate memory for packet\n");
+			set_shutdown_flag(1);
+			break;
+		}
+
         // read from the nfqueue socket
         ret = recv(netsock,buffer,cfg_net_buffer,MSG_DONTWAIT);
 

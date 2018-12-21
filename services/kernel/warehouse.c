@@ -166,6 +166,12 @@ void warehouse_playback(void)
 
 		// allocate a buffer for the data and set the convenience pointers
 		buffer = malloc(dh.length);
+
+		if (buffer == NULL) {
+			logmessage(LOG_ERR,logsrc,"Unable to allocate memory for playback\n");
+			break;
+		}
+
 		ctptr = (struct conntrack_info *)buffer;
 		nlptr = (struct netlogger_info *)buffer;
 
