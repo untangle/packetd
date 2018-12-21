@@ -164,6 +164,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 				// something is not correct.
 				if session.ConntrackConfirmed {
 					logger.Err("Conflicting session tuple [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
+					logger.Err("Packet Tuple: %v\n", mess.MsgTuple)
 					logger.Err("Previous session Information:\n")
 					logger.Err("CTuple: %v\n", session.ClientSideTuple)
 					logger.Err("STuple: %v\n", session.ServerSideTuple)
