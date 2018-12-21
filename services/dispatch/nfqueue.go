@@ -165,9 +165,9 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 				if session.ConntrackConfirmed {
 					logger.Err("Conflicting session tuple [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
 					logger.Err("Packet Tuple: %v\n", mess.MsgTuple)
-					logger.Err("Previous session Information:\n")
-					logger.Err("CTuple: %v\n", session.ClientSideTuple)
-					logger.Err("STuple: %v\n", session.ServerSideTuple)
+					logger.Err("Previous Session Information:\n")
+					logger.Err("ClientSideTuple: %v\n", session.ClientSideTuple)
+					logger.Err("ServerSideTuple: %v\n", session.ServerSideTuple)
 					logger.Err("CreationTime: %v ago\n", time.Now().Sub(session.CreationTime))
 					logger.Err("LastActivityTime: %v ago\n", time.Now().Sub(session.LastActivityTime))
 					logger.Err("Packets: %v\n", session.PacketCount)
@@ -175,9 +175,9 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 					logger.Err("Events: %v\n", session.EventCount)
 					if session.ConntrackEntry != nil {
 						logger.Err("Conntrack ID: %v\n", session.ConntrackEntry.ConntrackID)
-						logger.Err("Conntrack CTuple: %v\n", session.ConntrackEntry.ClientSideTuple)
-						logger.Err("Conntrack STuple: %v\n", session.ConntrackEntry.ServerSideTuple)
-						logger.Err("Conntrack Creation Time: %v\n", time.Now().Sub(session.ConntrackEntry.CreationTime))
+						logger.Err("Conntrack ClientSideTuple: %v\n", session.ConntrackEntry.ClientSideTuple)
+						logger.Err("Conntrack ServerSideTuple: %v\n", session.ConntrackEntry.ServerSideTuple)
+						logger.Err("Conntrack CreationTime: %v\n", time.Now().Sub(session.ConntrackEntry.CreationTime))
 						logger.Err("Conntrack LastActivityTime: %v\n", time.Now().Sub(session.ConntrackEntry.LastActivityTime))
 					}
 				} else {

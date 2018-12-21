@@ -114,10 +114,10 @@ func nextSessionID() uint64 {
 }
 
 // findSessionEntry searches for an entry in the session table
-func findSessionEntry(finder uint32) *SessionEntry {
+func findSessionEntry(ctid uint32) *SessionEntry {
 	sessionMutex.Lock()
-	entry, status := sessionTable[finder]
-	logger.Trace("Lookup session index %v -> %v\n", finder, status)
+	entry, status := sessionTable[ctid]
+	logger.Trace("Lookup session index %v -> %v\n", ctid, status)
 	sessionMutex.Unlock()
 	if status == false {
 		return nil
@@ -126,33 +126,47 @@ func findSessionEntry(finder uint32) *SessionEntry {
 }
 
 // insertSessionEntry adds an entry to the session table
-func insertSessionEntry(finder uint32, entry *SessionEntry) {
-	logger.Trace("Insert session index %v -> %v\n", finder, entry.ClientSideTuple)
+func insertSessionEntry(ctid uint32, entry *SessionEntry) {
+	logger.Trace("Insert session index %v -> %v\n", ctid, entry.ClientSideTuple)
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
-	if sessionTable[finder] != nil {
-		delete(sessionTable, finder)
+	if sessionTable[ctid] != nil {
+		delete(sessionTable, ctid)
 	}
-	sessionTable[finder] = entry
+	sessionTable[ctid] = entry
 	dict.AddSessionEntry(entry.ConntrackID, "session_id", entry.SessionID)
 }
 
 // removeSessionEntry removes an entry from the session table
-func removeSessionEntry(finder uint32) {
-	logger.Trace("Remove session index %v\n", finder)
+// of the specified ctid
+func removeSessionEntry(ctid uint32) {
+	logger.Trace("Remove session index %v\n", ctid)
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
-	entry, status := sessionTable[finder]
+	entry, status := sessionTable[ctid]
 	if status {
 		dict.DeleteSession(entry.ConntrackID)
 	}
-	delete(sessionTable, finder)
+	delete(sessionTable, ctid)
+}
+
+// removeSessionEntrySpecific removes an entry from the session table
+// of the specified ctid if its mapped to the specified sess
+func removeSessionEntrySpecific(ctid uint32, sess *SessionEntry) {
+	logger.Trace("Remove session index %v\n", ctid)
+	sessionMutex.Lock()
+	defer sessionMutex.Unlock()
+	entry, status := sessionTable[ctid]
+	if entry == sess {
+		if status {
+			dict.DeleteSession(entry.ConntrackID)
+		}
+		delete(sessionTable, ctid)
+	}
 }
 
 // cleanSessionTable cleans the session table by removing stale entries
 func cleanSessionTable() {
-	nowtime := time.Now()
-
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
 
@@ -161,7 +175,7 @@ func cleanSessionTable() {
 		// Their conntracks never get confirmed and thus there is never a delete conntrack event
 		// These sessions will hang in the table around and get cleaned up here.
 		// However, if we find a a stale conntrack-confirmed session.
-		if (nowtime.Unix() - session.LastActivityTime.Unix()) > 600 {
+		if time.Now().Sub(session.LastActivityTime) > 600*time.Second {
 			if session.ConntrackConfirmed {
 				logger.Err("Removing stale (%v) session entry [%v] %v\n", time.Now().Sub(session.LastActivityTime), key, session.ClientSideTuple)
 			}

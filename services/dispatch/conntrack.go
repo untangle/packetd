@@ -80,13 +80,24 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			return
 		}
 		removeConntrackEntry(ctid)
+		// We only want to remove the specific session
+		// There is a race, we may get this DELETE event after the ctid has been reused by a new session
+		// and we don't want to remove that mapping from the table
+		if conntrackEntry.Session != nil {
+			removeSessionEntrySpecific(ctid, conntrackEntry.Session)
+		}
+
+		// This is just a sanity check so that we print something
+		// when we lose the race condition
 		session := findSessionEntry(ctid)
 		if session != nil {
-			if session.ConntrackEntry == conntrackEntry {
-				removeSessionEntry(ctid)
-			} else {
-				logger.Warn("Conntrack DELETE session tuple mismatch: %v  %s != %s\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
-			}
+			logger.Warn("Conntrack DELETE session tuple mismatch: %v\n", ctid)
+			logger.Warn("Conntrack ClientSideTuple: %s\n", conntrackEntry.ClientSideTuple.String())
+			logger.Warn("Conntrack ServerSideTuple: %s\n", conntrackEntry.ServerSideTuple.String())
+			logger.Warn("Session ClientSideTuple:   %s\n", session.ClientSideTuple.String())
+			logger.Warn("Session ServerSideTuple:   %s\n", session.ServerSideTuple.String())
+			logger.Warn("Session CreationTime: %v\n", time.Now().Sub(session.CreationTime))
+			logger.Warn("Session LastActivityTime: %v\n", time.Now().Sub(session.LastActivityTime))
 		}
 	}
 
@@ -157,7 +168,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 				}
 
 				logger.Debug("Conntrack NEW tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
-				removeSessionEntry(ctid)
+				removeSessionEntrySpecific(ctid, session)
 				session = nil
 			}
 		}
@@ -301,22 +312,19 @@ func removeConntrackEntry(finder uint32) {
 
 // cleanConntrackTable cleans the conntrack table by removing stale entries
 func cleanConntrackTable() {
-	nowtime := time.Now()
-
 	conntrackTableMutex.Lock()
 	defer conntrackTableMutex.Unlock()
 
 	for key, val := range conntrackTable {
-		if (nowtime.Unix() - val.LastActivityTime.Unix()) < 1800 {
-			continue
+		if time.Now().Sub(val.LastActivityTime) > 1800*time.Second {
+			// This should never happen, log an error
+			// entries should be removed by DELETE events
+			// otherwise they should be getting UPDATE events and the LastActivityTime
+			// would be at least within 60 seconds.
+			// The the entry exists, the LastActivityTime is a long time ago
+			// some constraint has failed
+			logger.Err("Removing stale (%v) conntrack entry [%d] %v\n", key, val.ClientSideTuple, time.Now().Sub(val.LastActivityTime))
+			removeConntrackEntry(key)
 		}
-		// This should never happen, log an error
-		// entries should be removed by DELETE events
-		// otherwise they should be getting UPDATE events and the LastActivityTime
-		// would be at least within 60 seconds.
-		// The the entry exists, the LastActivityTime is a long time ago
-		// some constraint has failed
-		logger.Err("Removing stale (%v) conntrack entry [%d] %v\n", key, val.ClientSideTuple, time.Now().Sub(val.LastActivityTime))
-		removeConntrackEntry(key)
 	}
 }
