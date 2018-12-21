@@ -54,7 +54,9 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 	// start by looking for the existing conntrack entry
 	conntrackEntry, conntrackFound = findConntrackEntry(ctid)
 
-	logger.Trace("conntrack event[%c]: %v 0x%08x\n", eventType, ctid, connmark)
+	if logger.IsTraceEnabled() {
+		logger.Trace("conntrack event[%c]: %v %v:%v->%v:%v\n", eventType, ctid, client, clientPort, server, serverPort)
+	}
 
 	// handle DELETE events
 	if eventType == 'D' {
