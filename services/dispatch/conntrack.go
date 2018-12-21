@@ -316,7 +316,7 @@ func cleanConntrackTable() {
 		// would be at least within 60 seconds.
 		// The the entry exists, the LastActivityTime is a long time ago
 		// some constraint has failed
-		logger.Err("Removing stale conntrack entry %d: %v\n", key, val)
+		logger.Err("Removing stale (%v) conntrack entry [%d] %v\n", key, val.ClientSideTuple, time.Now().Sub(val.LastActivityTime))
 		removeConntrackEntry(key)
 	}
 }

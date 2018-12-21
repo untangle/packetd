@@ -154,7 +154,7 @@ func cleanSessionTable() {
 	nowtime := time.Now()
 
 	sessionMutex.Lock()
-	defer sessionMutex.Lock()
+	defer sessionMutex.Unlock()
 
 	for key, session := range sessionTable {
 		// Having stale sessions is normal if sessions get blocked
@@ -163,7 +163,7 @@ func cleanSessionTable() {
 		// However, if we find a a stale conntrack-confirmed session.
 		if (nowtime.Unix() - session.LastActivityTime.Unix()) > 600 {
 			if session.ConntrackConfirmed {
-				logger.Err("Removing confirmed stale session entry %v %v\n", key, session.ClientSideTuple)
+				logger.Err("Removing stale (%v) session entry [%v] %v\n", time.Now().Sub(session.LastActivityTime), key, session.ClientSideTuple)
 			}
 			removeSessionEntry(key)
 		}
