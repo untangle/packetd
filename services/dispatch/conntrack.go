@@ -85,7 +85,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		// There is a race, we may get this DELETE event after the ctid has been reused by a new session
 		// and we don't want to remove that mapping from the session table
 		if conntrackEntry.Session != nil {
-			removeSessionEntrySpecific(ctid, conntrackEntry.Session)
+			removeSessionEntrySpecific(conntrackEntry.Session)
 		}
 	}
 
@@ -148,15 +148,16 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 				// This NEW event will have the correct tuple, but it won't match the previous session.
 				// This is normal.
 
-				// This is a problem, however if the previous session was confirmed, and we have no received a NEW event
+				// This is a problem, however if the previous session was confirmed, and we have now received a NEW event
 				// before receiving a DELETE event for the old ctid
 				if session.ConntrackConfirmed {
 					logger.Err("Conntrack NEW tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
-					return
+					// FIXME what to do here?
+				} else {
+					logger.Debug("Conntrack NEW tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
 				}
 
-				logger.Debug("Conntrack NEW tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
-				removeSessionEntrySpecific(ctid, session)
+				removeSessionEntrySpecific(session)
 				session = nil
 			}
 		}

@@ -140,7 +140,7 @@ func insertSessionEntry(ctid uint32, entry *SessionEntry) {
 // removeSessionEntry removes an entry from the session table
 // of the specified ctid
 func removeSessionEntry(ctid uint32) {
-	logger.Trace("Remove session index %v\n", ctid)
+	logger.Trace("Remove session ctid %v\n", ctid)
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
 	entry, status := sessionTable[ctid]
@@ -152,16 +152,16 @@ func removeSessionEntry(ctid uint32) {
 
 // removeSessionEntrySpecific removes an entry from the session table
 // of the specified ctid if its mapped to the specified sess
-func removeSessionEntrySpecific(ctid uint32, sess *SessionEntry) {
-	logger.Trace("Remove session index %v\n", ctid)
+func removeSessionEntrySpecific(sess *SessionEntry) {
+	logger.Trace("Remove session ctid %v\n", sess.ConntrackID)
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
-	entry, status := sessionTable[ctid]
+	entry, status := sessionTable[sess.ConntrackID]
 	if entry == sess {
 		if status {
 			dict.DeleteSession(entry.ConntrackID)
 		}
-		delete(sessionTable, ctid)
+		delete(sessionTable, sess.ConntrackID)
 	}
 }
 
