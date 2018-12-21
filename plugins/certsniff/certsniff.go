@@ -104,7 +104,6 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var dataBucket *dataCollector
 	var found bool
 
-	result.Owner = pluginName
 	result.SessionRelease = false
 
 	// we only look for certs in TCP traffic not going to server port 443

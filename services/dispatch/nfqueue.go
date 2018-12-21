@@ -42,8 +42,13 @@ type NfqueueMessage struct {
 
 // NfqueueResult returns status and other information from a subscription handler function
 type NfqueueResult struct {
-	Owner          string
 	SessionRelease bool
+}
+
+// subscriberResult returns status and other information from a subscription handler function
+type subscriberResult struct {
+	owner          string
+	sessionRelease bool
 }
 
 // ReleaseSession is called by a subscriber to stop receiving traffic for a session
@@ -202,7 +207,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 // callSubscribers calls all the nfqueue message subscribers (plugins)
 // and returns a verdict and the new mark
 func callSubscribers(ctid uint32, session *SessionEntry, mess NfqueueMessage, pmark uint32, newSession bool) int {
-	resultsChannel := make(chan NfqueueResult)
+	resultsChannel := make(chan subscriberResult)
 
 	// We loop and increment the priority until all subscriptions have been called
 	sublist := MirrorNfqueueSubscriptions(session)
@@ -225,10 +230,13 @@ func callSubscribers(ctid uint32, session *SessionEntry, mess NfqueueMessage, pm
 			logger.Trace("Calling nfqueue PLUGIN:%s PRI:%d CTID:%d\n", key, priority, ctid)
 			go func(key string, val SubscriptionHolder) {
 				timeoutTimer := time.NewTimer(maxAllowedTime)
-				c := make(chan NfqueueResult, 1)
+				c := make(chan subscriberResult, 1)
 				t1 := getMicroseconds()
 
-				go func() { c <- val.NfqueueFunc(mess, ctid, newSession) }()
+				go func() {
+					result := val.NfqueueFunc(mess, ctid, newSession)
+					c <- subscriberResult{owner: key, sessionRelease: result.SessionRelease}
+				}()
 
 				select {
 				case result := <-c:
@@ -236,7 +244,7 @@ func callSubscribers(ctid uint32, session *SessionEntry, mess NfqueueMessage, pm
 					timeoutTimer.Stop()
 				case <-timeoutTimer.C:
 					logger.Err("Timeout reached while processing nfqueue. plugin:%s\n", key)
-					resultsChannel <- NfqueueResult{Owner: key, SessionRelease: true}
+					c <- subscriberResult{owner: key, sessionRelease: true}
 				}
 
 				timediff := (float64(getMicroseconds()-t1) / 1000.0)
@@ -255,8 +263,8 @@ func callSubscribers(ctid uint32, session *SessionEntry, mess NfqueueMessage, pm
 		for i := 0; i < hitcount; i++ {
 			select {
 			case result := <-resultsChannel:
-				if result.SessionRelease {
-					ReleaseSession(session, result.Owner)
+				if result.sessionRelease {
+					ReleaseSession(session, result.owner)
 				}
 			}
 		}

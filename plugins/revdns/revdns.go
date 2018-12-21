@@ -1,12 +1,13 @@
 package revdns
 
 import (
-	"github.com/untangle/packetd/services/dict"
-	"github.com/untangle/packetd/services/dispatch"
-	"github.com/untangle/packetd/services/logger"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/untangle/packetd/services/dict"
+	"github.com/untangle/packetd/services/dispatch"
+	"github.com/untangle/packetd/services/logger"
 )
 
 // ReverseHolder is used to cache a list of DNS names for an IP address
@@ -50,7 +51,6 @@ func PluginShutdown() {
 // store them in the cache.
 func PluginNfqueueClientHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	result.Owner = pluginName + clientSuffix
 	result.SessionRelease = true
 
 	// release immediately as we only care about the first packet
@@ -120,7 +120,6 @@ func PluginNfqueueClientHandler(mess dispatch.NfqueueMessage, ctid uint32, newSe
 // store them in the cache.
 func PluginNfqueueServerHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	result.Owner = pluginName + serverSuffix
 	result.SessionRelease = true
 
 	// release immediately as we only care about the first packet

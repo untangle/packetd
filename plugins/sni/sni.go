@@ -26,7 +26,6 @@ func PluginShutdown() {
 // for a TLS ClientHello packet from which we extract the SNI hostname
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	result.Owner = pluginName
 	result.SessionRelease = false
 
 	// We only search for SNI in TCP traffic

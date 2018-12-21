@@ -35,7 +35,6 @@ func PluginShutdown() {
 // extract the interesting subject fields, and put them in the session table.
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	result.Owner = pluginName
 	result.SessionRelease = true
 
 	// release immediately as we only care about the first packet

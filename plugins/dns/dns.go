@@ -45,7 +45,6 @@ func PluginShutdown() {
 // look at DNS packets, extracting the QNAME and putting it in the session table.
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	result.Owner = pluginName
 	result.SessionRelease = true
 
 	// for new sessions we look for the client and server IP in our DNS cache

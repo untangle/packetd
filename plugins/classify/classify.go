@@ -153,7 +153,6 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var reply string
 	var err error
 	var result dispatch.NfqueueResult
-	result.Owner = pluginName
 	result.SessionRelease = false
 
 	// make sure we have a valid conntrack id
