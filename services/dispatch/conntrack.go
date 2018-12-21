@@ -42,6 +42,18 @@ func (c ConntrackEntry) String() string {
 	return strconv.Itoa(int(c.ConntrackID)) + "|" + c.ClientSideTuple.String()
 }
 
+// removeConntrack remove a entry from the conntrackTable that is obsolete/dead/invalid
+func removeConntrack(ctid uint32, conntrackEntry *ConntrackEntry) {
+	removeConntrackEntry(ctid)
+
+	// We only want to remove the specific session
+	// There is a race, we may get this DELETE event after the ctid has been reused by a new session
+	// and we don't want to remove that mapping from the session table
+	if conntrackEntry != nil && conntrackEntry.Session != nil {
+		removeSessionEntrySpecific(conntrackEntry.Session)
+	}
+}
+
 // conntrackCallback is the global conntrack event handler
 func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uint8, protocol uint8,
 	client net.IP, server net.IP, clientPort uint16, serverPort uint16,
@@ -58,6 +70,46 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		logger.Trace("conntrack event[%c]: %v %v:%v->%v:%v\n", eventType, ctid, client, clientPort, server, serverPort)
 	}
 
+	// sanity check tuple for all eventType
+	if conntrackFound && conntrackEntry != nil {
+		var clientSideTuple Tuple
+		clientSideTuple.Protocol = protocol
+		clientSideTuple.ClientAddress = dupIP(client)
+		clientSideTuple.ClientPort = clientPort
+		clientSideTuple.ServerAddress = dupIP(server)
+		clientSideTuple.ServerPort = serverPort
+		if eventType == 'N' {
+			// if this is a new conntrack event, we should not have found a conntrackEntry with that ctid
+			logger.Err("Received conntract NEW event for existing ctid %d\n", ctid)
+			logger.Err("New:\n")
+			logger.Err("ClientSideTuple: %v\n", clientSideTuple)
+			logger.Err("Old:\n")
+			logger.Err("ClientSideTuple: %v\n", conntrackEntry.ClientSideTuple)
+			logger.Err("ServerSideTuple: %v\n", conntrackEntry.ServerSideTuple)
+			logger.Err("CreationTime: %v ago\n", time.Now().Sub(conntrackEntry.CreationTime))
+			logger.Err("LastActivityTime: %v ago\n", time.Now().Sub(conntrackEntry.LastActivityTime))
+			logger.Err("ConntrackID: %v\n", conntrackEntry.ConntrackID)
+			logger.Err("SessionID: %v\n", conntrackEntry.SessionID)
+			if conntrackEntry.Session != nil {
+				logger.Err("Session ClientSideTuple: %v\n", conntrackEntry.Session.ClientSideTuple)
+				logger.Err("Session ServerSideTuple: %v\n", conntrackEntry.Session.ServerSideTuple)
+				logger.Err("Session SessionID: %v\n", conntrackEntry.Session.SessionID)
+			}
+			logger.Err("Deleting obsolete conntrack entry %v.\n", ctid)
+			removeConntrack(ctid, conntrackEntry)
+			conntrackFound = false
+			conntrackEntry = nil
+		} else if !clientSideTuple.Equal(conntrackEntry.ClientSideTuple) {
+			// if the tuple isn't what we expect something has gone wrong
+			logger.Warn("Conntrack event[%c] tuple mismatch %v\n", eventType, ctid)
+			logger.Warn("Actual: %s Expected: %s\n", clientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
+			logger.Err("Deleting obsolete conntrack entry %v.\n", ctid)
+			removeConntrack(ctid, conntrackEntry)
+			conntrackFound = false
+			conntrackEntry = nil
+		}
+	}
+
 	// handle DELETE events
 	if eventType == 'D' {
 		// do not call subscribers for ID's we don't know about
@@ -66,33 +118,11 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			return
 		}
 
-		var clientSideTuple Tuple
-		clientSideTuple.Protocol = protocol
-		clientSideTuple.ClientAddress = dupIP(client)
-		clientSideTuple.ClientPort = clientPort
-		clientSideTuple.ServerAddress = dupIP(server)
-		clientSideTuple.ServerPort = serverPort
-
-		if !clientSideTuple.Equal(conntrackEntry.ClientSideTuple) {
-			// We found a session, but the tuple is not what we expect.
-			// something has gone wrong
-			logger.Err("Conntrack DELETE tuple mismatch: %v  %s != %s\n", ctid, clientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
-			// continue to remove it anyway...
-		}
-		removeConntrackEntry(ctid)
-
-		// We only want to remove the specific session
-		// There is a race, we may get this DELETE event after the ctid has been reused by a new session
-		// and we don't want to remove that mapping from the session table
-		if conntrackEntry.Session != nil {
-			removeSessionEntrySpecific(conntrackEntry.Session)
-		}
+		removeConntrack(ctid, conntrackEntry)
 	}
 
 	// handle NEW events
 	if eventType == 'N' {
-
-		origConntrackEntry := conntrackEntry
 		conntrackEntry = new(ConntrackEntry)
 		conntrackEntry.ConntrackID = ctid
 		conntrackEntry.ConnMark = connmark
@@ -109,34 +139,6 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		conntrackEntry.ServerSideTuple.ClientPort = clientPortNew
 		conntrackEntry.ServerSideTuple.ServerAddress = dupIP(serverNew)
 		conntrackEntry.ServerSideTuple.ServerPort = serverPortNew
-
-		// if this is a NEW event, and we already had a conntrackEntry for this ctid
-		// something has gone wrong
-		if conntrackFound == true {
-			logger.Err("Received conntract NEW event for existing ctid %d\n", ctid)
-			logger.Err("New:\n")
-			logger.Err("ClientSideTuple: %v\n", conntrackEntry.ClientSideTuple)
-			logger.Err("ServerSideTuple: %v\n", conntrackEntry.ServerSideTuple)
-			logger.Err("Old:\n")
-			logger.Err("ClientSideTuple: %v\n", origConntrackEntry.ClientSideTuple)
-			logger.Err("ServerSideTuple: %v\n", origConntrackEntry.ServerSideTuple)
-			logger.Err("CreationTime: %v ago\n", time.Now().Sub(origConntrackEntry.CreationTime))
-			logger.Err("LastActivityTime: %v ago\n", time.Now().Sub(origConntrackEntry.LastActivityTime))
-			logger.Err("ConntrackID: %v\n", origConntrackEntry.ConntrackID)
-			logger.Err("SessionID: %v\n", origConntrackEntry.SessionID)
-			if origConntrackEntry.Session != nil {
-				logger.Err("Session ClientSideTuple: %v\n", origConntrackEntry.Session.ClientSideTuple)
-				logger.Err("Session ServerSideTuple: %v\n", origConntrackEntry.Session.ServerSideTuple)
-				logger.Err("Session SessionID: %v\n", origConntrackEntry.Session.SessionID)
-			}
-
-			// remove the old entry as if we got a delete event
-			removeConntrackEntry(ctid)
-			if origConntrackEntry.Session != nil {
-				removeSessionEntrySpecific(origConntrackEntry.Session)
-			}
-			conntrackFound = false
-		}
 
 		// look for the session entry
 		session := findSessionEntry(ctid)
@@ -163,12 +165,12 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 				// This is a problem, however if the previous session was confirmed, and we have now received a NEW event
 				// before receiving a DELETE event for the old ctid
 				if session.ConntrackConfirmed {
-					logger.Err("Conntrack NEW tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
-					// FIXME what to do here?
+					logger.Err("Conntrack NEW session tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
 				} else {
-					logger.Debug("Conntrack NEW tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
+					logger.Debug("Conntrack NEW session tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
 				}
 
+				// Remove that session from the sessionTable - we can conclude its not valid anymore
 				removeSessionEntrySpecific(session)
 				session = nil
 			}
