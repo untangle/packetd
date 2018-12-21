@@ -77,7 +77,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			// We found a session, but the tuple is not what we expect.
 			// something has gone wrong
 			logger.Err("Conntrack DELETE tuple mismatch: %v  %s != %s\n", ctid, clientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
-			return
+			// continue to remove it anyway...
 		}
 		removeConntrackEntry(ctid)
 
