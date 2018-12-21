@@ -148,9 +148,9 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 			if mess.MsgTuple.Equal(session.ClientSideTuple) {
 				// netfilter considers this a "new" session, but the tuple is identical.
-				// this happens often when a second SYN packet is sent
+				// this happens because netfilter's session tracking is more advanced
+				// and often parses deeper headers (ping/dns) to track sessions
 				// in this case, we don't count it as a new session, just reuse the old one
-				logger.Debug("Conflicting session tuple [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
 				newSession = false
 			} else {
 				// If this is a new session and a session was found, it may have just been an aborted session

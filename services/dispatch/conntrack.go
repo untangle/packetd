@@ -137,28 +137,41 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			return
 		}
 
-		// if we find the session entry update with the server side tuple and
-		// create another index for the session using the server side tuple
+		// Do some sanity checks on the session we just found
 		if session != nil {
 			if session.ConntrackID != ctid {
 				// We found a session, if its conntrackID does not match the one of the event
-				// something has gone wrong
+				// This should never happen as we lookup the session using the ctid
 				logger.Err("Conntrack NEW ID mismatch: %s  %d != %d\n", session.ClientSideTuple.String(), ctid, session.ConntrackID)
-				return
-			}
-			if session.ConntrackConfirmed {
-				// if the session we found is already conntrack confirmed
-				// something has gone wrong
-				logger.Err("Conntrack NEW for confirmed session: %v %v %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
 				return
 			}
 			if !session.ClientSideTuple.Equal(conntrackEntry.ClientSideTuple) {
 				// We found a session, but the tuple is not what we expect.
-				// something has gone wrong
-				logger.Err("Conntrack NEW tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
-				return
-			}
 
+				// This happens in some scenarios. For example:
+				// A packet comes in and gets merged with another conntrack ID or dropped
+				// in this case the ctid is in the session table from the nfqueue handler, but it has not been conntrack confirmed yet.
+				// This server creates a new outbound connection (we don't queue our own packets outbound)
+				// In this case we'll get a conntrack NEW event for the outbound connection, but not an nfqueue event.
+				// This NEW event will have the correct tuple, but it won't match the previous session.
+				// This is normal.
+
+				// This is a problem, however if the previous session was confirmed, and we have no received a NEW event
+				// before receiving a DELETE event for the old ctid
+				if session.ConntrackConfirmed {
+					logger.Err("Conntrack NEW tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
+					return
+				}
+
+				logger.Debug("Conntrack NEW tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
+				removeSessionEntry(ctid)
+				session = nil
+			}
+		}
+
+		// if we find the session entry update with the server side tuple and
+		// create another index for the session using the server side tuple
+		if session != nil {
 			session.ServerSideTuple.Protocol = protocol
 			session.ServerSideTuple.ClientAddress = dupIP(clientNew)
 			session.ServerSideTuple.ClientPort = clientPortNew
