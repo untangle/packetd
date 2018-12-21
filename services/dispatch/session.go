@@ -153,6 +153,9 @@ func removeSessionEntry(finder uint32) {
 func cleanSessionTable() {
 	nowtime := time.Now()
 
+	sessionMutex.Lock()
+	defer sessionMutex.Lock()
+
 	for key, session := range sessionTable {
 		// Having stale sessions is normal if sessions get blocked
 		// Their conntracks never get confirmed and thus there is never a delete conntrack event
