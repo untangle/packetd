@@ -170,16 +170,17 @@ func cleanSessionTable() {
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
 
-	for key, session := range sessionTable {
+	for ctid, session := range sessionTable {
 		// Having stale sessions is normal if sessions get blocked
 		// Their conntracks never get confirmed and thus there is never a delete conntrack event
 		// These sessions will hang in the table around and get cleaned up here.
 		// However, if we find a a stale conntrack-confirmed session.
 		if time.Now().Sub(session.LastActivityTime) > 600*time.Second {
 			if session.ConntrackConfirmed {
-				logger.Err("Removing stale (%v) session entry [%v] %v\n", time.Now().Sub(session.LastActivityTime), key, session.ClientSideTuple)
+				logger.Err("Removing stale (%v) session entry [%v] %v\n", time.Now().Sub(session.LastActivityTime), ctid, session.ClientSideTuple)
 			}
-			removeSessionEntry(key)
+			dict.DeleteSession(ctid)
+			delete(sessionTable, ctid)
 		}
 	}
 }

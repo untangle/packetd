@@ -272,30 +272,30 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 }
 
 // findConntrackEntry finds an entry in the conntrack table
-func findConntrackEntry(finder uint32) (*ConntrackEntry, bool) {
+func findConntrackEntry(ctid uint32) (*ConntrackEntry, bool) {
 	conntrackTableMutex.Lock()
 	defer conntrackTableMutex.Unlock()
-	entry, status := conntrackTable[finder]
+	entry, status := conntrackTable[ctid]
 	return entry, status
 }
 
 // insertConntrackEntry adds an entry to the conntrack table
-func insertConntrackEntry(finder uint32, entry *ConntrackEntry) {
-	logger.Trace("Insert conntrack entry %d\n", finder)
+func insertConntrackEntry(ctid uint32, entry *ConntrackEntry) {
+	logger.Trace("Insert conntrack entry %d\n", ctid)
 	conntrackTableMutex.Lock()
 	defer conntrackTableMutex.Unlock()
-	if conntrackTable[finder] != nil {
-		delete(conntrackTable, finder)
+	if conntrackTable[ctid] != nil {
+		delete(conntrackTable, ctid)
 	}
-	conntrackTable[finder] = entry
+	conntrackTable[ctid] = entry
 }
 
 // removeConntrackEntry removes an entry from the conntrack table
-func removeConntrackEntry(finder uint32) {
-	logger.Trace("Remove conntrack entry %d\n", finder)
+func removeConntrackEntry(ctid uint32) {
+	logger.Trace("Remove conntrack entry %d\n", ctid)
 	conntrackTableMutex.Lock()
 	defer conntrackTableMutex.Unlock()
-	delete(conntrackTable, finder)
+	delete(conntrackTable, ctid)
 }
 
 // cleanConntrackTable cleans the conntrack table by removing stale entries
@@ -303,16 +303,16 @@ func cleanConntrackTable() {
 	conntrackTableMutex.Lock()
 	defer conntrackTableMutex.Unlock()
 
-	for key, val := range conntrackTable {
-		if time.Now().Sub(val.LastActivityTime) > 1800*time.Second {
+	for ctid, conntrackEntry := range conntrackTable {
+		if time.Now().Sub(conntrackEntry.LastActivityTime) > 1800*time.Second {
 			// This should never happen, log an error
 			// entries should be removed by DELETE events
 			// otherwise they should be getting UPDATE events and the LastActivityTime
 			// would be at least within 60 seconds.
 			// The the entry exists, the LastActivityTime is a long time ago
 			// some constraint has failed
-			logger.Err("Removing stale (%v) conntrack entry [%d] %v\n", key, val.ClientSideTuple, time.Now().Sub(val.LastActivityTime))
-			removeConntrackEntry(key)
+			logger.Err("Removing stale (%v) conntrack entry [%d] %v\n", time.Now().Sub(conntrackEntry.LastActivityTime), ctid, conntrackEntry.ClientSideTuple)
+			delete(conntrackTable, ctid)
 		}
 	}
 }
