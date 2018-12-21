@@ -179,14 +179,14 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 						logger.Err("Conntrack STuple: %v\n", session.ConntrackEntry.ServerSideTuple)
 						logger.Err("Conntrack Creation Time: %v\n", time.Now().Sub(session.ConntrackEntry.CreationTime))
 						logger.Err("Conntrack LastActivityTime: %v\n", time.Now().Sub(session.ConntrackEntry.LastActivityTime))
-
 					}
 				} else {
 					logger.Debug("Conflicting session tuple [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
-					removeSessionEntry(ctid)
-					session = createSessionEntry(mess, ctid)
-					mess.Session = session
 				}
+
+				removeSessionEntry(ctid)
+				session = createSessionEntry(mess, ctid)
+				mess.Session = session
 			}
 		}
 
