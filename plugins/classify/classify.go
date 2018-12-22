@@ -159,14 +159,6 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
-	// Session is ending
-	if mess.Packet == nil {
-		// FIXME we should send one last command to get the lastest classification
-		// in case it has been updated and log if changed
-		daemonRemove(ctid)
-		return dispatch.NfqueueResult{SessionRelease: true}
-	}
-
 	// make sure we have a valid session
 	if mess.Session == nil {
 		logger.Err("Ignoring event with invalid session\n")

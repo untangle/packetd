@@ -84,9 +84,15 @@ static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrac
 	info.conn_mark = nfct_get_attr_u32(ct,ATTR_MARK);
 
 	if (get_warehouse_flag() == 'C') warehouse_capture('C',&info,sizeof(info),0,0,0);
-	if (get_bypass_flag() == 0) go_conntrack_callback(&info,0);
 
-	return(NFCT_CB_CONTINUE);
+    // FIXME - its not ok to just throw away events when the bypass flag is set
+    // we will be missing important events like NEW/DELETE events such that
+    // when we resume, the events will no longer make sense because we missed important events prior
+	if (get_bypass_flag() != 0)
+        return NFCT_CB_CONTINUE;
+
+    go_conntrack_callback(&info,0);
+	return NFCT_CB_CONTINUE;
 }
 
 int conntrack_startup(void)

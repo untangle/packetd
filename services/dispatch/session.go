@@ -109,12 +109,6 @@ func (sess *Session) destroy() {
 		delete(sessionTable, sess.ConntrackID)
 	}
 	sessionMutex.Unlock()
-
-	// call the subscribers
-	var mess NfqueueMessage
-	mess.Session = sess
-	mess.Packet = nil
-	callSubscribers(sess.ConntrackID, sess, mess, 0, false)
 }
 
 // nextSessionID returns the next sequential session ID value
