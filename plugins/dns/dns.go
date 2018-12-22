@@ -39,6 +39,15 @@ func PluginStartup() {
 // for the argumented WaitGroup to let the main process know we're finished.
 func PluginShutdown() {
 	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
+
+	shutdownChannel <- true
+
+	select {
+	case <-shutdownChannel:
+		logger.Info("Successful shutdown of cleanupTask\n")
+	case <-time.After(10 * time.Second):
+		logger.Warn("Failed to properly shutdown cleanupTask\n")
+	}
 }
 
 // PluginNfqueueHandler is called to handle nfqueue packet data. We only

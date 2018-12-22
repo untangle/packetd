@@ -52,12 +52,12 @@ const maxPacketCount = 32     // The maximum number of packets to inspect before
 const maxTrafficSize = 0x8000 // The maximum number of bytes to inspect before releasing
 
 var applicationTable map[string]applicationInfo
-var socktime time.Time
-var sockspin int64
+var shutdownChannel = make(chan bool)
 var daemonProcess *exec.Cmd
-var daemonConnection net.Conn
+var daemonSocket net.Conn
 var classdHostPort = "127.0.0.1:8123"
 var classdMutex sync.Mutex
+var dialCounter int
 
 // PluginStartup is called to allow plugin specific initialization
 func PluginStartup() {
@@ -73,41 +73,18 @@ func PluginStartup() {
 		return
 	}
 
-	//  make sure the classd binary is available
+	//  make sure the classd binary is executable
 	if (info.Mode() & 0111) == 0 {
 		logger.Notice("Invalid file mode for classify daemon %s (%v)\n", daemonBinary, info.Mode())
 		return
 	}
 
-	// start the classd daemon with the no fork flag
-	if kernel.GetDebugFlag() {
-		daemonProcess = exec.Command(daemonBinary, "-f", "-d")
-	} else {
-		daemonProcess = exec.Command(daemonBinary, "-f")
-	}
-
-	err = daemonProcess.Start()
-	if err != nil {
-		logger.Err("Error starting classify daemon %s (%v)\n", daemonBinary, err)
-		return
-	}
-
-	logger.Info("The classd daemon has been started\n")
-
-	applicationTable = make(map[string]applicationInfo)
 	loadApplicationTable()
 
-	// give the daemon a second to open the socket
-	time.Sleep(time.Second)
+	// start the daemon manager to handle running the daemon and connecting the socket
+	go daemonManager()
 
-	// establish our connection to the daemon
-	socktime = time.Now()
-	sockspin = 0
-	daemonConnection, err = net.DialTimeout("tcp", classdHostPort, 5*time.Second)
-	if err != nil {
-		logger.Err("Error calling net.Dial(): %v\n", err)
-	}
-
+	// insert our nfqueue and conntrack subscriptions
 	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
 	dispatch.InsertConntrackSubscription(pluginName, 2, PluginConntrackHandler)
 }
@@ -116,28 +93,19 @@ func PluginStartup() {
 func PluginShutdown() {
 	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
 
-	// if we have a connection to the daemon close it
-	if daemonConnection != nil {
-		daemonConnection.Close()
-	}
+	// first signal the shutdown channel to stop the daemon manager
+	shutdownChannel <- true
 
-	daemonConnection = nil
+	// now we can disconnect and signal the daemon to shutdown
+	daemonGoodbye()
+	daemonShutdown()
 
-	// if the daemon process is valid terminate the running daemon
-	if daemonProcess != nil {
-		if daemonProcess.Process == nil {
-			logger.Err("The classd daemon process was invalid\n")
-			daemonProcess = nil
-			return
-		}
-
-		err := daemonProcess.Process.Signal(os.Interrupt)
-		if err != nil {
-			logger.Err("Error stopping classd daemon: %v\n", err)
-		} else {
-			logger.Info("The classd daemon has been stopped\n")
-		}
-		daemonProcess = nil
+	// wait for the shutdown to complete successfully or timeout
+	select {
+	case <-shutdownChannel:
+		logger.Info("Successful shutdown of daemonManager\n")
+	case <-time.After(10 * time.Second):
+		logger.Warn("Failed to properly shutdown daemonManager\n")
 	}
 }
 
@@ -171,6 +139,11 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
+	// if not connected to the daemon we can't do anything
+	if daemonSocket == nil {
+		return dispatch.NfqueueResult{SessionRelease: false}
+	}
+
 	// send the data to classd and read reply
 	reply, err = daemonClassify(mess, ctid, newSession)
 	if err != nil {
@@ -187,13 +160,17 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	return dispatch.NfqueueResult{SessionRelease: false}
-
 }
 
 // PluginConntrackHandler receives conntrack dispatch. The message will be one
 // of three possible values: N, U, or D for new entry, an update to an existing
 // entry, or delete of an existing entry.
 func PluginConntrackHandler(message int, entry *dispatch.Conntrack) {
+	// if not connected to the daemon we can't do anything with the message
+	if daemonSocket == nil {
+		return
+	}
+
 	// we're only interested in delete events
 	if message == 'D' {
 		daemonRemove(entry.ConntrackID)
@@ -374,15 +351,6 @@ func logEvent(session *dispatch.Session, changed []string) {
 		modifiedColumns[v] = session.GetAttachment(v)
 	}
 
-	// allColumns := make(map[string]interface{})
-	// allColumns["application_id"] = dispatch.GetSessionAttachment(session, "application_id")
-	// allColumns["application_name"] = dispatch.GetSessionAttachment(session, "application_name")
-	// allColumns["application_protochain"] = dispatch.GetSessionAttachment(session, "application_protochain")
-	// allColumns["application_detail"] = dispatch.GetSessionAttachment(session, "application_detail")
-	// allColumns["application_category"] = dispatch.GetSessionAttachment(session, "application_category")
-	// allColumns["application_confidence"] = dispatch.GetSessionAttachment(session, "application_confidence")
-	// session.PutAttachment("session_classify", allColumns)
-
 	reports.LogEvent(reports.CreateEvent("session_classify", "sessions", 2, columns, modifiedColumns))
 }
 
@@ -396,30 +364,10 @@ func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, 
 	classdMutex.Lock()
 	defer classdMutex.Unlock()
 
-	// if daemon not connected we do throttled reconnect attempts
-	if daemonConnection == nil {
-		nowtime := time.Now()
-
-		// if not time for another attempt return lost connection error
-		if (socktime.Unix() + sockspin) > nowtime.Unix() {
-			return string(buffer), fmt.Errorf("Lost connection to daemon. Reconnect in %d seconds", sockspin)
-		}
-
-		// update socktime and try to connect to the daemon
-		socktime = time.Now()
-		daemonConnection, err = net.Dial("tcp", classdHostPort)
-		if err != nil {
-			// if the connection failed update the throttle counter and return the error
-			if sockspin < 10 {
-				sockspin++
-			}
-			return string(buffer), err
-		}
+	// if daemon not connected we can't do anything
+	if daemonSocket == nil {
+		return "", fmt.Errorf("Connction to classify daemon not established")
 	}
-
-	// on successful connect update the socktime and clear the throttle counter
-	socktime = time.Now()
-	sockspin = 0
 
 	// if there are no arguments use the format as the command otherwise create command from the arguments
 	if len(args) == 0 {
@@ -429,46 +377,43 @@ func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, 
 	}
 
 	// write the command to the daemon socket
-	tot, err = daemonConnection.Write([]byte(command))
+	tot, err = daemonSocket.Write([]byte(command))
 
+	// on write error shutdown the socket and return error
 	if err != nil {
-		daemonConnection.Close()
-		daemonConnection = nil
+		daemonGoodbye()
 		return string(buffer), err
 	}
 
+	// on short write shutdown the socket and return error
 	if tot != len(command) {
-		daemonConnection.Close()
-		daemonConnection = nil
+		daemonGoodbye()
 		return string(buffer), fmt.Errorf("Underrun %d of %d calling daemon.Write(%s)", tot, len(command), command)
 	}
 
 	// if we have packet data send to the daemon socket after the command
 	if rawdata != nil {
-		tot, err = daemonConnection.Write(rawdata)
+		tot, err = daemonSocket.Write(rawdata)
 
+		// on write error shutdown the socket and return error
 		if err != nil {
-			daemonConnection.Close()
-			daemonConnection = nil
+			daemonGoodbye()
 			return string(buffer), err
 		}
 
+		// on short write shutdown the socket and return error
 		if tot != len(rawdata) {
-			daemonConnection.Close()
-			daemonConnection = nil
+			daemonGoodbye()
 			return string(buffer), fmt.Errorf("Underrun %d of %d calling daemon.Write(rawdata)", tot, len(rawdata))
 		}
-
 	}
 
 	// read the reply from the daemon
-	_, err = daemonConnection.Read(buffer)
+	_, err = daemonSocket.Read(buffer)
 
+	// on read error shutdown the socket and return error
 	if err != nil {
-		if daemonConnection != nil {
-			daemonConnection.Close()
-		}
-		daemonConnection = nil
+		daemonGoodbye()
 		return string(buffer), err
 	}
 
@@ -482,6 +427,8 @@ func loadApplicationTable() {
 	var infocount int
 	var list []string
 	var err error
+
+	applicationTable = make(map[string]applicationInfo)
 
 	// open the guid info file provided by Sandvine
 	file, err = os.Open(guidInfoFile)
@@ -595,4 +542,107 @@ func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname st
 	dict.AddSessionEntry(ctid, pairname, pairdata)
 	logger.Debug("Updating classification detail %s = %v ctid:%d\n", pairname, pairdata, ctid)
 	return true
+}
+
+// daemonManager is a goroutine to start, connect, monitor, restart, and reconnect the untangle-classd daemon
+// we also watch the shutdown channel and exit when the shutdown signal is received
+func daemonManager() {
+	for {
+		select {
+		case <-shutdownChannel:
+			shutdownChannel <- true
+			return
+		case <-time.After(time.Second):
+			if daemonProcess == nil {
+				daemonStartup()
+			}
+			if daemonSocket == nil {
+				daemonConnect()
+			}
+		}
+	}
+}
+
+// starts the daemon and uses a goroutine to wait for it to finish
+func daemonStartup() {
+	var err error
+
+	// start the classd daemon with the no fork flag and optionally the debug flag
+	if kernel.GetDebugFlag() {
+		daemonProcess = exec.Command(daemonBinary, "-f", "-d")
+	} else {
+		daemonProcess = exec.Command(daemonBinary, "-f")
+	}
+
+	// call the start function, check for error, and cleanup if things go bad
+	err = daemonProcess.Start()
+	if err != nil {
+		logger.Err("Error starting classify daemon %s (%v)\n", daemonBinary, err)
+		daemonProcess.Process.Release()
+		daemonProcess = nil
+		return
+	}
+
+	logger.Info("The classd daemon has been started. PID:%d\n", daemonProcess.Process.Pid)
+
+	// Use a goroutine to wait for the process to finish. In normal operation Wait() will
+	// return when the daemon shuts down in response to SIGINT which is sent after the
+	// daemon manager has shutdown. If the daemon exits for any other reason the manager
+	// will see the nil process and attempt to restart the daemon.
+	go func() {
+		err := daemonProcess.Wait()
+		logger.Info("The classd daemon has exited. INFO:%v\n", err)
+		daemonGoodbye()
+		daemonProcess = nil
+	}()
+}
+
+// called to send SIGINT to the classify daemon which will cause normal shutdown
+func daemonShutdown() {
+	if daemonProcess == nil {
+		return
+	}
+
+	// signal an interrupt signal to the daemon
+	err := daemonProcess.Process.Signal(os.Interrupt)
+	if err != nil {
+		logger.Err("Error stopping classd daemon: %v\n", err)
+	} else {
+		logger.Info("The classd daemon has been stopped\n")
+	}
+
+	daemonProcess = nil
+}
+
+func daemonConnect() {
+	var err error
+
+	// we can't connect if the daemon isn't running
+	if daemonProcess == nil {
+		return
+	}
+
+	// establish our connection to the daemon
+	daemonSocket, err = net.DialTimeout("tcp", classdHostPort, 5*time.Second)
+	if err != nil {
+		// no error messages until we've succesfully connected once to eliminate startup errors
+		// we get when trying to connect to the daemon before it starts to listen on the socket
+		if dialCounter > 0 {
+			logger.Err("Error calling net.DialTimeout(%s): %v\n", classdHostPort, err)
+		}
+	} else {
+		logger.Info("Succesfully connected to classify daemon(%s)\n", classdHostPort)
+		dialCounter++
+	}
+}
+
+// Called to shutdown the daemon connection. We close the connection if valid
+// and clear the daemonSocket which will trigger the manager to reconnect
+func daemonGoodbye() {
+	if daemonSocket == nil {
+		return
+	}
+
+	daemonSocket.Close()
+	daemonSocket = nil
 }
