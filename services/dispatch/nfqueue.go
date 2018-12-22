@@ -26,7 +26,7 @@ type NfqueueHandlerFunction func(NfqueueMessage, uint32, bool) NfqueueResult
 
 // NfqueueMessage is used to pass nfqueue traffic to interested plugins
 type NfqueueMessage struct {
-	Session        *SessionEntry
+	Session        *Session
 	MsgTuple       Tuple
 	Packet         gopacket.Packet
 	PacketMark     uint32
@@ -52,7 +52,7 @@ type subscriberResult struct {
 }
 
 // ReleaseSession is called by a subscriber to stop receiving traffic for a session
-func ReleaseSession(session *SessionEntry, owner string) {
+func ReleaseSession(session *Session, owner string) {
 	session.subLocker.Lock()
 	defer session.subLocker.Unlock()
 	origLen := len(session.subscriptions)
@@ -124,7 +124,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 	logger.Trace("nfqueue event[%d]: %v 0x%08x\n", ctid, mess.MsgTuple, pmark)
 
-	session := findSessionEntry(ctid)
+	session := findSession(ctid)
 
 	if session == nil {
 		if !newSession {
@@ -146,7 +146,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 			dict.AddSessionEntry(ctid, "bypass_packetd", true)
 			return NfAccept
 		}
-		session = createSessionEntry(mess, ctid)
+		session = createSession(mess, ctid)
 		mess.Session = session
 	} else {
 		if newSession {
@@ -173,8 +173,8 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 				// it in the conntrack table for the conntrack handle to handle
 
 				logger.Debug("Conflicting session [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
-				removeSessionEntry(ctid)
-				session = createSessionEntry(mess, ctid)
+				session.destroy()
+				session = createSession(mess, ctid)
 				mess.Session = session
 			}
 		}
@@ -204,7 +204,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 // callSubscribers calls all the nfqueue message subscribers (plugins)
 // and returns a verdict and the new mark
-func callSubscribers(ctid uint32, session *SessionEntry, mess NfqueueMessage, pmark uint32, newSession bool) int {
+func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark uint32, newSession bool) int {
 	resultsChannel := make(chan subscriberResult)
 
 	// We loop and increment the priority until all subscriptions have been called
@@ -285,10 +285,10 @@ func callSubscribers(ctid uint32, session *SessionEntry, mess NfqueueMessage, pm
 	return NfAccept
 }
 
-// createSessionEntry creates a new session and inserts the forward mapping
+// createSession creates a new session and inserts the forward mapping
 // into the session table
-func createSessionEntry(mess NfqueueMessage, ctid uint32) *SessionEntry {
-	session := new(SessionEntry)
+func createSession(mess NfqueueMessage, ctid uint32) *Session {
+	session := new(Session)
 	session.SessionID = nextSessionID()
 	session.ConntrackID = ctid
 	session.CreationTime = time.Now()
@@ -301,7 +301,7 @@ func createSessionEntry(mess NfqueueMessage, ctid uint32) *SessionEntry {
 	session.attachments = make(map[string]interface{})
 	AttachNfqueueSubscriptions(session)
 	logger.Trace("Session Adding %d to table\n", ctid)
-	insertSessionEntry(ctid, session)
+	insertSessionTable(ctid, session)
 	return session
 }
 

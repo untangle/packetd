@@ -48,7 +48,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 // PluginConntrackHandler receives conntrack dispatch. The message will be one
 // of three possible values: N, U, or D for new entry, an update to an existing
 // entry, or delete of an existing entry.
-func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
+func PluginConntrackHandler(message int, entry *dispatch.Conntrack) {
 	logger.Debug("ConntrackHandler MSG:%c ID:%d PROTO:%d SADDR:%s SPORT:%d DADDR:%s DPORT:%d TX:%d RX:%d UC:%d\n",
 		message,
 		entry.ConntrackID,

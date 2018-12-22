@@ -46,7 +46,7 @@ func Shutdown() {
 
 // AttachCertificateToSession is called to attach a certificate to a session entry and
 // to populate the dictionary  with details about the certificate
-func AttachCertificateToSession(session *dispatch.SessionEntry, certificate x509.Certificate) {
+func AttachCertificateToSession(session *dispatch.Session, certificate x509.Certificate) {
 
 	session.PutAttachment("certificate", certificate)
 
@@ -75,7 +75,7 @@ func AttachCertificateToSession(session *dispatch.SessionEntry, certificate x509
 }
 
 // setSessionEntry sets the session attachment and dict entry for the specified field to the specified value
-func setSessionEntry(session *dispatch.SessionEntry, field string, value string, ctid uint32) {
+func setSessionEntry(session *dispatch.Session, field string, value string, ctid uint32) {
 	if len(value) == 0 {
 		return
 	}
@@ -87,7 +87,7 @@ func setSessionEntry(session *dispatch.SessionEntry, field string, value string,
 
 // setSessionEntry sets the session attachment and dict entry for the specified field to the specified value
 // the value is a list of strings that will be joined into a single string using "|"
-func setSessionList(session *dispatch.SessionEntry, field string, value []string, ctid uint32) {
+func setSessionList(session *dispatch.Session, field string, value []string, ctid uint32) {
 	if len(value) == 0 {
 		return
 	}
@@ -163,7 +163,7 @@ func cleanupTask() {
 
 // logEvent logs an update event that updates the certificate columns
 // provide the session, and the client and server country
-func logEvent(session *dispatch.SessionEntry) {
+func logEvent(session *dispatch.Session) {
 	columns := map[string]interface{}{
 		"session_id": session.SessionID,
 	}

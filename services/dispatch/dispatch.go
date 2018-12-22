@@ -44,8 +44,8 @@ var shutdownCleanerTask = make(chan bool)
 // Startup starts the event handling service
 func Startup() {
 	// create the session, conntrack, and certificate tables
-	sessionTable = make(map[uint32]*SessionEntry)
-	conntrackTable = make(map[uint32]*ConntrackEntry)
+	sessionTable = make(map[uint32]*Session)
+	conntrackTable = make(map[uint32]*Conntrack)
 
 	// create the nfqueue, conntrack, and netlogger subscription tables
 	nfqueueSubList = make(map[string]SubscriptionHolder)
@@ -122,8 +122,8 @@ func InsertNfqueueSubscription(owner string, priority int, function NfqueueHandl
 	}
 }
 
-// AttachNfqueueSubscriptions attaches active nfqueue subscriptions to the argumented SessionEntry
-func AttachNfqueueSubscriptions(session *SessionEntry) {
+// AttachNfqueueSubscriptions attaches active nfqueue subscriptions to the argumented Session
+func AttachNfqueueSubscriptions(session *Session) {
 	session.subLocker.Lock()
 	session.subscriptions = make(map[string]SubscriptionHolder)
 
@@ -133,8 +133,8 @@ func AttachNfqueueSubscriptions(session *SessionEntry) {
 	session.subLocker.Unlock()
 }
 
-// MirrorNfqueueSubscriptions creates a copy of the subscriptions for the argumented SessionEntry
-func MirrorNfqueueSubscriptions(session *SessionEntry) map[string]SubscriptionHolder {
+// MirrorNfqueueSubscriptions creates a copy of the subscriptions for the argumented Session
+func MirrorNfqueueSubscriptions(session *Session) map[string]SubscriptionHolder {
 	mirror := make(map[string]SubscriptionHolder)
 	session.subLocker.Lock()
 
@@ -185,17 +185,20 @@ func HandleWarehousePlayback() {
 // were created by the previous warehouse playback operation
 func HandleWarehouseCleanup() {
 	if nfCleanupHolder != nil {
-		for val := range nfCleanupHolder {
-			logger.Debug("Removing playback session for %d\n", val)
-			removeSessionEntry(val)
+		for ctid := range nfCleanupHolder {
+			logger.Debug("Removing playback session for %d\n", ctid)
+			sess := findSession(ctid)
+			if sess != nil {
+				sess.destroy()
+			}
 		}
 		nfCleanupHolder = nil
 	}
 
 	if ctCleanupHolder != nil {
-		for val := range ctCleanupHolder {
-			logger.Debug("Removing playback conntrack for %d\n", val)
-			removeConntrackEntry(val)
+		for ctid := range ctCleanupHolder {
+			logger.Debug("Removing playback conntrack for %d\n", ctid)
+			removeConntrack(ctid)
 		}
 		ctCleanupHolder = nil
 	}

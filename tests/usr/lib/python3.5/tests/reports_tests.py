@@ -196,7 +196,7 @@ class ReportsTests(unittest.TestCase):
     @staticmethod
     def module_name():
         """module_name unittest method"""
-        return "settings"
+        return "reports"
 
     def initial_setup(self):
         """initial_setup unittest method"""

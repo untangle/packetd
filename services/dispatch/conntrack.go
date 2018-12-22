@@ -10,13 +10,13 @@ import (
 )
 
 // ConntrackHandlerFunction defines a pointer to a conntrack callback function
-type ConntrackHandlerFunction func(int, *ConntrackEntry)
+type ConntrackHandlerFunction func(int, *Conntrack)
 
-// ConntrackEntry stores the details of a conntrack entry
-type ConntrackEntry struct {
+// Conntrack stores the details of a conntrack entry
+type Conntrack struct {
 	ConntrackID      uint32
 	ConnMark         uint32
-	Session          *SessionEntry
+	Session          *Session
 	SessionID        uint64
 	CreationTime     time.Time
 	LastActivityTime time.Time
@@ -34,23 +34,23 @@ type ConntrackEntry struct {
 	TotalRate        float32 // the total byte rate site the last update
 }
 
-var conntrackTable map[uint32]*ConntrackEntry
+var conntrackTable map[uint32]*Conntrack
 var conntrackTableMutex sync.Mutex
 
 // String returns string representation of conntrack
-func (c ConntrackEntry) String() string {
+func (c Conntrack) String() string {
 	return strconv.Itoa(int(c.ConntrackID)) + "|" + c.ClientSideTuple.String()
 }
 
-// removeConntrack remove a entry from the conntrackTable that is obsolete/dead/invalid
-func removeConntrack(ctid uint32, conntrackEntry *ConntrackEntry) {
-	removeConntrackEntry(ctid)
+// removeConntrack remove an entry from the conntrackTable that is obsolete/dead/invalid
+func removeConntrack2(ctid uint32, conntrack *Conntrack) {
+	removeConntrack(ctid)
 
 	// We only want to remove the specific session
 	// There is a race, we may get this DELETE event after the ctid has been reused by a new session
 	// and we don't want to remove that mapping from the session table
-	if conntrackEntry != nil && conntrackEntry.Session != nil {
-		removeSessionEntrySpecific(conntrackEntry.Session)
+	if conntrack != nil && conntrack.Session != nil {
+		conntrack.Session.destroy()
 	}
 }
 
@@ -60,18 +60,18 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 	clientNew net.IP, serverNew net.IP, clientPortNew uint16, serverPortNew uint16,
 	c2sBytes uint64, s2cBytes uint64) {
 
-	var conntrackEntry *ConntrackEntry
+	var conntrack *Conntrack
 	var conntrackFound bool
 
 	// start by looking for the existing conntrack entry
-	conntrackEntry, conntrackFound = findConntrackEntry(ctid)
+	conntrack, conntrackFound = findConntrack(ctid)
 
 	if logger.IsTraceEnabled() {
 		logger.Trace("conntrack event[%c]: %v %v:%v->%v:%v\n", eventType, ctid, client, clientPort, server, serverPort)
 	}
 
 	// sanity check tuple for all eventType
-	if conntrackFound && conntrackEntry != nil {
+	if conntrackFound && conntrack != nil {
 		var clientSideTuple Tuple
 		clientSideTuple.Protocol = protocol
 		clientSideTuple.ClientAddress = dupIP(client)
@@ -79,34 +79,34 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		clientSideTuple.ServerAddress = dupIP(server)
 		clientSideTuple.ServerPort = serverPort
 		if eventType == 'N' {
-			// if this is a new conntrack event, we should not have found a conntrackEntry with that ctid
+			// if this is a new conntrack event, we should not have found a conntrack with that ctid
 			logger.Err("Received conntract NEW event for existing ctid %d\n", ctid)
 			logger.Err("New:\n")
 			logger.Err("ClientSideTuple: %v\n", clientSideTuple)
 			logger.Err("Old:\n")
-			logger.Err("ClientSideTuple: %v\n", conntrackEntry.ClientSideTuple)
-			logger.Err("ServerSideTuple: %v\n", conntrackEntry.ServerSideTuple)
-			logger.Err("CreationTime: %v ago\n", time.Now().Sub(conntrackEntry.CreationTime))
-			logger.Err("LastActivityTime: %v ago\n", time.Now().Sub(conntrackEntry.LastActivityTime))
-			logger.Err("ConntrackID: %v\n", conntrackEntry.ConntrackID)
-			logger.Err("SessionID: %v\n", conntrackEntry.SessionID)
-			if conntrackEntry.Session != nil {
-				logger.Err("Session ClientSideTuple: %v\n", conntrackEntry.Session.ClientSideTuple)
-				logger.Err("Session ServerSideTuple: %v\n", conntrackEntry.Session.ServerSideTuple)
-				logger.Err("Session SessionID: %v\n", conntrackEntry.Session.SessionID)
+			logger.Err("ClientSideTuple: %v\n", conntrack.ClientSideTuple)
+			logger.Err("ServerSideTuple: %v\n", conntrack.ServerSideTuple)
+			logger.Err("CreationTime: %v ago\n", time.Now().Sub(conntrack.CreationTime))
+			logger.Err("LastActivityTime: %v ago\n", time.Now().Sub(conntrack.LastActivityTime))
+			logger.Err("ConntrackID: %v\n", conntrack.ConntrackID)
+			logger.Err("SessionID: %v\n", conntrack.SessionID)
+			if conntrack.Session != nil {
+				logger.Err("Session ClientSideTuple: %v\n", conntrack.Session.ClientSideTuple)
+				logger.Err("Session ServerSideTuple: %v\n", conntrack.Session.ServerSideTuple)
+				logger.Err("Session SessionID: %v\n", conntrack.Session.SessionID)
 			}
 			logger.Err("Deleting obsolete conntrack entry %v.\n", ctid)
-			removeConntrack(ctid, conntrackEntry)
+			removeConntrack2(ctid, conntrack)
 			conntrackFound = false
-			conntrackEntry = nil
-		} else if !clientSideTuple.Equal(conntrackEntry.ClientSideTuple) {
+			conntrack = nil
+		} else if !clientSideTuple.Equal(conntrack.ClientSideTuple) {
 			// if the tuple isn't what we expect something has gone wrong
 			logger.Warn("Conntrack event[%c] tuple mismatch %v\n", eventType, ctid)
-			logger.Warn("Actual: %s Expected: %s\n", clientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
+			logger.Warn("Actual: %s Expected: %s\n", clientSideTuple.String(), conntrack.ClientSideTuple.String())
 			logger.Err("Deleting obsolete conntrack entry %v.\n", ctid)
-			removeConntrack(ctid, conntrackEntry)
+			removeConntrack2(ctid, conntrack)
 			conntrackFound = false
-			conntrackEntry = nil
+			conntrack = nil
 		}
 	}
 
@@ -118,30 +118,30 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			return
 		}
 
-		removeConntrack(ctid, conntrackEntry)
+		removeConntrack2(ctid, conntrack)
 	}
 
 	// handle NEW events
 	if eventType == 'N' {
-		conntrackEntry = new(ConntrackEntry)
-		conntrackEntry.ConntrackID = ctid
-		conntrackEntry.ConnMark = connmark
-		conntrackEntry.CreationTime = time.Now()
-		conntrackEntry.LastActivityTime = time.Now()
-		conntrackEntry.EventCount = 1
-		conntrackEntry.ClientSideTuple.Protocol = protocol
-		conntrackEntry.ClientSideTuple.ClientAddress = dupIP(client)
-		conntrackEntry.ClientSideTuple.ClientPort = clientPort
-		conntrackEntry.ClientSideTuple.ServerAddress = dupIP(server)
-		conntrackEntry.ClientSideTuple.ServerPort = serverPort
-		conntrackEntry.ServerSideTuple.Protocol = protocol
-		conntrackEntry.ServerSideTuple.ClientAddress = dupIP(clientNew)
-		conntrackEntry.ServerSideTuple.ClientPort = clientPortNew
-		conntrackEntry.ServerSideTuple.ServerAddress = dupIP(serverNew)
-		conntrackEntry.ServerSideTuple.ServerPort = serverPortNew
+		conntrack = new(Conntrack)
+		conntrack.ConntrackID = ctid
+		conntrack.ConnMark = connmark
+		conntrack.CreationTime = time.Now()
+		conntrack.LastActivityTime = time.Now()
+		conntrack.EventCount = 1
+		conntrack.ClientSideTuple.Protocol = protocol
+		conntrack.ClientSideTuple.ClientAddress = dupIP(client)
+		conntrack.ClientSideTuple.ClientPort = clientPort
+		conntrack.ClientSideTuple.ServerAddress = dupIP(server)
+		conntrack.ClientSideTuple.ServerPort = serverPort
+		conntrack.ServerSideTuple.Protocol = protocol
+		conntrack.ServerSideTuple.ClientAddress = dupIP(clientNew)
+		conntrack.ServerSideTuple.ClientPort = clientPortNew
+		conntrack.ServerSideTuple.ServerAddress = dupIP(serverNew)
+		conntrack.ServerSideTuple.ServerPort = serverPortNew
 
 		// look for the session entry
-		session := findSessionEntry(ctid)
+		session := findSession(ctid)
 
 		// Do some sanity checks on the session we just found
 		if session != nil {
@@ -151,7 +151,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 				logger.Err("Conntrack NEW ID mismatch: %s  %d != %d\n", session.ClientSideTuple.String(), ctid, session.ConntrackID)
 				return
 			}
-			if !session.ClientSideTuple.Equal(conntrackEntry.ClientSideTuple) {
+			if !session.ClientSideTuple.Equal(conntrack.ClientSideTuple) {
 				// We found a session, but the tuple is not what we expect.
 
 				// This happens in some scenarios. For example:
@@ -165,13 +165,13 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 				// This is a problem, however if the previous session was confirmed, and we have now received a NEW event
 				// before receiving a DELETE event for the old ctid
 				if session.ConntrackConfirmed {
-					logger.Err("Conntrack NEW session tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
+					logger.Err("Conntrack NEW session tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrack.ClientSideTuple.String())
 				} else {
-					logger.Debug("Conntrack NEW session tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrackEntry.ClientSideTuple.String())
+					logger.Debug("Conntrack NEW session tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrack.ClientSideTuple.String())
 				}
 
 				// Remove that session from the sessionTable - we can conclude its not valid anymore
-				removeSessionEntrySpecific(session)
+				session.destroy()
 				session = nil
 			}
 		}
@@ -185,16 +185,16 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			session.ServerSideTuple.ServerAddress = dupIP(serverNew)
 			session.ServerSideTuple.ServerPort = serverPortNew
 			session.ConntrackConfirmed = true
-			session.ConntrackEntry = conntrackEntry
+			session.Conntrack = conntrack
 			session.LastActivityTime = time.Now()
 			session.EventCount++
-			conntrackEntry.Session = session
-			conntrackEntry.SessionID = session.SessionID
+			conntrack.Session = session
+			conntrack.SessionID = session.SessionID
 		} else {
-			conntrackEntry.SessionID = nextSessionID()
+			conntrack.SessionID = nextSessionID()
 		}
 
-		insertConntrackEntry(ctid, conntrackEntry)
+		insertConntrack(ctid, conntrack)
 	}
 
 	// handle UPDATE events
@@ -206,20 +206,20 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			return
 		}
 
-		conntrackEntry.LastActivityTime = time.Now()
-		conntrackEntry.EventCount++
-		if (connmark & 0x0fffffff) != (conntrackEntry.ConnMark & 0x0fffffff) {
-			logger.Info("Connmark change [%v] 0x%08x != 0x%08x\n", conntrackEntry.ClientSideTuple, connmark, conntrackEntry.ConnMark)
-			conntrackEntry.ConnMark = connmark
+		conntrack.LastActivityTime = time.Now()
+		conntrack.EventCount++
+		if (connmark & 0x0fffffff) != (conntrack.ConnMark & 0x0fffffff) {
+			logger.Info("Connmark change [%v] 0x%08x != 0x%08x\n", conntrack.ClientSideTuple, connmark, conntrack.ConnMark)
+			conntrack.ConnMark = connmark
 		}
-		if conntrackEntry.Session != nil {
-			conntrackEntry.Session.LastActivityTime = time.Now()
-			conntrackEntry.Session.EventCount++
+		if conntrack.Session != nil {
+			conntrack.Session.LastActivityTime = time.Now()
+			conntrack.Session.EventCount++
 		}
 
-		oldC2sBytes := conntrackEntry.C2SBytes
-		oldS2cBytes := conntrackEntry.S2CBytes
-		oldTotalBytes := conntrackEntry.TotalBytes
+		oldC2sBytes := conntrack.C2SBytes
+		oldS2cBytes := conntrack.S2CBytes
+		oldTotalBytes := conntrack.TotalBytes
 		newC2sBytes := c2sBytes
 		newS2cBytes := s2cBytes
 		newTotalBytes := (newC2sBytes + newS2cBytes)
@@ -229,7 +229,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 
 		// In some cases, specifically UDP, a new session takes the place of an old session with the same tuple.
 		// In this case the counts go down because its actually a new session. If the total Bytes is low, this
-		// is probably the case so treat it as a new conntrackEntry.
+		// is probably the case so treat it as a new conntrack.
 		if (diffC2sBytes < 0) || (diffS2cBytes < 0) {
 			newC2sBytes = c2sBytes
 			diffC2sBytes = newC2sBytes
@@ -243,15 +243,15 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		s2cRate := float32(diffS2cBytes / 60)
 		totalRate := float32(diffTotalBytes / 60)
 
-		conntrackEntry.C2SBytes = newC2sBytes
-		conntrackEntry.S2CBytes = newS2cBytes
-		conntrackEntry.TotalBytes = newTotalBytes
-		conntrackEntry.C2SBytesDiff = diffC2sBytes
-		conntrackEntry.S2CBytesDiff = diffS2cBytes
-		conntrackEntry.TotalBytesDiff = diffTotalBytes
-		conntrackEntry.C2SRate = c2sRate
-		conntrackEntry.S2CRate = s2cRate
-		conntrackEntry.TotalRate = totalRate
+		conntrack.C2SBytes = newC2sBytes
+		conntrack.S2CBytes = newS2cBytes
+		conntrack.TotalBytes = newTotalBytes
+		conntrack.C2SBytesDiff = diffC2sBytes
+		conntrack.S2CBytesDiff = diffS2cBytes
+		conntrack.TotalBytesDiff = diffTotalBytes
+		conntrack.C2SRate = c2sRate
+		conntrack.S2CRate = s2cRate
+		conntrack.TotalRate = totalRate
 	}
 
 	// We loop and increment the priority until all subscriptions have been called
@@ -271,7 +271,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			logger.Debug("Calling conntrack APP:%s PRIORITY:%d\n", key, priority)
 			wg.Add(1)
 			go func(val SubscriptionHolder) {
-				val.ConntrackFunc(int(eventType), conntrackEntry)
+				val.ConntrackFunc(int(eventType), conntrack)
 				wg.Done()
 				logger.Debug("Finished conntrack APP:%s PRIORITY:%d\n", val.Owner, val.Priority)
 			}(val)
@@ -286,16 +286,16 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 	}
 }
 
-// findConntrackEntry finds an entry in the conntrack table
-func findConntrackEntry(ctid uint32) (*ConntrackEntry, bool) {
+// findConntrack finds an entry in the conntrack table
+func findConntrack(ctid uint32) (*Conntrack, bool) {
 	conntrackTableMutex.Lock()
 	defer conntrackTableMutex.Unlock()
 	entry, status := conntrackTable[ctid]
 	return entry, status
 }
 
-// insertConntrackEntry adds an entry to the conntrack table
-func insertConntrackEntry(ctid uint32, entry *ConntrackEntry) {
+// insertConntrack adds an entry to the conntrack table
+func insertConntrack(ctid uint32, entry *Conntrack) {
 	logger.Trace("Insert conntrack entry %d\n", ctid)
 	conntrackTableMutex.Lock()
 	defer conntrackTableMutex.Unlock()
@@ -305,8 +305,8 @@ func insertConntrackEntry(ctid uint32, entry *ConntrackEntry) {
 	conntrackTable[ctid] = entry
 }
 
-// removeConntrackEntry removes an entry from the conntrack table
-func removeConntrackEntry(ctid uint32) {
+// removeConntrack removes an entry from the conntrack table
+func removeConntrack(ctid uint32) {
 	logger.Trace("Remove conntrack entry %d\n", ctid)
 	conntrackTableMutex.Lock()
 	defer conntrackTableMutex.Unlock()
@@ -318,15 +318,15 @@ func cleanConntrackTable() {
 	conntrackTableMutex.Lock()
 	defer conntrackTableMutex.Unlock()
 
-	for ctid, conntrackEntry := range conntrackTable {
-		if time.Now().Sub(conntrackEntry.LastActivityTime) > 1800*time.Second {
+	for ctid, conntrack := range conntrackTable {
+		if time.Now().Sub(conntrack.LastActivityTime) > 1800*time.Second {
 			// This should never happen, log an error
 			// entries should be removed by DELETE events
 			// otherwise they should be getting UPDATE events and the LastActivityTime
 			// would be at least within 60 seconds.
 			// The the entry exists, the LastActivityTime is a long time ago
 			// some constraint has failed
-			logger.Err("Removing stale (%v) conntrack entry [%d] %v\n", time.Now().Sub(conntrackEntry.LastActivityTime), ctid, conntrackEntry.ClientSideTuple)
+			logger.Err("Removing stale (%v) conntrack entry [%d] %v\n", time.Now().Sub(conntrack.LastActivityTime), ctid, conntrack.ClientSideTuple)
 			delete(conntrackTable, ctid)
 		}
 	}

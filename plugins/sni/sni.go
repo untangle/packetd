@@ -204,7 +204,7 @@ func extractSNIhostname(buffer []byte) (bool, string) {
 
 // logEvent logs an update event that updates the ssl_sni column
 // provide the session, and the sni string
-func logEvent(session *dispatch.SessionEntry, sslSni string) {
+func logEvent(session *dispatch.Session, sslSni string) {
 	columns := map[string]interface{}{
 		"session_id": session.SessionID,
 	}

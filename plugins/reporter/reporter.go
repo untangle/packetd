@@ -33,7 +33,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var result dispatch.NfqueueResult
 	result.SessionRelease = true
 
-	var session *dispatch.SessionEntry
+	var session *dispatch.Session
 	session = mess.Session
 	if session == nil {
 		logger.Err("Missing session on NFQueue packet!")
@@ -91,8 +91,8 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 }
 
 // PluginConntrackHandler receives conntrack events
-func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
-	var session *dispatch.SessionEntry
+func PluginConntrackHandler(message int, entry *dispatch.Conntrack) {
+	var session *dispatch.Session
 
 	if entry.Session != nil {
 		logger.Trace("Conntrack Event: %c %v 0x%08x\n", message, entry.Session.ClientSideTuple, entry.ConnMark)
@@ -143,7 +143,7 @@ func PluginNetloggerHandler(netlogger *dispatch.NetloggerMessage) {
 }
 
 // doAccounting does the session_minutes accounting
-func doAccounting(entry *dispatch.ConntrackEntry, sessionID uint64) {
+func doAccounting(entry *dispatch.Conntrack, sessionID uint64) {
 	columns := map[string]interface{}{
 		"time_stamp": time.Now(),
 		"session_id": sessionID,

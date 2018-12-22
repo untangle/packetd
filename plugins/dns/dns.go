@@ -47,6 +47,11 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var result dispatch.NfqueueResult
 	result.SessionRelease = true
 
+	// Session is over
+	if mess.Packet == nil {
+		return result
+	}
+
 	// for new sessions we look for the client and server IP in our DNS cache
 	if newSession {
 		var name string

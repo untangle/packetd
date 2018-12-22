@@ -8,8 +8,8 @@ import (
 	"github.com/untangle/packetd/services/logger"
 )
 
-// SessionEntry stores information of a packetd session
-type SessionEntry struct {
+// Session stores information of a packetd session
+type Session struct {
 
 	// SessionID is the globally unique ID for this session (created in packetd)
 	SessionID uint64
@@ -36,7 +36,7 @@ type SessionEntry struct {
 	ConntrackConfirmed bool
 
 	// The conntrack entry associated with this session
-	ConntrackEntry *ConntrackEntry
+	Conntrack *Conntrack
 
 	// PacketdCount stores the number of packets queued to packetd for this session
 	PacketCount uint64
@@ -61,7 +61,7 @@ type SessionEntry struct {
 }
 
 // sessionTable is the global session table
-var sessionTable map[uint32]*SessionEntry
+var sessionTable map[uint32]*Session
 
 // sessionMutex is the lock for sessionTable
 var sessionMutex sync.Mutex
@@ -70,32 +70,51 @@ var sessionMutex sync.Mutex
 var sessionIndex uint64
 
 // PutAttachment is used to safely add an attachment to a session object
-func (entry *SessionEntry) PutAttachment(name string, value interface{}) {
-	entry.attachmentLock.Lock()
-	entry.attachments[name] = value
-	entry.attachmentLock.Unlock()
+func (sess *Session) PutAttachment(name string, value interface{}) {
+	sess.attachmentLock.Lock()
+	sess.attachments[name] = value
+	sess.attachmentLock.Unlock()
 }
 
 // GetAttachment is used to safely get an attachment from a session object
-func (entry *SessionEntry) GetAttachment(name string) interface{} {
-	entry.attachmentLock.Lock()
-	value := entry.attachments[name]
-	entry.attachmentLock.Unlock()
+func (sess *Session) GetAttachment(name string) interface{} {
+	sess.attachmentLock.Lock()
+	value := sess.attachments[name]
+	sess.attachmentLock.Unlock()
 	return value
 }
 
 // DeleteAttachment is used to safely delete an attachment from a session object
-func (entry *SessionEntry) DeleteAttachment(name string) bool {
-	entry.attachmentLock.Lock()
-	value := entry.attachments[name]
-	delete(entry.attachments, name)
-	entry.attachmentLock.Unlock()
+func (sess *Session) DeleteAttachment(name string) bool {
+	sess.attachmentLock.Lock()
+	value := sess.attachments[name]
+	delete(sess.attachments, name)
+	sess.attachmentLock.Unlock()
 
 	if value == nil {
 		return false
 	}
 
 	return true
+}
+
+// destroy is called to end the session
+// it removes the session from the session table, and calls
+// the finialization event to all subscribers
+func (sess *Session) destroy() {
+	sessionMutex.Lock()
+	sessInTable, found := sessionTable[sess.ConntrackID]
+	if found && sess == sessInTable {
+		dict.DeleteSession(sess.ConntrackID)
+		delete(sessionTable, sess.ConntrackID)
+	}
+	sessionMutex.Unlock()
+
+	// call the subscribers
+	var mess NfqueueMessage
+	mess.Session = sess
+	mess.Packet = nil
+	callSubscribers(sess.ConntrackID, sess, mess, 0, false)
 }
 
 // nextSessionID returns the next sequential session ID value
@@ -113,56 +132,29 @@ func nextSessionID() uint64 {
 	return (value)
 }
 
-// findSessionEntry searches for an entry in the session table
-func findSessionEntry(ctid uint32) *SessionEntry {
+// findSession searches for an sess in the session table
+func findSession(ctid uint32) *Session {
 	sessionMutex.Lock()
-	entry, status := sessionTable[ctid]
+	sess, status := sessionTable[ctid]
 	logger.Trace("Lookup session index %v -> %v\n", ctid, status)
 	sessionMutex.Unlock()
 	if status == false {
 		return nil
 	}
-	return entry
+	return sess
 }
 
-// insertSessionEntry adds an entry to the session table
-func insertSessionEntry(ctid uint32, entry *SessionEntry) {
-	logger.Trace("Insert session index %v -> %v\n", ctid, entry.ClientSideTuple)
+// insertSessionTable adds an sess to the session table
+func insertSessionTable(ctid uint32, sess *Session) {
+	logger.Trace("Insert session index %v -> %v\n", ctid, sess.ClientSideTuple)
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
 	if sessionTable[ctid] != nil {
+		logger.Warn("Overriding previous session: %v\n", ctid)
 		delete(sessionTable, ctid)
 	}
-	sessionTable[ctid] = entry
-	dict.AddSessionEntry(entry.ConntrackID, "session_id", entry.SessionID)
-}
-
-// removeSessionEntry removes an entry from the session table
-// of the specified ctid
-func removeSessionEntry(ctid uint32) {
-	logger.Trace("Remove session ctid %v\n", ctid)
-	sessionMutex.Lock()
-	defer sessionMutex.Unlock()
-	entry, status := sessionTable[ctid]
-	if status {
-		dict.DeleteSession(entry.ConntrackID)
-	}
-	delete(sessionTable, ctid)
-}
-
-// removeSessionEntrySpecific removes an entry from the session table
-// of the specified ctid if its mapped to the specified sess
-func removeSessionEntrySpecific(sess *SessionEntry) {
-	logger.Trace("Remove session ctid %v\n", sess.ConntrackID)
-	sessionMutex.Lock()
-	defer sessionMutex.Unlock()
-	entry, status := sessionTable[sess.ConntrackID]
-	if entry == sess {
-		if status {
-			dict.DeleteSession(entry.ConntrackID)
-		}
-		delete(sessionTable, sess.ConntrackID)
-	}
+	sessionTable[ctid] = sess
+	dict.AddSessionEntry(sess.ConntrackID, "session_id", sess.SessionID)
 }
 
 // cleanSessionTable cleans the session table by removing stale entries
@@ -177,7 +169,7 @@ func cleanSessionTable() {
 		// However, if we find a a stale conntrack-confirmed session.
 		if time.Now().Sub(session.LastActivityTime) > 600*time.Second {
 			if session.ConntrackConfirmed {
-				logger.Err("Removing stale (%v) session entry [%v] %v\n", time.Now().Sub(session.LastActivityTime), ctid, session.ClientSideTuple)
+				logger.Err("Removing stale (%v) session [%v] %v\n", time.Now().Sub(session.LastActivityTime), ctid, session.ClientSideTuple)
 			}
 			dict.DeleteSession(ctid)
 			delete(sessionTable, ctid)

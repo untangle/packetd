@@ -82,6 +82,10 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		dstAddr = mess.IP4Layer.DstIP
 	}
 
+	if srcAddr == nil || dstAddr == nil {
+		return result
+	}
+
 	SrcRecord, err := geodb.City(srcAddr)
 	if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
 		clientCountry = SrcRecord.Country.IsoCode
@@ -183,7 +187,7 @@ func findGeoFile(download bool) string {
 
 // logEvent logs an update event that updates the *_country columns
 // provide the session, and the client and server country
-func logEvent(session *dispatch.SessionEntry, clientCountry string, serverCountry string) {
+func logEvent(session *dispatch.Session, clientCountry string, serverCountry string) {
 	columns := map[string]interface{}{
 		"session_id": session.SessionID,
 	}

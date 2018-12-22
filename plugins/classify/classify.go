@@ -152,36 +152,38 @@ func SetHostPort(value string) {
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var reply string
 	var err error
-	var result dispatch.NfqueueResult
-	result.SessionRelease = false
 
 	// make sure we have a valid conntrack id
 	if ctid == 0 {
 		logger.Err("Ignoring event with invalid ctid\n")
-		result.SessionRelease = true
-		return result
+		return dispatch.NfqueueResult{SessionRelease: true}
+	}
+
+	// Session is ending
+	if mess.Packet == nil {
+		// FIXME we should send one last command to get the lastest classification
+		// in case it has been updated and log if changed
+		daemonRemove(ctid)
+		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
 	// make sure we have a valid session
 	if mess.Session == nil {
 		logger.Err("Ignoring event with invalid session\n")
-		result.SessionRelease = true
-		return result
+		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
 	// make sure we have a valid IPv4 or IPv6 layer
 	if mess.IP4Layer == nil && mess.IP6Layer == nil {
 		logger.Err("Invalid packet: %v\n", mess.Session.ClientSideTuple.Protocol)
-		result.SessionRelease = true
-		return result
+		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
 	// send the data to classd and read reply
 	reply, err = daemonClassify(mess, ctid, newSession)
 	if err != nil {
 		logger.Err("classd communication error: %v\n", err)
-		result.SessionRelease = true
-		return result
+		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
 	// process the reply and get the classification state
@@ -189,30 +191,33 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, release the session
 	if state == navlStateClassified || state == navlStateTerminated || mess.Session.PacketCount > maxPacketCount || mess.Session.ByteCount > maxTrafficSize {
-		result.SessionRelease = true
-		return result
+		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
-	return result
+	return dispatch.NfqueueResult{SessionRelease: false}
+
 }
 
 // PluginConntrackHandler receives conntrack dispatch. The message will be one
 // of three possible values: N, U, or D for new entry, an update to an existing
 // entry, or delete of an existing entry.
-func PluginConntrackHandler(message int, entry *dispatch.ConntrackEntry) {
+func PluginConntrackHandler(message int, entry *dispatch.Conntrack) {
+	// we're only interested in delete events
+	if message == 'D' {
+		daemonRemove(entry.ConntrackID)
+	}
+}
+
+// daemonRemove sends a command to classd to remove the ctid
+func daemonRemove(ctid uint32) {
 	var reply string
 	var err error
 
-	// we're only interested in delete events
-	if message != 'D' {
-		return
-	}
-
 	if logger.IsTraceEnabled() {
-		logger.Trace("daemonCommand REMOVE|%d\n", entry.ConntrackID)
+		logger.Trace("daemonCommand REMOVE|%d\n", ctid)
 	}
 
-	reply, err = daemonCommand(nil, "REMOVE|%d\r\n", entry.ConntrackID)
+	reply, err = daemonCommand(nil, "REMOVE|%d\r\n", ctid)
 	if err != nil {
 		logger.Err("daemonCommand error: %s\n", err.Error())
 		return
@@ -365,7 +370,7 @@ func parseReply(replyString string) (string, string, string, string, uint64, str
 
 // logEvent logs a session_classify event that updates the application_* columns
 // provide the session and the changed column names
-func logEvent(session *dispatch.SessionEntry, changed []string) {
+func logEvent(session *dispatch.Session, changed []string) {
 	if len(changed) == 0 {
 		return
 	}

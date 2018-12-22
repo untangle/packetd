@@ -184,7 +184,7 @@ func PluginNfqueueServerHandler(mess dispatch.NfqueueMessage, ctid uint32, newSe
 
 // attachReverseNamesToSession is called to attach the reverse DNS names to a
 // session entry and put them in the dictionary
-func attachReverseNamesToSession(keyname string, session *dispatch.SessionEntry, list []string) {
+func attachReverseNamesToSession(keyname string, session *dispatch.Session, list []string) {
 	var builder string
 
 	for i := 0; i < len(list); i++ {
