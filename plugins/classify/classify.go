@@ -16,11 +16,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
-	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
 )
@@ -52,9 +52,11 @@ const maxPacketCount = 32     // The maximum number of packets to inspect before
 const maxTrafficSize = 0x8000 // The maximum number of bytes to inspect before releasing
 
 var applicationTable map[string]applicationInfo
-var shutdownChannel = make(chan bool)
+var shutdownFlag = false
 var daemonProcess *exec.Cmd
 var daemonSocket net.Conn
+var daemonChannel = make(chan bool, 1)
+
 var classdHostPort = "127.0.0.1:8123"
 var classdMutex sync.Mutex
 var dialCounter int
@@ -94,15 +96,11 @@ func PluginShutdown() {
 	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
 
 	// first signal the shutdown channel to stop the daemon manager
-	shutdownChannel <- true
+	shutdownFlag = true
+	daemonChannel <- true
 
-	// now we can disconnect and signal the daemon to shutdown
-	daemonGoodbye()
-	daemonShutdown()
-
-	// wait for the shutdown to complete successfully or timeout
 	select {
-	case <-shutdownChannel:
+	case <-daemonChannel:
 		logger.Info("Successful shutdown of daemonManager\n")
 	case <-time.After(10 * time.Second):
 		logger.Warn("Failed to properly shutdown daemonManager\n")
@@ -547,18 +545,33 @@ func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname st
 // daemonManager is a goroutine to start, connect, monitor, restart, and reconnect the untangle-classd daemon
 // we also watch the shutdown channel and exit when the shutdown signal is received
 func daemonManager() {
+	daemonChannel <- true
 	for {
-		select {
-		case <-shutdownChannel:
-			shutdownChannel <- true
+		<-daemonChannel
+
+		if shutdownFlag {
+			daemonGoodbye()
+			daemonShutdown()
 			return
-		case <-time.After(time.Second):
-			if daemonProcess == nil {
-				daemonStartup()
-			}
-			if daemonSocket == nil {
-				daemonConnect()
-			}
+		}
+
+		if daemonProcess == nil {
+			daemonStartup()
+
+			// Use a goroutine to wait for the process to finish. In normal operation Wait() will
+			// return when the daemon shuts down in response to SIGINT which is sent after the
+			// daemon manager has shutdown. If the daemon exits for any other reason the manager
+			// will see the nil process and attempt to restart the daemon.
+			go func() {
+				err := daemonProcess.Wait()
+				logger.Info("The classd daemon has exited. INFO:%v\n", err)
+				daemonGoodbye()
+				daemonProcess = nil
+				daemonChannel <- true
+			}()
+		}
+		if daemonSocket == nil {
+			daemonConnect()
 		}
 	}
 }
@@ -566,15 +579,53 @@ func daemonManager() {
 // starts the daemon and uses a goroutine to wait for it to finish
 func daemonStartup() {
 	var err error
+	var daemonStdout io.ReadCloser
+	var daemonStderr io.ReadCloser
 
 	// start the classd daemon with the no fork flag and optionally the debug flag
-	if kernel.GetDebugFlag() {
-		daemonProcess = exec.Command(daemonBinary, "-f", "-d")
+	if logger.IsDebugEnabled() {
+		daemonProcess = exec.Command(daemonBinary, "-l", "-d")
 	} else {
-		daemonProcess = exec.Command(daemonBinary, "-f")
+		daemonProcess = exec.Command(daemonBinary, "-l")
+	}
+
+	// set a diffrent process group so it doesn't get packetd signals
+	daemonProcess.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
 	}
 
 	// call the start function, check for error, and cleanup if things go bad
+	_, err = daemonProcess.StdinPipe()
+	if err != nil {
+		logger.Err("Error starting classify daemon %s (%v)\n", daemonBinary, err)
+		daemonProcess.Process.Release()
+		daemonProcess = nil
+		return
+	}
+	daemonStderr, err = daemonProcess.StderrPipe()
+	if err != nil {
+		logger.Err("Error starting classify daemon %s (%v)\n", daemonBinary, err)
+		daemonProcess.Process.Release()
+		daemonProcess = nil
+		return
+	}
+	daemonStdout, err = daemonProcess.StdoutPipe()
+	if err != nil {
+		logger.Err("Error starting classify daemon %s (%v)\n", daemonBinary, err)
+		daemonProcess.Process.Release()
+		daemonProcess = nil
+		return
+	}
+	printOutputFn := func(reader io.ReadCloser) {
+		for {
+			scanner := bufio.NewScanner(reader)
+			for scanner.Scan() {
+				logger.Info("classd: %v\n", scanner.Text())
+			}
+		}
+	}
+	go printOutputFn(daemonStdout)
+	go printOutputFn(daemonStderr)
 	err = daemonProcess.Start()
 	if err != nil {
 		logger.Err("Error starting classify daemon %s (%v)\n", daemonBinary, err)
@@ -584,17 +635,6 @@ func daemonStartup() {
 	}
 
 	logger.Info("The classd daemon has been started. PID:%d\n", daemonProcess.Process.Pid)
-
-	// Use a goroutine to wait for the process to finish. In normal operation Wait() will
-	// return when the daemon shuts down in response to SIGINT which is sent after the
-	// daemon manager has shutdown. If the daemon exits for any other reason the manager
-	// will see the nil process and attempt to restart the daemon.
-	go func() {
-		err := daemonProcess.Wait()
-		logger.Info("The classd daemon has exited. INFO:%v\n", err)
-		daemonGoodbye()
-		daemonProcess = nil
-	}()
 }
 
 // called to send SIGINT to the classify daemon which will cause normal shutdown
