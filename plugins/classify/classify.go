@@ -88,7 +88,6 @@ func PluginStartup() {
 
 	// insert our nfqueue and conntrack subscriptions
 	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
-	dispatch.InsertConntrackSubscription(pluginName, 2, PluginConntrackHandler)
 }
 
 // PluginShutdown is called when the daemon is shutting down
@@ -168,26 +167,6 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	return dispatch.NfqueueResult{SessionRelease: false}
-}
-
-// PluginConntrackHandler receives conntrack dispatch. The message will be one
-// of three possible values: N, U, or D for new entry, an update to an existing
-// entry, or delete of an existing entry.
-func PluginConntrackHandler(message int, entry *dispatch.Conntrack) {
-	// if not connected to the daemon we can't do anything with the message
-	if daemonSocket == nil {
-		return
-	}
-
-	// if there is no session associated with this conntrack we don't need to do anything
-	if entry.Session == nil {
-		return
-	}
-
-	// we're only interested in delete events
-	if message == 'D' {
-		daemonRemove(entry.Session.SessionID)
-	}
 }
 
 // daemonRemove sends a command to classd to remove the sessionID
