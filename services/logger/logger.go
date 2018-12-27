@@ -61,18 +61,36 @@ func Shutdown() {
 
 }
 
+// GetLogLevel returns the log level for the specified source(s)
+func GetLogLevel(source string) int {
+	lvl, stat := appLogLevel[source]
+	if stat == true {
+		return lvl
+	}
+
+	return LogLevelInfo //default
+}
+
+// GetLogLevel2 returns the log level for the specified source(s)
+// it uses altsource only if a specification for source is not found
+func GetLogLevel2(source string, altsource string) int {
+	lvl, stat := appLogLevel[source]
+	if stat == true {
+		return lvl
+	}
+	altlvl, stat := appLogLevel[altsource]
+	if stat == true {
+		return altlvl
+	}
+
+	return LogLevelInfo //default
+}
+
 // LogMessage is called to write messages to the system log
 func LogMessage(level int, format string, args ...interface{}) {
-	caller, packagename, _, _ := findCaller()
+	caller, packagename, comboname, _, _ := findCaller()
 
-	// if no log level defined, assume Info
-	var loglvl = LogLevelInfo
-
-	item, stat := appLogLevel[packagename]
-	if stat == true {
-		loglvl = item
-	}
-	if level > loglvl {
+	if level > GetLogLevel2(comboname, packagename) {
 		return
 	}
 
@@ -115,17 +133,20 @@ func LogMessageSource(level int, source string, format string, args ...interface
 
 // IsLogEnabled returns true if logging is enabled for the caller at the specified level, false otherwise
 func IsLogEnabled(level int) bool {
-	_, packagename, _, _ := findCaller()
-	return IsLogEnabledSource(level, packagename)
+	_, packagename, comboname, _, _ := findCaller()
+	if IsLogEnabledSource(level, comboname) {
+		return true
+	}
+	if IsLogEnabledSource(level, packagename) {
+		return true
+	}
+	return false
 }
 
 // IsLogEnabledSource is the same as IsLogEnabled but for the manually specified source
 func IsLogEnabledSource(level int, source string) bool {
-	item, stat := appLogLevel[source]
-	if stat == true {
-		return (item >= level)
-	}
-	return false
+	lvl := GetLogLevel(source)
+	return (lvl >= level)
 }
 
 // Emerg is called for log level EMERG messages
@@ -340,8 +361,12 @@ func initLoggerConfig() {
 	// services
 	config["certcache"] = "INFO"
 	config["dict"] = "INFO"
-	config["dispatch"] = "INFO"
+	config["dispatch/conntrack.go"] = "INFO"
+	config["dispatch/netlogger.go"] = "INFO"
+	config["dispatch/nfqueue.go"] = "INFO"
+	config["dispatch/session.go"] = "INFO"
 	config["dispatch_timer"] = "INFO"
+	config["dispatch"] = "INFO"
 	config["exec"] = "INFO"
 	config["kernel"] = "INFO"
 	config["logger"] = "INFO"
@@ -369,7 +394,7 @@ func initLoggerConfig() {
 	file.Close()
 }
 
-func findCaller() (string, string, string, int) {
+func findCaller() (string, string, string, string, int) {
 	// start with 1 because this is not public
 	for depth := 1; depth < 15; depth++ {
 		_, filename, line, ok := runtime.Caller(depth)
@@ -384,7 +409,6 @@ func findCaller() (string, string, string, int) {
 			} else {
 				shortname = filename
 			}
-			//shortname = strings.TrimSuffix(shortname, ".go")
 
 			var packagename string
 			if len(split) > 2 {
@@ -397,9 +421,10 @@ func findCaller() (string, string, string, int) {
 			if len(summary) > 26 {
 				summary = summary[len(summary)-26:]
 			}
-			return summary, packagename, shortname, line
+			comboname := packagename + "/" + shortname
+			return summary, packagename, comboname, shortname, line
 		}
 	}
 
-	return "unknown|unknown:0", "unknown:0", "unknown", 0
+	return "unknown|unknown:0", "unknown:0", "unknown", "unknown", 0
 }
