@@ -12,7 +12,7 @@
 static struct nfq_q_handle		*nfqqh;
 static struct nfq_handle		*nfqh;
 static int						cfg_sock_buffer = (1024 * 1024 * 4);
-static int						cfg_net_maxlen = 10240;
+static int						cfg_net_maxlen = 1024;
 static int						cfg_net_buffer = 32768;
 static int						cfg_net_queue = 1818;
 static char                     *logsrc = "nfqueue";

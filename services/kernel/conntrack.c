@@ -21,7 +21,7 @@ struct update_mark_args {
 	uint32_t	val;
 };
 
-#define BUFFER_SIZE 1024*1024*4
+#define BUFFER_SIZE 1024*1024*8
 
 static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrack *ct,void *data)
 {
