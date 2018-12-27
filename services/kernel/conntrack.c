@@ -21,6 +21,8 @@ struct update_mark_args {
 	uint32_t	val;
 };
 
+#define BUFFER_SIZE 1024*1024*4
+
 static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrack *ct,void *data)
 {
 	struct conntrack_info	info;
@@ -51,6 +53,8 @@ static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrac
 
 	// get the conntrack ID
 	info.conn_id = nfct_get_attr_u32(ct, ATTR_ID);
+
+    //logmessage(LOG_TRACE, logsrc, "conntrack event [%u] %c\n", info.conn_id, info.msg_type);
 
 	// get the orig and repl source and destination addresses
 	if (info.family == AF_INET) {
@@ -110,6 +114,9 @@ int conntrack_startup(void)
 		return(1);
 	}
 
+    ret = nfnl_rcvbufsiz(nfct_nfnlh(nfcth), BUFFER_SIZE);
+    logmessage(LOG_DEBUG,logsrc,"Buffer size set to %d\n", ret);
+
 	// register the conntrack callback
 	ret = nfct_callback_register(nfcth,NFCT_T_ALL,conntrack_callback,NULL);
 
@@ -126,14 +133,16 @@ void conntrack_shutdown(void)
 {
 	if (nfcth == NULL) return;
 
-	// unregister the callback handler
-	nfct_callback_unregister(nfcth);
-
-	// close the conntrack netlink handler
-	nfct_close(nfcth);
+    struct nfct_handle* ptr = nfcth;
 
 	// clear our conntrack handle
-	nfcth = NULL;
+    nfcth = NULL;
+
+	// unregister the callback handler
+	nfct_callback_unregister(ptr);
+
+	// close the conntrack netlink handler
+	nfct_close(ptr);
 }
 
 int conntrack_thread(void)
@@ -161,7 +170,12 @@ int conntrack_thread(void)
 
 	// detect and process events while the shutdown flag is clear
 	while (get_shutdown_flag() == 0) {
-		FD_ZERO(&tester);
+        /* int res = nfct_catch(nfcth); */
+        /* if (res < 0) { */
+        /*     if (nfcth == NULL) */
+        /*         return 0; */
+        /* } */
+        FD_ZERO(&tester);
 		FD_SET(sock,&tester);
 		tv.tv_sec = 1;
 		tv.tv_usec = 0;
