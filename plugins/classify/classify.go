@@ -139,7 +139,17 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// if not connected to the daemon we can't do anything
 	if daemonSocket == nil {
-		return dispatch.NfqueueResult{SessionRelease: false}
+		logger.Warn("Connection to classd failed. Restarting classd...\n")
+		// write to daemonChannel, but don't block
+		select {
+		case daemonChannel <- true:
+		default:
+		}
+		// Release this session just in case
+		// If this is happening something is wrong
+		// While releasing is not ideal, its better if the daemon
+		// has crashed and can't be brought back
+		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
 	// send the data to classd and read reply
@@ -564,7 +574,11 @@ func daemonManager() {
 			// will see the nil process and attempt to restart the daemon.
 			go func() {
 				err := daemonProcess.Wait()
-				logger.Info("The classd daemon has exited. INFO:%v\n", err)
+				if err != nil {
+					logger.Info("The classd daemon has exited. Error:%v\n", err)
+				} else {
+					logger.Info("The classd daemon has exited.\n", err)
+				}
 				daemonGoodbye()
 				daemonProcess = nil
 				daemonChannel <- true
@@ -573,6 +587,8 @@ func daemonManager() {
 		if daemonSocket == nil {
 			daemonConnect()
 		}
+		// sleep a bit to prevent spinning
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 
@@ -616,6 +632,25 @@ func daemonStartup() {
 		daemonProcess = nil
 		return
 	}
+	err = daemonProcess.Start()
+	if err != nil {
+		logger.Err("Error starting classify daemon %s (%v)\n", daemonBinary, err)
+		daemonProcess.Process.Release()
+		daemonProcess = nil
+		return
+	}
+
+	// Wait for startup to complete
+	scanner := bufio.NewScanner(daemonStdout)
+	for scanner.Scan() {
+		// look for "starting" message
+		txt := scanner.Text()
+		logger.Info("classd: %v\n", txt)
+		if strings.Contains(txt, "netserver thread is starting") {
+			break
+		}
+	}
+
 	printOutputFn := func(reader io.ReadCloser) {
 		for {
 			scanner := bufio.NewScanner(reader)
@@ -626,13 +661,6 @@ func daemonStartup() {
 	}
 	go printOutputFn(daemonStdout)
 	go printOutputFn(daemonStderr)
-	err = daemonProcess.Start()
-	if err != nil {
-		logger.Err("Error starting classify daemon %s (%v)\n", daemonBinary, err)
-		daemonProcess.Process.Release()
-		daemonProcess = nil
-		return
-	}
 
 	logger.Info("The classd daemon has been started. PID:%d\n", daemonProcess.Process.Pid)
 }
@@ -665,11 +693,7 @@ func daemonConnect() {
 	// establish our connection to the daemon
 	daemonSocket, err = net.DialTimeout("tcp", classdHostPort, 5*time.Second)
 	if err != nil {
-		// no error messages until we've succesfully connected once to eliminate startup errors
-		// we get when trying to connect to the daemon before it starts to listen on the socket
-		if dialCounter > 0 {
-			logger.Err("Error calling net.DialTimeout(%s): %v\n", classdHostPort, err)
-		}
+		logger.Err("Error calling net.DialTimeout(%s): %v\n", classdHostPort, err)
 	} else {
 		logger.Info("Succesfully connected to classify daemon(%s)\n", classdHostPort)
 		dialCounter++
