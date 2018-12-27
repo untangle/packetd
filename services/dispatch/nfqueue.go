@@ -199,6 +199,13 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 	session.ByteCount += uint64(mess.Length)
 	session.EventCount++
 
+	// If we've processed this many packets without all the plugins releasing
+	// there is likely an issue. Only warn at "== X" packet count
+	// to avoid flooding logs with a "> X" condition
+	if session.PacketCount == 100 {
+		logger.Warn("Deep session scan. %v Packets:%v Bytes:%v\n", session.ClientSideTuple, session.PacketCount, session.ByteCount)
+	}
+
 	return callSubscribers(ctid, session, mess, pmark, newSession)
 }
 
