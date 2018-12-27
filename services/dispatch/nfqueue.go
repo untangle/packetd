@@ -203,7 +203,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 	// there is likely an issue. Only warn at "== X" packet count
 	// to avoid flooding logs with a "> X" condition
 	if session.PacketCount == 100 {
-		logger.Warn("Deep session scan. %v Packets:%v Bytes:%v\n", session.ClientSideTuple, session.PacketCount, session.ByteCount)
+		logger.Warn("Deep session scan. %v Packets:%v Bytes:%v Subscribers:%v\n", session.ClientSideTuple, session.PacketCount, session.ByteCount, session.subscriptions)
 	}
 
 	return callSubscribers(ctid, session, mess, pmark, newSession)
