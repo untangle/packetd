@@ -120,8 +120,8 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var err error
 
 	// make sure we have a valid conntrack id
-	if ctid == 0 {
-		logger.Err("Ignoring event with invalid ctid\n")
+	if mess.Session == nil || mess.Session.SessionID == 0 {
+		logger.Err("Ignoring event with invalid sessionID\n")
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
@@ -153,7 +153,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	// send the data to classd and read reply
-	reply, err = daemonClassify(mess, ctid, newSession)
+	reply, err = daemonClassify(mess, mess.Session.SessionID, newSession)
 	if err != nil {
 		logger.Err("classd communication error: %v\n", err)
 		return dispatch.NfqueueResult{SessionRelease: true}
@@ -179,22 +179,27 @@ func PluginConntrackHandler(message int, entry *dispatch.Conntrack) {
 		return
 	}
 
+	// if there is no session associated with this conntrack we don't need to do anything
+	if entry.Session == nil {
+		return
+	}
+
 	// we're only interested in delete events
 	if message == 'D' {
-		daemonRemove(entry.ConntrackID)
+		daemonRemove(entry.Session.SessionID)
 	}
 }
 
-// daemonRemove sends a command to classd to remove the ctid
-func daemonRemove(ctid uint32) {
+// daemonRemove sends a command to classd to remove the sessionID
+func daemonRemove(sessionID uint64) {
 	var reply string
 	var err error
 
 	if logger.IsTraceEnabled() {
-		logger.Trace("daemonCommand REMOVE|%d\n", ctid)
+		logger.Trace("daemonCommand REMOVE|%d\n", sessionID)
 	}
 
-	reply, err = daemonCommand(nil, "REMOVE|%d\r\n", ctid)
+	reply, err = daemonCommand(nil, "REMOVE|%d\r\n", sessionID)
 	if err != nil {
 		logger.Err("daemonCommand error: %s\n", err.Error())
 		return
@@ -206,7 +211,7 @@ func daemonRemove(ctid uint32) {
 }
 
 // daemonClassify sends classd the commands and returns the reply
-func daemonClassify(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) (string, error) {
+func daemonClassify(mess dispatch.NfqueueMessage, sessionID uint64, newSession bool) (string, error) {
 	var proto string
 	var reply string
 	var err error
@@ -221,7 +226,7 @@ func daemonClassify(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) 
 
 	// if this is the first packet of the session we send a session create command
 	if newSession {
-		reply, err = daemonCommand(nil, "CREATE|%d|%s|%s|%d|%s|%d\r\n", ctid, proto, mess.Session.ClientSideTuple.ClientAddress, mess.Session.ClientSideTuple.ClientPort, mess.Session.ClientSideTuple.ServerAddress, mess.Session.ClientSideTuple.ServerPort)
+		reply, err = daemonCommand(nil, "CREATE|%d|%s|%s|%d|%s|%d\r\n", sessionID, proto, mess.Session.ClientSideTuple.ClientAddress, mess.Session.ClientSideTuple.ClientPort, mess.Session.ClientSideTuple.ServerAddress, mess.Session.ClientSideTuple.ServerPort)
 		if err != nil {
 			logger.Err("daemonCommand error: %s\n", err.Error())
 			return "", err
@@ -232,7 +237,7 @@ func daemonClassify(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) 
 	}
 
 	// send the packet data to the daemon
-	reply, err = daemonCommand(mess.Packet.Data(), "PACKET|%d|%d\r\n", ctid, len(mess.Packet.Data()))
+	reply, err = daemonCommand(mess.Packet.Data(), "PACKET|%d|%d\r\n", sessionID, len(mess.Packet.Data()))
 
 	if err != nil {
 		logger.Err("daemonCommand error: %s\n", err.Error())
