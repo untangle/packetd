@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -87,10 +89,16 @@ var eventQueue = make(chan Event, 1000)
 // EventsLogged records the number of events logged
 var EventsLogged = 0
 
+// DbFilename is the sqlite db filename
+const dbFilename = "/tmp/reports.db"
+
+// the DB soft size limit
+const dbLimit = 1048576 * 96
+
 // Startup starts the reports service
 func Startup() {
 	var err error
-	db, err = sql.Open("sqlite3", "/tmp/reports.db")
+	db, err = sql.Open("sqlite3", dbFilename)
 
 	if err != nil {
 		logger.Err("Failed to open database: %s\n", err.Error())
@@ -98,7 +106,8 @@ func Startup() {
 
 	go func() {
 		createTables()
-		eventLogger()
+		go eventLogger()
+		go dbCleaner()
 	}()
 }
 
@@ -518,4 +527,65 @@ func mergeConditions(reportEntry *ReportEntry) {
 		reportEntry.Conditions = append(reportEntry.Conditions, reportEntry.UserConditions...)
 	}
 	reportEntry.UserConditions = []ReportCondition{}
+}
+
+// dbCleaner checks the size of the sqlite DB and trims it when it gets over
+// the predetermined size
+func dbCleaner() {
+	ch := make(chan bool, 1)
+
+	for {
+		select {
+		case <-ch:
+		case <-time.After(60 * time.Second):
+		}
+
+		dbFile, err := os.Stat(dbFilename)
+		if err != nil {
+			logger.Warn("Error checking DB file: %v\n", err.Error())
+			continue
+		}
+		// get the size
+		size := dbFile.Size()
+		logger.Debug("Current DB Size: %.1fM\n", (float32(size) / float32(1024*1024)))
+		if size > dbLimit {
+			trimPercent("sessions", .1)
+			trimPercent("session_minutes", .1)
+			runSQL("VACUUM")
+			logger.Info("Trimmed DB.\n")
+			// re-run and check size with no delay
+			ch <- true
+		}
+	}
+}
+
+// trimPercent trims the specified table by the specified percent (by time)
+// example: trimPercent("sessions",.1) will drop the oldest 10% of events in sessions by time
+func trimPercent(table string, percent float32) {
+	logger.Debug("Trimming %s by %.1f%% percent...\n", table, percent*100.0)
+
+	sqlStr := fmt.Sprintf("DELETE FROM %s WHERE time_stamp < (SELECT min(time_stamp)+cast((max(time_stamp)-min(time_stamp))*%f as int) from %s)", table, percent, table)
+
+	runSQL(sqlStr)
+}
+
+// runSql runs the specified SQL
+// results are not read
+// errors are logged
+func runSQL(sqlStr string) {
+	logger.Debug("SQL: %s\n", sqlStr)
+	stmt, err := db.Prepare(sqlStr)
+	if err != nil {
+		logger.Warn("Failed to prepare statement: %s %s\n", err.Error(), sqlStr)
+		return
+	}
+	_, err = stmt.Exec()
+	if err != nil {
+		logger.Warn("Failed to exec statement: %s %s\n", err.Error(), sqlStr)
+		return
+	}
+	err = stmt.Close()
+	if err != nil {
+		logger.Warn("Failed to close statement: %s %s\n", err.Error(), sqlStr)
+	}
 }
