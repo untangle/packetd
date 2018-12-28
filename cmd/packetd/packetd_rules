@@ -1,7 +1,8 @@
 #!/bin/sh
 
 NFT=${NFT:-nft}
-PACKETD_QUEUE_NUM=1818
+PACKETD_QUEUE_NUM=2000
+PACKETD_QUEUE_NUM_HIGH=2003
 QUEUE_PRIORITY="-145"
 MANGLE_PRIORITY="-145"
 TABLE_NAME="packetd"
@@ -102,7 +103,7 @@ insert_packetd_rules()
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state new mark set "mark|0x10000000"
 
     # Queue the traffic
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd counter queue num ${PACKETD_QUEUE_NUM} bypass
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd counter queue num ${PACKETD_QUEUE_NUM} - ${PACKETD_QUEUE_NUM_HIGH} fanout,bypass
 }
 
 usage() {

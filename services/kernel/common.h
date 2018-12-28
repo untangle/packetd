@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -82,7 +83,7 @@ struct nfq_data {
 	struct nfattr	**data;
 };
 
-extern void go_nfqueue_callback(uint32_t mark,unsigned char* data,int len,uint32_t ctid,uint32_t nfid,char* memory,int playflag);
+extern void go_nfqueue_callback(uint32_t mark,unsigned char* data,int len,uint32_t ctid,uint32_t nfid,char* memory,int playflag,int index);
 extern void go_netlogger_callback(struct netlogger_info* info,int playflag);
 extern void go_conntrack_callback(struct conntrack_info* info,int playflag);
 
@@ -121,11 +122,10 @@ int conntrack_update_mark(uint32_t ctid, uint32_t mask, uint32_t value);
 int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data);
 uint32_t nfq_get_conntrack_id(struct nfq_data *nfad, int l3num);
 int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data *nfad,void *data);
-int nfqueue_set_verdict(uint32_t nfid, uint32_t verdict);
-int nfqueue_startup(void);
-void nfqueue_shutdown(void);
-int nfqueue_thread(void);
-void nfqueue_shutdown(void);
+int nfqueue_set_verdict(int index, uint32_t nfid, uint32_t verdict);
+int nfqueue_startup(int index);
+void nfqueue_shutdown(int index);
+int nfqueue_thread(int index);
 void nfqueue_free_buffer(char *buffer);
 
 int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct nflog_data *nfa,void *data);

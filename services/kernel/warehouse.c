@@ -204,7 +204,7 @@ void warehouse_playback(void)
 		{
 			case 'Q':
 				dh.ctid |= 0xF0000000;
-				go_nfqueue_callback(dh.mark,buffer,dh.length,dh.ctid,dh.nfid,buffer,1);
+				go_nfqueue_callback(dh.mark,buffer,dh.length,dh.ctid,dh.nfid,buffer,1,0);
 				break;
 
 			case 'C':

@@ -50,7 +50,11 @@ func Shutdown() {
 // StartCallbacks donates threads for all the C services and starts other persistent tasks
 func StartCallbacks() {
 	// Donate threads to kernel hooks
-	go C.nfqueue_thread()
+	go C.nfqueue_thread(0)
+	go C.nfqueue_thread(1)
+	go C.nfqueue_thread(2)
+	go C.nfqueue_thread(3)
+
 	go C.conntrack_thread()
 	go C.netlogger_thread()
 
@@ -158,10 +162,10 @@ func RegisterNetloggerCallback(cb NetloggerCallback) {
 }
 
 //export go_nfqueue_callback
-func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.char, playflag C.int) {
+func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.char, playflag C.int, index C.int) {
 	if nfqueueCallback == nil {
 		logger.Warn("No queue callback registered. Ignoring packet.\n")
-		C.nfqueue_set_verdict(nfid, C.NF_ACCEPT)
+		C.nfqueue_set_verdict(index, nfid, C.NF_ACCEPT)
 		C.nfqueue_free_buffer(buffer)
 		return
 	}
@@ -190,7 +194,9 @@ func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint
 		packetLength = int(size)
 
 		verdict := nfqueueCallback(conntrackID, packet, packetLength, pmark)
-		C.nfqueue_set_verdict(nfid, C.uint32_t(verdict))
+		if playflag == 0 {
+			C.nfqueue_set_verdict(index, nfid, C.uint32_t(verdict))
+		}
 		C.nfqueue_free_buffer(buffer)
 
 	}

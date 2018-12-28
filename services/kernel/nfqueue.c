@@ -9,14 +9,16 @@
 
 #include "common.h"
 
-static struct nfq_q_handle		*nfqqh;
-static struct nfq_handle		*nfqh;
+#define NUM_QUEUES 4
+
+static struct nfq_q_handle*     nfqqh[NUM_QUEUES];
+static struct nfq_handle*       nfqh[NUM_QUEUES];
 static int						cfg_sock_buffer = (1024 * 1024 * 4);
-static int						cfg_net_maxlen = 1024;
+static int						cfg_net_maxlen = 512;
 static int						cfg_net_buffer = 32768;
-static int						cfg_net_queue = 1818;
-static char                     *logsrc = "nfqueue";
-static char						*buffer;
+static int						cfg_net_queue = 2000;
+static char*                    logsrc = "nfqueue";
+static char*                    buffer[NUM_QUEUES];
 
 int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data)
 {
@@ -59,13 +61,15 @@ unsigned int nfq_get_conntrack_id(struct nfq_data *nfad, int l3num)
 
 int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data *nfad,void *data)
 {
-	struct nfqnl_msg_packet_hdr		*hdr;
-	unsigned char					*rawpkt;
+	struct nfqnl_msg_packet_hdr*    hdr;
+	unsigned char*                  rawpkt;
     uint32_t                        mark;
 	uint32_t    					ctid;
     uint32_t                        nfid;
-	struct iphdr					*iphead;
+	struct iphdr*                   iphead;
 	int								rawlen;
+    intptr_t                        index = (intptr_t)data;
+    char*                           buff = buffer[index];
 
 	// get the packet header and mark
 	hdr = nfq_get_msg_packet_hdr(nfad);
@@ -83,7 +87,7 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 	if (rawlen < (int)sizeof(struct iphdr)) {
 		nfq_set_verdict(qh,(hdr ? ntohl(hdr->packet_id) : 0),NF_ACCEPT,0,NULL);
 		logmessage(LOG_WARNING,logsrc,"Invalid length %d received\n",rawlen);
-		nfqueue_free_buffer(buffer);
+		nfqueue_free_buffer(buff);
 		return(0);
 	}
 
@@ -91,7 +95,7 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
 	iphead = (struct iphdr *)rawpkt;
 
 	if (iphead->version != 4 && iphead->version != 6) {
-		nfqueue_free_buffer(buffer);
+		nfqueue_free_buffer(buff);
         return(0);
     }
 
@@ -105,25 +109,25 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
             ip_addr.s_addr = iphead->daddr;
             logmessage(LOG_DEBUG,logsrc,"Error: dst IP: %s\n", inet_ntoa(ip_addr));
         }
-		nfqueue_set_verdict(nfid, NF_ACCEPT);
-        nfqueue_free_buffer(buffer);
+		nfqueue_set_verdict(index, nfid, NF_ACCEPT);
+        nfqueue_free_buffer(buff);
         return 0;
     }
 
 	if (get_warehouse_flag() == 'C') warehouse_capture('Q',rawpkt,rawlen,mark,ctid,nfid);
 
-	if (get_bypass_flag() == 0) go_nfqueue_callback(mark,rawpkt,rawlen,ctid,nfid,buffer,0);
-	else nfqueue_set_verdict(nfid, NF_ACCEPT);
+	if (get_bypass_flag() == 0) go_nfqueue_callback(mark,rawpkt,rawlen,ctid,nfid,buff,0,index);
+	else nfqueue_set_verdict(index, nfid, NF_ACCEPT);
 
 	return(0);
 }
 
-int nfqueue_set_verdict(uint32_t nfid, uint32_t verdict)
+int nfqueue_set_verdict(int index, uint32_t nfid, uint32_t verdict)
 {
-    if (nfqqh == NULL)
+    if (nfqqh[index] == NULL)
         return -1;
 
-	int ret = nfq_set_verdict(nfqqh,nfid,verdict,0,NULL);
+	int ret = nfq_set_verdict(nfqqh[index],nfid,verdict,0,NULL);
     if (ret < 1) {
         logmessage(LOG_ERR,logsrc,"nfq_set_verdict(): %s\n",strerror(errno));
     }
@@ -131,20 +135,20 @@ int nfqueue_set_verdict(uint32_t nfid, uint32_t verdict)
     return ret;
 }
 
-int nfqueue_startup(void)
+int nfqueue_startup(int index)
 {
 	int		ret;
 
 	//open a new netfilter queue handler
-	nfqh = nfq_open();
-	if (nfqh == NULL) {
+	nfqh[index] = nfq_open();
+	if (nfqh[index] == NULL) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_open()\n");
 		set_shutdown_flag(1);
 		return(1);
 	}
 
 	// unbind any existing queue handler
-	ret = nfq_unbind_pf(nfqh,AF_INET);
+	ret = nfq_unbind_pf(nfqh[index],AF_INET);
 	if (ret < 0) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_unbind_pf()\n");
 		set_shutdown_flag(1);
@@ -152,7 +156,7 @@ int nfqueue_startup(void)
 	}
 
 	// bind the queue handler for AF_INET
-	ret = nfq_bind_pf(nfqh,AF_INET);
+	ret = nfq_bind_pf(nfqh[index],AF_INET);
 	if (ret < 0) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_bind_pf(lan)\n");
 		set_shutdown_flag(1);
@@ -160,7 +164,7 @@ int nfqueue_startup(void)
 	}
 
 	// create a new netfilter queue
-	nfqqh = nfq_create_queue(nfqh,cfg_net_queue,netq_callback,NULL);
+	nfqqh[index] = nfq_create_queue(nfqh[index],cfg_net_queue+index,netq_callback,(void*)(intptr_t)index);
 	if (nfqqh == 0) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_create_queue(%u)\n",cfg_net_queue);
 		set_shutdown_flag(1);
@@ -168,7 +172,7 @@ int nfqueue_startup(void)
 	}
 
 	// set the queue length
-	ret = nfq_set_queue_maxlen(nfqqh,cfg_net_maxlen);
+	ret = nfq_set_queue_maxlen(nfqqh[index],cfg_net_maxlen);
 	if (ret < 0) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_set_queue_maxlen(%d)\n",cfg_net_maxlen);
 		set_shutdown_flag(1);
@@ -176,7 +180,7 @@ int nfqueue_startup(void)
 	}
 
 	// set the queue data copy mode
-	ret = nfq_set_mode(nfqqh,NFQNL_COPY_PACKET,cfg_net_buffer);
+	ret = nfq_set_mode(nfqqh[index],NFQNL_COPY_PACKET,cfg_net_buffer);
 	if (ret < 0) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_set_mode(NFQNL_COPY_PACKET)\n");
 		set_shutdown_flag(1);
@@ -184,7 +188,7 @@ int nfqueue_startup(void)
 	}
 
 	// set flag so we also get the conntrack info for each packet
-	ret = nfq_set_queue_flags(nfqqh,NFQA_CFG_F_FAIL_OPEN,NFQA_CFG_F_FAIL_OPEN);
+	ret = nfq_set_queue_flags(nfqqh[index],NFQA_CFG_F_FAIL_OPEN,NFQA_CFG_F_FAIL_OPEN);
 	if (ret < 0) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_set_queue_flags(NFQA_CFG_F_FAIL_OPEN)\n");
 		set_shutdown_flag(1);
@@ -192,7 +196,7 @@ int nfqueue_startup(void)
 	}
 
 	// set flag so we also get the conntrack info for each packet
-	ret = nfq_set_queue_flags(nfqqh,NFQA_CFG_F_CONNTRACK,NFQA_CFG_F_CONNTRACK);
+	ret = nfq_set_queue_flags(nfqqh[index],NFQA_CFG_F_CONNTRACK,NFQA_CFG_F_CONNTRACK);
 	if (ret < 0) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_set_queue_flags(NFQA_CFG_F_CONNTRACK)\n");
 		set_shutdown_flag(1);
@@ -202,13 +206,13 @@ int nfqueue_startup(void)
 	return(0);
 }
 
-void nfqueue_shutdown(void)
+void nfqueue_shutdown(int index)
 {
-    struct nfq_q_handle* qh = nfqqh;
-    struct nfq_handle* h = nfqh;
+    struct nfq_q_handle* qh = nfqqh[index];
+    struct nfq_handle* h = nfqh[index];
 
-    nfqqh = NULL;
-    nfqh = NULL;
+    nfqqh[index] = NULL;
+    nfqh[index] = NULL;
 
     // destroy the netfilter queue
     if (qh != NULL)
@@ -219,7 +223,7 @@ void nfqueue_shutdown(void)
         nfq_close(h);
 }
 
-int nfqueue_thread(void)
+int nfqueue_thread(int index)
 {
 	struct pollfd	network;
 	int				netsock;
@@ -227,8 +231,7 @@ int nfqueue_thread(void)
 
 	logmessage(LOG_INFO,logsrc,"The nfqueue thread is starting\n");
 
-	// call our nfqueue startup function
-	ret = nfqueue_startup();
+	ret = nfqueue_startup(index);
 
 	if (ret != 0) {
 		logmessage(LOG_ERR,logsrc,"Error %d returned from nfqueue_startup()\n",ret);
@@ -237,10 +240,10 @@ int nfqueue_thread(void)
 	}
 
 	// set the socket receive buffer size
-	ret = nfnl_rcvbufsiz(nfq_nfnlh(nfqh),cfg_sock_buffer);
+	ret = nfnl_rcvbufsiz(nfq_nfnlh(nfqh[index]),cfg_sock_buffer);
 
 	// get the socket descriptor for the netlink queue
-	netsock = nfnl_fd(nfq_nfnlh(nfqh));
+	netsock = nfnl_fd(nfq_nfnlh(nfqh[index]));
 
 	// set up the network poll structure
 	network.fd = netsock;
@@ -254,7 +257,9 @@ int nfqueue_thread(void)
 		ret = poll(&network,1,1000);
 
 		// nothing received so just continue
-		if (ret == 0) continue;
+		if (ret == 0) {
+            continue;
+        }
 
 		// handle poll errors
 		if (ret < 0) {
@@ -267,21 +272,21 @@ int nfqueue_thread(void)
 		}
 
 		// allocate a buffer to hold the packet
-		buffer = (char *)malloc(cfg_net_buffer);
+		buffer[index] = (char *)malloc(cfg_net_buffer);
 
-		if (buffer == NULL) {
+		if (buffer[index] == NULL) {
 			logmessage(LOG_ERR,logsrc,"Unable to allocate memory for packet\n");
 			set_shutdown_flag(1);
 			break;
 		}
 
         // read from the nfqueue socket
-        ret = recv(netsock,buffer,cfg_net_buffer,MSG_DONTWAIT);
+        ret = recv(netsock,buffer[index],cfg_net_buffer,MSG_DONTWAIT);
 
         if (ret == 0) {
             logmessage(LOG_ERR,logsrc,"The nfqueue socket was unexpectedly closed\n");
 			set_shutdown_flag(1);
-			nfqueue_free_buffer(buffer);
+			nfqueue_free_buffer(buffer[index]);
             break;
         }
 
@@ -292,16 +297,16 @@ int nfqueue_thread(void)
 			}
             logmessage(LOG_ERR,logsrc,"Error %d (%s) returned from recv()\n",errno,strerror(errno));
 			set_shutdown_flag(1);
-			nfqueue_free_buffer(buffer);
+			nfqueue_free_buffer(buffer[index]);
             break;
         }
 
         // pass the data to the packet handler
-        nfq_handle_packet(nfqh,buffer,ret);
+        nfq_handle_packet(nfqh[index],buffer[index],ret);
 	}
 
 	// call our nfqueue shutdown function
-	nfqueue_shutdown();
+	nfqueue_shutdown(index);
 
 	logmessage(LOG_INFO,logsrc,"The nfqueue thread has terminated\n");
 	go_child_shutdown();
