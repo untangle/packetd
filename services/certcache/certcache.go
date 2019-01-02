@@ -138,11 +138,14 @@ func cleanCertificateTable() {
 	var counter int
 	nowtime := time.Now()
 
+	certificateMutex.Lock()
+	defer certificateMutex.Unlock()
+
 	for key, val := range certificateTable {
 		if (nowtime.Unix() - val.CreationTime.Unix()) < cleanTimeout {
 			continue
 		}
-		RemoveCertificate(key)
+		delete(certificateTable, key)
 		counter++
 		logger.Debug("Removing certificate for %s\n", key)
 	}
