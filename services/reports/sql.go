@@ -286,6 +286,9 @@ func getDistinctValues(reportEntry *ReportEntry) ([]string, error) {
 		return nil, err
 	}
 
+	dbLock.RLock()
+	defer dbLock.RUnlock()
+
 	logger.Info("Categories SQL: %v %v\n", categoriesSQLStr, conditionValues(reportEntry.Conditions))
 	rows, err := db.Query(categoriesSQLStr, conditionValues(reportEntry.Conditions)...)
 	if err != nil {

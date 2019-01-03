@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -82,6 +83,7 @@ type ReportEntry struct {
 }
 
 var db *sql.DB
+var dbLock sync.RWMutex
 var queries = make(map[uint64]*Query)
 var queryID uint64
 var eventQueue = make(chan Event, 1000)
@@ -156,6 +158,9 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	}
 	values := conditionValues(reportEntry.Conditions)
 
+	// Hold RLock, gets unlocked in CloseQuery
+	dbLock.RLock()
+
 	logger.Info("SQL: %v %v\n", sqlStr, values)
 	rows, err = db.Query(sqlStr, values...)
 	if err != nil {
@@ -195,6 +200,7 @@ func GetData(queryID uint64) (string, error) {
 
 // CloseQuery closes the query now
 func CloseQuery(queryID uint64) (string, error) {
+	defer dbLock.RUnlock()
 	q := queries[queryID]
 	if q == nil {
 		logger.Warn("Query not found: %d\n", queryID)
@@ -275,6 +281,9 @@ func logInsertEvent(event Event) {
 	valueStr += ")"
 	sqlStr += " VALUES " + valueStr
 
+	dbLock.Lock()
+	defer dbLock.Unlock()
+
 	logger.Debug("SQL: %s\n", sqlStr)
 	stmt, err := db.Prepare(sqlStr)
 	if err != nil {
@@ -319,6 +328,9 @@ func logUpdateEvent(event Event) {
 		values = append(values, v)
 		first = false
 	}
+
+	dbLock.Lock()
+	defer dbLock.Unlock()
 
 	logger.Debug("SQL: %s\n", sqlStr)
 	stmt, err := db.Prepare(sqlStr)
@@ -391,6 +403,9 @@ func cleanupQuery(query *Query) {
 
 func createTables() {
 	var err error
+
+	dbLock.Lock()
+	defer dbLock.Unlock()
 
 	_, err = db.Exec(
 		`CREATE TABLE IF NOT EXISTS sessions (
@@ -573,6 +588,9 @@ func trimPercent(table string, percent float32) {
 // results are not read
 // errors are logged
 func runSQL(sqlStr string) {
+	dbLock.Lock()
+	defer dbLock.Unlock()
+
 	logger.Debug("SQL: %s\n", sqlStr)
 	stmt, err := db.Prepare(sqlStr)
 	if err != nil {
