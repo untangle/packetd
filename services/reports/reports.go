@@ -85,6 +85,7 @@ type ReportEntry struct {
 var db *sql.DB
 var dbLock sync.RWMutex
 var queries = make(map[uint64]*Query)
+var queriesLock sync.RWMutex
 var queryID uint64
 var eventQueue = make(chan Event, 10000)
 
@@ -157,6 +158,7 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	sqlStr, err = makeSQLString(reportEntry)
 	if err != nil {
 		logger.Warn("Failed to make SQL: %v\n", err)
+		dbLock.RUnlock()
 		return nil, err
 	}
 	values := conditionValues(reportEntry.Conditions)
@@ -165,13 +167,16 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	rows, err = db.Query(sqlStr, values...)
 	if err != nil {
 		logger.Err("db.Query error: %s\n", err)
+		dbLock.RUnlock()
 		return nil, err
 	}
 	q := new(Query)
 	q.ID = atomic.AddUint64(&queryID, 1)
 	q.Rows = rows
 
+	queriesLock.Lock()
 	queries[q.ID] = q
+	queriesLock.Unlock()
 	go func() {
 		time.Sleep(30 * time.Second)
 		cleanupQuery(q)
@@ -181,7 +186,9 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 
 // GetData returns the data for the provided QueryID
 func GetData(queryID uint64) (string, error) {
+	queriesLock.RLock()
 	q := queries[queryID]
+	queriesLock.RUnlock()
 	if q == nil {
 		logger.Warn("Query not found: %d\n", queryID)
 		return "", errors.New("Query ID not found")
@@ -200,7 +207,9 @@ func GetData(queryID uint64) (string, error) {
 
 // CloseQuery closes the query now
 func CloseQuery(queryID uint64) (string, error) {
+	queriesLock.RLock()
 	q := queries[queryID]
+	queriesLock.RUnlock()
 	if q == nil {
 		logger.Warn("Query not found: %d\n", queryID)
 		return "", errors.New("Query ID not found")
@@ -396,12 +405,16 @@ func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
 }
 
 func cleanupQuery(query *Query) {
-	defer dbLock.RUnlock()
 	logger.Debug("cleanupQuery(%d)\n", query.ID)
+	queriesLock.Lock()
+	defer queriesLock.Unlock()
 	delete(queries, query.ID)
 	if query.Rows != nil {
 		query.Rows.Close()
 		query.Rows = nil
+		// we must unlock the dbLock whil holding queriesLock
+		// to ensure we don't double unlock
+		dbLock.RUnlock()
 	}
 	logger.Debug("cleanupQuery(%d) finished\n", query.ID)
 }
