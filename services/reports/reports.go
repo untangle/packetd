@@ -151,15 +151,15 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	var rows *sql.Rows
 	var sqlStr string
 
+	// Hold RLock, gets unlocked in CloseQuery
+	dbLock.RLock()
+
 	sqlStr, err = makeSQLString(reportEntry)
 	if err != nil {
 		logger.Warn("Failed to make SQL: %v\n", err)
 		return nil, err
 	}
 	values := conditionValues(reportEntry.Conditions)
-
-	// Hold RLock, gets unlocked in CloseQuery
-	dbLock.RLock()
 
 	logger.Info("SQL: %v %v\n", sqlStr, values)
 	rows, err = db.Query(sqlStr, values...)
