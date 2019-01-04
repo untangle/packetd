@@ -319,7 +319,8 @@ func cleanConntrackTable() {
 	defer conntrackTableMutex.Unlock()
 
 	for ctid, conntrack := range conntrackTable {
-		if time.Now().Sub(conntrack.LastActivityTime) > 1800*time.Second {
+		// We use 10000 seconds because 7440 is the established idle tcp timeout default
+		if time.Now().Sub(conntrack.LastActivityTime) > 10000*time.Second {
 			// This should never happen, log an error
 			// entries should be removed by DELETE events
 			// otherwise they should be getting UPDATE events and the LastActivityTime
