@@ -218,6 +218,9 @@ func CreateEvent(name string, table string, sqlOp int, columns map[string]interf
 
 // LogEvent adds an event to the eventQueue for later logging
 func LogEvent(event Event) error {
+	if len(eventQueue) == cap(eventQueue) {
+		logger.Warn("Event queue at capacity: %d\n", cap(eventQueue))
+	}
 	eventQueue <- event
 	return nil
 }
