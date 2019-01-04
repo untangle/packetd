@@ -171,7 +171,7 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 		return nil, err
 	}
 
-	dbLock.RLock()
+	dbLock.RUnlock()
 
 	q := new(Query)
 	q.ID = atomic.AddUint64(&queryID, 1)
