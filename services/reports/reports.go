@@ -151,7 +151,7 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	var rows *sql.Rows
 	var sqlStr string
 
-	// Hold RLock, gets unlocked in CloseQuery
+	// Hold RLock, gets unlocked in CloseQuery/cleanupQuery
 	dbLock.RLock()
 
 	sqlStr, err = makeSQLString(reportEntry)
@@ -200,7 +200,6 @@ func GetData(queryID uint64) (string, error) {
 
 // CloseQuery closes the query now
 func CloseQuery(queryID uint64) (string, error) {
-	defer dbLock.RUnlock()
 	q := queries[queryID]
 	if q == nil {
 		logger.Warn("Query not found: %d\n", queryID)
@@ -397,6 +396,7 @@ func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
 }
 
 func cleanupQuery(query *Query) {
+	defer dbLock.RUnlock()
 	logger.Debug("cleanupQuery(%d)\n", query.ID)
 	delete(queries, query.ID)
 	if query.Rows != nil {
@@ -569,9 +569,11 @@ func dbCleaner() {
 		size := dbFile.Size()
 		logger.Debug("Current DB Size: %.1fM\n", (float32(size) / float32(1024*1024)))
 		if size > dbLimit {
+			dbLock.Lock()
 			trimPercent("sessions", .1)
 			trimPercent("session_minutes", .1)
 			runSQL("VACUUM")
+			dbLock.Unlock()
 			logger.Info("Trimmed DB.\n")
 			// re-run and check size with no delay
 			ch <- true
@@ -593,9 +595,6 @@ func trimPercent(table string, percent float32) {
 // results are not read
 // errors are logged
 func runSQL(sqlStr string) {
-	dbLock.Lock()
-	defer dbLock.Unlock()
-
 	logger.Debug("SQL: %s\n", sqlStr)
 	stmt, err := db.Prepare(sqlStr)
 	if err != nil {
