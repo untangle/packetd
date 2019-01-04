@@ -170,6 +170,9 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 		dbLock.RUnlock()
 		return nil, err
 	}
+
+	dbLock.RLock()
+
 	q := new(Query)
 	q.ID = atomic.AddUint64(&queryID, 1)
 	q.Rows = rows
@@ -412,9 +415,6 @@ func cleanupQuery(query *Query) {
 	if query.Rows != nil {
 		query.Rows.Close()
 		query.Rows = nil
-		// we must unlock the dbLock whil holding queriesLock
-		// to ensure we don't double unlock
-		dbLock.RUnlock()
 	}
 	logger.Debug("cleanupQuery(%d) finished\n", query.ID)
 }
