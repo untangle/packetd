@@ -101,8 +101,8 @@ class NftablesTests(unittest.TestCase):
         print(exp_str)
         rule_str = nftables_util.rule_cmd(rule, "inet", "forward", "forward-filter")
         print(rule_str)
-        assert(exp_str == "ip protocol 'tcp' accept")
-        assert(rule_str == "nft add rule inet forward forward-filter ip protocol 'tcp' accept")
+        assert(exp_str == "meta l4proto 'tcp' accept")
+        assert(rule_str == "nft add rule inet forward forward-filter meta l4proto 'tcp' accept")
         
 
 
@@ -133,11 +133,11 @@ conditions_tests = [
     [[{"value":"foo","op":"=="}], None],
 
     [[{"type": "IP_PROTOCOL","op":"=="}], None],
-    [[{"type": "IP_PROTOCOL","op":"==","value": "tcp,udp"}], "ip protocol '{tcp,udp}'"],
-    [[{"type": "IP_PROTOCOL","op":"!=","value": "tcp,udp"}], "ip protocol != '{tcp,udp}'"],
-    [[{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "ip protocol 'tcp'"],
-    [[{"type": "IP_PROTOCOL","op":"==","value": "TCP"}], "ip protocol 'tcp'"],
-    [[{"type": "IP_PROTOCOL","op":"!=","value": "tcp"}], "ip protocol != 'tcp'"],
+    [[{"type": "IP_PROTOCOL","op":"==","value": "tcp,udp"}], "meta l4proto '{tcp,udp}'"],
+    [[{"type": "IP_PROTOCOL","op":"!=","value": "tcp,udp"}], "meta l4proto != '{tcp,udp}'"],
+    [[{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "meta l4proto 'tcp'"],
+    [[{"type": "IP_PROTOCOL","op":"==","value": "TCP"}], "meta l4proto 'tcp'"],
+    [[{"type": "IP_PROTOCOL","op":"!=","value": "tcp"}], "meta l4proto != 'tcp'"],
 
     [[{"type": "SOURCE_INTERFACE_NAME","op":"==","value": "lo"}], "iifname 'lo'"],
     [[{"type": "SOURCE_INTERFACE_NAME","op":"!=","value": "lo"}], "iifname != 'lo'"],
@@ -176,26 +176,26 @@ conditions_tests = [
     [[{"type": "SOURCE_PORT","op":"==","value": "1234"}], None],
     [[{"type": "SOURCE_PORT","op":"==","value": "1234"}], None],
     [[{"type": "SOURCE_PORT","op":"==","value": "1234"}], None],
-    [[{"type": "SOURCE_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": 6}], "tcp sport '1234' ip protocol '6'"],
-    [[{"type": "SOURCE_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "6"}], "tcp sport '1234' ip protocol '6'"],
-    [[{"type": "SOURCE_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp sport '1234' ip protocol 'tcp'"],
-    [[{"type": "SOURCE_PORT","op":"!=","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp sport != '1234' ip protocol 'tcp'"],
-    [[{"type": "SOURCE_PORT","op":"==","value": "1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp sport '1235-1236' ip protocol 'tcp'"],
-    [[{"type": "SOURCE_PORT","op":"!=","value": "1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp sport != '1235-1236' ip protocol 'tcp'"],
-    [[{"type": "SOURCE_PORT","op":"==","value": "1234,1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp sport '{1234,1235-1236}' ip protocol 'tcp'"],
-    [[{"type": "SOURCE_PORT","op":"!=","value": "1234,1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp sport != '{1234,1235-1236}' ip protocol 'tcp'"],
+    [[{"type": "SOURCE_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": 6}], "tcp sport '1234' meta l4proto '6'"],
+    [[{"type": "SOURCE_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "6"}], "tcp sport '1234' meta l4proto '6'"],
+    [[{"type": "SOURCE_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp sport '1234' meta l4proto 'tcp'"],
+    [[{"type": "SOURCE_PORT","op":"!=","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp sport != '1234' meta l4proto 'tcp'"],
+    [[{"type": "SOURCE_PORT","op":"==","value": "1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp sport '1235-1236' meta l4proto 'tcp'"],
+    [[{"type": "SOURCE_PORT","op":"!=","value": "1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp sport != '1235-1236' meta l4proto 'tcp'"],
+    [[{"type": "SOURCE_PORT","op":"==","value": "1234,1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp sport '{1234,1235-1236}' meta l4proto 'tcp'"],
+    [[{"type": "SOURCE_PORT","op":"!=","value": "1234,1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp sport != '{1234,1235-1236}' meta l4proto 'tcp'"],
 
     [[{"type": "DESTINATION_PORT","op":"==","value": "1234"}], None],
     [[{"type": "DESTINATION_PORT","op":"==","value": "1234"}], None],
     [[{"type": "DESTINATION_PORT","op":"==","value": "1234"}], None],
-    [[{"type": "DESTINATION_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": 6}], "tcp dport '1234' ip protocol '6'"],
-    [[{"type": "DESTINATION_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "6"}], "tcp dport '1234' ip protocol '6'"],
-    [[{"type": "DESTINATION_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp dport '1234' ip protocol 'tcp'"],
-    [[{"type": "DESTINATION_PORT","op":"!=","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp dport != '1234' ip protocol 'tcp'"],
-    [[{"type": "DESTINATION_PORT","op":"==","value": "1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp dport '1235-1236' ip protocol 'tcp'"],
-    [[{"type": "DESTINATION_PORT","op":"!=","value": "1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp dport != '1235-1236' ip protocol 'tcp'"],
-    [[{"type": "DESTINATION_PORT","op":"==","value": "1234,1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp dport '{1234,1235-1236}' ip protocol 'tcp'"],
-    [[{"type": "DESTINATION_PORT","op":"!=","value": "1234,1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp dport != '{1234,1235-1236}' ip protocol 'tcp'"],
+    [[{"type": "DESTINATION_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": 6}], "tcp dport '1234' meta l4proto '6'"],
+    [[{"type": "DESTINATION_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "6"}], "tcp dport '1234' meta l4proto '6'"],
+    [[{"type": "DESTINATION_PORT","op":"==","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp dport '1234' meta l4proto 'tcp'"],
+    [[{"type": "DESTINATION_PORT","op":"!=","value": "1234"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp dport != '1234' meta l4proto 'tcp'"],
+    [[{"type": "DESTINATION_PORT","op":"==","value": "1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp dport '1235-1236' meta l4proto 'tcp'"],
+    [[{"type": "DESTINATION_PORT","op":"!=","value": "1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp dport != '1235-1236' meta l4proto 'tcp'"],
+    [[{"type": "DESTINATION_PORT","op":"==","value": "1234,1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp dport '{1234,1235-1236}' meta l4proto 'tcp'"],
+    [[{"type": "DESTINATION_PORT","op":"!=","value": "1234,1235-1236"},{"type": "IP_PROTOCOL","op":"==","value": "tcp"}], "tcp dport != '{1234,1235-1236}' meta l4proto 'tcp'"],
 
     [[{"type": "SOURCE_INTERFACE_ZONE","op":"==","value": "1"}], "mark and 0x000000ff '1'"],
     [[{"type": "SOURCE_INTERFACE_ZONE","op":"!=","value": "1"}], "mark and 0x000000ff != '1'"],
@@ -237,7 +237,7 @@ conditions_tests = [
     [[{"type": "SERVER_INTERFACE_ZONE","op":"==","value": "wan"}], "ct mark and 0x0c000000 0x04000000"],
     [[{"type": "SERVER_INTERFACE_ZONE","op":"==","value": "lan"}], "ct mark and 0x0c000000 0x08000000"],
     [[{"type": "SERVER_INTERFACE_ZONE","op":"!=","value": "wan"}], "ct mark and 0x0c000000 != 0x04000000"],
-    [[{"type": "SERVER_INTERFACE_ZONE","op":"!=","value": "lan"}], "ct mark and 0x0c000000 != x08000000"],
+    [[{"type": "SERVER_INTERFACE_ZONE","op":"!=","value": "lan"}], "ct mark and 0x0c000000 != 0x08000000"],
     [[{"type": "SERVER_INTERFACE_ZONE","op":"==","value": "1,wan"}], None],
     [[{"type": "SERVER_INTERFACE_ZONE","op":"==","value": "1,lan"}], None],
 
