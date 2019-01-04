@@ -86,7 +86,7 @@ var db *sql.DB
 var dbLock sync.RWMutex
 var queries = make(map[uint64]*Query)
 var queryID uint64
-var eventQueue = make(chan Event, 1000)
+var eventQueue = make(chan Event, 10000)
 
 // EventsLogged records the number of events logged
 var EventsLogged = 0
