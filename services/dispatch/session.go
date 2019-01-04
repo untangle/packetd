@@ -161,7 +161,7 @@ func cleanSessionTable() {
 		// Their conntracks never get confirmed and thus there is never a delete conntrack event
 		// These sessions will hang in the table around and get cleaned up here.
 		// However, if we find a a stale conntrack-confirmed session.
-		if time.Now().Sub(session.LastActivityTime) > 600*time.Second {
+		if time.Now().Sub(session.LastActivityTime) > 1800*time.Second {
 			if session.ConntrackConfirmed {
 				logger.Err("Removing stale (%v) session [%v] %v\n", time.Now().Sub(session.LastActivityTime), ctid, session.ClientSideTuple)
 			}
