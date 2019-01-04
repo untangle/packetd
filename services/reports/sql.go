@@ -214,6 +214,9 @@ func makeCategoriesSeriesSQLString(reportEntry *ReportEntry) (string, error) {
 		columnStr += " AS '" + escapeSingleTick(column) + "'"
 		columns = append(columns, columnStr)
 	}
+	if len(columns) == 0 {
+		return "", errors.New("No values for series")
+	}
 	reportEntry.QuerySeries.Columns = columns
 
 	return makeSeriesSQLString(reportEntry)
