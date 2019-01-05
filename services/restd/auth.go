@@ -41,6 +41,12 @@ func authRequired(engine *gin.Engine) gin.HandlerFunc {
 			return
 		}
 
+		// if the setup wizard is not completed, auth is not required
+		if !isSetupWizardCompleted() {
+			c.Next()
+			return
+		}
+
 		c.JSON(http.StatusForbidden, gin.H{"error": "Authorization failed"})
 		c.Abort()
 	}
@@ -156,6 +162,13 @@ func authLogout(c *gin.Context) {
 }
 
 func authStatus(c *gin.Context) {
+
+	// if the setup wizard is not completed, auth is not required - return fake user
+	if !isSetupWizardCompleted() {
+		c.JSON(http.StatusOK, map[string]string{"username": "setup"})
+		return
+	}
+
 	session := sessions.Default(c)
 	user := session.Get("username")
 	if user == nil {

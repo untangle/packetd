@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -82,9 +83,11 @@ type ReportEntry struct {
 }
 
 var db *sql.DB
+var dbLock sync.RWMutex
 var queries = make(map[uint64]*Query)
+var queriesLock sync.RWMutex
 var queryID uint64
-var eventQueue = make(chan Event, 1000)
+var eventQueue = make(chan Event, 10000)
 
 // EventsLogged records the number of events logged
 var EventsLogged = 0
@@ -149,9 +152,13 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	var rows *sql.Rows
 	var sqlStr string
 
+	// Hold RLock, gets unlocked in CloseQuery/cleanupQuery
+	dbLock.RLock()
+
 	sqlStr, err = makeSQLString(reportEntry)
 	if err != nil {
 		logger.Warn("Failed to make SQL: %v\n", err)
+		dbLock.RUnlock()
 		return nil, err
 	}
 	values := conditionValues(reportEntry.Conditions)
@@ -160,13 +167,19 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	rows, err = db.Query(sqlStr, values...)
 	if err != nil {
 		logger.Err("db.Query error: %s\n", err)
+		dbLock.RUnlock()
 		return nil, err
 	}
+
+	dbLock.RUnlock()
+
 	q := new(Query)
 	q.ID = atomic.AddUint64(&queryID, 1)
 	q.Rows = rows
 
+	queriesLock.Lock()
 	queries[q.ID] = q
+	queriesLock.Unlock()
 	go func() {
 		time.Sleep(30 * time.Second)
 		cleanupQuery(q)
@@ -176,7 +189,9 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 
 // GetData returns the data for the provided QueryID
 func GetData(queryID uint64) (string, error) {
+	queriesLock.RLock()
 	q := queries[queryID]
+	queriesLock.RUnlock()
 	if q == nil {
 		logger.Warn("Query not found: %d\n", queryID)
 		return "", errors.New("Query ID not found")
@@ -195,7 +210,9 @@ func GetData(queryID uint64) (string, error) {
 
 // CloseQuery closes the query now
 func CloseQuery(queryID uint64) (string, error) {
+	queriesLock.RLock()
 	q := queries[queryID]
+	queriesLock.RUnlock()
 	if q == nil {
 		logger.Warn("Query not found: %d\n", queryID)
 		return "", errors.New("Query ID not found")
@@ -212,7 +229,12 @@ func CreateEvent(name string, table string, sqlOp int, columns map[string]interf
 
 // LogEvent adds an event to the eventQueue for later logging
 func LogEvent(event Event) error {
-	eventQueue <- event
+	select {
+	case eventQueue <- event:
+	default:
+		logger.Warn("Event queue at capacity[%d] Dropping event: %v\n", cap(eventQueue), event)
+		return errors.New("Event Queue at Capacity")
+	}
 	return nil
 }
 
@@ -275,6 +297,9 @@ func logInsertEvent(event Event) {
 	valueStr += ")"
 	sqlStr += " VALUES " + valueStr
 
+	dbLock.Lock()
+	defer dbLock.Unlock()
+
 	logger.Debug("SQL: %s\n", sqlStr)
 	stmt, err := db.Prepare(sqlStr)
 	if err != nil {
@@ -319,6 +344,9 @@ func logUpdateEvent(event Event) {
 		values = append(values, v)
 		first = false
 	}
+
+	dbLock.Lock()
+	defer dbLock.Unlock()
 
 	logger.Debug("SQL: %s\n", sqlStr)
 	stmt, err := db.Prepare(sqlStr)
@@ -381,6 +409,8 @@ func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
 
 func cleanupQuery(query *Query) {
 	logger.Debug("cleanupQuery(%d)\n", query.ID)
+	queriesLock.Lock()
+	defer queriesLock.Unlock()
 	delete(queries, query.ID)
 	if query.Rows != nil {
 		query.Rows.Close()
@@ -391,6 +421,9 @@ func cleanupQuery(query *Query) {
 
 func createTables() {
 	var err error
+
+	dbLock.Lock()
+	defer dbLock.Unlock()
 
 	_, err = db.Exec(
 		`CREATE TABLE IF NOT EXISTS sessions (
@@ -549,9 +582,11 @@ func dbCleaner() {
 		size := dbFile.Size()
 		logger.Debug("Current DB Size: %.1fM\n", (float32(size) / float32(1024*1024)))
 		if size > dbLimit {
+			dbLock.Lock()
 			trimPercent("sessions", .1)
 			trimPercent("session_minutes", .1)
 			runSQL("VACUUM")
+			dbLock.Unlock()
 			logger.Info("Trimmed DB.\n")
 			// re-run and check size with no delay
 			ch <- true

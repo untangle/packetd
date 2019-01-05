@@ -230,13 +230,16 @@ func cleanReverseTable() {
 	var counter int
 	nowtime := time.Now()
 
+	reverseMutex.Lock()
+	defer reverseMutex.Unlock()
+
 	for key, val := range reverseTable {
 		if val.ExpireTime.Unix() < nowtime.Unix() {
 			logger.Trace("revdns leaving ADDR:%s LIST:%v in table\n", key, val.NameList)
 			continue
 		}
 		logger.Trace("revdns removing ADDR:%s LIST:%v from table\n", key, val.NameList)
-		removeReverse(key)
+		delete(reverseTable, key)
 		counter++
 	}
 

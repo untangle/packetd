@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -48,6 +50,8 @@ func Startup() {
 	// store := cookie.NewStore([]byte("secret"))
 
 	engine.Use(sessions.Sessions("auth_session", store))
+
+	engine.GET("/", rootHandler)
 
 	engine.GET("/ping", pingHandler)
 
@@ -114,6 +118,15 @@ func RemoveEmptyStrings(strings []string) []string {
 		}
 	}
 	return b
+}
+
+func rootHandler(c *gin.Context) {
+	//addHeaders(c)
+	if isSetupWizardCompleted() {
+		c.Redirect(http.StatusTemporaryRedirect, "/admin")
+	} else {
+		c.Redirect(http.StatusTemporaryRedirect, "/setup")
+	}
 }
 
 func pingHandler(c *gin.Context) {
@@ -385,4 +398,21 @@ func addHeaders(c *gin.Context) {
 	// c.Header("Access-Control-Allow-Origin", "*")
 	// c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE")
 	// c.Header("Access-Control-Allow-Headers", "X-Custom-Header")
+}
+
+// returns true if the setup wizard is completed, or false if not
+// if any error occurs it returns true (assumes the wizard is completed)
+func isSetupWizardCompleted() bool {
+	wizardCompletedJSON := settings.GetSettings([]string{"system", "setupWizard", "completed"})
+	if wizardCompletedJSON == nil {
+		logger.Warn("Failed to read setup wizard completed settings: %v\n", wizardCompletedJSON)
+		return true
+	}
+	wizardCompletedBool, ok := wizardCompletedJSON.(bool)
+	if !ok {
+		logger.Warn("Invalid type of setup wizard completed setting: %v %v\n", wizardCompletedJSON, reflect.TypeOf(wizardCompletedJSON))
+		return true
+	}
+
+	return wizardCompletedBool
 }

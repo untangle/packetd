@@ -171,13 +171,16 @@ func cleanAddressTable() {
 	var counter int
 	nowtime := time.Now()
 
+	addressMutex.Lock()
+	defer addressMutex.Unlock()
+
 	for key, val := range addressTable {
 		if val.ExpireTime.Unix() < nowtime.Unix() {
 			logger.Debug("DNS Leaving ADDR:%s in table\n", key)
 			continue
 		}
 		logger.Debug("DNS Removing ADDR:%s NAME:%s from table\n", val.Address.String(), val.Name)
-		removeAddress(val.Address)
+		delete(addressTable, val.Address.String())
 		counter++
 	}
 

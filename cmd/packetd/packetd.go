@@ -7,8 +7,11 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"runtime/pprof"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -39,8 +42,6 @@ var memProfileTarget string
 var localFlag bool
 
 func main() {
-	var lasttime int64
-
 	handleSignals()
 	parseArguments()
 
@@ -83,32 +84,17 @@ func main() {
 		kernel.StartWarehouseCapture()
 	}
 
-	// Loop until the shutdown flag is set
-	for kernel.GetShutdownFlag() == 0 {
-		time.Sleep(time.Second)
-		current := time.Now()
-
-		if lasttime == 0 {
-			lasttime = current.Unix()
+	// Wait until the shutdown flag is set
+	for !kernel.GetShutdownFlag() {
+		select {
+		case <-kernel.GetShutdownChannel():
+			break
+		case <-time.After(1 * time.Hour):
+			logger.Info(".\n")
+			printStats()
 		}
-
-		if current.Unix() < (lasttime + 600) {
-			continue
-		}
-
-		lasttime = current.Unix()
-		logger.Info(".\n")
-
-		var mem runtime.MemStats
-		runtime.ReadMemStats(&mem)
-		logger.Debug("Memory Stats:\n")
-		logger.Debug("Memory Alloc: %d\n", mem.Alloc)
-		logger.Debug("Memory TotalAlloc: %d\n", mem.TotalAlloc)
-		logger.Debug("Memory HeapAlloc: %d\n", mem.HeapAlloc)
-		logger.Debug("Memory HeapSys: %d\n", mem.HeapSys)
-
-		logger.Debug("Reports EventsLogged: %d\n", reports.EventsLogged)
 	}
+	logger.Info("Shutdown initiated...\n")
 
 	if kernel.GetWarehouseFlag() == 'C' {
 		kernel.CloseWarehouseCapture()
@@ -261,7 +247,7 @@ func startPlugins() {
 	// Start Plugins
 	startups := []func(){
 		example.PluginStartup,
-		//classify.PluginStartup,
+		classify.PluginStartup,
 		geoip.PluginStartup,
 		certfetch.PluginStartup,
 		certsniff.PluginStartup,
@@ -286,7 +272,7 @@ func stopPlugins() {
 
 	shutdowns := []func(){
 		example.PluginShutdown,
-		//classify.PluginShutdown,
+		classify.PluginShutdown,
 		geoip.PluginShutdown,
 		certfetch.PluginShutdown,
 		certsniff.PluginShutdown,
@@ -357,4 +343,55 @@ func removeRules() {
 		dir = home
 	}
 	syscmd.SystemCommand(dir+"/"+rulesScript, []string{"-r"})
+}
+
+// prints some basic stats about packetd
+func printStats() {
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+	logger.Info("Memory Stats:\n")
+	logger.Info("Memory Alloc: %d\n", mem.Alloc)
+	logger.Info("Memory TotalAlloc: %d\n", mem.TotalAlloc)
+	logger.Info("Memory HeapAlloc: %d\n", mem.HeapAlloc)
+	logger.Info("Memory HeapSys: %d\n", mem.HeapSys)
+
+	logger.Info("Reports EventsLogged: %d\n", reports.EventsLogged)
+	stats, err := getProcStats()
+	if err == nil {
+		for _, line := range strings.Split(stats, "\n") {
+			if line != "" {
+				logger.Info("%s\n", line)
+			}
+		}
+	} else {
+		logger.Warn("Failed to read stats: %v\n", err)
+	}
+}
+
+func getProcStats() (string, error) {
+	file, err := os.OpenFile("/proc/"+strconv.Itoa(os.Getpid())+"/status", os.O_RDONLY, 0660)
+	if err != nil {
+		return "", err
+	}
+
+	defer file.Close()
+
+	var interesting = ""
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		re, err := regexp.Compile("[[:space:]]+")
+		if err != nil {
+			return "", nil
+		}
+		line = re.ReplaceAllString(line, " ")
+
+		if strings.HasPrefix(line, "Rss") {
+			interesting += line + "\n"
+		}
+		if strings.HasPrefix(line, "Threads") {
+			interesting += line + "\n"
+		}
+	}
+	return interesting, nil
 }

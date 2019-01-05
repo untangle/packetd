@@ -118,15 +118,15 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var reply string
 	var err error
 
-	// make sure we have a valid conntrack id
-	if mess.Session == nil || mess.Session.SessionID == 0 {
-		logger.Err("Ignoring event with invalid sessionID\n")
+	// make sure we have a valid session
+	if mess.Session == nil {
+		logger.Err("Ignoring event with invalid Session\n")
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
-	// make sure we have a valid session
-	if mess.Session == nil {
-		logger.Err("Ignoring event with invalid session\n")
+	// make sure we have a valid conntrack id
+	if mess.Session.SessionID == 0 {
+		logger.Err("Ignoring event with invalid SessionID\n")
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
@@ -163,6 +163,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, release the session
 	if state == navlStateClassified || state == navlStateTerminated || mess.Session.PacketCount > maxPacketCount || mess.Session.ByteCount > maxTrafficSize {
+		daemonRemove(mess.Session.SessionID)
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
@@ -561,7 +562,7 @@ func daemonManager() {
 				if err != nil {
 					logger.Info("The classd daemon has exited. Error:%v\n", err)
 				} else {
-					logger.Info("The classd daemon has exited.\n", err)
+					logger.Info("The classd daemon has exited.\n")
 				}
 				daemonGoodbye()
 				daemonProcess = nil
@@ -582,11 +583,12 @@ func daemonStartup() {
 	var daemonStdout io.ReadCloser
 	var daemonStderr io.ReadCloser
 
-	// start the classd daemon with the no fork flag and optionally the debug flag
+	// start the classd daemon with the local and naked flags so we can capture the log
+	// output with no timestamp also add the debug flag if our debug flag is enabled
 	if logger.IsDebugEnabled() {
-		daemonProcess = exec.Command(daemonBinary, "-l", "-d")
+		daemonProcess = exec.Command(daemonBinary, "-l", "-n", "-d")
 	} else {
-		daemonProcess = exec.Command(daemonBinary, "-l")
+		daemonProcess = exec.Command(daemonBinary, "-l", "-n")
 	}
 
 	// set a diffrent process group so it doesn't get packetd signals

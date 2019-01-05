@@ -12,7 +12,6 @@
 static char		*g_warehouse_file = NULL;
 static int		g_warehouse_speed = 100;
 static int		g_warehouse_flag = 'I';
-static int		g_shutdown = 0;
 static int		g_bypass = 0;
 static int		g_debug = 0;
 
@@ -85,13 +84,12 @@ void hexmessage(int priority,const char *source,const void *buffer,int size)
 
 int get_shutdown_flag(void)
 {
-	return(g_shutdown);
+	return go_get_shutdown_flag();
 }
 
-void set_shutdown_flag(int value)
+void set_shutdown_flag()
 {
-	logmessage(LOG_INFO,logsrc,"The shutdown flag has been set: %d\n", value);
-	g_shutdown = value;
+    go_set_shutdown_flag();
 }
 
 int get_bypass_flag(void)

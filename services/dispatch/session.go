@@ -160,8 +160,10 @@ func cleanSessionTable() {
 		// Having stale sessions is normal if sessions get blocked
 		// Their conntracks never get confirmed and thus there is never a delete conntrack event
 		// These sessions will hang in the table around and get cleaned up here.
-		// However, if we find a a stale conntrack-confirmed session.
-		if time.Now().Sub(session.LastActivityTime) > 600*time.Second {
+		// However, if we find a a stale conntrack-confirmed session that is bad.
+
+		// We use 10000 seconds because 7440 is the established idle tcp timeout default
+		if time.Now().Sub(session.LastActivityTime) > 10000*time.Second {
 			if session.ConntrackConfirmed {
 				logger.Err("Removing stale (%v) session [%v] %v\n", time.Now().Sub(session.LastActivityTime), ctid, session.ClientSideTuple)
 			}

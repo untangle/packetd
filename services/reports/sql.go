@@ -10,6 +10,7 @@ import (
 )
 
 // makeSQLString makes a SQL string from a ReportEntry
+// You must hold the dbLock read lock to call this function
 func makeSQLString(reportEntry *ReportEntry) (string, error) {
 	if reportEntry.Table == "" {
 		return "", errors.New("Missing required attribute Table")
@@ -212,6 +213,9 @@ func makeCategoriesSeriesSQLString(reportEntry *ReportEntry) (string, error) {
 		columnStr += " THEN " + aggValue + " END)"
 		columnStr += " AS '" + escapeSingleTick(column) + "'"
 		columns = append(columns, columnStr)
+	}
+	if len(columns) == 0 {
+		return "", errors.New("No values for series")
 	}
 	reportEntry.QuerySeries.Columns = columns
 
