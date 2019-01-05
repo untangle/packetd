@@ -562,7 +562,7 @@ func daemonManager() {
 				if err != nil {
 					logger.Info("The classd daemon has exited. Error:%v\n", err)
 				} else {
-					logger.Info("The classd daemon has exited.\n", err)
+					logger.Info("The classd daemon has exited.\n")
 				}
 				daemonGoodbye()
 				daemonProcess = nil

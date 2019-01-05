@@ -139,7 +139,7 @@ int nfqueue_startup(void)
 	nfqh = nfq_open();
 	if (nfqh == NULL) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_open()\n");
-		set_shutdown_flag(1);
+		set_shutdown_flag();
 		return(1);
 	}
 
@@ -147,7 +147,7 @@ int nfqueue_startup(void)
 	ret = nfq_unbind_pf(nfqh,AF_INET);
 	if (ret < 0) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_unbind_pf()\n");
-		set_shutdown_flag(1);
+		set_shutdown_flag();
 		return(2);
 	}
 
@@ -155,7 +155,7 @@ int nfqueue_startup(void)
 	ret = nfq_bind_pf(nfqh,AF_INET);
 	if (ret < 0) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_bind_pf(lan)\n");
-		set_shutdown_flag(1);
+		set_shutdown_flag();
 		return(3);
 	}
 
@@ -163,7 +163,7 @@ int nfqueue_startup(void)
 	nfqqh = nfq_create_queue(nfqh,cfg_net_queue,netq_callback,NULL);
 	if (nfqqh == 0) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_create_queue(%u)\n",cfg_net_queue);
-		set_shutdown_flag(1);
+		set_shutdown_flag();
 		return(4);
 	}
 
@@ -171,7 +171,7 @@ int nfqueue_startup(void)
 	ret = nfq_set_queue_maxlen(nfqqh,cfg_net_maxlen);
 	if (ret < 0) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_set_queue_maxlen(%d)\n",cfg_net_maxlen);
-		set_shutdown_flag(1);
+		set_shutdown_flag();
 		return(5);
 	}
 
@@ -179,7 +179,7 @@ int nfqueue_startup(void)
 	ret = nfq_set_mode(nfqqh,NFQNL_COPY_PACKET,cfg_net_buffer);
 	if (ret < 0) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_set_mode(NFQNL_COPY_PACKET)\n");
-		set_shutdown_flag(1);
+		set_shutdown_flag();
 		return(6);
 	}
 
@@ -187,7 +187,7 @@ int nfqueue_startup(void)
 	ret = nfq_set_queue_flags(nfqqh,NFQA_CFG_F_FAIL_OPEN,NFQA_CFG_F_FAIL_OPEN);
 	if (ret < 0) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_set_queue_flags(NFQA_CFG_F_FAIL_OPEN)\n");
-		set_shutdown_flag(1);
+		set_shutdown_flag();
 		return(7);
 	}
 
@@ -195,7 +195,7 @@ int nfqueue_startup(void)
 	ret = nfq_set_queue_flags(nfqqh,NFQA_CFG_F_CONNTRACK,NFQA_CFG_F_CONNTRACK);
 	if (ret < 0) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_set_queue_flags(NFQA_CFG_F_CONNTRACK)\n");
-		set_shutdown_flag(1);
+		set_shutdown_flag();
 		return(8);
 	}
 
@@ -232,7 +232,7 @@ int nfqueue_thread(void)
 
 	if (ret != 0) {
 		logmessage(LOG_ERR,logsrc,"Error %d returned from nfqueue_startup()\n",ret);
-		set_shutdown_flag(1);
+		set_shutdown_flag();
 		return(1);
 	}
 
@@ -271,7 +271,7 @@ int nfqueue_thread(void)
 
 		if (buffer == NULL) {
 			logmessage(LOG_ERR,logsrc,"Unable to allocate memory for packet\n");
-			set_shutdown_flag(1);
+			set_shutdown_flag();
 			break;
 		}
 
@@ -280,7 +280,7 @@ int nfqueue_thread(void)
 
         if (ret == 0) {
             logmessage(LOG_ERR,logsrc,"The nfqueue socket was unexpectedly closed\n");
-			set_shutdown_flag(1);
+			set_shutdown_flag();
 			nfqueue_free_buffer(buffer);
             break;
         }
@@ -291,7 +291,7 @@ int nfqueue_thread(void)
 				continue;
 			}
             logmessage(LOG_ERR,logsrc,"Error %d (%s) returned from recv()\n",errno,strerror(errno));
-			set_shutdown_flag(1);
+			set_shutdown_flag();
 			nfqueue_free_buffer(buffer);
             break;
         }

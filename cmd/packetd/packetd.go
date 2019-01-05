@@ -39,8 +39,6 @@ var memProfileTarget string
 var localFlag bool
 
 func main() {
-	var lasttime int64
-
 	handleSignals()
 	parseArguments()
 
@@ -83,32 +81,17 @@ func main() {
 		kernel.StartWarehouseCapture()
 	}
 
-	// Loop until the shutdown flag is set
-	for kernel.GetShutdownFlag() == 0 {
-		time.Sleep(time.Second)
-		current := time.Now()
-
-		if lasttime == 0 {
-			lasttime = current.Unix()
+	// Wait until the shutdown flag is set
+	for !kernel.GetShutdownFlag() {
+		select {
+		case <-kernel.GetShutdownChannel():
+			break
+		case <-time.After(60 * time.Second):
+			logger.Info(".\n")
+			printStats()
 		}
-
-		if current.Unix() < (lasttime + 600) {
-			continue
-		}
-
-		lasttime = current.Unix()
-		logger.Info(".\n")
-
-		var mem runtime.MemStats
-		runtime.ReadMemStats(&mem)
-		logger.Debug("Memory Stats:\n")
-		logger.Debug("Memory Alloc: %d\n", mem.Alloc)
-		logger.Debug("Memory TotalAlloc: %d\n", mem.TotalAlloc)
-		logger.Debug("Memory HeapAlloc: %d\n", mem.HeapAlloc)
-		logger.Debug("Memory HeapSys: %d\n", mem.HeapSys)
-
-		logger.Debug("Reports EventsLogged: %d\n", reports.EventsLogged)
 	}
+	logger.Info("Shutdown initiated...\n")
 
 	if kernel.GetWarehouseFlag() == 'C' {
 		kernel.CloseWarehouseCapture()
@@ -357,4 +340,17 @@ func removeRules() {
 		dir = home
 	}
 	syscmd.SystemCommand(dir+"/"+rulesScript, []string{"-r"})
+}
+
+// prints some basic stats about packetd
+func printStats() {
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+	logger.Debug("Memory Stats:\n")
+	logger.Debug("Memory Alloc: %d\n", mem.Alloc)
+	logger.Debug("Memory TotalAlloc: %d\n", mem.TotalAlloc)
+	logger.Debug("Memory HeapAlloc: %d\n", mem.HeapAlloc)
+	logger.Debug("Memory HeapSys: %d\n", mem.HeapSys)
+
+	logger.Debug("Reports EventsLogged: %d\n", reports.EventsLogged)
 }

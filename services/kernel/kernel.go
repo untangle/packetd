@@ -34,7 +34,10 @@ var shutdownConntrackTask = make(chan bool)
 var conntrackCallback ConntrackCallback
 var nfqueueCallback NfqueueCallback
 var netloggerCallback NetloggerCallback
-var debugFlag bool
+var debugFlag = false
+var shutdownFlag = false
+var shutdownChannel = make(chan bool)
+var shutdownChannelCloseOnce sync.Once
 
 var nfCleanList map[uint32]bool
 var ctCleanList map[uint32]bool
@@ -82,14 +85,22 @@ func StopCallbacks() {
 	}
 }
 
-// GetShutdownFlag returns the C shutdown flag
-func GetShutdownFlag() int {
-	return int(C.get_shutdown_flag())
+// GetShutdownFlag returns the shutdown flag for kernel
+func GetShutdownFlag() bool {
+	return shutdownFlag
 }
 
-// SetShutdownFlag sets the C shutdown flag
+// SetShutdownFlag sets the shutdown flag for kernel
 func SetShutdownFlag() {
-	C.set_shutdown_flag(1)
+	shutdownFlag = true
+	shutdownChannelCloseOnce.Do(func() {
+		close(shutdownChannel)
+	})
+}
+
+// GetShutdownChannel returns a channel
+func GetShutdownChannel() chan bool {
+	return shutdownChannel
 }
 
 // GetDebugFlag gets the shared debug flag
@@ -155,6 +166,19 @@ func RegisterNfqueueCallback(cb NfqueueCallback) {
 // RegisterNetloggerCallback registers the global netlogger callback for handling netlogger events
 func RegisterNetloggerCallback(cb NetloggerCallback) {
 	netloggerCallback = cb
+}
+
+//export go_get_shutdown_flag
+func go_get_shutdown_flag() int32 {
+	if shutdownFlag {
+		return 1
+	}
+	return 0
+}
+
+//export go_set_shutdown_flag
+func go_set_shutdown_flag() {
+	shutdownFlag = true
 }
 
 //export go_nfqueue_callback

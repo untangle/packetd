@@ -110,7 +110,7 @@ int conntrack_startup(void)
 
 	if (nfcth == NULL) {
 		logmessage(LOG_ERR,logsrc,"Error %d returned from nfct_open()\n",errno);
-		set_shutdown_flag(1);
+		set_shutdown_flag();
 		return(1);
 	}
 
@@ -122,7 +122,7 @@ int conntrack_startup(void)
 
 	if (ret != 0) {
 		logmessage(LOG_ERR,logsrc,"Error %d returned from nfct_callback_register()\n",errno);
-		set_shutdown_flag(1);
+		set_shutdown_flag();
 		return(2);
 	}
 
@@ -158,7 +158,7 @@ int conntrack_thread(void)
 
 	if (ret != 0) {
 		logmessage(LOG_ERR,logsrc,"Error %d returned from conntrack_startup()\n",ret);
-		set_shutdown_flag(1);
+		set_shutdown_flag();
 		return(1);
 	}
 
