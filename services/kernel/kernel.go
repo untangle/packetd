@@ -51,12 +51,14 @@ func Shutdown() {
 }
 
 // StartCallbacks donates threads for all the C services and starts other persistent tasks
-func StartCallbacks() {
+func StartCallbacks(numNfqueueThreads int) {
 	// Donate threads to kernel hooks
-	go C.nfqueue_thread(0)
-	go C.nfqueue_thread(1)
-	go C.nfqueue_thread(2)
-	go C.nfqueue_thread(3)
+	if numNfqueueThreads > 32 {
+		numNfqueueThreads = 32
+	}
+	for x := 0; x < numNfqueueThreads; x++ {
+		go C.nfqueue_thread(C.int(x))
+	}
 
 	go C.conntrack_thread()
 	go C.netlogger_thread()

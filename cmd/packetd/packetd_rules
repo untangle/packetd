@@ -1,8 +1,6 @@
 #!/bin/sh
 
 NFT=${NFT:-nft}
-PACKETD_QUEUE_NUM=2000
-PACKETD_QUEUE_NUM_HIGH=2003
 QUEUE_PRIORITY="-145"
 MANGLE_PRIORITY="-145"
 TABLE_NAME="packetd"
@@ -13,33 +11,35 @@ is_queue_open()
     local l_queue_mode
     local l_queue_size
 
+    FIRST_QUEUE="`echo $PACKETD_QUEUE | sed 's/-.*//'`"
+
     # make sure the nfnetlink_queue file is available
     if [ ! -f /proc/net/netfilter/nfnetlink_queue ]; then
-        echo "[`date`] The netfilter nfnetlink_queue does not exist - not inserting rules for packetd"
+        echo "The netfilter nfnetlink_queue does not exist - not inserting rules for packetd"
         return 1
     fi
 
     # see if our queue is active
-    l_queue_stat=`awk -v queue=${PACKETD_QUEUE_NUM} '{ if ( $1 == queue ) print $2 }' /proc/net/netfilter/nfnetlink_queue`
+    l_queue_stat=`awk -v queue=${FIRST_QUEUE} '{ if ( $1 == queue ) print $2 }' /proc/net/netfilter/nfnetlink_queue`
 
     if [ -z "${l_queue_stat}" ]; then
-        echo "[`date`] The packetd netfilter queue is not open - not inserting rules for packetd"
+        echo "The packetd netfilter queue ${FIRST_QUEUE} is not open - not inserting rules for packetd"
         return 1
     fi
 
     # see if the queue copy mode is what we expect
-    l_queue_mode=`awk -v queue=${PACKETD_QUEUE_NUM} '{ if ( $1 == queue )print $4 }' /proc/net/netfilter/nfnetlink_queue`
+    l_queue_mode=`awk -v queue=${FIRST_QUEUE} '{ if ( $1 == queue )print $4 }' /proc/net/netfilter/nfnetlink_queue`
 
     if [ $((l_queue_mode)) -ne 2 ]; then
-        echo "[`date`] Unexpected queue copy mode - not inserting rules for packetd"
+        echo "Unexpected queue copy mode ${FIRST_QUEUE} - not inserting rules for packetd"
         return 1
     fi
 
     # see if the queue copy size is what we expect
-    l_queue_mode=`awk -v queue=${PACKETD_QUEUE_NUM} '{ if ( $1 == queue ) print $5 }' /proc/net/netfilter/nfnetlink_queue`
+    l_queue_mode=`awk -v queue=${FIRST_QUEUE} '{ if ( $1 == queue ) print $5 }' /proc/net/netfilter/nfnetlink_queue`
 
     if [ $((l_queue_mode)) -ne 32768 ]; then
-        echo "[`date`] Unexpected queue copy size - not inserting rules for packetd"
+        echo "Unexpected queue copy size ${FIRST_QUEUE} - not inserting rules for packetd"
         return 1
     fi
 
@@ -103,15 +103,18 @@ insert_packetd_rules()
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state new mark set "mark|0x10000000"
 
     # Queue the traffic
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd counter queue num ${PACKETD_QUEUE_NUM} - ${PACKETD_QUEUE_NUM_HIGH} fanout,bypass
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd counter queue num ${PACKETD_QUEUE} fanout,bypass
 }
 
 usage() {
-    echo "$0 [options]"
+    echo "$0 [options] queue-number/queue-range"
     echo "optional options: "
     echo " -r              (force removal only)"
     echo " -i              (force insert only)"
     echo " -h              (help)"
+    echo
+    echo "example:"
+    echo "$0 2000-2003"
     echo
 }
 
@@ -122,11 +125,18 @@ while getopts "rih" opt; do
   case $opt in
     r) OP="remove";;
     i) OP="insert";;
-    h) usage;exit 0;;
-    *) usage;exit 0;;
+    h) usage;exit 1;;
+    *) usage;exit 1;;
   esac
 done
+shift $(($OPTIND-1))
 
+if [ -z "$1" ] ; then
+    usage
+    exit 1
+fi
+
+PACKETD_QUEUE="$1"
 
 ## make sure we are called as root
 USERVAL=`id -u`
@@ -143,16 +153,16 @@ fi
 
 if [ "$OP" = "remove" ] ; then
     remove_packetd_rules
-    echo "[`date`] The packetd netfilter rules removed."
+    echo "packetd netfilter rules removed."
     exit 0
 elif [ "$OP" = "insert" ] ; then
     insert_packetd_rules
-    echo "[`date`] The packetd netfilter rules inserted."
+    echo "packetd netfilter rules inserted."
     exit 0
 else
     remove_packetd_rules
     is_queue_open && {
         insert_packetd_rules
-        echo "[`date`] The packetd netfilter rules inserted."
+        echo "packetd netfilter rules inserted."
     }
 fi

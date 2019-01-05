@@ -40,6 +40,8 @@ const rulesScript = "packetd_rules"
 
 var memProfileTarget string
 var localFlag bool
+var cpuCount = getConcurrencyFactor()
+var queueRange = getQueueRange()
 
 func main() {
 	handleSignals()
@@ -54,7 +56,7 @@ func main() {
 
 	// Start the callbacks AFTER all services and plugins are initialized
 	logger.Info("Starting kernel callbacks...\n")
-	kernel.StartCallbacks()
+	kernel.StartCallbacks(cpuCount)
 
 	// Insert netfilter rules
 	logger.Info("Inserting netfilter rules...\n")
@@ -328,7 +330,17 @@ func insertRules() {
 	if ok && home != "" {
 		dir = home
 	}
-	syscmd.SystemCommand(dir+"/"+rulesScript, []string{})
+	output, err := syscmd.SystemCommand(dir+"/"+rulesScript, []string{queueRange})
+	if err != nil {
+		logger.Warn("Error running %v: %v\n", rulesScript, err.Error())
+		kernel.SetShutdownFlag()
+	} else {
+		for _, line := range strings.Split(string(output), "\n") {
+			if line != "" {
+				logger.Info("%s\n", line)
+			}
+		}
+	}
 }
 
 // remove the netfilter queue rules for packetd
@@ -342,7 +354,7 @@ func removeRules() {
 	if ok && home != "" {
 		dir = home
 	}
-	syscmd.SystemCommand(dir+"/"+rulesScript, []string{"-r"})
+	syscmd.SystemCommand(dir+"/"+rulesScript, []string{"-r", queueRange})
 }
 
 // prints some basic stats about packetd
@@ -394,4 +406,41 @@ func getProcStats() (string, error) {
 		}
 	}
 	return interesting, nil
+}
+
+// getConcurrencyFactor returns the number of CPUs
+// or 4 if any error occurs in determining the number
+func getConcurrencyFactor() int {
+	defaultValue := 4
+
+	file, err := os.OpenFile("/proc/cpuinfo", os.O_RDONLY, 0660)
+	if err != nil {
+		logger.Warn("Failed to read /proc/cpuinfo: %v\n", err.Error())
+		return defaultValue
+	}
+
+	defer file.Close()
+
+	count := 0
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "processor") {
+			count++
+		}
+	}
+
+	if count == 0 {
+		logger.Warn("Failed to detect CPU count\n")
+		return defaultValue
+	}
+
+	return count
+}
+
+// getQueueRange gets the nfqueue specification
+func getQueueRange() string {
+	str := "2000"
+	str = str + "-" + strconv.Itoa(2000+cpuCount)
+	return str
 }

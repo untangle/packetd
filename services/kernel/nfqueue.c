@@ -9,16 +9,16 @@
 
 #include "common.h"
 
-#define NUM_QUEUES 4
+#define MAX_QUEUES 128
 
-static struct nfq_q_handle*     nfqqh[NUM_QUEUES];
-static struct nfq_handle*       nfqh[NUM_QUEUES];
+static struct nfq_q_handle*     nfqqh[MAX_QUEUES];
+static struct nfq_handle*       nfqh[MAX_QUEUES];
 static int						cfg_sock_buffer = (1024 * 1024 * 4);
 static int						cfg_net_maxlen = 512;
 static int						cfg_net_buffer = 32768;
 static int						cfg_net_queue = 2000;
 static char*                    logsrc = "nfqueue";
-static char*                    buffer[NUM_QUEUES];
+static char*                    buffer[MAX_QUEUES];
 
 int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data)
 {
@@ -229,7 +229,7 @@ int nfqueue_thread(int index)
 	int				netsock;
 	int				val,ret;
 
-	logmessage(LOG_INFO,logsrc,"The nfqueue thread is starting\n");
+	logmessage(LOG_INFO,logsrc,"The nfqueue thread [%i] is starting\n", index);
 
 	ret = nfqueue_startup(index);
 
@@ -308,7 +308,7 @@ int nfqueue_thread(int index)
 	// call our nfqueue shutdown function
 	nfqueue_shutdown(index);
 
-	logmessage(LOG_INFO,logsrc,"The nfqueue thread has terminated\n");
+	logmessage(LOG_INFO,logsrc,"The nfqueue thread [%i] as terminated\n", index);
 	go_child_shutdown();
 	return(0);
 }
