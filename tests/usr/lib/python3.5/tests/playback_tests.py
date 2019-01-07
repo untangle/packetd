@@ -4,7 +4,7 @@ import subprocess
 import unittest
 import time
 import os
-import tests.test_registry as test_registry
+import runtests.test_registry as test_registry
 
 def packetd_traffic_bypass():
     """Tells packetd to bypass real traffic"""

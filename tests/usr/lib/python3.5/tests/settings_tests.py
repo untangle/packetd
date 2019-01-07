@@ -6,7 +6,7 @@ import subprocess
 import unittest
 import json
 import sys
-import tests.test_registry as test_registry
+import runtests.test_registry as test_registry
 
 def get_settings(attributes=None, seperator="/"):
     """Gets the current settings and returns the JSON Object or None if there is any error"""

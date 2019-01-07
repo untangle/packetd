@@ -2,8 +2,8 @@
 # pylint: disable=no-self-use
 import subprocess
 import unittest
-import tests.test_registry as test_registry
-import tests.remote_control as remote_control
+import runtests.test_registry as test_registry
+import runtests.remote_control as remote_control
 
 class GeoipTests(unittest.TestCase):
 

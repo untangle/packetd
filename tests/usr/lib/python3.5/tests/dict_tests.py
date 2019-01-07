@@ -5,7 +5,7 @@
 import unittest
 import sys
 import threading
-import tests.test_registry as test_registry
+import runtests.test_registry as test_registry
 
 def add_entry(table, key, field, value, key_type="string", value_type="string"):
     """Add an entry to the dict"""

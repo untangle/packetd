@@ -1,8 +1,8 @@
 """packetd environment tests"""
 # pylint: disable=no-self-use
 import unittest
-import tests.remote_control as remote_control
-import tests.test_registry as test_registry
+import runtests.remote_control as remote_control
+import runtests.test_registry as test_registry
 
 class EnvironmentTests(unittest.TestCase):
     """packetd environment tests"""

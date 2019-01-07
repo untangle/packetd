@@ -3,7 +3,7 @@
 import subprocess
 import unittest
 import json
-import tests.test_registry as test_registry
+import runtests.test_registry as test_registry
 
 
 ONE_CONDITION = {
