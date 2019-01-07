@@ -362,10 +362,10 @@ func printStats() {
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
 	logger.Info("Memory Stats:\n")
-	logger.Info("Memory Alloc: %d\n", mem.Alloc)
-	logger.Info("Memory TotalAlloc: %d\n", mem.TotalAlloc)
-	logger.Info("Memory HeapAlloc: %d\n", mem.HeapAlloc)
-	logger.Info("Memory HeapSys: %d\n", mem.HeapSys)
+	logger.Info("Memory Alloc: %d kB\n", (mem.Alloc / 1024))
+	logger.Info("Memory TotalAlloc: %d kB\n", (mem.TotalAlloc / 1024))
+	logger.Info("Memory HeapAlloc: %d kB\n", (mem.HeapAlloc / 1024))
+	logger.Info("Memory HeapSys: %d kB\n", (mem.HeapSys / 1024))
 
 	logger.Info("Reports EventsLogged: %d\n", reports.EventsLogged)
 	stats, err := getProcStats()
