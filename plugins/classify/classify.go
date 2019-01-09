@@ -163,31 +163,10 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, release the session
 	if state == navlStateClassified || state == navlStateTerminated || mess.Session.PacketCount > maxPacketCount || mess.Session.ByteCount > maxTrafficSize {
-		daemonRemove(mess.Session.SessionID)
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
 	return dispatch.NfqueueResult{SessionRelease: false}
-}
-
-// daemonRemove sends a command to classd to remove the sessionID
-func daemonRemove(sessionID uint64) {
-	var reply string
-	var err error
-
-	if logger.IsTraceEnabled() {
-		logger.Trace("daemonCommand REMOVE|%d\n", sessionID)
-	}
-
-	reply, err = daemonCommand(nil, "REMOVE|%d\r\n", sessionID)
-	if err != nil {
-		logger.Err("daemonCommand error: %s\n", err.Error())
-		return
-	}
-
-	if logger.IsTraceEnabled() {
-		logger.Trace("daemonCommand result: %s\n", strings.Replace(strings.Replace(reply, "\n", "|", -1), "\r", "", -1))
-	}
 }
 
 // daemonClassify sends classd the commands and returns the reply
@@ -204,20 +183,8 @@ func daemonClassify(mess dispatch.NfqueueMessage, sessionID uint64, newSession b
 		return "", errors.New("Unsupported protocol")
 	}
 
-	// if this is the first packet of the session we send a session create command
-	if newSession {
-		reply, err = daemonCommand(nil, "CREATE|%d|%s|%s|%d|%s|%d\r\n", sessionID, proto, mess.Session.ClientSideTuple.ClientAddress, mess.Session.ClientSideTuple.ClientPort, mess.Session.ClientSideTuple.ServerAddress, mess.Session.ClientSideTuple.ServerPort)
-		if err != nil {
-			logger.Err("daemonCommand error: %s\n", err.Error())
-			return "", err
-		}
-		if logger.IsTraceEnabled() {
-			logger.Trace("daemonCommand result: %s\n", strings.Replace(strings.Replace(reply, "\n", "|", -1), "\r", "", -1))
-		}
-	}
-
 	// send the packet data to the daemon
-	reply, err = daemonCommand(mess.Packet.Data(), "PACKET|%d|%d\r\n", sessionID, len(mess.Packet.Data()))
+	reply, err = daemonCommand(mess.Packet.Data(), "PACKET|%d|%s|%d\r\n", sessionID, proto, len(mess.Packet.Data()))
 
 	if err != nil {
 		logger.Err("daemonCommand error: %s\n", err.Error())
@@ -583,12 +550,13 @@ func daemonStartup() {
 	var daemonStdout io.ReadCloser
 	var daemonStderr io.ReadCloser
 
-	// start the classd daemon with the local and naked flags so we can capture the log
-	// output with no timestamp also add the debug flag if our debug flag is enabled
+	// start the classd daemon with the mfw flag to enable our mode of operation
+	// include the local flag so we can capture the log output
+	// include the debug flag when our own debug mode is enabled
 	if logger.IsDebugEnabled() {
-		daemonProcess = exec.Command(daemonBinary, "-l", "-n", "-d")
+		daemonProcess = exec.Command(daemonBinary, "-mfw", "-l", "-d")
 	} else {
-		daemonProcess = exec.Command(daemonBinary, "-l", "-n")
+		daemonProcess = exec.Command(daemonBinary, "-mfw", "-l")
 	}
 
 	// set a diffrent process group so it doesn't get packetd signals
