@@ -63,7 +63,7 @@ docker-compose -f cmd/packetd/docker-compose.build.yml up --build libc
 Result:
 
 ```
-# file ./packetd
+# file ./cmd/packetd/packetd
 ./packetd: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 2.6.32, BuildID[sha1]=7459d11c6fd1dd3ed5d3e3ed5c2320e27dc4bea4, with debug_info, not stripped
 ```
 
@@ -77,7 +77,7 @@ docker-compose -f cmd/packetd/docker-compose.build.yml up --build musl
 Result:
 
 ```
-# file ./packetd
+# file ./cmd/packetd/packetd
 ./packetd: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-musl-x86_64.so.1, with debug_info, not stripped
 ```
 
