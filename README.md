@@ -57,7 +57,7 @@ libc target
 -----------
 
 ```
-docker-compose -f docker-compose.build.yml up --build libc
+docker-compose -f cmd/packetd/docker-compose.build.yml up --build libc
 ```
 
 Result:
@@ -71,7 +71,7 @@ MUSL target
 -----------
 
 ```
-docker-compose -f docker-compose.build.yml up --build musl
+docker-compose -f cmd/packetd/docker-compose.build.yml up --build musl
 ```
 
 Result:
