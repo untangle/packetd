@@ -210,6 +210,13 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) int {
 	// parse update classd information from reply
 	appid, name, protochain, detail, confidence, category, state = parseReply(reply)
 
+	// if confidence is zero it means NAVL didn't give us any classification for the
+	// packet so we ignore the defaults classd uses for new/unknown sessions so we
+	// don't write over any details we may have already received for the session
+	if confidence == 0 {
+		return state
+	}
+
 	var changed []string
 	if updateClassifyDetail(mess, ctid, "application_id", appid) {
 		changed = append(changed, "application_id")
