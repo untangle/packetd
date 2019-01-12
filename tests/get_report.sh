@@ -1,13 +1,14 @@
 #!/bin/sh
+ 
+if [ "" = "$1" ] ; then
+    echo "usage: $0 report_filename.json"
+    exit 1
+fi
 
-QUERY_ID="`curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d @./test1-report.json 'http://localhost/reports/create_query'`"
+REPORT_FILE=$1
+
+QUERY_ID="`curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d @./${REPORT_FILE} 'http://localhost/api/reports/create_query'`"
 echo $QUERY_ID
 
-#DATA="`curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d $QUERY_ID 'http://localhost/reports/get_data'`"
-#echo $DATA
-
-#DATA="`curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d $QUERY_ID 'http://localhost/reports/get_data'`"
-#echo $DATA
-
-DATA="`curl -X GET -s -o - -H 'Content-Type: application/json; charset=utf-8' "http://localhost/reports/get_data/$QUERY_ID"`"
+DATA="`curl -X GET -s -o - -H 'Content-Type: application/json; charset=utf-8' "http://localhost/api/reports/get_data/$QUERY_ID"`"
 echo $DATA

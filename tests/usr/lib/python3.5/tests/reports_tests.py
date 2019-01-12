@@ -147,6 +147,29 @@ BASIC_CATEGORIES_SERIES_REPORT_ENTRY = {
     }
 }
 
+JOIN_REPORT_ENTRY = {
+    "name": "Top Application by Bandwidth",
+    "category": "Sessions",
+    "description": "The application sorted by sum of bytes transferred",
+    "displayOrder": 20,
+    "type": "CATEGORIES",
+    "table": "sessions join session_minutes using (session_id)",
+    "columnDisambiguation": [{
+        "columnName": "time_stamp",
+        "newColumnName": "session_minutes.time_stamp"
+    }],
+    "queryCategories": {
+        "groupColumn": "application_name",
+        "aggregationFunction": "sum",
+        "aggregationValue": "bytes"
+    },
+    "rendering": {
+        "type": "pie",
+        "donutInnerSize": 50,
+        "3dEnabled": True
+    }
+}
+
 def merge(dict1, dict2):
     """Merge the entries from two dictionaries and return a new dictionary"""
     res = {**dict1, **dict2}
@@ -373,6 +396,22 @@ class ReportsTests(unittest.TestCase):
         result = results[0]
         assert result != None
         assert result.get('time_trunc') != None
+
+    def test_060_join_query(self):
+        """Tests a report that uses a join in the table"""
+        query_id = create_query(JOIN_REPORT_ENTRY)
+        assert query_id != None
+        results = get_data(query_id)
+        print(results)
+        close_query(query_id)
+        assert results != None
+        assert isinstance(results, list)
+        assert len(results) > 0
+        result = results[0]
+        assert result != None
+        if len(results) > 0:
+            assert "application_name" in results[0]
+            assert "value" in results[0]
 
     def final_tear_down(self):
         """final_tear_down unittest method"""

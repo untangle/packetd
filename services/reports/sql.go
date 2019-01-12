@@ -53,14 +53,15 @@ func makeTextSQLString(reportEntry *ReportEntry) (string, error) {
 	sqlStr += " " + escape(reportEntry.Table)
 	sqlStr += " WHERE"
 	for i, condition := range reportEntry.Conditions {
-		opStr, err := operatorSQL(condition.Operator)
-		if err != nil {
-			return "", err
-		}
 		if i != 0 {
 			sqlStr += " AND"
 		}
-		sqlStr += " " + condition.Column + " " + opStr + " ?"
+		newStr, err := getConditionSQL(reportEntry, &condition)
+		if err != nil {
+			logger.Warn("Invalid condition: %v %v\n", condition, err)
+			return "", err
+		}
+		sqlStr += newStr
 	}
 	return sqlStr, nil
 }
@@ -71,14 +72,15 @@ func makeEventsSQLString(reportEntry *ReportEntry) (string, error) {
 	sqlStr += " " + escape(reportEntry.Table)
 	sqlStr += " WHERE"
 	for i, condition := range reportEntry.Conditions {
-		opStr, err := operatorSQL(condition.Operator)
-		if err != nil {
-			return "", err
-		}
 		if i != 0 {
 			sqlStr += " AND"
 		}
-		sqlStr += " " + condition.Column + " " + opStr + " ?"
+		newStr, err := getConditionSQL(reportEntry, &condition)
+		if err != nil {
+			logger.Warn("Invalid condition: %v %v\n", condition, err)
+			return "", err
+		}
+		sqlStr += newStr
 	}
 	return sqlStr, nil
 }
@@ -113,14 +115,15 @@ func makeCategoriesSQLString(reportEntry *ReportEntry) (string, error) {
 	sqlStr += " FROM " + escape(reportEntry.Table)
 	sqlStr += " WHERE"
 	for i, condition := range reportEntry.Conditions {
-		opStr, err := operatorSQL(condition.Operator)
-		if err != nil {
-			return "", err
-		}
 		if i != 0 {
 			sqlStr += " AND"
 		}
-		sqlStr += " " + condition.Column + " " + opStr + " ?"
+		newStr, err := getConditionSQL(reportEntry, &condition)
+		if err != nil {
+			logger.Warn("Invalid condition: %v %v\n", condition, err)
+			return "", err
+		}
+		sqlStr += newStr
 	}
 	sqlStr += " GROUP BY " + reportEntry.QueryCategories.GroupColumn
 	sqlStr += fmt.Sprintf(" ORDER BY %d %s", orderByColumn, order)
@@ -161,7 +164,7 @@ func makeSeriesSQLString(reportEntry *ReportEntry) (string, error) {
 	}
 
 	qStr := "SELECT"
-	qStr += fmt.Sprintf(" (time_stamp/%d*%d) as time_trunc", timeIntervalMilli, timeIntervalMilli)
+	qStr += fmt.Sprintf(" (%s/%d*%d) as time_trunc", getColumnName(reportEntry, "time_stamp"), timeIntervalMilli, timeIntervalMilli)
 	for _, column := range reportEntry.QuerySeries.Columns {
 		if column == "" {
 			return "", errors.New("Missing column name")
@@ -171,14 +174,15 @@ func makeSeriesSQLString(reportEntry *ReportEntry) (string, error) {
 	qStr += " FROM " + escape(reportEntry.Table)
 	qStr += " WHERE"
 	for i, condition := range reportEntry.Conditions {
-		opStr, err := operatorSQL(condition.Operator)
-		if err != nil {
-			return "", err
-		}
 		if i != 0 {
 			qStr += " AND"
 		}
-		qStr += " " + condition.Column + " " + opStr + " ?"
+		newStr, err := getConditionSQL(reportEntry, &condition)
+		if err != nil {
+			logger.Warn("Invalid condition: %v %v\n", condition, err)
+			return "", err
+		}
+		qStr += newStr
 	}
 	qStr += " GROUP BY time_trunc"
 
@@ -220,15 +224,6 @@ func makeCategoriesSeriesSQLString(reportEntry *ReportEntry) (string, error) {
 	reportEntry.QuerySeries.Columns = columns
 
 	return makeSeriesSQLString(reportEntry)
-}
-
-// return the SQL conditions/fragment to limit the time_stamp
-// to the specified startTime and endTime
-func timeStampConditions(startTime time.Time, endTime time.Time) string {
-	//startTimeStr := startTime.Format("yyyy-MM-dd HH:mm:ss")
-	startTimeStr := dateFormat(startTime)
-	endTimeStr := dateFormat(endTime)
-	return fmt.Sprintf("time_stamp > %s AND time_stamp < %s", startTimeStr, endTimeStr)
 }
 
 //makeTimelineSQLString makes a SQL query string to provide the timeline to left join
@@ -460,4 +455,28 @@ func findTime(reportEntry ReportEntry, operator string) (string, error) {
 	}
 
 	return "", errors.New("time not found")
+}
+
+// getConditionSQL returns the SQL for a given condition
+func getConditionSQL(reportEntry *ReportEntry, condition *ReportCondition) (string, error) {
+	opStr, err := operatorSQL(condition.Operator)
+	if err != nil {
+		return "", err
+	}
+	columnName := getColumnName(reportEntry, condition.Column)
+	return " " + columnName + " " + opStr + " ?", nil
+}
+
+// getColumnName returns the proper column name providing the name
+// this does a lookup in the disambiguation table and updates the column name if necessary
+// to remove ambiguation of duplicate column names when doing joins
+func getColumnName(reportEntry *ReportEntry, columnName string) string {
+	if reportEntry.ColumnDisambiguation != nil {
+		for _, disambi := range reportEntry.ColumnDisambiguation {
+			if columnName == disambi.ColumnName {
+				return disambi.NewColumnName
+			}
+		}
+	}
+	return columnName
 }

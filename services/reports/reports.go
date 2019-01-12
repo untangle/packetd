@@ -65,21 +65,28 @@ type ReportCondition struct {
 	Value    interface{} `json:"value"`
 }
 
+// ReportColumnDisambiguation remove and ambigious column names (used for joins)
+type ReportColumnDisambiguation struct {
+	ColumnName    string `json:"columnName"`
+	NewColumnName string `json:"newColumnName"`
+}
+
 // ReportEntry is a report entry as defined in the JSON schema
 type ReportEntry struct {
-	UniqueID        string                 `json:"uniqueId"`
-	Name            string                 `json:"name"`
-	Category        string                 `json:"category"`
-	Description     string                 `json:"description"`
-	DisplayOrder    int                    `json:"displayOrder"`
-	ReadOnly        bool                   `json:"readOnly"`
-	Type            string                 `json:"type"`
-	Table           string                 `json:"table"`
-	Conditions      []ReportCondition      `json:"conditions"`
-	UserConditions  []ReportCondition      `json:"userConditions"`
-	QueryCategories QueryCategoriesOptions `json:"queryCategories"`
-	QueryText       QueryTextOptions       `json:"queryText"`
-	QuerySeries     QuerySeriesOptions     `json:"querySeries"`
+	UniqueID             string                       `json:"uniqueId"`
+	Name                 string                       `json:"name"`
+	Category             string                       `json:"category"`
+	Description          string                       `json:"description"`
+	DisplayOrder         int                          `json:"displayOrder"`
+	ReadOnly             bool                         `json:"readOnly"`
+	Type                 string                       `json:"type"`
+	Table                string                       `json:"table"`
+	Conditions           []ReportCondition            `json:"conditions"`
+	ColumnDisambiguation []ReportColumnDisambiguation `json:"columnDisambiguation"`
+	UserConditions       []ReportCondition            `json:"userConditions"`
+	QueryCategories      QueryCategoriesOptions       `json:"queryCategories"`
+	QueryText            QueryTextOptions             `json:"queryText"`
+	QuerySeries          QuerySeriesOptions           `json:"querySeries"`
 }
 
 var db *sql.DB
