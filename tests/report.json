@@ -1,0 +1,21 @@
+{
+    "name": "Top Applications Bytes by Time",
+    "category": "Sessions",
+    "description": "description",
+    "displayOrder": 21,
+    "type": "CATEGORIES_SERIES",
+    "table": "session_minutes join sessions using (session_id)",
+    "queryCategories": {
+        "groupColumn": "application_name",
+        "aggregationFunction": "sum",
+        "aggregationValue": "bytes",
+        "limit": 10
+    },
+    "columnDisambiguation": [{
+        "columnName": "time_stamp",
+        "newColumnName": "session_minutes.time_stamp"
+    }],
+    "rendering": {
+        "type": "spline"
+    }
+}
