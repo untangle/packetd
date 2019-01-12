@@ -132,6 +132,9 @@ func PluginConntrackHandler(message int, entry *dispatch.Conntrack) {
 	if message == 'U' {
 		if session != nil {
 			doAccounting(entry, session.SessionID)
+		} else {
+			// Still account for unknown session data
+			doAccounting(entry, 0)
 		}
 	}
 }
