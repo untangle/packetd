@@ -612,16 +612,8 @@ func daemonStartup() {
 		}
 	}
 
-	printOutputFn := func(reader io.ReadCloser) {
-		for {
-			scanner := bufio.NewScanner(reader)
-			for scanner.Scan() {
-				logger.Info("classd: %v\n", scanner.Text())
-			}
-		}
-	}
-	go printOutputFn(daemonStdout)
-	go printOutputFn(daemonStderr)
+	go daemonOutputWriter(daemonStdout)
+	go daemonOutputWriter(daemonStderr)
 
 	logger.Info("The classd daemon has been started. PID:%d\n", daemonProcess.Process.Pid)
 }
@@ -670,4 +662,14 @@ func daemonGoodbye() {
 
 	daemonSocket.Close()
 	daemonSocket = nil
+}
+
+// daemonOutputWriter just writes any output from the daemon to stdout
+func daemonOutputWriter(reader io.ReadCloser) {
+	for {
+		scanner := bufio.NewScanner(reader)
+		for scanner.Scan() {
+			logger.Info("classd: %v\n", scanner.Text())
+		}
+	}
 }

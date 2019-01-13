@@ -35,7 +35,7 @@ func Startup() {
 	}
 
 	engine = gin.New()
-	engine.Use(gin.Logger())
+	engine.Use(ginlogger())
 	engine.Use(gin.Recovery())
 
 	config := cors.DefaultConfig()
@@ -415,4 +415,10 @@ func isSetupWizardCompleted() bool {
 	}
 
 	return wizardCompletedBool
+}
+
+func ginlogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		logger.Info("GIN: %v %v\n", c.Request.Method, c.Request.RequestURI)
+	}
 }
