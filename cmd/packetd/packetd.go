@@ -301,8 +301,10 @@ func handleSignals() {
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-ch
-		logger.Warn("Received signal [%v]. Setting shutdown flag\n", sig)
-		kernel.SetShutdownFlag()
+		go func() {
+			logger.Warn("Received signal [%v]. Setting shutdown flag\n", sig)
+			kernel.SetShutdownFlag()
+		}()
 	}()
 
 	// Add SIGQUIT handler (dump thread stack trace)
@@ -311,10 +313,10 @@ func handleSignals() {
 	go func() {
 		for {
 			sig := <-quitch
-			buf := make([]byte, 1<<20)
-			stacklen := runtime.Stack(buf, true)
-			ioutil.WriteFile("/tmp/packetd.stack", buf[:stacklen], 0644)
 			go func() {
+				buf := make([]byte, 1<<20)
+				stacklen := runtime.Stack(buf, true)
+				ioutil.WriteFile("/tmp/packetd.stack", buf[:stacklen], 0644)
 				logger.Warn("Received signal [%v]. Printing Thread Dump...\n", sig)
 				logger.Warn("\n\n%s\n\n", buf[:stacklen])
 				logger.Warn("Thread dump complete.\n")
