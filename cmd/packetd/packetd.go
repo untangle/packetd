@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -311,10 +312,13 @@ func handleSignals() {
 		for {
 			sig := <-quitch
 			buf := make([]byte, 1<<20)
-			logger.Warn("Received signal [%v]. Printing Thread Dump...\n", sig)
 			stacklen := runtime.Stack(buf, true)
-			logger.Warn("\n\n%s\n\n", buf[:stacklen])
-			logger.Warn("Thread dump complete.\n")
+			ioutil.WriteFile("/tmp/packetd.stack", buf[:stacklen], 0644)
+			go func() {
+				logger.Warn("Received signal [%v]. Printing Thread Dump...\n", sig)
+				logger.Warn("\n\n%s\n\n", buf[:stacklen])
+				logger.Warn("Thread dump complete.\n")
+			}()
 		}
 	}()
 }
