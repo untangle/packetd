@@ -420,5 +420,6 @@ func isSetupWizardCompleted() bool {
 func ginlogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		logger.Info("GIN: %v %v\n", c.Request.Method, c.Request.RequestURI)
+		c.Next()
 	}
 }
