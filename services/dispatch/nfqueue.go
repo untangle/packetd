@@ -138,9 +138,6 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 				logger.Debug("Ignoring mid-session FIN packet: %s %d\n", mess.MsgTuple, ctid)
 			} else {
 				logger.Info("Ignoring mid-session packet: %s %d\n", mess.MsgTuple, ctid)
-				if mess.TCPLayer != nil {
-					logger.Info("TCP flags: [SYN: %v FIN: %v RST: %v ACK: %v]\n", mess.TCPLayer.SYN, mess.TCPLayer.FIN, mess.TCPLayer.RST, mess.TCPLayer.ACK)
-				}
 			}
 
 			dict.AddSessionEntry(ctid, "bypass_packetd", true)
@@ -150,7 +147,6 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		mess.Session = session
 	} else {
 		if newSession {
-
 			if mess.MsgTuple.Equal(session.ClientSideTuple) {
 				// netfilter considers this a "new" session, but the tuple is identical.
 				// this happens because netfilter's session tracking is more advanced
@@ -217,6 +213,13 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 	// We loop and increment the priority until all subscriptions have been called
 	sublist := MirrorNfqueueSubscriptions(session)
 	subtotal := len(sublist)
+
+	// If there are no subscribers anymore, just release now
+	if subtotal == 0 {
+		dict.AddSessionEntry(session.ConntrackID, "bypass_packetd", true)
+		return NfAccept
+	}
+
 	subcount := 0
 	priority := 0
 	var timeMap = make(map[string]float64)
