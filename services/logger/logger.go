@@ -15,6 +15,7 @@ const logConfigFile = "/tmp/logconfig.js"
 var logLevelName = [...]string{"EMERG", "ALERT", "CRIT", "ERROR", "WARN", "NOTIC", "INFO", "DEBUG", "TRACE"}
 var appLogLevel map[string]int
 var launchTime time.Time
+var timestampEnabled = true
 
 //LogLevelEmerg = stdlog.h/LOG_EMERG
 const LogLevelEmerg = 0
@@ -94,14 +95,11 @@ func LogMessage(level int, format string, args ...interface{}) {
 		return
 	}
 
-	nowtime := time.Now()
-	var elapsed = nowtime.Sub(launchTime)
-
 	if len(args) == 0 {
-		fmt.Printf("[%11.5f] %-5s %26s: %s", elapsed.Seconds(), logLevelName[level], caller, format)
+		fmt.Printf("%s%-5s %26s: %s", getPrefix(), logLevelName[level], caller, format)
 	} else {
 		buffer := fmt.Sprintf(format, args...)
-		fmt.Printf("[%11.5f] %-5s %26s: %s", elapsed.Seconds(), logLevelName[level], caller, buffer)
+		fmt.Printf("%s%-5s %26s: %s", getPrefix(), logLevelName[level], caller, buffer)
 	}
 }
 
@@ -120,14 +118,11 @@ func LogMessageSource(level int, source string, format string, args ...interface
 		return
 	}
 
-	nowtime := time.Now()
-	var elapsed = nowtime.Sub(launchTime)
-
 	if len(args) == 0 {
-		fmt.Printf("[%11.5f] %-5s %26s: %s", elapsed.Seconds(), logLevelName[level], source, format)
+		fmt.Printf("%s%-5s %26s: %s", getPrefix(), logLevelName[level], source, format)
 	} else {
 		buffer := fmt.Sprintf(format, args...)
-		fmt.Printf("[%11.5f] %-5s %26s: %s", elapsed.Seconds(), logLevelName[level], source, buffer)
+		fmt.Printf("%s%-5s %26s: %s", getPrefix(), logLevelName[level], source, buffer)
 	}
 }
 
@@ -247,6 +242,16 @@ type LogWriter struct {
 // NewLogWriter creates an io Writer to steam output to the Log facility
 func NewLogWriter() *LogWriter {
 	return (&LogWriter{make([]byte, 0)})
+}
+
+// EnableTimestamp enables the elapsed time in output
+func EnableTimestamp() {
+	timestampEnabled = true
+}
+
+// DisableTimestamp disable the elapsed time in output
+func DisableTimestamp() {
+	timestampEnabled = false
 }
 
 // Write takes written data and stores it in a buffer and writes to the log when a line feed is detected
@@ -427,4 +432,15 @@ func findCaller() (string, string, string, string, int) {
 	}
 
 	return "unknown|unknown:0", "unknown:0", "unknown", "unknown", 0
+}
+
+// getPrefix returns a log message prefix
+func getPrefix() string {
+	if !timestampEnabled {
+		return ""
+	}
+
+	nowtime := time.Now()
+	var elapsed = nowtime.Sub(launchTime)
+	return fmt.Sprintf("[%11.5f] ", elapsed.Seconds())
 }
