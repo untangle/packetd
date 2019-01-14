@@ -200,13 +200,7 @@ void conntrack_dump(void)
 
 	if (nfcth == NULL) return;
 
-	family = AF_INET;
+	family = AF_UNSPEC;
 	ret = nfct_send(nfcth,NFCT_Q_DUMP,&family);
-	if (ret < 0) logmessage(LOG_WARNING,logsrc,"nfct_send(AF_INET) result = %d\n",ret);
-
-/* FIXME - figure out why this breaks everything
-	family = AF_INET6;
-	ret = nfct_send(nfcth,NFCT_Q_DUMP,&family);
-	if (ret < 0) logmessage(LOG_WARNING,logsrc,"nfct_send(AF_INET6) result = %d\n",ret);
-*/
+	if (ret < 0) logmessage(LOG_WARNING,logsrc,"nfct_send() result:%d errno:%d\n",ret,errno);
 }
