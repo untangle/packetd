@@ -48,8 +48,8 @@ const navlStateInspecting = 1 // Indicates the connection is under inspection
 const navlStateMonitoring = 2 // Indicates the connection is under monitoring
 const navlStateClassified = 3 // Indicates the connection is fully classified
 
-const maxPacketCount = 32     // The maximum number of packets to inspect before releasing
-const maxTrafficSize = 0x8000 // The maximum number of bytes to inspect before releasing
+const maxPacketCount = 64      // The maximum number of packets to inspect before releasing
+const maxTrafficSize = 0x10000 // The maximum number of bytes to inspect before releasing
 
 var applicationTable map[string]applicationInfo
 var shutdownFlag = false
@@ -159,10 +159,13 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	// process the reply and get the classification state
-	state := processReply(reply, mess, ctid)
+	state, confidence := processReply(reply, mess, ctid)
 
 	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, release the session
 	if state == navlStateClassified || state == navlStateTerminated || mess.Session.PacketCount > maxPacketCount || mess.Session.ByteCount > maxTrafficSize {
+		if logger.IsLogEnabled(logger.LogLevelDebug) {
+			logger.Debug("RELEASING SESSION:%d STATE:%d CONFIDENCE:%d PACKETS:%d BYTES:%d\n", ctid, state, confidence, mess.Session.PacketCount, mess.Session.ByteCount)
+		}
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
@@ -198,12 +201,12 @@ func daemonClassify(mess dispatch.NfqueueMessage, sessionID uint64, newSession b
 }
 
 // processReply processes a reply from the classd daemon
-func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) int {
+func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int, int) {
 	var appid string
 	var name string
 	var protochain string
 	var detail string
-	var confidence uint64
+	var confidence int
 	var category string
 	var state int
 
@@ -214,7 +217,7 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) int {
 	// packet so we ignore the defaults classd uses for new/unknown sessions so we
 	// don't write over any details we may have already received for the session
 	if confidence == 0 {
-		return state
+		return state, confidence
 	}
 
 	var changed []string
@@ -242,18 +245,18 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) int {
 		logEvent(mess.Session, changed)
 	}
 
-	return state
+	return state, confidence
 }
 
 // parseReply parses a reply from classd and returns
 // (appid, name, protochain, detail, confidence, category, state)
-func parseReply(replyString string) (string, string, string, string, uint64, string, int) {
+func parseReply(replyString string) (string, string, string, string, int, string, int) {
 	var err error
 	var appid string
 	var name string
 	var protochain string
 	var detail string
-	var confidence uint64
+	var confidence int
 	var category string
 	var state int
 
@@ -279,7 +282,7 @@ func parseReply(replyString string) (string, string, string, string, uint64, str
 			detail = rawpair[1]
 			break
 		case "CONFIDENCE: ":
-			confidence, err = strconv.ParseUint(rawpair[1], 10, 64)
+			confidence, err = strconv.Atoi(rawpair[1])
 			if err != nil {
 				confidence = 0
 			}
