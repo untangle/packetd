@@ -189,6 +189,12 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		mess.ClientToServer = false
 	}
 
+	// if this is a new session set the client side interface index and type
+	if newSession {
+		session.ClientSideInterfaceIndex = uint8((pmark & 0x000000FF))
+		session.ClientSideInterfaceType = uint8((pmark & 0x03000000) >> 24)
+	}
+
 	// Update some accounting bits
 	session.LastActivityTime = time.Now()
 	session.PacketCount++

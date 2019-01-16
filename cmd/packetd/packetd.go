@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"os/user"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -45,6 +46,20 @@ var cpuCount = getConcurrencyFactor()
 var queueRange = getQueueRange()
 
 func main() {
+	userinfo, err := user.Current()
+	if err != nil {
+		panic(err)
+	}
+
+	userid, err := strconv.Atoi(userinfo.Uid)
+	if err != nil {
+		panic(err)
+	}
+
+	if userid != 0 {
+		panic("This application must be run as root!")
+	}
+
 	handleSignals()
 	parseArguments()
 
