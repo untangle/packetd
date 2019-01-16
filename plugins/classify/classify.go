@@ -201,12 +201,12 @@ func daemonClassify(mess dispatch.NfqueueMessage, sessionID uint64, newSession b
 }
 
 // processReply processes a reply from the classd daemon
-func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int, int) {
+func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int, uint64) {
 	var appid string
 	var name string
 	var protochain string
 	var detail string
-	var confidence int
+	var confidence uint64
 	var category string
 	var state int
 
@@ -250,13 +250,13 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 
 // parseReply parses a reply from classd and returns
 // (appid, name, protochain, detail, confidence, category, state)
-func parseReply(replyString string) (string, string, string, string, int, string, int) {
+func parseReply(replyString string) (string, string, string, string, uint64, string, int) {
 	var err error
 	var appid string
 	var name string
 	var protochain string
 	var detail string
-	var confidence int
+	var confidence uint64
 	var category string
 	var state int
 
@@ -282,7 +282,7 @@ func parseReply(replyString string) (string, string, string, string, int, string
 			detail = rawpair[1]
 			break
 		case "CONFIDENCE: ":
-			confidence, err = strconv.Atoi(rawpair[1])
+			confidence, err = strconv.ParseUint(rawpair[1], 10, 64)
 			if err != nil {
 				confidence = 0
 			}
