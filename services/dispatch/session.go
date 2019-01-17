@@ -27,19 +27,19 @@ type Session struct {
 	ClientSideTuple Tuple
 
 	// ClientSideInterfaceIndex stores the client-side interface index
-	ClientSideInterfaceIndex uint8
+	ClientInterfaceID uint8
 
 	// ClientSideInterfaceType stores the client-side interface type
-	ClientSideInterfaceType uint8
+	ClientInterfaceType uint8
 
 	// ServerSideTuple stores the server-side (post-NAT) session tuple
 	ServerSideTuple Tuple
 
 	// ServerSideInterfaceIndex stores the server-side interface index
-	ServerSideInterfaceIndex uint8
+	ServerInterfaceID uint8
 
 	// ServerSideInterfaceType stores the server-side interface type
-	ServerSideInterfaceType uint8
+	ServerInterfaceType uint8
 
 	// ConntrackConfirmed is true if this session has been confirmed by conntrack. false otherwise
 	// A session becomes confirmed by conntrack once its packet reaches the final CONNTRACK_CONFIRM
