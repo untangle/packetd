@@ -41,8 +41,9 @@ func Startup() {
 
 	config := cors.DefaultConfig()
 
-	// FIXME Allow cross-site for dev - this should be disabled in production
-	config.AllowAllOrigins = true
+	// Allow cross-site for dev - this should be disabled in production
+	// config.AllowAllOrigins = true
+
 	engine.Use(cors.New(config))
 
 	// A server-side store would be better IMO, but I can't find one.
@@ -247,7 +248,8 @@ func warehousePlayback(c *gin.Context) {
 }
 
 func warehouseCapture(c *gin.Context) {
-	c.JSON(200, "THIS FUNCTION IS NOT YET IMPLEMENTED") // FIXME - some day
+	// FIXME - some day
+	c.JSON(200, "THIS FUNCTION IS NOT YET IMPLEMENTED")
 }
 
 func warehouseCleanup(c *gin.Context) {
