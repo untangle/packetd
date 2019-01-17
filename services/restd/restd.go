@@ -37,6 +37,7 @@ func Startup() {
 	engine = gin.New()
 	engine.Use(ginlogger())
 	engine.Use(gin.Recovery())
+	engine.Use(addHeaders)
 
 	config := cors.DefaultConfig()
 
@@ -121,7 +122,6 @@ func RemoveEmptyStrings(strings []string) []string {
 }
 
 func rootHandler(c *gin.Context) {
-	//addHeaders(c)
 	if isSetupWizardCompleted() {
 		c.Redirect(http.StatusTemporaryRedirect, "/admin")
 	} else {
@@ -130,14 +130,12 @@ func rootHandler(c *gin.Context) {
 }
 
 func pingHandler(c *gin.Context) {
-	//addHeaders(c)
 	c.JSON(200, gin.H{
 		"message": "pong",
 	})
 }
 
 func reportsGetData(c *gin.Context) {
-	//addHeaders(c)
 	queryStr := c.Param("query_id")
 	if queryStr == "" {
 		c.JSON(200, gin.H{"error": "query_id not found"})
@@ -160,7 +158,6 @@ func reportsGetData(c *gin.Context) {
 }
 
 func reportsCreateQuery(c *gin.Context) {
-	//addHeaders(c)
 	body, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
 		c.JSON(200, gin.H{"error": err.Error()})
@@ -316,7 +313,6 @@ func trafficControl(c *gin.Context) {
 }
 
 func getSettings(c *gin.Context) {
-	//addHeaders(c)
 	var segments []string
 
 	path := c.Param("path")
@@ -333,7 +329,6 @@ func getSettings(c *gin.Context) {
 }
 
 func getDefaultSettings(c *gin.Context) {
-	//addHeaders(c)
 	var segments []string
 
 	path := c.Param("path")
@@ -350,7 +345,6 @@ func getDefaultSettings(c *gin.Context) {
 }
 
 func setSettings(c *gin.Context) {
-	//addHeaders(c)
 	var segments []string
 	path := c.Param("path")
 
@@ -378,7 +372,6 @@ func setSettings(c *gin.Context) {
 }
 
 func trimSettings(c *gin.Context) {
-	//addHeaders(c)
 	var segments []string
 	path := c.Param("path")
 
@@ -394,10 +387,12 @@ func trimSettings(c *gin.Context) {
 }
 
 func addHeaders(c *gin.Context) {
+	c.Header("Cache-Control", "must-revalidate")
 	// c.Header("Example-Header", "foo")
 	// c.Header("Access-Control-Allow-Origin", "*")
 	// c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE")
 	// c.Header("Access-Control-Allow-Headers", "X-Custom-Header")
+	c.Next()
 }
 
 // returns true if the setup wizard is completed, or false if not
