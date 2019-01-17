@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
@@ -39,12 +38,10 @@ func Startup() {
 	engine.Use(gin.Recovery())
 	engine.Use(addHeaders)
 
-	config := cors.DefaultConfig()
-
 	// Allow cross-site for dev - this should be disabled in production
+	// config := cors.DefaultConfig()
 	// config.AllowAllOrigins = true
-
-	engine.Use(cors.New(config))
+	// engine.Use(cors.New(config))
 
 	// A server-side store would be better IMO, but I can't find one.
 	// -dmorris
