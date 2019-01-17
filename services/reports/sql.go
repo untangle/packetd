@@ -131,6 +131,10 @@ func makeCategoriesSQLString(reportEntry *ReportEntry) (string, error) {
 	if reportEntry.QueryCategories.Limit != 0 {
 		sqlStr += fmt.Sprintf(" LIMIT %d", reportEntry.QueryCategories.Limit)
 	}
+
+	// remove "0" values
+	sqlStr = "SELECT " + reportEntry.QueryCategories.GroupColumn + ", value FROM ( " + sqlStr + " ) WHERE value > 0"
+
 	return sqlStr, nil
 }
 
