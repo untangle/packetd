@@ -213,11 +213,24 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 	// parse update classd information from reply
 	appid, name, protochain, detail, confidence, category, state = parseReply(reply)
 
-	// if confidence is zero it means NAVL didn't give us any classification for the
-	// packet so we ignore the defaults classd uses for new/unknown sessions so we
-	// don't write over any details we may have already received for the session
-	if confidence == 0 {
-		return state, confidence
+	// We look at the confidence and ignore any reply where the value is less
+	// than the confidence currently attached to the session. Because of the
+	// unpredictable nature of gorouting scheduling, we sometimes get confidence = 0
+	// if NAVL didn't give us any classification. This can happen if packets are
+	// processed out of order and NAVL gets data for a session that has already
+	// encountered a FIN packet. In this case it generates a no connection error
+	// and classd gives us the generic /IP defaults. We also don't want to apply
+	// a lower confidence reply on top of a higher confidence reply which can
+	// happen if the lower confidence reply is recived and parsed after the
+	// higher confidence reply has already been handled.
+	checkdata := mess.Session.GetAttachment("application_confidence")
+
+	if checkdata != nil {
+		checkval := checkdata.(uint64)
+		if confidence < checkval {
+			logger.Alert("Ignoring update with confidence %d < %d\n", confidence, checkval)
+			return state, confidence
+		}
 	}
 
 	var changed []string
@@ -510,7 +523,7 @@ func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname st
 	// at this point the session has the attachment but the data has changed so we update the session and the dictionary
 	mess.Session.PutAttachment(pairname, pairdata)
 	dict.AddSessionEntry(ctid, pairname, pairdata)
-	logger.Debug("Updating classification detail %s = %v ctid:%d\n", pairname, pairdata, ctid)
+	logger.Debug("Updating classification detail %s from %v to %v ctid:%d\n", pairname, checkdata, pairdata, ctid)
 	return true
 }
 
