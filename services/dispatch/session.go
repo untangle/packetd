@@ -110,6 +110,17 @@ func (sess *Session) DeleteAttachment(name string) bool {
 	return true
 }
 
+// LockAttachments locks the attatchments mutex and returns the attachment map to the caller
+func (sess *Session) LockAttachments() map[string]interface{} {
+	sess.attachmentLock.Lock()
+	return (sess.attachments)
+}
+
+// UnlockAttachments unlocks the attachments mutex
+func (sess *Session) UnlockAttachments() {
+	sess.attachmentLock.Unlock()
+}
+
 // destroy is called to end the session
 // it removes the session from the session table, and calls
 // the finialization event to all subscribers

@@ -163,9 +163,11 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, release the session
 	if state == navlStateClassified || state == navlStateTerminated || mess.Session.PacketCount > maxPacketCount || mess.Session.ByteCount > maxTrafficSize {
+
 		if logger.IsLogEnabled(logger.LogLevelDebug) {
 			logger.Debug("RELEASING SESSION:%d STATE:%d CONFIDENCE:%d PACKETS:%d BYTES:%d\n", ctid, state, confidence, mess.Session.PacketCount, mess.Session.ByteCount)
 		}
+
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
@@ -209,9 +211,17 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 	var confidence uint64
 	var category string
 	var state int
+	var attachments map[string]interface{}
 
 	// parse update classd information from reply
 	appid, name, protochain, detail, confidence, category, state = parseReply(reply)
+
+	// WARNING - DO NOT USE Session GetAttachment or SetAttachment in this function
+	// Because we make decisions based on existing attachments and update multiple
+	// attachments, we lock the attachments and access them directly for efficiency.
+	// Other calls that lock the attachment mutex will hang forever if called from here.
+	attachments = mess.Session.LockAttachments()
+	defer mess.Session.UnlockAttachments()
 
 	// We look at the confidence and ignore any reply where the value is less
 	// than the confidence currently attached to the session. Because of the
@@ -223,7 +233,7 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 	// a lower confidence reply on top of a higher confidence reply which can
 	// happen if the lower confidence reply is recived and parsed after the
 	// higher confidence reply has already been handled.
-	checkdata := mess.Session.GetAttachment("application_confidence")
+	checkdata := attachments["application_confidence"]
 
 	if checkdata != nil {
 		checkval := checkdata.(uint64)
@@ -234,28 +244,28 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 	}
 
 	var changed []string
-	if updateClassifyDetail(mess, ctid, "application_id", appid) {
+	if updateClassifyDetail(attachments, ctid, "application_id", appid) {
 		changed = append(changed, "application_id")
 	}
-	if updateClassifyDetail(mess, ctid, "application_name", name) {
+	if updateClassifyDetail(attachments, ctid, "application_name", name) {
 		changed = append(changed, "application_name")
 	}
-	if updateClassifyDetail(mess, ctid, "application_protochain", protochain) {
+	if updateClassifyDetail(attachments, ctid, "application_protochain", protochain) {
 		changed = append(changed, "application_protochain")
 	}
-	if updateClassifyDetail(mess, ctid, "application_detail", detail) {
+	if updateClassifyDetail(attachments, ctid, "application_detail", detail) {
 		changed = append(changed, "application_detail")
 	}
-	if updateClassifyDetail(mess, ctid, "application_confidence", confidence) {
+	if updateClassifyDetail(attachments, ctid, "application_confidence", confidence) {
 		changed = append(changed, "application_confidence")
 	}
-	if updateClassifyDetail(mess, ctid, "application_category", category) {
+	if updateClassifyDetail(attachments, ctid, "application_category", category) {
 		changed = append(changed, "application_category")
 	}
 
 	// if something changed, log a new event
 	if len(changed) > 0 {
-		logEvent(mess.Session, changed)
+		logEvent(mess.Session, attachments, changed)
 	}
 
 	return state, confidence
@@ -322,7 +332,7 @@ func parseReply(replyString string) (string, string, string, string, uint64, str
 
 // logEvent logs a session_classify event that updates the application_* columns
 // provide the session and the changed column names
-func logEvent(session *dispatch.Session, changed []string) {
+func logEvent(session *dispatch.Session, attachments map[string]interface{}, changed []string) {
 	if len(changed) == 0 {
 		return
 	}
@@ -331,7 +341,7 @@ func logEvent(session *dispatch.Session, changed []string) {
 	}
 	modifiedColumns := make(map[string]interface{})
 	for _, v := range changed {
-		modifiedColumns[v] = session.GetAttachment(v)
+		modifiedColumns[v] = attachments[v]
 	}
 
 	reports.LogEvent(reports.CreateEvent("session_classify", "sessions", 2, columns, modifiedColumns))
@@ -491,7 +501,7 @@ func loadApplicationTable() {
 // updateClassifyDetail updates a key/value pair in the session attachments
 // if the value has changed for the provided key, it will also update the nf_dict session table
 // returns true if value changed, false otherwise
-func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname string, pairdata interface{}) bool {
+func updateClassifyDetail(attachments map[string]interface{}, ctid uint32, pairname string, pairdata interface{}) bool {
 
 	// we don't wan't to put empty strings in the attachments or the dictionary
 	switch v := pairdata.(type) {
@@ -504,9 +514,9 @@ func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname st
 	}
 
 	// if the session doesn't have this attachment yet we add it and write to the dictionary
-	checkdata := mess.Session.GetAttachment(pairname)
+	checkdata := attachments[pairname]
 	if checkdata == nil {
-		mess.Session.PutAttachment(pairname, pairdata)
+		attachments[pairname] = pairdata
 		dict.AddSessionEntry(ctid, pairname, pairdata)
 		logger.Debug("Setting classification detail %s = %v ctid:%d\n", pairname, pairdata, ctid)
 		return true
@@ -521,7 +531,7 @@ func updateClassifyDetail(mess dispatch.NfqueueMessage, ctid uint32, pairname st
 	}
 
 	// at this point the session has the attachment but the data has changed so we update the session and the dictionary
-	mess.Session.PutAttachment(pairname, pairdata)
+	attachments[pairname] = pairdata
 	dict.AddSessionEntry(ctid, pairname, pairdata)
 	logger.Debug("Updating classification detail %s from %v to %v ctid:%d\n", pairname, checkdata, pairdata, ctid)
 	return true
