@@ -241,6 +241,14 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 			return state, confidence
 		}
 	}
+    checkprotochain := attachments["application_protochain"]
+    if checkprotochain != nil {
+        current := checkprotochain.(string)
+        if strings.Count(protochain, "/") < strings.Count(current,"/") {
+			logger.Alert("Ignoring update with protochain %s < %s\n", protochain, current)
+			return state, confidence
+        }
+    }
     if protochain == "/IP/TCP" && confidence == 100 {
         logger.Alert("100 confidence at /IP/TCP\n")
         logger.Alert("New  classification: %v %v %v %v %v %v %v\n",
