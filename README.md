@@ -15,7 +15,13 @@ You'll need an Untangle mirror to get the patched libnetfilter-queue-dev:
 apt-get install libnetfilter-log-dev libnetfilter-queue-dev libnetfilter-conntrack-dev
 ```
 
-You will also need to install several golang packages dependencies:
+Then build the regular way:
+
+```
+make
+```
+
+This will install several dependencies automatically, or you can do so manually:
 
 ```
 go get -u github.com/gin-gonic/gin
@@ -25,12 +31,6 @@ go get -u github.com/google/gopacket
 go get -u github.com/mattn/go-sqlite3
 go get -u github.com/oschwald/geoip2-golang
 go get -u github.com/GehirnInc/crypt
-```
-
-Then build the regular way:
-
-```
-go build
 ```
 
 If you want to use the golint tool, you can install it with this command:
@@ -87,7 +87,7 @@ Running it
 You'll also need an Untangle mirror for most of those:
 
 ```
-apt-get install untangle-classd untangle-geoip-database untangle-python3-sync-settings libnetfilter-log1 libnetfilter-queue1 libnetfilter-conntrack3
+apt-get install untangle-classd untangle-geoip-database untangle-python3-sync-settings libnetfilter-log1 libnetfilter-queue1 libnetfilter-conntrack3 nftables
 ```
 
 Then:
