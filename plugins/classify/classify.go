@@ -240,15 +240,23 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 			logger.Alert("Ignoring update with confidence %d < %d\n", confidence, checkval)
 			return state, confidence
 		}
-	}
-    checkprotochain := attachments["protochain"]
-    if checkprotochain != nil {
-        current := checkprotochain.(string)
-        if strings.Count(protochain, "/") < strings.Count(current,"/") {
-			logger.Alert("Ignoring update with protochain %s < %s\n", protochain, current)
-			return state, confidence
+        checkprotochain := attachments["protochain"]
+        if checkprotochain != nil {
+            current := checkprotochain.(string)
+            if current == "/IP/TCP" && checkval == 100 {
+                logger.Alert("100 confidence at /IP/TCP\n")
+                logger.Alert("New  classification: %v %v %v %v %v %v %v\n", appid, name, protochain, detail, confidence, category, state)
+                logger.Alert("Orig classification: %v %v %v %v %v %v\n",
+                    attachments["application_id"],
+                    attachments["application_name"],
+                    attachments["application_protochain"],
+                    attachments["application_detail"],
+                    attachments["application_confidence"],
+                    attachments["application_category"])
+                logger.Alert("Stats: %v %v\n", mess.Session.PacketCount, mess.Session.ByteCount)
+            }
         }
-    }
+	}
 
 	var changed []string
 	if updateClassifyDetail(attachments, ctid, "application_id", appid) {
