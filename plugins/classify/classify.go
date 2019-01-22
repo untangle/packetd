@@ -234,7 +234,6 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 	// happen if the lower confidence reply is recived and parsed after the
 	// higher confidence reply has already been handled.
 	checkdata := attachments["application_confidence"]
-
 	if checkdata != nil {
 		checkval := checkdata.(uint64)
 		if confidence < checkval {
@@ -242,6 +241,14 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 			return state, confidence
 		}
 	}
+    checkprotochain := attachments["protochain"]
+    if checkprotochain != nil {
+        current := checkprotochain.(string)
+        if strings.Count(protochain, "/") < strings.Count(current,"/") {
+			logger.Alert("Ignoring update with protochain %s < %s\n", protochain, current)
+			return state, confidence
+        }
+    }
 
 	var changed []string
 	if updateClassifyDetail(attachments, ctid, "application_id", appid) {
