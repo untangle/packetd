@@ -1,0 +1,10 @@
+version: '2'
+services:
+    musl:
+      image: untangleinc/packetd:build-musl
+      volumes:
+        - ${HOME}/go/src:/go/src
+    libc:
+      image: untangleinc/packetd:build-libc
+      volumes:
+        - ${HOME}/go/src:/go/src
