@@ -6,7 +6,7 @@ RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 735A9E18E8F62EDF413
 RUN apt-get update
 RUN apt-get install -y libnetfilter-log-dev libnetfilter-queue-dev libnetfilter-conntrack-dev
 
-VOLUME /go/src
+VOLUME /go
 WORKDIR /go/src/github.com/untangle/packetd
 
 CMD make

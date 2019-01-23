@@ -28,6 +28,6 @@ WORKDIR libnetfilter_queue
 RUN ./autogen.sh && ./configure && make && make install
 
 # build packetd
-VOLUME /go/src
+VOLUME /go
 WORKDIR /go/src/github.com/untangle/packetd
 CMD make
