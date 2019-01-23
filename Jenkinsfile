@@ -96,7 +96,7 @@ pipeline {
 	  agent { label 'mfw' }
 
           environment {
-            libc = 'libc'
+            libc = 'glibc'
 	    packetd = "cmd/packetd/packetd-${libc}"
 	    settingsd = "cmd/settingsd/settingsd-${libc}"
           }
