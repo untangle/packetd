@@ -64,7 +64,6 @@ pipeline {
             success { archivePacketd() }
           }
         }
-
       }
     }
 
@@ -88,6 +87,7 @@ pipeline {
               }
             }
           }
+        }
 
         stage('Test libc') {
 	  agent { label 'mfw' }
@@ -127,6 +127,5 @@ pipeline {
 	}
       }
     }
-
   }
 }
