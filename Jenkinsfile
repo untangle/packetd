@@ -1,9 +1,10 @@
 void buildPacketd(String libc, String buildDir) {
   sh "docker-compose -f ${buildDir}/build/docker-compose.build.yml -p packetd_${libc} run ${libc}"
+  sh "cp ${buildDir}/cmd/packetd/packetd cmd/packetd/packetd-${libc} cmd/settingsd/settingsd-${libc}"
 }
 
 void archivePacketd() {
-  archiveArtifacts artifacts:"cmd/packetd/packetd,cmd/settingsd/settingsd", fingerprint: true
+  archiveArtifacts artifacts:"cmd/packetd/packetd-*,cmd/settingsd/settingsd-*", fingerprint: true
 }
 
 pipeline {
@@ -18,7 +19,7 @@ pipeline {
 
           environment {
             libc = 'musl'
-            buildDir = "${env.HOME}/build-packetd-${env.BRANCH_NAME}-${libc}"
+            buildDir = "${env.HOME}/build-packetd-${env.BRANCH_NAME}-${libc}/go/src/github.com/untangle/packetd"
           }
 
 	  stages {
@@ -29,7 +30,7 @@ pipeline {
             stage('Build packetd musl') {
               steps {
                 buildPacketd(libc, buildDir)
-                stash(name:"packetd-${libc}", includes:"cmd/packetd/packetd,cmd/settingsd/settingsd")
+                stash(name:"packetd-${libc}", includes:"cmd/packetd/packetd-*,cmd/settingsd/settingsd-*")
               }
             }
           }
@@ -44,7 +45,7 @@ pipeline {
 
           environment {
             libc = 'glibc'
-            buildDir = "${env.HOME}/build-packetd-${env.BRANCH_NAME}-${libc}"
+            buildDir = "${env.HOME}/build-packetd-${env.BRANCH_NAME}-${libc}/go/src/github.com/untangle/packetd"
           }
 
 	  stages {
@@ -55,7 +56,7 @@ pipeline {
             stage('Build packetd glibc') {
               steps {
                 buildPacketd(libc, buildDir)
-                stash(name:"packetd-${libc}", includes:"cmd/packetd/packetd,cmd/settingsd/settingsd")
+                stash(name:"packetd-${libc}", includes:"cmd/packetd/packetd-*,cmd/settingsd/settingsd-*")
               }
             }
           }
@@ -74,8 +75,8 @@ pipeline {
 
           environment {
             libc = 'musl'
-	    packetd = 'cmd/packetd/packetd'
-	    settingsd = 'cmd/settingsd/settingsd'
+	    packetd = "cmd/packetd/packetd-${libc}"
+	    settingsd = "cmd/settingsd/settingsd-${libc}"
           }
 
           stages {
@@ -94,8 +95,8 @@ pipeline {
 
           environment {
             libc = 'libc'
-	    packetd = 'cmd/packetd/packetd'
-	    settingsd = 'cmd/settingsd/settingsd'
+	    packetd = "cmd/packetd/packetd-${libc}"
+	    settingsd = "cmd/settingsd/settingsd-${libc}"
           }
 
           stages {
