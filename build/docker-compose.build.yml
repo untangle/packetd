@@ -3,8 +3,8 @@ services:
     musl:
       image: untangleinc/packetd:build-musl
       volumes:
-        - ../../../../../..:/go/src
+        - ../../../..:/go/src
     glibc:
       image: untangleinc/packetd:build-glibc
       volumes:
-        - ../../../../../..:/go/src
+        - ../../../..:/go
