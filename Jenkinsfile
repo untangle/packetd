@@ -3,7 +3,7 @@ void buildPacketd(String libc, String buildDir) {
 }
 
 void archivePacketd() {
-  archiveArtifacts artifacts: includes:"cmd/packetd/packetd,cmd/settingsd/settingsd", fingerprint: true
+  archiveArtifacts artifacts:"cmd/packetd/packetd,cmd/settingsd/settingsd", fingerprint: true
 }
 
 pipeline {
