@@ -308,7 +308,7 @@ int nfqueue_thread(int index)
 	// call our nfqueue shutdown function
 	nfqueue_shutdown(index);
 
-	logmessage(LOG_INFO,logsrc,"The nfqueue thread [%i] as terminated\n", index);
+	logmessage(LOG_INFO,logsrc,"The nfqueue thread [%i] has terminated\n", index);
 	go_child_shutdown();
 	return(0);
 }

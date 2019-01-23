@@ -233,22 +233,23 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 	// a lower confidence reply on top of a higher confidence reply which can
 	// happen if the lower confidence reply is recived and parsed after the
 	// higher confidence reply has already been handled.
+
 	checkdata := attachments["application_confidence"]
 	if checkdata != nil {
 		checkval := checkdata.(uint64)
 		if confidence < checkval {
-			logger.Debug("Ignoring update with confidence %d < %d\n", confidence, checkval)
+			logger.Debug("Ignoring update with confidence %d < %d STATE:%d\n", confidence, checkval, state)
 			return state, confidence
 		}
 	}
-    checkprotochain := attachments["application_protochain"]
-    if checkprotochain != nil {
-        current := checkprotochain.(string)
-        if strings.Count(protochain, "/") < strings.Count(current,"/") {
-			logger.Debug("Ignoring update with protochain %s < %s\n", protochain, current)
+	checkprotochain := attachments["application_protochain"]
+	if checkprotochain != nil {
+		current := checkprotochain.(string)
+		if strings.Count(protochain, "/") < strings.Count(current, "/") {
+			logger.Debug("Ignoring update with protochain %s < %s STATE:%d\n", protochain, current, state)
 			return state, confidence
-        }
-    }
+		}
+	}
 
 	var changed []string
 	if updateClassifyDetail(attachments, ctid, "application_id", appid) {
