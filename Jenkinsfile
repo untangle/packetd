@@ -105,8 +105,8 @@ pipeline {
             stage('Prep libc') {
               steps {
                 unstash(name:"packetd-${libc}")
-                sh("test -f ${packetd} && file ${packetd} | grep -q -v GNU/Linux")
-                sh("test -f ${settingsd} && file ${settingsd} | grep -q -v GNU/Linux")
+                sh("test -f ${packetd} && file ${packetd} | grep -q GNU/Linux")
+                sh("test -f ${settingsd} && file ${settingsd} | grep -q GNU/Linux")
               }
             }
           }
