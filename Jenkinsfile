@@ -1,5 +1,5 @@
 void buildPacketd(String libc, String buildDir) {
-  sh "docker-compose -f ${buildDir}/build/docker-compose.build.yml -p packetd_${libc} up --build ${libc}"
+  sh "docker-compose -f ${buildDir}/build/docker-compose.build.yml -p packetd_${libc} run ${libc}"
 }
 
 void archivePacketd() {
