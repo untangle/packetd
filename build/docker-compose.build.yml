@@ -4,7 +4,7 @@ services:
       image: untangleinc/packetd:build-musl
       volumes:
         - ${HOME}/go/src:/go/src
-    libc:
-      image: untangleinc/packetd:build-libc
+    glibc:
+      image: untangleinc/packetd:build-glibc
       volumes:
         - ${HOME}/go/src:/go/src

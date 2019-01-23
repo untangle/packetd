@@ -67,11 +67,11 @@ Result:
 ./packetd: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-musl-x86_64.so.1, with debug_info, not stripped
 ```
 
-libc target
+glibc target
 -----------
 
 ```
-docker-compose -f build/docker-compose.build.yml up --build libc
+docker-compose -f build/docker-compose.build.yml up --build glibc
 ```
 
 Result:

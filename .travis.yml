@@ -4,7 +4,7 @@ env:
   - GOPATH="${HOME}/go"
   - DIR="${GOPATH}/src/github.com/untangle"
   matrix:
-  - TARGET=libc TEST="grep -q GNU/Linux"
+  - TARGET=glibc TEST="grep -q GNU/Linux"
   - TARGET=musl TEST="grep -q -v GNU/Linux"
 services:
 - docker
