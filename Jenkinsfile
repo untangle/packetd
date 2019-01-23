@@ -1,4 +1,5 @@
 void buildPacketd(String libc, String buildDir) {
+  sh "docker pull untangleinc/packetd:build-${libc}
   sh "docker-compose -f ${buildDir}/build/docker-compose.build.yml -p packetd_${libc} run ${libc}"
   sh "cp ${buildDir}/cmd/packetd/packetd cmd/packetd/packetd-${libc}"
   sh "cp ${buildDir}/cmd/settingsd/settingsd cmd/settingsd/settingsd-${libc}"
