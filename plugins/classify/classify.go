@@ -7,7 +7,6 @@ package classify
 import (
 	"bufio"
 	"encoding/csv"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -116,7 +115,6 @@ func SetHostPort(value string) {
 // push the results to the conntrack dictionary.
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var reply string
-	var err error
 
 	// make sure we have a valid session
 	if mess.Session == nil {
@@ -152,9 +150,9 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	// send the data to classd and read reply
-	reply, err = daemonClassify(mess, mess.Session.SessionID, newSession)
-	if err != nil {
-		logger.Err("classd communication error: %v\n", err)
+	reply = daemonClassify(&mess)
+
+	if len(reply) == 0 {
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
@@ -175,7 +173,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 }
 
 // daemonClassify sends classd the commands and returns the reply
-func daemonClassify(mess dispatch.NfqueueMessage, sessionID uint64, newSession bool) (string, error) {
+func daemonClassify(mess *dispatch.NfqueueMessage) string {
 	var proto string
 	var reply string
 	var err error
@@ -185,21 +183,22 @@ func daemonClassify(mess dispatch.NfqueueMessage, sessionID uint64, newSession b
 	} else if mess.IP6Layer != nil {
 		proto = "IP6"
 	} else {
-		return "", errors.New("Unsupported protocol")
+		logger.Err("Unsupported protocol for %d\n", mess.Session.ConntrackID)
+		return ""
 	}
 
 	// send the packet data to the daemon
-	reply, err = daemonCommand(mess.Packet.Data(), "PACKET|%d|%s|%d\r\n", sessionID, proto, len(mess.Packet.Data()))
+	reply, err = daemonCommand(mess.Packet.Data(), "PACKET|%d|%s|%d\r\n", mess.Session.SessionID, proto, len(mess.Packet.Data()))
 
 	if err != nil {
 		logger.Err("daemonCommand error: %s\n", err.Error())
-		return "", err
+		return ""
 	}
 
 	if logger.IsTraceEnabled() {
 		logger.Trace("daemonCommand result: %s\n", strings.Replace(strings.Replace(reply, "\n", "|", -1), "\r", "", -1))
 	}
-	return reply, nil
+	return reply
 }
 
 // processReply processes a reply from the classd daemon
