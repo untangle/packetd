@@ -85,11 +85,15 @@ pipeline {
             stage('Prep musl') {
               steps {
                 unstash(name:"packetd-${libc}")
-		sh "mv cmd/packetd/packetd-${libc} cmd/packetd/packetd"
-                sh "test -f ${packetd} && file ${packetd} | grep -q -v GNU/Linux"
-                sh "test -f ${settingsd} && file ${settingsd} | grep -q -v GNU/Linux"
               }
             }
+
+	    stage('File testing for muslf') {
+	      steps {
+		sh "test -f ${packetd} && file ${packetd} | grep -v -q GNU/Linux"
+		sh "test -f ${settingsd} && file ${settingsd} | grep -v -q GNU/Linux"
+	      }
+	    }
           }
         }
 
