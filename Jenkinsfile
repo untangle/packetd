@@ -88,7 +88,7 @@ pipeline {
               }
             }
 
-	    stage('File testing for muslf') {
+	    stage('File testing for musl') {
 	      steps {
 		sh "test -f ${packetd} && file ${packetd} | grep -v -q GNU/Linux"
 		sh "test -f ${settingsd} && file ${settingsd} | grep -v -q GNU/Linux"
