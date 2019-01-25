@@ -121,7 +121,7 @@ pipeline {
 	      }
 	    }
 
-	    stage('Restd testing for libc') {
+	    stage('settingsd testing for libc') {
 	      steps {
 		sh "docker-compose -f ${dockerfile} build local"
 		sh "docker-compose -f ${dockerfile} up --abort-on-container-exit --exit-code-from local"
