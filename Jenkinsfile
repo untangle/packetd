@@ -87,42 +87,42 @@ pipeline {
                 unstash(name:"packetd-${libc}")
 		sh "mv cmd/packetd/packetd-${libc} cmd/packetd/packetd"
                 sh "test -f ${packetd} && file ${packetd} | grep -q -v GNU/Linux")
-                sh("test -f ${settingsd} && file ${settingsd} | grep -q -v GNU/Linux")
+                sh "test -f ${settingsd} && file ${settingsd} | grep -q -v GNU/Linux"
               }
             }
           }
-        }
 
-        stage('Test libc') {
-	  agent { label 'mfw' }
+	  stage('Test libc') {
+	    agent { label 'mfw' }
 
-          environment {
-            libc = 'glibc'
-	    packetd = "cmd/packetd/packetd-${libc}"
-	    settingsd = "cmd/settingsd/settingsd-${libc}"
-	    dockerfile = 'build/docker-compose.test.yml'
-          }
+	    environment {
+	      libc = 'glibc'
+	      packetd = "cmd/packetd/packetd-${libc}"
+	      settingsd = "cmd/settingsd/settingsd-${libc}"
+	      dockerfile = 'build/docker-compose.test.yml'
+	    }
 
-          stages {
-            stage('Prep libc') {
-              steps {
-                unstash(name:"packetd-${libc}")
-              }
-            }
+	    stages {
+	      stage('Prep libc') {
+		steps {
+		  unstash(name:"packetd-${libc}")
+		}
+	      }
 
-            stage('File testing for libc') {
-              steps {
-                sh("test -f ${packetd} && file ${packetd} | grep -q GNU/Linux")
-                sh("test -f ${settingsd} && file ${settingsd} | grep -q GNU/Linux")
-              }
-            }
+	      stage('File testing for libc') {
+		steps {
+		  sh "test -f ${packetd} && file ${packetd} | grep -q GNU/Linux"
+		  sh "test -f ${settingsd} && file ${settingsd} | grep -q GNU/Linux"
+		}
+	      }
 
-            stage('Restd testing for libc') {
-              steps {
-                sh("docker-compose -f ${dockerfile} build local")
-                sh("docker-compose -f ${dockerfile} up --abort-on-container-exit --exit-code-from local")
-              }
-            }
+	      stage('Restd testing for libc') {
+		steps {
+		  sh "docker-compose -f ${dockerfile} build local"
+		  sh "docker-compose -f ${dockerfile} up --abort-on-container-exit --exit-code-from local"
+		}
+	      }
+	    }
           }
         }
       }
