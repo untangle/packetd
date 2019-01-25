@@ -4,9 +4,11 @@ services:
     #   image: untangleinc/ngfw:classd
     #   ports:
     #     - "0.0.0.0:8123:8123"
-    glibc:
-      build: .
-      dockerfile: Dockerfile.test
+    local:
+      build:
+        # FIXME: nasty, but right now we want to COPY stuff from ../
+        context: ..
+        dockerfile: build/Dockerfile.test.local
       # depends_on:
       #   - classd
       # command: -classd classd:8123

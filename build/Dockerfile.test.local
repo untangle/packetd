@@ -1,0 +1,18 @@
+FROM untangleinc/packetd:build-glibc
+
+RUN apt-get update -q
+
+RUN apt-get install -y untangle-python3-sync-settings
+RUN apt-get install -y untangle-geoip-database
+
+# FIXME: target OS not correct right now
+RUN mkdir /etc/config
+RUN touch /etc/init.d/network
+
+COPY cmd/packetd/packetd* /usr/bin/
+COPY cmd/settingsd/settingsd* /usr/bin/
+COPY build/entrypoint-test.sh /usr/bin/
+
+EXPOSE 80
+
+ENTRYPOINT [ "entrypoint-test.sh" ]

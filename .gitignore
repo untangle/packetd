@@ -1,6 +1,7 @@
 packetd
 cmd/packetd/packetd
-cmd/settingsd/settingsd
+cmd/packetd/packetd-*
+cmd/settingsd/settingsd*
 *.pyc
 __pycache__/
 #*

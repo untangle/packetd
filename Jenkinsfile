@@ -6,7 +6,7 @@ void buildPacketd(String libc, String buildDir) {
 }
 
 void archivePacketd() {
-  archiveArtifacts artifacts:"cmd/packetd/packetd-*,cmd/settingsd/settingsd-*", fingerprint: true
+  archiveArtifacts artifacts:"cmd/packetd/packetd*,cmd/settingsd/settingsd*", fingerprint: true
 }
 
 pipeline {
@@ -32,7 +32,7 @@ pipeline {
             stage('Build packetd musl') {
               steps {
                 buildPacketd(libc, buildDir)
-                stash(name:"packetd-${libc}", includes:"cmd/packetd/packetd-*,cmd/settingsd/settingsd-*")
+                stash(name:"packetd-${libc}", includes:"cmd/packetd/packetd*,cmd/settingsd/settingsd*")
               }
             }
           }
@@ -58,7 +58,7 @@ pipeline {
             stage('Build packetd glibc') {
               steps {
                 buildPacketd(libc, buildDir)
-                stash(name:"packetd-${libc}", includes:"cmd/packetd/packetd-*,cmd/settingsd/settingsd-*")
+                stash(name:"packetd-${libc}", includes:"cmd/packetd/packetd*,cmd/settingsd/settingsd*")
               }
             }
           }
@@ -85,7 +85,8 @@ pipeline {
             stage('Prep musl') {
               steps {
                 unstash(name:"packetd-${libc}")
-                sh("test -f ${packetd} && file ${packetd} | grep -q -v GNU/Linux")
+		sh "mv cmd/packetd/packetd-${libc} cmd/packetd/packetd"
+                sh "test -f ${packetd} && file ${packetd} | grep -q -v GNU/Linux")
                 sh("test -f ${settingsd} && file ${settingsd} | grep -q -v GNU/Linux")
               }
             }
@@ -99,14 +100,27 @@ pipeline {
             libc = 'glibc'
 	    packetd = "cmd/packetd/packetd-${libc}"
 	    settingsd = "cmd/settingsd/settingsd-${libc}"
+	    dockerfile = 'build/docker-compose.test.yml'
           }
 
           stages {
             stage('Prep libc') {
               steps {
                 unstash(name:"packetd-${libc}")
+              }
+            }
+
+            stage('File testing for libc') {
+              steps {
                 sh("test -f ${packetd} && file ${packetd} | grep -q GNU/Linux")
                 sh("test -f ${settingsd} && file ${settingsd} | grep -q GNU/Linux")
+              }
+            }
+
+            stage('Restd testing for libc') {
+              steps {
+                sh("docker-compose -f ${dockerfile} build local")
+                sh("docker-compose -f ${dockerfile} up --abort-on-container-exit --exit-code-from local")
               }
             }
           }
