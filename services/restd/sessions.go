@@ -45,10 +45,10 @@ func getSessions() ([]map[string]interface{}, error) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		s := parseSession(line)
-		logger.Warn("LINE: %v\n", s)
-		if s != nil {
-			sessions = append(sessions, s)
+		m := parseSession(line)
+		logger.Warn("LINE: %v\n", m)
+		if m != nil {
+			sessions = append(sessions, m)
 		}
 	}
 
@@ -240,7 +240,7 @@ func parseSession(line string) map[string]interface{} {
 			serverInterfaceType := mark & 0x0c000000 >> 26
 			priority := mark & 0x00ff0000 >> 16
 
-			m["mark"] = m
+			m["mark"] = mark
 			if clientInterfaceID != 0 {
 				m["client_interface_id"] = clientInterfaceID
 			}
