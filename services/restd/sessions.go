@@ -55,7 +55,7 @@ func getSessions() ([]map[string]interface{}, error) {
 	// build a tuple map to store the sessions
 	tupleMap := make(map[string]map[string]interface{})
 	for _, s := range sessions {
-		tuple := fmt.Sprintf("%v|%v|%v->%v|%v", s["ipProtocol"], s["clientAddress"], s["clientPort"], s["serverAddress"], s["serverPort"])
+		tuple := fmt.Sprintf("%v|%v|%v->%v|%v", s["ip_protocol"], s["client_address"], s["client_port"], s["server_address"], s["server_port"])
 		tupleMap[tuple] = s
 	}
 
@@ -127,7 +127,7 @@ func parseSession(line string) map[string]interface{} {
 		logger.Warn("Invalid IP Protocol (%s). Skipping line: %s\n", err.Error(), line)
 		return nil
 	}
-	m["ipProtocol"] = uint8(ipProtocolInt)
+	m["ip_protocol"] = uint8(ipProtocolInt)
 
 	// words[4] is seconds to expire
 	i++
@@ -136,14 +136,14 @@ func parseSession(line string) map[string]interface{} {
 		logger.Warn("Invalid Timeout (%s). Skipping line: %s\n", err.Error(), line)
 		return nil
 	}
-	m["timeoutSeconds"] = uint32(timeoutSeconds)
+	m["timeout_seconds"] = uint32(timeoutSeconds)
 
 	// words[5] is either a connection state, or the beginning of the key=value pairs
 	// check if it looks like key=value, if so start parsing the key=value pairs, otherwise treat it like
 	// a connection state
 	i++
 	if !strings.Contains(words[i], "=") {
-		m["connectionState"] = words[i]
+		m["connection_state"] = words[i]
 		i++
 	}
 
@@ -161,11 +161,11 @@ func parseSession(line string) map[string]interface{} {
 
 		//skip flag fields like "[ASSURED]"
 		if word == "[ASSURED]" {
-			m["assuredFlag"] = true
+			m["assured_flag"] = true
 			continue
 		}
 		if word == "[UNREPLIED]" {
-			m["unrepliedFlag"] = true
+			m["unreplied_flag"] = true
 			continue
 		}
 
@@ -180,43 +180,43 @@ func parseSession(line string) map[string]interface{} {
 		switch key {
 		case "src":
 			if !srcSeen {
-				m["clientAddress"] = net.ParseIP(value)
+				m["client_address"] = net.ParseIP(value)
 			} else {
-				m["serverAddressNew"] = net.ParseIP(value)
+				m["server_address_new"] = net.ParseIP(value)
 			}
 			srcSeen = true
 			break
 		case "dst":
 			if !dstSeen {
-				m["serverAddress"] = net.ParseIP(value)
+				m["server_address"] = net.ParseIP(value)
 			} else {
-				m["clientAddressNew"] = net.ParseIP(value)
+				m["client_address_new"] = net.ParseIP(value)
 			}
 			dstSeen = true
 			break
 		case "sport":
 			port, err := strconv.Atoi(value)
 			if err != nil {
-				logger.Warn("Invalid Port (%s). Skipping line: %s\n", err.Error(), line)
+				logger.Warn("Invalid port (%s). Skipping line: %s\n", err.Error(), line)
 				return nil
 			}
 			if !sportSeen {
-				m["clientPort"] = uint16(port)
+				m["client_port"] = uint16(port)
 			} else {
-				m["serverPortNew"] = uint16(port)
+				m["server_port_new"] = uint16(port)
 			}
 			sportSeen = true
 			break
 		case "dport":
 			port, err := strconv.Atoi(value)
 			if err != nil {
-				logger.Warn("Invalid Port (%s). Skipping line: %s\n", err.Error(), line)
+				logger.Warn("Invalid port (%s). Skipping line: %s\n", err.Error(), line)
 				return nil
 			}
 			if !dportSeen {
-				m["serverPort"] = uint16(port)
+				m["server_port"] = uint16(port)
 			} else {
-				m["clientPortNew"] = uint16(port)
+				m["client_port_new"] = uint16(port)
 			}
 			dportSeen = true
 			break
@@ -240,17 +240,18 @@ func parseSession(line string) map[string]interface{} {
 			serverInterfaceType := mark & 0x0c000000 >> 26
 			priority := mark & 0x00ff0000 >> 16
 
+			m["mark"] = m
 			if clientInterfaceID != 0 {
-				m["clientInterfaceID"] = clientInterfaceID
+				m["client_interface_id"] = clientInterfaceID
 			}
 			if clientInterfaceType != 0 {
-				m["clientInterfaceType"] = clientInterfaceType
+				m["client_interface_type"] = clientInterfaceType
 			}
 			if serverInterfaceID != 0 {
-				m["serverInterfaceID"] = serverInterfaceID
+				m["server_interface_id"] = serverInterfaceID
 			}
 			if serverInterfaceType != 0 {
-				m["serverInterfaceType"] = serverInterfaceType
+				m["server_interface_type"] = serverInterfaceType
 			}
 			m["priority"] = priority
 		}
