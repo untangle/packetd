@@ -58,7 +58,7 @@ var externalDaemon = false
 
 var daemonProcess *exec.Cmd
 var daemonSocket net.Conn
-var daemonChannel = make(chan bool, 16)
+var daemonChannel = make(chan bool, 1)
 
 var classdHostPort = "127.0.0.1:8123"
 var classdMutex sync.Mutex
