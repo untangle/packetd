@@ -71,11 +71,11 @@ func getSessions() ([]map[string]interface{}, error) {
 
 		_, ok := tupleMap[tuple]
 		if !ok {
-			logger.Warn("MERGE: %v NOT FOUND\n", tuple)
+			// matching session not found, continue
 			continue
 		}
-		logger.Warn("MERGE: %v FOUND\n", tuple)
 
+		// matching session found, merge the (new) values into the map
 		for key, value := range session {
 			_, alreadyFound := tupleMap[tuple][key]
 			if alreadyFound {

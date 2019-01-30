@@ -230,7 +230,7 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 	// encountered a FIN packet. In this case it generates a no connection error
 	// and classd gives us the generic /IP defaults. We also don't want to apply
 	// a lower confidence reply on top of a higher confidence reply which can
-	// happen if the lower confidence reply is recived and parsed after the
+	// happen if the lower confidence reply is received and parsed after the
 	// higher confidence reply has already been handled.
 
 	checkdata := attachments["application_confidence"]
@@ -599,7 +599,7 @@ func daemonStartup() {
 		daemonProcess = exec.Command(daemonBinary, "-mfw", "-l")
 	}
 
-	// set a diffrent process group so it doesn't get packetd signals
+	// set a different process group so it doesn't get packetd signals
 	daemonProcess.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
@@ -681,7 +681,7 @@ func daemonConnect() {
 	if err != nil {
 		logger.Err("Error calling net.DialTimeout(%s): %v\n", classdHostPort, err)
 	} else {
-		logger.Info("Succesfully connected to classify daemon(%s)\n", classdHostPort)
+		logger.Info("Successfully connected to classify daemon(%s)\n", classdHostPort)
 		dialCounter++
 	}
 }
