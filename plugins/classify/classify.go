@@ -52,13 +52,16 @@ const maxTrafficSize = 0x10000 // The maximum number of bytes to inspect before 
 
 var applicationTable map[string]applicationInfo
 var shutdownFlag = false
+
+// only set to true when running classd manually like when testing with valgrind
+var externalDaemon = false
+
 var daemonProcess *exec.Cmd
 var daemonSocket net.Conn
-var daemonChannel = make(chan bool, 1)
+var daemonChannel = make(chan bool, 16)
 
 var classdHostPort = "127.0.0.1:8123"
 var classdMutex sync.Mutex
-var dialCounter int
 
 // PluginStartup is called to allow plugin specific initialization
 func PluginStartup() {
@@ -554,10 +557,11 @@ func daemonManager() {
 		if shutdownFlag {
 			daemonGoodbye()
 			daemonShutdown()
+			daemonChannel <- true
 			return
 		}
 
-		if daemonProcess == nil {
+		if daemonProcess == nil && externalDaemon == false {
 			daemonStartup()
 
 			// Use a goroutine to wait for the process to finish. In normal operation Wait() will
@@ -576,11 +580,13 @@ func daemonManager() {
 				daemonChannel <- true
 			}()
 		}
+
 		if daemonSocket == nil {
 			daemonConnect()
 		}
+
 		// sleep a bit to prevent spinning
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(time.Second)
 	}
 }
 
@@ -672,7 +678,7 @@ func daemonConnect() {
 	var err error
 
 	// we can't connect if the daemon isn't running
-	if daemonProcess == nil {
+	if daemonProcess == nil && externalDaemon == false {
 		return
 	}
 
@@ -680,16 +686,16 @@ func daemonConnect() {
 	daemonSocket, err = net.DialTimeout("tcp", classdHostPort, 5*time.Second)
 	if err != nil {
 		logger.Err("Error calling net.DialTimeout(%s): %v\n", classdHostPort, err)
+		daemonChannel <- true
 	} else {
 		logger.Info("Successfully connected to classify daemon(%s)\n", classdHostPort)
-		dialCounter++
 	}
 }
 
 // Called to shutdown the daemon connection. We close the connection if valid
 // and clear the daemonSocket which will trigger the manager to reconnect
 func daemonGoodbye() {
-	if daemonSocket == nil {
+	if daemonSocket == nil && externalDaemon == false {
 		return
 	}
 
