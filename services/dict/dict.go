@@ -2,6 +2,7 @@ package dict
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -706,4 +707,30 @@ func GetAllEntries() ([]Entry, error) {
 		entries = append(entries, parseEntry(scanner.Text()))
 	}
 	return entries, err
+}
+
+// GetSessions returns the session table
+func GetSessions() (map[uint32]map[string]interface{}, error) {
+	entries, err := GetAllEntries()
+	if err != nil {
+		return nil, err
+	}
+
+	m := make(map[uint32]map[string]interface{})
+	for _, e := range entries {
+		if e.Table != "session" {
+			continue
+		}
+		sessionID, ok := e.Key.(uint32)
+		if !ok {
+			logger.Warn("Invalid key is session table: %v %T %v\n", e.Key, e.Key, e)
+			return nil, errors.New("Invalid key")
+		}
+		if m[sessionID] == nil {
+			m[sessionID] = make(map[string]interface{})
+		}
+		m[sessionID][e.Field] = e.Value
+	}
+
+	return m, nil
 }

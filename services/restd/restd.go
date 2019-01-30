@@ -62,22 +62,28 @@ func Startup() {
 
 	api := engine.Group("/api")
 	api.Use(authRequired(engine))
+
 	api.GET("/settings", getSettings)
 	api.GET("/settings/*path", getSettings)
 	api.POST("/settings", setSettings)
 	api.POST("/settings/*path", setSettings)
 	api.DELETE("/settings", trimSettings)
 	api.DELETE("/settings/*path", trimSettings)
+
 	api.GET("/defaults", getDefaultSettings)
 	api.GET("/defaults/*path", getDefaultSettings)
+
 	api.POST("/reports/create_query", reportsCreateQuery)
 	api.GET("/reports/get_data/:query_id", reportsGetData)
 	api.POST("/reports/close_query/:query_id", reportsCloseQuery)
+
 	api.POST("/warehouse/capture", warehouseCapture)
 	api.POST("/warehouse/playback", warehousePlayback)
 	api.POST("/warehouse/cleanup", warehouseCleanup)
 	api.GET("/warehouse/status", warehouseStatus)
 	api.POST("/control/traffic", trafficControl)
+
+	api.GET("/status/sessions", statusSessions)
 
 	// files
 	engine.Static("/admin", "/www/admin")
