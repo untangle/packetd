@@ -84,6 +84,8 @@ func Startup() {
 	api.POST("/control/traffic", trafficControl)
 
 	api.GET("/status/sessions", statusSessions)
+	api.GET("/status/system", statusSystem)
+	api.GET("/status/hardware", statusHardware)
 
 	// files
 	engine.Static("/admin", "/www/admin")

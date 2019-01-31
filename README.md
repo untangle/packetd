@@ -31,6 +31,7 @@ go get -u github.com/google/gopacket
 go get -u github.com/mattn/go-sqlite3
 go get -u github.com/oschwald/geoip2-golang
 go get -u github.com/GehirnInc/crypt
+go get -u github.com/c9s/goprocinfo/linux
 ```
 
 If you want to use the golint tool, you can install it with this command:
