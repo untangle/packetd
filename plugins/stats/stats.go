@@ -34,13 +34,6 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var result dispatch.NfqueueResult
 	var stats *statsHolder
 
-	// release the session once we have collected a useful amount of data
-	if mess.Session.PacketCount > (listSize * 2) {
-		mess.Session.DeleteAttachment("stats_holder")
-		result.SessionRelease = true
-		return result
-	}
-
 	// create and attach statsHolder for new sessions and retrieve for existing sessions
 	if newSession {
 		stats = new(statsHolder)
@@ -60,11 +53,16 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// for C2S packets we store the current time as the transmit time
 	// for S2C packets we calculate the latency as the time elapsed since transmit
+	// we don't update the xmit time if already set while waiting for a server packet
+	// and we clear the xmit time after each calculation so we only look at time between
+	// the client sending a packet and reciving the next packet from the server
 	if mess.ClientToServer {
+		if !stats.xmitTime.IsZero() {
+			return result
+		}
 		stats.xmitTime = time.Now()
 	} else {
 		if stats.xmitTime.IsZero() {
-			logger.Warn("Missing transmit time for session %d\n", ctid)
 			return result
 		}
 		duration := time.Since(stats.xmitTime)
@@ -72,6 +70,12 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		stats.latencyList[stats.latencyCount] = duration
 		stats.latencyCount++
 		logger.Trace("Session latency:%v | Average latency:%v\n", duration, calculateAverageLatency(stats))
+
+		// release the session once we have collected a useful amount of data
+		if stats.latencyCount == listSize {
+			mess.Session.DeleteAttachment("stats_holder")
+			result.SessionRelease = true
+		}
 	}
 
 	return result
