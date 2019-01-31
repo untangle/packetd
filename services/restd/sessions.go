@@ -46,7 +46,6 @@ func getSessions() ([]map[string]interface{}, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 		m := parseSession(line)
-		logger.Warn("LINE: %v\n", m)
 		if m != nil {
 			sessions = append(sessions, m)
 		}
