@@ -109,9 +109,11 @@ func parseValue(arg string) interface{} {
 	var value interface{}
 
 	if strings.Contains(arg, "string: ") {
-		var temp string
-		fmt.Sscanf(arg, "string: %s", &temp)
-		value = temp
+		slices := strings.SplitN(arg, " ", 2)
+		if len(slices) < 2 {
+			return ""
+		}
+		return slices[1]
 	} else if strings.Contains(arg, "int: ") {
 		var temp uint32
 		fmt.Sscanf(arg, "int: %d", &temp)
