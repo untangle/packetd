@@ -9,7 +9,9 @@ import (
 )
 
 const pluginName = "stats"
-const listSize = 12
+const listSize = 1
+
+var latencyTracker [256]*MovingAverage
 
 type statsHolder struct {
 	latencyList  [listSize]time.Duration
@@ -21,6 +23,11 @@ type statsHolder struct {
 // PluginStartup function is called to allow plugin specific initialization.
 func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
+
+	for x := 0; x < 256; x++ {
+		latencyTracker[x] = CreateMovingAverage(10000)
+	}
+
 	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
 }
 
@@ -39,7 +46,10 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		stats = new(statsHolder)
 		mess.Session.PutAttachment("stats_holder", stats)
 	} else {
-		stats = mess.Session.GetAttachment("stats_holder").(*statsHolder)
+		pointer := mess.Session.GetAttachment("stats_holder")
+		if pointer != nil {
+			stats = pointer.(*statsHolder)
+		}
 	}
 
 	if stats == nil {
@@ -69,12 +79,14 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		stats.xmitTime = time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC)
 		stats.latencyList[stats.latencyCount] = duration
 		stats.latencyCount++
-		logger.Trace("Session latency:%v | Average latency:%v\n", duration, calculateAverageLatency(stats))
 
-		// release the session once we have collected a useful amount of data
+		// release the session and add to the average once we have collected a useful amount of data
 		if stats.latencyCount == listSize {
+			value := calculateAverageLatency(stats)
+			latencyTracker[mess.Session.ServerInterfaceID].AddValue(value.Nanoseconds())
 			mess.Session.DeleteAttachment("stats_holder")
 			result.SessionRelease = true
+			latencyTracker[mess.Session.ServerInterfaceID].DumpStatistics()
 		}
 	}
 
