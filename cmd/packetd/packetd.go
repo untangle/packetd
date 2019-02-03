@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"os/signal"
 	"os/user"
 	"path/filepath"
@@ -227,7 +228,10 @@ func parseArguments() {
 func startServices() {
 	logger.Startup()
 	logger.Info("Starting services...\n")
+
 	printVersion()
+	loadRequirements()
+
 	kernel.Startup()
 	dispatch.Startup()
 	syscmd.Startup()
@@ -469,4 +473,15 @@ func getQueueRange() string {
 	str := "2000"
 	str = str + "-" + strconv.Itoa(2000+cpuCount)
 	return str
+}
+
+func loadRequirements() {
+	err := exec.Command("modprobe", "nf_conntrack").Run()
+	if err != nil {
+		logger.Err("Failed to modprobe nf_conntrack: %s", err.Error())
+	}
+	err = ioutil.WriteFile("/proc/sys/net/netfilter/nf_conntrack_acct", []byte("1"), 0644)
+	if err != nil {
+		logger.Err("Failed to enable nf_conntrack_acct %s", err.Error())
+	}
 }
