@@ -686,7 +686,10 @@ func daemonConnect() {
 	daemonSocket, err = net.DialTimeout("tcp", classdHostPort, 5*time.Second)
 	if err != nil {
 		logger.Err("Error calling net.DialTimeout(%s): %v\n", classdHostPort, err)
-		daemonChannel <- true
+		select {
+		case daemonChannel <- true:
+		default:
+		}
 	} else {
 		logger.Info("Successfully connected to classify daemon(%s)\n", classdHostPort)
 	}
