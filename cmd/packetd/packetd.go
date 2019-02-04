@@ -42,6 +42,7 @@ import (
 const rulesScript = "packetd_rules"
 
 var memProfileTarget string
+var cpuProfileTarget string
 var localFlag bool
 var cpuCount = getConcurrencyFactor()
 var queueRange = getQueueRange()
@@ -134,6 +135,10 @@ func main() {
 	// Stop services
 	logger.Info("Stopping services...\n")
 
+	if len(cpuProfileTarget) > 0 {
+		pprof.StopCPUProfile()
+	}
+
 	if len(memProfileTarget) > 0 {
 		f, err := os.Create(memProfileTarget)
 		if err == nil {
@@ -209,19 +214,20 @@ func parseArguments() {
 	}
 
 	if *cpuProfilePtr != "" {
-		f, err := os.Create(*cpuProfilePtr)
+		cpuProfileTarget = *cpuProfilePtr
+		f, err := os.Create(cpuProfileTarget)
 		if err != nil {
 			logger.Err("Could not create CPU profile: ", err)
 		}
 		if err := pprof.StartCPUProfile(f); err != nil {
 			logger.Err("Could not start CPU profile: ", err)
 		}
-		defer pprof.StopCPUProfile()
 	}
 
 	if *memProfilePtr != "" {
 		memProfileTarget = *memProfilePtr
 	}
+
 }
 
 // startServices starts all the services
