@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"os/signal"
 	"os/user"
 	"path/filepath"
@@ -42,6 +43,7 @@ import (
 const rulesScript = "packetd_rules"
 
 var memProfileTarget string
+var cpuProfileTarget string
 var localFlag bool
 var cpuCount = getConcurrencyFactor()
 var queueRange = getQueueRange()
@@ -134,6 +136,10 @@ func main() {
 	// Stop services
 	logger.Info("Stopping services...\n")
 
+	if len(cpuProfileTarget) > 0 {
+		pprof.StopCPUProfile()
+	}
+
 	if len(memProfileTarget) > 0 {
 		f, err := os.Create(memProfileTarget)
 		if err == nil {
@@ -209,26 +215,30 @@ func parseArguments() {
 	}
 
 	if *cpuProfilePtr != "" {
-		f, err := os.Create(*cpuProfilePtr)
+		cpuProfileTarget = *cpuProfilePtr
+		f, err := os.Create(cpuProfileTarget)
 		if err != nil {
 			logger.Err("Could not create CPU profile: ", err)
 		}
 		if err := pprof.StartCPUProfile(f); err != nil {
 			logger.Err("Could not start CPU profile: ", err)
 		}
-		defer pprof.StopCPUProfile()
 	}
 
 	if *memProfilePtr != "" {
 		memProfileTarget = *memProfilePtr
 	}
+
 }
 
 // startServices starts all the services
 func startServices() {
 	logger.Startup()
 	logger.Info("Starting services...\n")
+
 	printVersion()
+	loadRequirements()
+
 	kernel.Startup()
 	dispatch.Startup()
 	syscmd.Startup()
@@ -472,4 +482,15 @@ func getQueueRange() string {
 	str := "2000"
 	str = str + "-" + strconv.Itoa(2000+cpuCount)
 	return str
+}
+
+func loadRequirements() {
+	err := exec.Command("modprobe", "nf_conntrack").Run()
+	if err != nil {
+		logger.Err("Failed to modprobe nf_conntrack: %s", err.Error())
+	}
+	err = ioutil.WriteFile("/proc/sys/net/netfilter/nf_conntrack_acct", []byte("1"), 0644)
+	if err != nil {
+		logger.Err("Failed to enable nf_conntrack_acct %s", err.Error())
+	}
 }

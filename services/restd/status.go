@@ -8,7 +8,7 @@ import (
 
 // statusSystem is the RESTD /api/status/system handler
 func statusSystem(c *gin.Context) {
-	logger.Info("statusSystem()\n")
+	logger.Debug("statusSystem()\n")
 
 	stats := make(map[string]interface{})
 
@@ -59,7 +59,7 @@ func statusSystem(c *gin.Context) {
 
 // statusHardware is the RESTD /api/status/system handler
 func statusHardware(c *gin.Context) {
-	logger.Info("statusHardware()\n")
+	logger.Debug("statusHardware()\n")
 
 	stats := make(map[string]interface{})
 

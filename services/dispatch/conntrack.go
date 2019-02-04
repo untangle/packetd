@@ -123,22 +123,10 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 
 	// handle NEW events
 	if eventType == 'N' {
-		conntrack = new(Conntrack)
-		conntrack.ConntrackID = ctid
-		conntrack.ConnMark = connmark
-		conntrack.CreationTime = time.Now()
-		conntrack.LastActivityTime = time.Now()
-		conntrack.EventCount = 1
-		conntrack.ClientSideTuple.Protocol = protocol
-		conntrack.ClientSideTuple.ClientAddress = dupIP(client)
-		conntrack.ClientSideTuple.ClientPort = clientPort
-		conntrack.ClientSideTuple.ServerAddress = dupIP(server)
-		conntrack.ClientSideTuple.ServerPort = serverPort
-		conntrack.ServerSideTuple.Protocol = protocol
-		conntrack.ServerSideTuple.ClientAddress = dupIP(clientNew)
-		conntrack.ServerSideTuple.ClientPort = clientPortNew
-		conntrack.ServerSideTuple.ServerAddress = dupIP(serverNew)
-		conntrack.ServerSideTuple.ServerPort = serverPortNew
+		conntrack = createConntrack(ctid, connmark, family, eventType, protocol,
+			client, server, clientPort, serverPort,
+			clientNew, serverNew, clientPortNew, serverPortNew,
+			c2sBytes, s2cBytes)
 
 		// look for the session entry
 		session := findSession(ctid)
@@ -202,10 +190,15 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 	// handle UPDATE events
 	if eventType == 'U' {
 
-		// do not call subscribers for ID's we don't know about
+		// We did not find an existing conntarck entry for this update event
+		// This means we likely missed the new event when we create & insert the conntrack entry
+		// Create one now
 		if conntrackFound == false {
-			logger.Debug("Received conntract update for unknown id %d\n", ctid)
-			return
+			conntrack = createConntrack(ctid, connmark, family, eventType, protocol,
+				client, server, clientPort, serverPort,
+				clientNew, serverNew, clientPortNew, serverPortNew,
+				c2sBytes, s2cBytes)
+			insertConntrack(ctid, conntrack)
 		}
 
 		conntrack.LastActivityTime = time.Now()
@@ -333,4 +326,28 @@ func cleanConntrackTable() {
 			delete(conntrackTable, ctid)
 		}
 	}
+}
+
+// createConntrack creates a new conntrack entry
+func createConntrack(ctid uint32, connmark uint32, family uint8, eventType uint8, protocol uint8,
+	client net.IP, server net.IP, clientPort uint16, serverPort uint16,
+	clientNew net.IP, serverNew net.IP, clientPortNew uint16, serverPortNew uint16,
+	c2sBytes uint64, s2cBytes uint64) *Conntrack {
+	conntrack := new(Conntrack)
+	conntrack.ConntrackID = ctid
+	conntrack.ConnMark = connmark
+	conntrack.CreationTime = time.Now()
+	conntrack.LastActivityTime = time.Now()
+	conntrack.EventCount = 1
+	conntrack.ClientSideTuple.Protocol = protocol
+	conntrack.ClientSideTuple.ClientAddress = dupIP(client)
+	conntrack.ClientSideTuple.ClientPort = clientPort
+	conntrack.ClientSideTuple.ServerAddress = dupIP(server)
+	conntrack.ClientSideTuple.ServerPort = serverPort
+	conntrack.ServerSideTuple.Protocol = protocol
+	conntrack.ServerSideTuple.ClientAddress = dupIP(clientNew)
+	conntrack.ServerSideTuple.ClientPort = clientPortNew
+	conntrack.ServerSideTuple.ServerAddress = dupIP(serverNew)
+	conntrack.ServerSideTuple.ServerPort = serverPortNew
+	return conntrack
 }

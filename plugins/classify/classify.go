@@ -141,10 +141,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	if daemonSocket == nil {
 		logger.Warn("Connection to classd failed. Restarting classd...\n")
 		// write to daemonChannel, but don't block
-		select {
-		case daemonChannel <- true:
-		default:
-		}
+		setDaemonRestartFlag()
 		// Release this session just in case
 		// If this is happening something is wrong
 		// While releasing is not ideal, its better if the daemon
@@ -550,14 +547,14 @@ func updateClassifyDetail(attachments map[string]interface{}, ctid uint32, pairn
 // daemonManager is a goroutine to start, connect, monitor, restart, and reconnect the untangle-classd daemon
 // we also watch the shutdown channel and exit when the shutdown signal is received
 func daemonManager() {
-	daemonChannel <- true
+	setDaemonRestartFlag()
 	for {
 		<-daemonChannel
 
 		if shutdownFlag {
 			daemonGoodbye()
 			daemonShutdown()
-			daemonChannel <- true
+			setDaemonRestartFlag()
 			return
 		}
 
@@ -577,7 +574,7 @@ func daemonManager() {
 				}
 				daemonGoodbye()
 				daemonProcess = nil
-				daemonChannel <- true
+				setDaemonRestartFlag()
 			}()
 		}
 
@@ -686,7 +683,7 @@ func daemonConnect() {
 	daemonSocket, err = net.DialTimeout("tcp", classdHostPort, 5*time.Second)
 	if err != nil {
 		logger.Err("Error calling net.DialTimeout(%s): %v\n", classdHostPort, err)
-		daemonChannel <- true
+		setDaemonRestartFlag()
 	} else {
 		logger.Info("Successfully connected to classify daemon(%s)\n", classdHostPort)
 	}
@@ -705,10 +702,15 @@ func daemonGoodbye() {
 
 // daemonOutputWriter just writes any output from the daemon to stdout
 func daemonOutputWriter(reader io.ReadCloser) {
-	for {
-		scanner := bufio.NewScanner(reader)
-		for scanner.Scan() {
-			logger.Info("classd: %v\n", scanner.Text())
-		}
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		logger.Info("classd: %v\n", scanner.Text())
+	}
+}
+
+func setDaemonRestartFlag() {
+	select {
+	case daemonChannel <- true:
+	default:
 	}
 }

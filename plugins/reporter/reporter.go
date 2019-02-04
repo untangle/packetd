@@ -122,10 +122,10 @@ func PluginConntrackHandler(message int, entry *dispatch.Conntrack) {
 
 	if message == 'U' {
 		if session != nil {
-			doAccounting(entry, session.SessionID)
+			doAccounting(entry, session.SessionID, entry.ConntrackID)
 		} else {
 			// Still account for unknown session data
-			doAccounting(entry, 0)
+			doAccounting(entry, 0, entry.ConntrackID)
 		}
 	}
 }
@@ -137,7 +137,7 @@ func PluginNetloggerHandler(netlogger *dispatch.NetloggerMessage) {
 }
 
 // doAccounting does the session_minutes accounting
-func doAccounting(entry *dispatch.Conntrack, sessionID uint64) {
+func doAccounting(entry *dispatch.Conntrack, sessionID uint64, ctid uint32) {
 	columns := map[string]interface{}{
 		"time_stamp": time.Now(),
 		"session_id": sessionID,
@@ -146,4 +146,8 @@ func doAccounting(entry *dispatch.Conntrack, sessionID uint64) {
 		"bytes":      entry.TotalBytesDiff,
 	}
 	reports.LogEvent(reports.CreateEvent("session_minute", "session_minutes", 1, columns, nil))
+
+	dict.AddSessionEntry(ctid, "bytes_per_sec_total_1min", uint32(entry.TotalBytesDiff/60))
+	dict.AddSessionEntry(ctid, "bytes_per_sec_c2s_1min", uint32(entry.C2SBytesDiff/60))
+	dict.AddSessionEntry(ctid, "bytes_per_sec_s2c_1min", uint32(entry.S2CBytesDiff/60))
 }

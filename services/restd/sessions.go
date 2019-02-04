@@ -16,7 +16,7 @@ import (
 
 // statusSessions is the RESTD /api/status/sessions handler
 func statusSessions(c *gin.Context) {
-	logger.Info("statusSession()\n")
+	logger.Debug("statusSession()\n")
 
 	sessions, err := getSessions()
 	if err != nil {
