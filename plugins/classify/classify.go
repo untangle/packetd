@@ -702,11 +702,9 @@ func daemonGoodbye() {
 
 // daemonOutputWriter just writes any output from the daemon to stdout
 func daemonOutputWriter(reader io.ReadCloser) {
-	for {
-		scanner := bufio.NewScanner(reader)
-		for scanner.Scan() {
-			logger.Info("classd: %v\n", scanner.Text())
-		}
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		logger.Info("classd: %v\n", scanner.Text())
 	}
 }
 
