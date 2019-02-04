@@ -7,6 +7,7 @@ import (
 	"github.com/c9s/goprocinfo/linux"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/reports"
 )
 
 const pluginName = "stats"
@@ -100,7 +101,6 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 			latencyTracker[mess.Session.ServerInterfaceID].AddValue(value.Nanoseconds())
 			mess.Session.DeleteAttachment("stats_holder")
 			result.SessionRelease = true
-			latencyTracker[mess.Session.ServerInterfaceID].DumpStatistics()
 		}
 	}
 
@@ -128,7 +128,13 @@ func interfaceTask() {
 			return
 		case <-time.After(timeUntilNextMin()):
 			logger.Debug("Collecting interface statistics\n")
-			collectInterfaceStats()
+			collectInterfaceStats(60)
+
+			for i := 0; i < 256; i++ {
+				if !latencyTracker[i].IsEmpty() {
+					latencyTracker[i].dumpStatistics(i)
+				}
+			}
 		}
 	}
 }
@@ -143,9 +149,10 @@ func timeUntilNextMin() time.Duration {
 	return duration
 }
 
-func collectInterfaceStats() {
+func collectInterfaceStats(seconds uint64) {
 	var statInfo *linux.NetworkStat
 	var diffInfo linux.NetworkStat
+	var latency uint64
 
 	procData, err := linux.ReadNetworkStat("/proc/net/dev")
 	if err != nil {
@@ -156,8 +163,8 @@ func collectInterfaceStats() {
 	for i := 0; i < len(procData); i++ {
 		item := procData[i]
 		statInfo = interfaceMap[item.Iface]
-		// if no entry for the interface use the existing values as the starting point
 		if statInfo == nil {
+			// if no entry for the interface use the existing values as the starting point
 			statInfo = new(linux.NetworkStat)
 			statInfo.Iface = item.Iface
 			statInfo.RxBytes = item.RxBytes
@@ -177,10 +184,9 @@ func collectInterfaceStats() {
 			statInfo.TxCarrier = item.TxCarrier
 			statInfo.TxCompressed = item.TxCompressed
 			interfaceMap[item.Iface] = statInfo
-			logger.Info("EMPTY: %s\n", item.Iface)
-		// found the interface entry so calculate the difference since last time
-		// pass previous values as pointers so they can be updated after the calculation
 		} else {
+			// found the interface entry so calculate the difference since last time
+			// pass previous values as pointers so they can be updated after the calculation
 			diffInfo.Iface = item.Iface
 			diffInfo.RxBytes = calculateDifference(&statInfo.RxBytes, item.RxBytes)
 			diffInfo.RxPackets = calculateDifference(&statInfo.RxPackets, item.RxPackets)
@@ -198,7 +204,49 @@ func collectInterfaceStats() {
 			diffInfo.TxColls = calculateDifference(&statInfo.TxColls, item.TxColls)
 			diffInfo.TxCarrier = calculateDifference(&statInfo.TxCarrier, item.TxCarrier)
 			diffInfo.TxCompressed = calculateDifference(&statInfo.TxCompressed, item.TxCompressed)
-			logger.Info("STATS: %v\n", diffInfo)
+
+			// TODO - figure out how to get interface ID from interface name
+			latency = 0
+
+			columns := map[string]interface{}{
+				"time_stamp":         time.Now(),
+				"interface":          diffInfo.Iface,
+				"avg_latency":        latency,
+				"rx_bytes":           diffInfo.RxBytes,
+				"rx_bytes_rate":      diffInfo.RxBytes / seconds,
+				"rx_packets":         diffInfo.RxPackets,
+				"rx_packets_rate":    diffInfo.RxPackets / seconds,
+				"rx_errs":            diffInfo.RxErrs,
+				"rx_errs_rate":       diffInfo.RxErrs / seconds,
+				"rx_drop":            diffInfo.RxDrop,
+				"rx_drop_rate":       diffInfo.RxDrop / seconds,
+				"rx_fifo":            diffInfo.RxFifo,
+				"rx_fifo_rate":       diffInfo.RxFifo / seconds,
+				"rx_frame":           diffInfo.RxFrame,
+				"rx_frame_rate":      diffInfo.RxFrame / seconds,
+				"rx_compressed":      diffInfo.RxCompressed,
+				"rx_compressed_rate": diffInfo.RxCompressed / seconds,
+				"rx_multicast":       diffInfo.RxMulticast,
+				"rx_multicast_rate":  diffInfo.RxMulticast / seconds,
+				"tx_bytes":           diffInfo.TxBytes,
+				"tx_bytes_rate":      diffInfo.TxBytes / seconds,
+				"tx_packets":         diffInfo.TxPackets,
+				"tx_packets_rate":    diffInfo.TxPackets / seconds,
+				"tx_errs":            diffInfo.TxErrs,
+				"tx_errs_rate":       diffInfo.TxErrs / seconds,
+				"tx_drop":            diffInfo.TxDrop,
+				"tx_drop_rate":       diffInfo.TxDrop / seconds,
+				"tx_fifo":            diffInfo.TxFifo,
+				"tx_fifo_rate":       diffInfo.TxFifo / seconds,
+				"tx_colls":           diffInfo.TxColls,
+				"tx_colls_rate":      diffInfo.TxColls / seconds,
+				"tx_carrier":         diffInfo.TxCarrier,
+				"tx_carrier_rate":    diffInfo.TxCarrier / seconds,
+				"tx_compressed":      diffInfo.TxCompressed,
+				"tx_compressed_rate": diffInfo.TxCompressed / seconds,
+			}
+
+			reports.LogEvent(reports.CreateEvent("interface_stats", "interface_stats", 1, columns, nil))
 		}
 	}
 }
@@ -206,7 +254,7 @@ func collectInterfaceStats() {
 func calculateDifference(previous *uint64, current uint64) uint64 {
 	// TODO - need to handle integer wrap
 
-	diff :=	(current - *previous)
+	diff := (current - *previous)
 	*previous = current
 	return diff
 }

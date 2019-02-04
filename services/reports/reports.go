@@ -497,6 +497,48 @@ func createTables() {
 	if err != nil {
 		logger.Err("Failed to create table: %s\n", err.Error())
 	}
+
+	_, err = db.Exec(
+		`CREATE TABLE IF NOT EXISTS interface_stats (
+                     time_stamp bigint NOT NULL,
+					 interface text,
+					 avg_latency int8,
+					 rx_bytes int8,
+					 rx_bytes_rate int8,
+					 rx_packets int8,
+					 rx_packets_rate int8,
+					 rx_errs int8,
+					 rx_errs_rate int8,
+					 rx_drop int8,
+					 rx_drop_rate int8,
+					 rx_fifo int8,
+					 rx_fifo_rate int8,
+					 rx_frame int8,
+					 rx_frame_rate int8,
+					 rx_compressed int8,
+					 rx_compressed_rate int8,
+					 rx_multicast int8,
+					 rx_multicast_rate int8,
+					 tx_bytes int8,
+					 tx_bytes_rate int8,
+					 tx_packets int8,
+					 tx_packets_rate int8,
+					 tx_errs int8,
+					 tx_errs_rate int8,
+					 tx_drop int8,
+					 tx_drop_rate int8,
+					 tx_fifo int8,
+					 tx_fifo_rate int8,
+					 tx_colls int8,
+					 tx_colls_rate int8,
+					 tx_carrier int8,
+					 tx_carrier_rate int8,
+					 tx_compressed,
+                     tx_compressed_rate int8)`)
+
+	if err != nil {
+		logger.Err("Failed to create table: %s\n", err.Error())
+	}
 }
 
 // addDefaultTimestampConditions adds time_stamp > X and time_stamp < Y
@@ -592,6 +634,7 @@ func dbCleaner() {
 			dbLock.Lock()
 			trimPercent("sessions", .1)
 			trimPercent("session_minutes", .1)
+			trimPercent("interface_stats", .1)
 			runSQL("VACUUM")
 			dbLock.Unlock()
 			logger.Info("Trimmed DB.\n")
