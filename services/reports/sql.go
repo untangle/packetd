@@ -135,6 +135,7 @@ func makeCategoriesSQLString(reportEntry *ReportEntry) (string, error) {
 	// remove "0" values
 	sqlStr = "SELECT " + reportEntry.QueryCategories.GroupColumn + ", value FROM ( " + sqlStr + " ) WHERE value > 0"
 
+	logger.Debug("Categories SQL: %v %v\n", sqlStr)
 	return sqlStr, nil
 }
 
@@ -197,6 +198,8 @@ func makeSeriesSQLString(reportEntry *ReportEntry) (string, error) {
 	sqlStr += " USING (time_trunc) "
 	sqlStr += " ORDER BY time_trunc ASC "
 
+	logger.Debug("Series Query SQL: %v %v\n", qStr)
+	logger.Debug("Series SQL: %v %v\n", sqlStr)
 	return sqlStr, nil
 }
 
@@ -227,7 +230,11 @@ func makeCategoriesSeriesSQLString(reportEntry *ReportEntry) (string, error) {
 	}
 	reportEntry.QuerySeries.Columns = columns
 
-	return makeSeriesSQLString(reportEntry)
+	sqlStr, err := makeSeriesSQLString(reportEntry)
+	if sqlStr != "" {
+		logger.Debug("Categories Series SQL: %v %v\n", sqlStr)
+	}
+	return sqlStr, err
 }
 
 //makeTimelineSQLString makes a SQL query string to provide the timeline to left join
@@ -244,6 +251,8 @@ func makeTimelineSQLString(startTime string, endTime string, intervalSec int64) 
 	sqlStr += " (" + makeSeqSQLString("d", 10) + "), "
 	sqlStr += " (" + makeSeqSQLString("e", 10) + ") "
 	sqlStr += "WHERE time_trunc < " + endTime
+
+	logger.Debug("Timeline SQL: %v %v\n", sqlStr)
 	return sqlStr, nil
 }
 
@@ -289,7 +298,6 @@ func getDistinctValues(reportEntry *ReportEntry) ([]string, error) {
 		return nil, err
 	}
 
-	logger.Info("Categories SQL: %v %v\n", categoriesSQLStr, conditionValues(reportEntry.Conditions))
 	rows, err := db.Query(categoriesSQLStr, conditionValues(reportEntry.Conditions)...)
 	if err != nil {
 		logger.Warn("Failed to get Distinct values: %v\n", err)
