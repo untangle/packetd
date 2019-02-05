@@ -247,7 +247,6 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		c2sRate := float32(diffC2sBytes) / secondsSinceLastUpdate
 		s2cRate := float32(diffS2cBytes) / secondsSinceLastUpdate
 		totalRate := float32(diffTotalBytes) / secondsSinceLastUpdate
-		logger.Warn("XXX totalRate: %v %v kB/s\n", conntrack.ClientSideTuple, totalRate/1000.0)
 
 		conntrack.C2SBytes = newC2sBytes
 		conntrack.S2CBytes = newS2cBytes
