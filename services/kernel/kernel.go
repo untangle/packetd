@@ -9,6 +9,7 @@ import "C"
 
 import (
 	"net"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -57,14 +58,26 @@ func StartCallbacks(numNfqueueThreads int, intervalSeconds int) {
 		numNfqueueThreads = 32
 	}
 	for x := 0; x < numNfqueueThreads; x++ {
-		go C.nfqueue_thread(C.int(x))
+		go func(x C.int) {
+			runtime.LockOSThread()
+			C.nfqueue_thread(x)
+		}(C.int(x))
 	}
 
-	go C.conntrack_thread()
-	go C.netlogger_thread()
+	go func() {
+		runtime.LockOSThread()
+		C.conntrack_thread()
+	}()
+	go func() {
+		runtime.LockOSThread()
+		C.netlogger_thread()
+	}()
 
 	// start the conntrack interval-second update task
-	go conntrackTask(intervalSeconds)
+	go func() {
+		runtime.LockOSThread()
+		conntrackTask(intervalSeconds)
+	}()
 }
 
 // StopCallbacks stops all C services and callbacks
