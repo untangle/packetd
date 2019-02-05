@@ -46,6 +46,7 @@ var cpuProfileTarget string
 var localFlag bool
 var cpuCount = getConcurrencyFactor()
 var queueRange = getQueueRange()
+var conntrackIntervalSeconds = 10
 
 func main() {
 	userinfo, err := user.Current()
@@ -74,7 +75,7 @@ func main() {
 
 	// Start the callbacks AFTER all services and plugins are initialized
 	logger.Info("Starting kernel callbacks...\n")
-	kernel.StartCallbacks(cpuCount)
+	kernel.StartCallbacks(cpuCount, conntrackIntervalSeconds)
 
 	// Insert netfilter rules
 	logger.Info("Inserting netfilter rules...\n")
@@ -239,7 +240,7 @@ func startServices() {
 	loadRequirements()
 
 	kernel.Startup()
-	dispatch.Startup()
+	dispatch.Startup(conntrackIntervalSeconds)
 	syscmd.Startup()
 	settings.Startup()
 	reports.Startup()

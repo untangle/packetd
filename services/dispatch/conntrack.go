@@ -20,6 +20,7 @@ type Conntrack struct {
 	SessionID        uint64
 	CreationTime     time.Time
 	LastActivityTime time.Time
+	LastUpdateTime   time.Time
 	ClientSideTuple  Tuple
 	ServerSideTuple  Tuple
 	EventCount       uint64
@@ -201,7 +202,16 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			insertConntrack(ctid, conntrack)
 		}
 
+		previousUpdateTime := conntrack.LastUpdateTime
 		conntrack.LastActivityTime = time.Now()
+		conntrack.LastUpdateTime = conntrack.LastActivityTime
+		var secondsSinceLastUpdate float32
+		if previousUpdateTime.IsZero() {
+			secondsSinceLastUpdate = float32(conntrackIntervalSeconds)
+		} else {
+			secondsSinceLastUpdate = float32(conntrack.LastUpdateTime.Sub(previousUpdateTime).Seconds())
+		}
+
 		conntrack.EventCount++
 		if (connmark & 0x0fffffff) != (conntrack.ConnMark & 0x0fffffff) {
 			logger.Info("Connmark change [%v] 0x%08x != 0x%08x\n", conntrack.ClientSideTuple, connmark, conntrack.ConnMark)
@@ -234,9 +244,10 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			diffTotalBytes = newTotalBytes
 		}
 
-		c2sRate := float32(diffC2sBytes / 60)
-		s2cRate := float32(diffS2cBytes / 60)
-		totalRate := float32(diffTotalBytes / 60)
+		c2sRate := float32(diffC2sBytes) / secondsSinceLastUpdate
+		s2cRate := float32(diffS2cBytes) / secondsSinceLastUpdate
+		totalRate := float32(diffTotalBytes) / secondsSinceLastUpdate
+		logger.Warn("XXX totalRate: %v %v kB/s\n", conntrack.ClientSideTuple, totalRate/1000.0)
 
 		conntrack.C2SBytes = newC2sBytes
 		conntrack.S2CBytes = newS2cBytes
@@ -319,7 +330,7 @@ func cleanConntrackTable() {
 			// This should never happen, log an error
 			// entries should be removed by DELETE events
 			// otherwise they should be getting UPDATE events and the LastActivityTime
-			// would be at least within 60 seconds.
+			// would be at least within interval seconds.
 			// The the entry exists, the LastActivityTime is a long time ago
 			// some constraint has failed
 			logger.Err("Removing stale (%v) conntrack entry [%d] %v\n", time.Now().Sub(conntrack.LastActivityTime), ctid, conntrack.ClientSideTuple)

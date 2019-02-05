@@ -144,6 +144,9 @@ func doAccounting(entry *dispatch.Conntrack, sessionID uint64, ctid uint32) {
 		"c2s_bytes":  entry.C2SBytesDiff,
 		"s2c_bytes":  entry.S2CBytesDiff,
 		"bytes":      entry.TotalBytesDiff,
+		"c2s_rate":   int32(entry.C2SRate),
+		"s2c_rate":   int32(entry.S2CRate),
+		"rate":       int32(entry.TotalRate),
 	}
 	reports.LogEvent(reports.CreateEvent("session_stat", "session_stats", 1, columns, nil))
 
