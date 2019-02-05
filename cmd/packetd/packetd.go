@@ -176,6 +176,7 @@ func parseArguments() {
 	playSpeedPtr := flag.Int("playspeed", 100, "traffic playback speed percentage")
 	cpuProfilePtr := flag.String("cpuprofile", "", "write cpu profile to file")
 	memProfilePtr := flag.String("memprofile", "", "write memory profile to file")
+	logFilePtr := flag.String("logfile", "", "file to redirect stdout/stderr")
 
 	flag.Parse()
 
@@ -226,6 +227,15 @@ func parseArguments() {
 
 	if *memProfilePtr != "" {
 		memProfileTarget = *memProfilePtr
+	}
+
+	if *logFilePtr != "" {
+		logFile, err := os.OpenFile(*logFilePtr, os.O_WRONLY|os.O_CREATE|os.O_SYNC, 0755)
+		if err != nil {
+			panic("Failed to write to log file\n")
+		}
+		syscall.Dup2(int(logFile.Fd()), 1)
+		syscall.Dup2(int(logFile.Fd()), 2)
 	}
 
 }
