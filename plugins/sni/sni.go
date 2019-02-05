@@ -57,7 +57,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	// release the session if we don't find SNI in the first few packets
-	if mess.Session.PacketCount >= maxPacketCount {
+	if mess.Session.GetPacketCount() >= maxPacketCount {
 		logger.Debug("Exceeded SNI packet limit ctid:%d\n", ctid)
 		release = true
 	}

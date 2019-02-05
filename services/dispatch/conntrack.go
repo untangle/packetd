@@ -177,7 +177,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			session.ConntrackConfirmed = true
 			session.Conntrack = conntrack
 			session.LastActivityTime = time.Now()
-			session.EventCount++
+			session.AddEventCount(1)
 			conntrack.Session = session
 			conntrack.SessionID = session.SessionID
 		} else {
@@ -209,7 +209,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		}
 		if conntrack.Session != nil {
 			conntrack.Session.LastActivityTime = time.Now()
-			conntrack.Session.EventCount++
+			conntrack.Session.AddEventCount(1)
 		}
 
 		oldC2sBytes := conntrack.C2SBytes

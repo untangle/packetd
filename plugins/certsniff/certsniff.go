@@ -149,7 +149,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		}
 
 		// if we don't find ClientHello after a while just give up
-		if mess.Session.PacketCount > maxClientCount {
+		if mess.Session.GetPacketCount() > maxClientCount {
 			result.SessionRelease = true
 		}
 
@@ -179,7 +179,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	// if we don't find the server certificate after a while just give up
-	if mess.Session.PacketCount > maxServerCount {
+	if mess.Session.GetPacketCount() > maxServerCount {
 		result.SessionRelease = true
 	}
 

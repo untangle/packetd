@@ -197,15 +197,16 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 
 	// Update some accounting bits
 	session.LastActivityTime = time.Now()
-	session.PacketCount++
-	session.ByteCount += uint64(mess.Length)
-	session.EventCount++
+	session.AddPacketCount(1)
+	session.AddByteCount(uint64(mess.Length))
+	session.AddEventCount(1)
 
 	// If we've processed this many packets without all the plugins releasing
 	// there is likely an issue. Only warn at "== X" packet count
 	// to avoid flooding logs with a "> X" condition
-	if session.PacketCount == 100 || session.PacketCount == 200 {
-		logger.Warn("Deep session scan. %v ctid:%v Packets:%v Bytes:%v Subscribers:%v\n", session.ClientSideTuple, ctid, session.PacketCount, session.ByteCount, session.subscriptions)
+	packetcount := session.GetPacketCount()
+	if packetcount == 100 || packetcount == 200 {
+		logger.Warn("Deep session scan. %v ctid:%v Packets:%v Bytes:%v Subscribers:%v\n", session.ClientSideTuple, ctid, session.GetPacketCount(), session.GetByteCount(), session.subscriptions)
 	}
 
 	return callSubscribers(ctid, session, mess, pmark, newSession)
@@ -308,11 +309,11 @@ func createSession(mess NfqueueMessage, ctid uint32) *Session {
 	session.SessionID = nextSessionID()
 	session.ConntrackID = ctid
 	session.CreationTime = time.Now()
-	session.PacketCount = 1
-	session.ByteCount = uint64(mess.Length)
+	session.SetPacketCount(1)
+	session.SetByteCount(uint64(mess.Length))
 	session.LastActivityTime = time.Now()
 	session.ClientSideTuple = mess.MsgTuple
-	session.EventCount = 1
+	session.SetEventCount(1)
 	session.ConntrackConfirmed = false
 	session.attachments = make(map[string]interface{})
 	AttachNfqueueSubscriptions(session)

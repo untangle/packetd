@@ -2,6 +2,7 @@ package dispatch
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/untangle/packetd/services/dict"
@@ -21,6 +22,7 @@ type Session struct {
 	CreationTime time.Time
 
 	// LastActivityTime stores the last time we got any nfqueue/conntrack event for this session
+	// FIXME - this may need to be atomic
 	LastActivityTime time.Time
 
 	// ClientSideTuple stores the client-side (pre-NAT) session tuple
@@ -50,15 +52,6 @@ type Session struct {
 	// The conntrack entry associated with this session
 	Conntrack *Conntrack
 
-	// PacketdCount stores the number of packets queued to packetd for this session
-	PacketCount uint64
-
-	// ByteCount stores the number of bytes of packets queued to packetd for this session
-	ByteCount uint64
-
-	// EventCount stores the number of nfqueue/conntrack events for this session
-	EventCount uint64
-
 	// subscriptions stores the nfqueue subscribers
 	subscriptions map[string]SubscriptionHolder
 
@@ -70,6 +63,10 @@ type Session struct {
 
 	// attachmentLock is the lock for attachments
 	attachmentLock sync.Mutex
+
+	packetCount uint64
+	byteCount   uint64
+	eventCount  uint64
 }
 
 // sessionTable is the global session table
@@ -119,6 +116,54 @@ func (sess *Session) LockAttachments() map[string]interface{} {
 // UnlockAttachments unlocks the attachments mutex
 func (sess *Session) UnlockAttachments() {
 	sess.attachmentLock.Unlock()
+}
+
+// GetPacketCount gets the packet count
+func (sess *Session) GetPacketCount() uint64 {
+	return atomic.LoadUint64(&sess.packetCount)
+}
+
+// SetPacketCount sets the packet count
+func (sess *Session) SetPacketCount(value uint64) uint64 {
+	atomic.StoreUint64(&sess.packetCount, value)
+	return value
+}
+
+// AddPacketCount increases the packet count by the argumented value
+func (sess *Session) AddPacketCount(value uint64) uint64 {
+	return atomic.AddUint64(&sess.packetCount, value)
+}
+
+// GetByteCount gets the byte count
+func (sess *Session) GetByteCount() uint64 {
+	return atomic.LoadUint64(&sess.byteCount)
+}
+
+// SetByteCount sets the byte count
+func (sess *Session) SetByteCount(value uint64) uint64 {
+	atomic.StoreUint64(&sess.byteCount, value)
+	return value
+}
+
+// AddByteCount increases the byte count by the argumented value
+func (sess *Session) AddByteCount(value uint64) uint64 {
+	return atomic.AddUint64(&sess.byteCount, value)
+}
+
+// GetEventCount gets the event count
+func (sess *Session) GetEventCount() uint64 {
+	return atomic.LoadUint64(&sess.eventCount)
+}
+
+// SetEventCount sets the event count
+func (sess *Session) SetEventCount(value uint64) uint64 {
+	atomic.StoreUint64(&sess.eventCount, value)
+	return value
+}
+
+// AddEventCount increases the event count by the argumented value
+func (sess *Session) AddEventCount(value uint64) uint64 {
+	return atomic.AddUint64(&sess.eventCount, value)
 }
 
 // destroy is called to end the session
