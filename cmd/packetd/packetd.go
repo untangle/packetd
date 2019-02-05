@@ -21,6 +21,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/c9s/goprocinfo/linux"
 	"github.com/untangle/packetd/plugins/certfetch"
 	"github.com/untangle/packetd/plugins/certsniff"
 	"github.com/untangle/packetd/plugins/classify"
@@ -177,6 +178,7 @@ func parseArguments() {
 	cpuProfilePtr := flag.String("cpuprofile", "", "write cpu profile to file")
 	memProfilePtr := flag.String("memprofile", "", "write memory profile to file")
 	logFilePtr := flag.String("logfile", "", "file to redirect stdout/stderr")
+	cpuCountPtr := flag.Int("cpucount", cpuCount, "override the cpucount manually")
 
 	flag.Parse()
 
@@ -223,6 +225,10 @@ func parseArguments() {
 
 	if *cpuProfilePtr != "" {
 		cpuProfileTarget = *cpuProfilePtr
+	}
+
+	if cpuCountPtr != nil {
+		cpuCount = *cpuCountPtr
 	}
 
 	if *memProfilePtr != "" {
@@ -454,36 +460,6 @@ func getProcStats() (string, error) {
 	return interesting, nil
 }
 
-// getConcurrencyFactor returns the number of CPUs
-// or 4 if any error occurs in determining the number
-func getConcurrencyFactor() int {
-	defaultValue := 4
-
-	file, err := os.OpenFile("/proc/cpuinfo", os.O_RDONLY, 0660)
-	if err != nil {
-		logger.Warn("Failed to read /proc/cpuinfo: %v\n", err.Error())
-		return defaultValue
-	}
-
-	defer file.Close()
-
-	count := 0
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "processor") {
-			count++
-		}
-	}
-
-	if count == 0 {
-		logger.Warn("Failed to detect CPU count\n")
-		return defaultValue
-	}
-
-	return count
-}
-
 // getQueueRange gets the nfqueue specification
 func getQueueRange() string {
 	str := "2000"
@@ -491,6 +467,7 @@ func getQueueRange() string {
 	return str
 }
 
+// load all packetd requirements
 func loadRequirements() {
 	err := exec.Command("modprobe", "nf_conntrack").Run()
 	if err != nil {
@@ -502,6 +479,7 @@ func loadRequirements() {
 	}
 }
 
+// startCPUProfiling starts the CPU profiling processing
 func startCPUProfiling() {
 	f, err := os.Create(cpuProfileTarget)
 	if err != nil {
@@ -517,6 +495,18 @@ func startCPUProfiling() {
 	}()
 }
 
+// stopCPUProfiling stops the CPU profiling processing
 func stopCPUProfiling() {
 	pprof.StopCPUProfile()
+}
+
+// getConcurrencyFactor returns the number of CPUs
+// or 4 if any error occurs in determining the number
+func getConcurrencyFactor() int {
+	cpuinfo, err := linux.ReadCPUInfo("/proc/cpuinfo")
+	if err != nil {
+		logger.Warn("Error reading cpuinfo: %s\n", err.Error())
+		return 4
+	}
+	return cpuinfo.NumCore()
 }
