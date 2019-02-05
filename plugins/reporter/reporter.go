@@ -150,7 +150,7 @@ func doAccounting(entry *dispatch.Conntrack, sessionID uint64, ctid uint32) {
 	}
 	reports.LogEvent(reports.CreateEvent("session_stat", "session_stats", 1, columns, nil))
 
-	dict.AddSessionEntry(ctid, "bytes_per_sec_total_1min", uint32(entry.TotalBytesDiff/60))
-	dict.AddSessionEntry(ctid, "bytes_per_sec_c2s_1min", uint32(entry.C2SBytesDiff/60))
-	dict.AddSessionEntry(ctid, "bytes_per_sec_s2c_1min", uint32(entry.S2CBytesDiff/60))
+	dict.AddSessionEntry(ctid, "rate", uint32(entry.TotalRate))
+	dict.AddSessionEntry(ctid, "c2s_rate", uint32(entry.C2SRate))
+	dict.AddSessionEntry(ctid, "s2c_rate", uint32(entry.S2CRate))
 }
