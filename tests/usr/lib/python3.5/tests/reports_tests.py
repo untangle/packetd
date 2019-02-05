@@ -153,10 +153,10 @@ JOIN_REPORT_ENTRY = {
     "description": "The application sorted by sum of bytes transferred",
     "displayOrder": 20,
     "type": "CATEGORIES",
-    "table": "sessions join session_minutes using (session_id)",
+    "table": "sessions join session_stats using (session_id)",
     "columnDisambiguation": [{
         "columnName": "time_stamp",
-        "newColumnName": "session_minutes.time_stamp"
+        "newColumnName": "session_stats.time_stamp"
     }],
     "queryCategories": {
         "groupColumn": "application_name",

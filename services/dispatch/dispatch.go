@@ -39,10 +39,16 @@ var netloggerSubMutex sync.Mutex
 var nfCleanupHolder map[uint32]bool
 var ctCleanupHolder map[uint32]bool
 
+// channel used to shutdown the cleaner task
 var shutdownCleanerTask = make(chan bool)
 
+// stores the interval of conntrack updates
+var conntrackIntervalSeconds int
+
 // Startup starts the event handling service
-func Startup() {
+func Startup(ctInterval int) {
+	conntrackIntervalSeconds = ctInterval
+
 	// create the session, conntrack, and certificate tables
 	sessionTable = make(map[uint32]*Session)
 	conntrackTable = make(map[uint32]*Conntrack)

@@ -487,12 +487,15 @@ func createTables() {
 	// We need to add domain level categorization
 
 	_, err = db.Exec(
-		`CREATE TABLE IF NOT EXISTS session_minutes (
+		`CREATE TABLE IF NOT EXISTS session_stats (
                      session_id int8 NOT NULL,
                      time_stamp bigint NOT NULL,
                      c2s_bytes int8,
                      s2c_bytes int8,
-                     bytes int8)`)
+                     bytes int8,
+                     c2s_rate int8,
+                     s2c_rate int8,
+                     rate int8)`)
 
 	if err != nil {
 		logger.Err("Failed to create table: %s\n", err.Error())
@@ -633,7 +636,7 @@ func dbCleaner() {
 		if size > dbLimit {
 			dbLock.Lock()
 			trimPercent("sessions", .1)
-			trimPercent("session_minutes", .1)
+			trimPercent("session_stats", .1)
 			trimPercent("interface_stats", .1)
 			runSQL("VACUUM")
 			dbLock.Unlock()

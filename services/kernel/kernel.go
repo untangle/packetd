@@ -51,7 +51,7 @@ func Shutdown() {
 }
 
 // StartCallbacks donates threads for all the C services and starts other persistent tasks
-func StartCallbacks(numNfqueueThreads int) {
+func StartCallbacks(numNfqueueThreads int, intervalSeconds int) {
 	// Donate threads to kernel hooks
 	if numNfqueueThreads > 32 {
 		numNfqueueThreads = 32
@@ -63,8 +63,8 @@ func StartCallbacks(numNfqueueThreads int) {
 	go C.conntrack_thread()
 	go C.netlogger_thread()
 
-	// start the conntrack 60-second update task
-	go conntrackTask()
+	// start the conntrack interval-second update task
+	go conntrackTask(intervalSeconds)
 }
 
 // StopCallbacks stops all C services and callbacks
@@ -368,7 +368,7 @@ func go_child_message(level C.int, source *C.char, message *C.char) {
 }
 
 //conntrack periodic task
-func conntrackTask() {
+func conntrackTask(intervalSeconds int) {
 	var counter int
 
 	for {
@@ -376,7 +376,8 @@ func conntrackTask() {
 		case <-shutdownConntrackTask:
 			shutdownConntrackTask <- true
 			return
-		case <-time.After(timeUntilNextMin()):
+		case <-time.After(time.Second * time.Duration(intervalSeconds)):
+			//case <-time.After(timeUntilNextMin()):
 			counter++
 			logger.Debug("Calling conntrack dump %d\n", counter)
 			C.conntrack_dump()
