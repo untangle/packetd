@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -68,6 +70,10 @@ func main() {
 
 	// Start services
 	startServices()
+
+	if len(cpuProfileTarget) > 0 {
+		startCPUProfiling()
+	}
 
 	// Start the plugins
 	logger.Info("Starting plugins...\n")
@@ -137,7 +143,7 @@ func main() {
 	logger.Info("Stopping services...\n")
 
 	if len(cpuProfileTarget) > 0 {
-		pprof.StopCPUProfile()
+		stopCPUProfiling()
 	}
 
 	if len(memProfileTarget) > 0 {
@@ -216,13 +222,6 @@ func parseArguments() {
 
 	if *cpuProfilePtr != "" {
 		cpuProfileTarget = *cpuProfilePtr
-		f, err := os.Create(cpuProfileTarget)
-		if err != nil {
-			logger.Err("Could not create CPU profile: ", err)
-		}
-		if err := pprof.StartCPUProfile(f); err != nil {
-			logger.Err("Could not start CPU profile: ", err)
-		}
 	}
 
 	if *memProfilePtr != "" {
@@ -491,4 +490,23 @@ func loadRequirements() {
 	if err != nil {
 		logger.Err("Failed to enable nf_conntrack_acct %s", err.Error())
 	}
+}
+
+func startCPUProfiling() {
+	f, err := os.Create(cpuProfileTarget)
+	if err != nil {
+		logger.Err("Could not create CPU profile: ", err)
+	}
+	if err := pprof.StartCPUProfile(f); err != nil {
+		logger.Err("Could not start CPU profile: ", err)
+	}
+
+	logger.Info("pprof listening on localhost:6060\n")
+	go func() {
+		http.ListenAndServe("localhost:6060", nil)
+	}()
+}
+
+func stopCPUProfiling() {
+	pprof.StopCPUProfile()
 }
