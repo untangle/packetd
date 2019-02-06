@@ -559,7 +559,7 @@ func AddDeviceEntry(key net.HardwareAddr, field string, value interface{}) error
 // AddSessionEntry adds a field/value entry for the supplied int key in the session table
 // This is a convenience wrapper for AddEntry
 func AddSessionEntry(key uint32, field string, value interface{}) error {
-	return AddEntry("session", key, field, value)
+	return AddEntry("sessions", key, field, value)
 }
 
 // DeleteDictionary removes a dictionary with the supplied key in the supplied table
@@ -601,7 +601,7 @@ func DeleteDevice(key net.HardwareAddr) error {
 // DeleteSession removes a dictionary from the session table
 // This is a convenience wrapper for DeleteDictionary
 func DeleteSession(key uint32) error {
-	return DeleteDictionary("session", key)
+	return DeleteDictionary("sessions", key)
 }
 
 // GetDictionary gets all of the dictionary entries for the supplied key
@@ -686,7 +686,7 @@ func GetDeviceEntry(key net.HardwareAddr, field string) (Entry, error) {
 // GetSessionEntry gets the dictionary entry from the session table with the specified key and field
 // This is a convenience wrapper for GetEntry
 func GetSessionEntry(key uint32, field string) (Entry, error) {
-	return GetEntry("session", key, field)
+	return GetEntry("sessions", key, field)
 }
 
 // GetAllEntries gets all of entries for all known dictionaries
@@ -720,12 +720,12 @@ func GetSessions() (map[uint32]map[string]interface{}, error) {
 
 	m := make(map[uint32]map[string]interface{})
 	for _, e := range entries {
-		if e.Table != "session" {
+		if e.Table != "sessions" {
 			continue
 		}
 		sessionID, ok := e.Key.(uint32)
 		if !ok {
-			logger.Warn("Invalid key is session table: %v %T %v\n", e.Key, e.Key, e)
+			logger.Warn("Invalid key is sessions table: %v %T %v\n", e.Key, e.Key, e)
 			return nil, errors.New("Invalid key")
 		}
 		if m[sessionID] == nil {

@@ -31,8 +31,8 @@ class GeoipTests(unittest.TestCase):
         subprocess.call("nft flush chain inet test filter-rules", shell=True)
         result1 = remote_control.run_command("ping -W5 -c1 4.2.2.1")
         subprocess.call("nft add rule inet test filter-rules ip daddr 4.2.2.2 counter", shell=True)
-        subprocess.call("nft add rule inet test filter-rules ip daddr 4.2.2.2 dict session ct id server_country long_string US counter", shell=True)
-        subprocess.call("nft add rule inet test filter-rules dict session ct id server_country long_string US counter reject", shell=True)
+        subprocess.call("nft add rule inet test filter-rules ip daddr 4.2.2.2 dict sessions ct id server_country long_string US counter", shell=True)
+        subprocess.call("nft add rule inet test filter-rules dict sessions ct id server_country long_string US counter reject", shell=True)
         result2 = remote_control.run_command("ping -W5 -c1 4.2.2.2")
         # subprocess.call("nft flush chain inet test filter-rules", shell=True)
         assert result1 == 0
@@ -43,8 +43,8 @@ class GeoipTests(unittest.TestCase):
         subprocess.call("nft flush chain inet test filter-rules", shell=True)
         result1 = remote_control.run_command("ping -W5 -c1 4.2.2.1")
         subprocess.call("nft add rule inet test filter-rules ip daddr 4.2.2.2 counter", shell=True)
-        subprocess.call("nft add rule inet test filter-rules ip daddr 4.2.2.2 dict session ct id server_country long_string US counter", shell=True)
-        subprocess.call("nft add rule inet test filter-rules dict session ct id server_country long_string US counter drop", shell=True)
+        subprocess.call("nft add rule inet test filter-rules ip daddr 4.2.2.2 dict sessions ct id server_country long_string US counter", shell=True)
+        subprocess.call("nft add rule inet test filter-rules dict sessions ct id server_country long_string US counter drop", shell=True)
         result2 = remote_control.run_command("ping -W1 -c1 4.2.2.2")
         # subprocess.call("nft flush chain inet test filter-rules", shell=True)
         assert result1 == 0

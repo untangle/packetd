@@ -23,11 +23,11 @@ def playback_start(filename, filehash, playspeed):
     """start the playback file"""
     fullpath = "/tmp/" + filename
     md5sum = get_file_md5(fullpath)
-    print("CHECKING FILENAME:%s MD5:%s" % (fullpath,md5sum))
-    if (md5sum != filehash):
+    print("CHECKING FILENAME:%s MD5:%s" % (fullpath, md5sum))
+    if md5sum != filehash:
         download_playback_file(filename)
         md5sum = get_file_md5(fullpath)
-        print("DOWNLOAD FILENAME:%s MD5:%s" % (fullpath,md5sum))
+        print("DOWNLOAD FILENAME:%s MD5:%s" % (fullpath, md5sum))
     assert md5sum == filehash
     result = subprocess.call("curl -X POST -s -o - -H 'Content-Type: application/json; charset=utf-8' -d '{\"filename\":\"%s\",\"speed\":\"%i\"}' 'http://localhost/api/warehouse/playback' >> /tmp/subproc.out" % (fullpath, playspeed), shell=True)
     return result
@@ -58,10 +58,10 @@ def read_dict():
     dictfile.close()
     return rawdata
 
-def read_dict_session(ctid):
+def read_dict_sessions(ctid):
     """return the dict for a specific session"""
     dictfile = open("/proc/net/dict/read", "r+")
-    dictfile.write("table=session,key_int=" + ctid + ",")
+    dictfile.write("table=sessions,key_int=" + ctid + ",")
     rawdata = dictfile.read()
     dictfile.close()
     return rawdata
@@ -78,15 +78,15 @@ def get_file_md5(filename):
 def clear_dict():
     """Clears the dictionary of the fack session IDs in the playbacks"""
     dictfile = open("/proc/net/dict/delete", "r+")
-    dictfile.write("table=session,key_int=" + PlaybackTests.http_ctid + ",")
+    dictfile.write("table=sessions,key_int=" + PlaybackTests.http_ctid + ",")
     dictfile.close()
 
     dictfile = open("/proc/net/dict/delete", "r+")
-    dictfile.write("table=session,key_int=" + PlaybackTests.https_ctid + ",")
+    dictfile.write("table=sessions,key_int=" + PlaybackTests.https_ctid + ",")
     dictfile.close()
 
     dictfile = open("/proc/net/dict/delete", "r+")
-    dictfile.write("table=session,key_int=" + PlaybackTests.hint_ctid + ",")
+    dictfile.write("table=sessions,key_int=" + PlaybackTests.hint_ctid + ",")
     dictfile.close()
 
 class PlaybackTests(unittest.TestCase):
@@ -124,9 +124,9 @@ class PlaybackTests(unittest.TestCase):
     def test_010_check_empty_table(self):
         """verify the ctids aren't in the dictionary"""
         rawdata = read_dict()
-        assert "table: session key_int: " + PlaybackTests.http_ctid not in rawdata
-        assert "table: session key_int: " + PlaybackTests.https_ctid not in rawdata
-        assert "table: session key_int: " + PlaybackTests.hint_ctid not in rawdata
+        assert "table: sessions key_int: " + PlaybackTests.http_ctid not in rawdata
+        assert "table: sessions key_int: " + PlaybackTests.https_ctid not in rawdata
+        assert "table: sessions key_int: " + PlaybackTests.hint_ctid not in rawdata
 
     def test_020_playback_capture_file_normal(self):
         """playback the capture file and wait for it to finish"""
@@ -136,7 +136,7 @@ class PlaybackTests(unittest.TestCase):
         endtime = time.time()
         PlaybackTests.normtime = (endtime - begtime)
         print("NORMTIME: " + str(PlaybackTests.normtime))
-        rawdata = read_dict_session(PlaybackTests.http_ctid)
+        rawdata = read_dict_sessions(PlaybackTests.http_ctid)
         playback_cleanup()
         assert rawdata != ""
 
@@ -151,7 +151,7 @@ class PlaybackTests(unittest.TestCase):
         print("FASTTIME:" + str(fasttime) + "  TARGET:" + str(calctime))
         assert fasttime < calctime + 4
         assert fasttime > calctime - 4
-        rawdata = read_dict_session(PlaybackTests.http_ctid)
+        rawdata = read_dict_sessions(PlaybackTests.http_ctid)
         playback_cleanup()
         assert rawdata != ""
 
@@ -166,7 +166,7 @@ class PlaybackTests(unittest.TestCase):
         print("SLOWTIME:" + str(slowtime) + "  TARGET:" + str(calctime))
         assert slowtime < calctime + 4
         assert slowtime > calctime - 4
-        rawdata = read_dict_session(PlaybackTests.http_ctid)
+        rawdata = read_dict_sessions(PlaybackTests.http_ctid)
         playback_cleanup()
         assert rawdata != ""
 
@@ -174,7 +174,7 @@ class PlaybackTests(unittest.TestCase):
         """check classify HTTP session details in the dictionary"""
         assert playback_start(PlaybackTests.play_file_name, PlaybackTests.play_file_hash, 0) == 0
         assert playback_wait() == 0
-        rawdata = read_dict_session(PlaybackTests.http_ctid)
+        rawdata = read_dict_sessions(PlaybackTests.http_ctid)
         playback_cleanup()
         print(rawdata)
         assert "field: application_name string: HTTP" in rawdata
@@ -184,7 +184,7 @@ class PlaybackTests(unittest.TestCase):
         """check HTTPS session geoip details in the dictionary"""
         assert playback_start(PlaybackTests.play_file_name, PlaybackTests.play_file_hash, 0) == 0
         assert playback_wait() == 0
-        rawdata = read_dict_session(PlaybackTests.https_ctid)
+        rawdata = read_dict_sessions(PlaybackTests.https_ctid)
         playback_cleanup()
         assert "field: server_country string: JP" in rawdata
 
@@ -192,7 +192,7 @@ class PlaybackTests(unittest.TestCase):
         """check HTTPS session sni details in the dictionary"""
         assert playback_start(PlaybackTests.play_file_name, PlaybackTests.play_file_hash, 0) == 0
         assert playback_wait() == 0
-        rawdata = read_dict_session(PlaybackTests.https_ctid)
+        rawdata = read_dict_sessions(PlaybackTests.https_ctid)
         playback_cleanup()
         assert "field: ssl_sni string: www.japan.go.jp" in rawdata
 
@@ -200,7 +200,7 @@ class PlaybackTests(unittest.TestCase):
         """check HTTPS session cert details in the dictionary"""
         assert playback_start(PlaybackTests.play_file_name, PlaybackTests.play_file_hash, 0) == 0
         assert playback_wait() == 0
-        rawdata = read_dict_session(PlaybackTests.https_ctid)
+        rawdata = read_dict_sessions(PlaybackTests.https_ctid)
         playback_cleanup()
         assert "field: certificate_subject_cn string: www.japan.go.jp" in rawdata
 
@@ -208,7 +208,7 @@ class PlaybackTests(unittest.TestCase):
         """check for DNS hint in the dictionary"""
         assert playback_start(PlaybackTests.hint_file_name, PlaybackTests.hint_file_hash, 0) == 0
         assert playback_wait() == 0
-        rawdata = read_dict_session(PlaybackTests.hint_ctid)
+        rawdata = read_dict_sessions(PlaybackTests.hint_ctid)
         playback_cleanup()
         assert "field: server_dns_hint string: www.yahoo.com" in rawdata
 
@@ -216,7 +216,7 @@ class PlaybackTests(unittest.TestCase):
         """check for reverse DNS in the dictionary"""
         assert playback_start(PlaybackTests.revd_file_name, PlaybackTests.revd_file_hash, 0) == 0
         assert playback_wait() == 0
-        rawdata = read_dict_session(PlaybackTests.revd_ctid)
+        rawdata = read_dict_sessions(PlaybackTests.revd_ctid)
         playback_cleanup()
         assert "field: server_reverse_dns string: google-public-dns-a.google.com" in rawdata
 
