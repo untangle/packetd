@@ -245,7 +245,7 @@ func parseArguments() {
 	}
 
 	if *logFilePtr != "" {
-		logFile, err := os.OpenFile(*logFilePtr, os.O_WRONLY|os.O_CREATE|os.O_SYNC, 0755)
+		logFile, err := os.OpenFile(*logFilePtr, os.O_WRONLY|os.O_CREATE|os.O_SYNC|os.O_TRUNC, 0755)
 		if err != nil {
 			panic("Failed to write to log file\n")
 		}
