@@ -86,11 +86,11 @@ insert_packetd_rules()
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state invalid return
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state untracked return
 
-    # In case we are quickly reusing a conntrack id, flush the session dictionary on new connections
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state new counter dict session ct id flush
+    # In case we are quickly reusing a conntrack id, flush the sessions dictionary on new connections
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state new counter dict sessions ct id flush
 
     # Don't catch bypassed traffic
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd dict session ct id bypass_packetd bool true counter return
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd dict sessions ct id bypass_packetd bool true counter return
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct mark and 0x80000000 == 0x80000000 counter return
 
     # Set the new packet mark

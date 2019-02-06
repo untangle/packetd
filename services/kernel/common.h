@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>

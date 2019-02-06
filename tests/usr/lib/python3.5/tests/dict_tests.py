@@ -2,6 +2,7 @@
 # pylint: disable=no-self-use
 # pylint: disable=too-many-arguments
 # pylint: disable=protected-access
+# pylint: disable=too-many-public-methods
 import unittest
 import sys
 import threading

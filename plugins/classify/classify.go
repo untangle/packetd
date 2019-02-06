@@ -565,17 +565,16 @@ func daemonManager() {
 			// return when the daemon shuts down in response to SIGINT which is sent after the
 			// daemon manager has shutdown. If the daemon exits for any other reason the manager
 			// will see the nil process and attempt to restart the daemon.
-			go func() {
-				err := daemonProcess.Wait()
+			go func(proc *exec.Cmd) {
+				err := proc.Wait()
 				if err != nil {
 					logger.Info("The classd daemon has exited. Error:%v\n", err)
 				} else {
 					logger.Info("The classd daemon has exited.\n")
 				}
 				daemonGoodbye()
-				daemonProcess = nil
 				setDaemonRestartFlag()
-			}()
+			}(daemonProcess)
 		}
 
 		if daemonSocket == nil {

@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -19,6 +21,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/c9s/goprocinfo/linux"
 	"github.com/untangle/packetd/plugins/certfetch"
 	"github.com/untangle/packetd/plugins/certsniff"
 	"github.com/untangle/packetd/plugins/classify"
@@ -37,7 +40,6 @@ import (
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/restd"
 	"github.com/untangle/packetd/services/settings"
-	"github.com/untangle/packetd/services/syscmd"
 )
 
 const rulesScript = "packetd_rules"
@@ -64,11 +66,25 @@ func main() {
 		panic("This application must be run as root!")
 	}
 
-	handleSignals()
+	logger.Startup()
 	parseArguments()
 
 	// Start services
 	startServices()
+
+	handleSignals()
+
+	// for i := 0; i < 5; i++ {
+	// 	go func() {
+	// 		logger.Info("Starting infinite loop...\n")
+	// 		for {
+	// 		}
+	// 	}()
+	// }
+
+	if len(cpuProfileTarget) > 0 {
+		startCPUProfiling()
+	}
 
 	// Start the plugins
 	logger.Info("Starting plugins...\n")
@@ -110,6 +126,7 @@ func main() {
 	for !kernel.GetShutdownFlag() {
 		select {
 		case <-kernel.GetShutdownChannel():
+			logger.Info("Shutdown channel initiated... %v\n", kernel.GetShutdownFlag())
 			break
 		case <-time.After(1 * time.Hour):
 			logger.Info(".\n")
@@ -122,13 +139,12 @@ func main() {
 		kernel.CloseWarehouseCapture()
 	}
 
-	// Remove netfilter rules
-	logger.Info("Removing netfilter rules...\n")
-	removeRules()
-
 	// Stop kernel callbacks
 	logger.Info("Removing kernel callbacks...\n")
 	kernel.StopCallbacks()
+
+	// Remove netfilter rules
+	removeRules()
 
 	// Stop all plugins
 	logger.Info("Stopping plugins...\n")
@@ -138,7 +154,7 @@ func main() {
 	logger.Info("Stopping services...\n")
 
 	if len(cpuProfileTarget) > 0 {
-		pprof.StopCPUProfile()
+		stopCPUProfiling()
 	}
 
 	if len(memProfileTarget) > 0 {
@@ -171,6 +187,8 @@ func parseArguments() {
 	playSpeedPtr := flag.Int("playspeed", 100, "traffic playback speed percentage")
 	cpuProfilePtr := flag.String("cpuprofile", "", "write cpu profile to file")
 	memProfilePtr := flag.String("memprofile", "", "write memory profile to file")
+	logFilePtr := flag.String("logfile", "", "file to redirect stdout/stderr")
+	cpuCountPtr := flag.Int("cpucount", cpuCount, "override the cpucount manually")
 
 	flag.Parse()
 
@@ -217,24 +235,29 @@ func parseArguments() {
 
 	if *cpuProfilePtr != "" {
 		cpuProfileTarget = *cpuProfilePtr
-		f, err := os.Create(cpuProfileTarget)
-		if err != nil {
-			logger.Err("Could not create CPU profile: ", err)
-		}
-		if err := pprof.StartCPUProfile(f); err != nil {
-			logger.Err("Could not start CPU profile: ", err)
-		}
+	}
+
+	if cpuCountPtr != nil {
+		cpuCount = *cpuCountPtr
 	}
 
 	if *memProfilePtr != "" {
 		memProfileTarget = *memProfilePtr
 	}
 
+	if *logFilePtr != "" {
+		logFile, err := os.OpenFile(*logFilePtr, os.O_WRONLY|os.O_CREATE|os.O_SYNC|os.O_TRUNC, 0755)
+		if err != nil {
+			panic("Failed to write to log file\n")
+		}
+		syscall.Dup2(int(logFile.Fd()), 1)
+		syscall.Dup2(int(logFile.Fd()), 2)
+	}
+
 }
 
 // startServices starts all the services
 func startServices() {
-	logger.Startup()
 	logger.Info("Starting services...\n")
 
 	printVersion()
@@ -242,7 +265,6 @@ func startServices() {
 
 	kernel.Startup()
 	dispatch.Startup(conntrackIntervalSeconds)
-	syscmd.Startup()
 	settings.Startup()
 	reports.Startup()
 	dict.Startup()
@@ -259,7 +281,6 @@ func stopServices() {
 		dict.Shutdown()
 		reports.Shutdown()
 		settings.Shutdown()
-		syscmd.Shutdown()
 		dispatch.Shutdown()
 		kernel.Shutdown()
 		logger.Shutdown()
@@ -331,7 +352,7 @@ func stopPlugins() {
 // Add signal handlers
 func handleSignals() {
 	// Add SIGINT & SIGTERM handler (exit)
-	ch := make(chan os.Signal)
+	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-ch
@@ -346,15 +367,8 @@ func handleSignals() {
 	signal.Notify(quitch, syscall.SIGQUIT)
 	go func() {
 		for {
-			sig := <-quitch
-			go func() {
-				buf := make([]byte, 1<<20)
-				stacklen := runtime.Stack(buf, true)
-				ioutil.WriteFile("/tmp/packetd.stack", buf[:stacklen], 0644)
-				logger.Warn("Received signal [%v]. Printing Thread Dump...\n", sig)
-				logger.Warn("\n\n%s\n\n", buf[:stacklen])
-				logger.Warn("Thread dump complete.\n")
-			}()
+			<-quitch
+			go dumpStack()
 		}
 	}()
 }
@@ -370,7 +384,7 @@ func insertRules() {
 	if ok && home != "" {
 		dir = home
 	}
-	output, err := syscmd.SystemCommand(dir+"/"+rulesScript, []string{queueRange})
+	output, err := exec.Command(dir+"/"+rulesScript, queueRange).CombinedOutput()
 	if err != nil {
 		logger.Warn("Error running %v: %v\n", rulesScript, err.Error())
 		kernel.SetShutdownFlag()
@@ -394,7 +408,12 @@ func removeRules() {
 	if ok && home != "" {
 		dir = home
 	}
-	syscmd.SystemCommand(dir+"/"+rulesScript, []string{"-r", queueRange})
+	logger.Info("Removing netfilter rules...\n")
+	err = exec.Command(dir+"/"+rulesScript, "-r", queueRange).Run()
+	if err != nil {
+		logger.Err("Failed to remove rules: %s\n", err.Error())
+	}
+	logger.Info("Removing netfilter rules...done\n")
 }
 
 // prints some basic stats about packetd
@@ -448,36 +467,6 @@ func getProcStats() (string, error) {
 	return interesting, nil
 }
 
-// getConcurrencyFactor returns the number of CPUs
-// or 4 if any error occurs in determining the number
-func getConcurrencyFactor() int {
-	defaultValue := 4
-
-	file, err := os.OpenFile("/proc/cpuinfo", os.O_RDONLY, 0660)
-	if err != nil {
-		logger.Warn("Failed to read /proc/cpuinfo: %v\n", err.Error())
-		return defaultValue
-	}
-
-	defer file.Close()
-
-	count := 0
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "processor") {
-			count++
-		}
-	}
-
-	if count == 0 {
-		logger.Warn("Failed to detect CPU count\n")
-		return defaultValue
-	}
-
-	return count
-}
-
 // getQueueRange gets the nfqueue specification
 func getQueueRange() string {
 	str := "2000"
@@ -485,6 +474,7 @@ func getQueueRange() string {
 	return str
 }
 
+// load all packetd requirements
 func loadRequirements() {
 	err := exec.Command("modprobe", "nf_conntrack").Run()
 	if err != nil {
@@ -494,4 +484,46 @@ func loadRequirements() {
 	if err != nil {
 		logger.Err("Failed to enable nf_conntrack_acct %s", err.Error())
 	}
+}
+
+// startCPUProfiling starts the CPU profiling processing
+func startCPUProfiling() {
+	f, err := os.Create(cpuProfileTarget)
+	if err != nil {
+		logger.Err("Could not create CPU profile: ", err)
+	}
+	if err := pprof.StartCPUProfile(f); err != nil {
+		logger.Err("Could not start CPU profile: ", err)
+	}
+
+	logger.Info("pprof listening on localhost:6060\n")
+	go func() {
+		http.ListenAndServe("localhost:6060", nil)
+	}()
+}
+
+// stopCPUProfiling stops the CPU profiling processing
+func stopCPUProfiling() {
+	pprof.StopCPUProfile()
+}
+
+// getConcurrencyFactor returns the number of CPUs
+// or 4 if any error occurs in determining the number
+func getConcurrencyFactor() int {
+	cpuinfo, err := linux.ReadCPUInfo("/proc/cpuinfo")
+	if err != nil {
+		logger.Warn("Error reading cpuinfo: %s\n", err.Error())
+		return 4
+	}
+	return cpuinfo.NumCore()
+}
+
+// dumpStack to /tmp/packetd.stack and log
+func dumpStack() {
+	buf := make([]byte, 1<<20)
+	stacklen := runtime.Stack(buf, true)
+	ioutil.WriteFile("/tmp/packetd.stack", buf[:stacklen], 0644)
+	logger.Warn("Printing Thread Dump...\n")
+	logger.Warn("\n\n%s\n\n", buf[:stacklen])
+	logger.Warn("Thread dump complete.\n")
 }

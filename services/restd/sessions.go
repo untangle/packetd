@@ -58,13 +58,13 @@ func getSessions() ([]map[string]interface{}, error) {
 		tupleMap[tuple] = s
 	}
 
-	// read the data from dict "session" table
+	// read the data from dict "sessions" table
 	sessionTable, err := dict.GetSessions()
 	if err != nil {
 		logger.Warn("Unable to get sessions: %v\n", err)
 	}
 
-	// for all the data in the dict "session" table, merge it into the matching tupleMap entries
+	// for all the data in the dict "sessions" table, merge it into the matching tupleMap entries
 	for _, session := range sessionTable {
 		tuple := fmt.Sprintf("%v|%v|%v->%v|%v", session["ip_protocol"], session["client_address"], session["client_port"], session["server_address"], session["server_port"])
 
