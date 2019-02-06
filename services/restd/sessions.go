@@ -221,14 +221,16 @@ func parseSession(line string) map[string]interface{} {
 			break
 		case "packets": //fallthrough
 		case "bytes":
-			i, err := strconv.Atoi(value)
+			bigint, err := strconv.ParseUint(value, 10, 64)
 			if err != nil {
 				logger.Warn("Invalid %s (%s). Skipping line: %s\n", key, err.Error(), line)
 				return nil
 			}
-			m[key] = i
+			m[key] = bigint
 		case "mark":
-			mark, err := strconv.Atoi(value)
+			var mark uint32
+			mark64, err := strconv.ParseUint(value, 10, 32)
+			mark = uint32(mark64)
 			if err != nil {
 				logger.Warn("Invalid mark (%s). Skipping line: %s\n", err.Error(), line)
 				return nil
