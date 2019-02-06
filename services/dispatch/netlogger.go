@@ -75,5 +75,9 @@ func netloggerCallback(version uint8,
 
 		// Increment the priority and keep looping until we've called all subscribers
 		priority++
+		if priority > 100 {
+			logger.Err("Priority > 100 Constraint failed! %d %d %d %v", subcount, subtotal, priority, sublist)
+			panic("Constraint failed - infinite loop detected")
+		}
 	}
 }

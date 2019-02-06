@@ -272,6 +272,7 @@ func findCertificates(buffer []byte, mess dispatch.NfqueueMessage) bool {
 	var msglen int
 	var recoff int
 	var msgoff int
+	var loopcheck int
 
 	// start at the beginning of the buffer
 	bufflen = len(buffer)
@@ -284,6 +285,12 @@ func findCertificates(buffer []byte, mess dispatch.NfqueueMessage) bool {
 
 	// walk through each TLS record
 	for {
+		loopcheck++
+		if loopcheck > 100 {
+			logger.Err("Constraint failed: %v %v\n", loopcheck, recoff)
+			return false
+		}
+
 		// make sure we have enough data to extract the record length
 		if (recoff + 4) >= bufflen {
 			return false
@@ -310,7 +317,14 @@ func findCertificates(buffer []byte, mess dispatch.NfqueueMessage) bool {
 		msgoff = (recoff + 5)
 
 		// walk through each handshake message in the TLS record
+		var loopcheck2 int
 		for {
+			loopcheck2++
+			if loopcheck2 > 100 {
+				logger.Err("Constraint failed: %v %v\n", loopcheck2, msgoff)
+				return false
+			}
+
 			// when we reach the end of the record break out of the message walk
 			if msgoff >= (recoff + reclen + 5) {
 				break
