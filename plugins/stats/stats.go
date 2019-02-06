@@ -8,13 +8,15 @@ import (
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
+	"github.com/untangle/packetd/services/settings"
 )
 
 const pluginName = "stats"
 const listSize = 1
 
 var latencyTracker [256]*MovingAverage
-var interfaceMap map[string]*linux.NetworkStat
+var interfaceStatsMap map[string]*linux.NetworkStat
+var interfaceNameMap map[string]int
 var shutdownChannel = make(chan bool)
 
 type latencyInfo struct {
@@ -32,7 +34,11 @@ func PluginStartup() {
 		latencyTracker[x] = CreateMovingAverage(10000)
 	}
 
-	interfaceMap = make(map[string]*linux.NetworkStat)
+	interfaceStatsMap = make(map[string]*linux.NetworkStat)
+	interfaceNameMap = make(map[string]int)
+
+	loadInterfaceNameMap()
+
 	go interfaceTask()
 	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
 }
@@ -149,10 +155,12 @@ func timeUntilNextMin() time.Duration {
 	return duration
 }
 
+// collectInterfaceStats gets the stats for every interface and then
+// calculates and logs the difference since the last time it was called
 func collectInterfaceStats(seconds uint64) {
 	var statInfo *linux.NetworkStat
 	var diffInfo linux.NetworkStat
-	var latency uint64
+	var latency int64
 
 	procData, err := linux.ReadNetworkStat("/proc/net/dev")
 	if err != nil {
@@ -162,7 +170,7 @@ func collectInterfaceStats(seconds uint64) {
 
 	for i := 0; i < len(procData); i++ {
 		item := procData[i]
-		statInfo = interfaceMap[item.Iface]
+		statInfo = interfaceStatsMap[item.Iface]
 		if statInfo == nil {
 			// if no entry for the interface use the existing values as the starting point
 			statInfo = new(linux.NetworkStat)
@@ -183,7 +191,7 @@ func collectInterfaceStats(seconds uint64) {
 			statInfo.TxColls = item.TxColls
 			statInfo.TxCarrier = item.TxCarrier
 			statInfo.TxCompressed = item.TxCompressed
-			interfaceMap[item.Iface] = statInfo
+			interfaceStatsMap[item.Iface] = statInfo
 		} else {
 			// found the interface entry so calculate the difference since last time
 			// pass previous values as pointers so they can be updated after the calculation
@@ -205,8 +213,16 @@ func collectInterfaceStats(seconds uint64) {
 			diffInfo.TxCarrier = calculateDifference(&statInfo.TxCarrier, item.TxCarrier)
 			diffInfo.TxCompressed = calculateDifference(&statInfo.TxCompressed, item.TxCompressed)
 
-			// TODO - figure out how to get interface ID from interface name
-			latency = 0
+			// convert the interface name to the ID value
+			faceval := getInterfaceIDValue(diffInfo.Iface)
+
+			// negative return means we don't know the ID so we set latency to zero
+			// otherwise we get the total moving average
+			if faceval < 0 {
+				latency = 0
+			} else {
+				latency = latencyTracker[faceval].GetTotalAverage()
+			}
 
 			columns := map[string]interface{}{
 				"time_stamp":         time.Now(),
@@ -251,10 +267,63 @@ func collectInterfaceStats(seconds uint64) {
 	}
 }
 
+// calculateDifference determines the difference between the two argumented values
+// and then updates the pointer to the previous value with the current value
+// FIXME - need to handle integer wrap
 func calculateDifference(previous *uint64, current uint64) uint64 {
-	// TODO - need to handle integer wrap
-
 	diff := (current - *previous)
 	*previous = current
 	return diff
+}
+
+// getInterfaceIDValue is called to get the interface ID value the corresponds
+// to the argumented interface name. If we don't find the name in the map on the
+// first try we refresh the map and look again. This lets us passively reload the
+// map to pick up interfaces that have been added since last time we loaded
+// FIXME - probably need to rethink this to handle re-numbering
+func getInterfaceIDValue(name string) int {
+	var val int
+	var ok bool
+
+	val, ok = interfaceNameMap[name]
+	if ok {
+		return val
+	}
+
+	loadInterfaceNameMap()
+
+	val, ok = interfaceNameMap[name]
+	if ok {
+		return val
+	}
+
+	return -1
+}
+
+// loadInterfaceNameMap
+func loadInterfaceNameMap() {
+	var netName string
+	var netID int
+
+	networkJSON := settings.GetSettings([]string{"network", "interfaces"})
+	if networkJSON == nil {
+		logger.Warn("Unable to read network settings\n")
+	}
+
+	networkSlice, ok := networkJSON.([]interface{})
+	if !ok {
+		logger.Warn("Unable to locate interfaces")
+		return
+	}
+
+	// start with an empty map
+	interfaceNameMap = make(map[string]int)
+
+	// walk the list of interfaces and store each name/id in the map
+	for _, value := range networkSlice {
+		item := value.(map[string]interface{})
+		netName = item["device"].(string)
+		netID = int(item["interfaceId"].(float64))
+		interfaceNameMap[netName] = netID
+	}
 }
