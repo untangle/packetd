@@ -102,6 +102,14 @@ func parseConntrack(ct *dispatch.Conntrack) map[string]interface{} {
 	//FIXME get packet count
 	//FIXME get ASSURED/UNREPLIED flags
 
+	// ignore 127.0.0.1 traffic
+	if ct.ClientSideTuple.ClientAddress != nil && ct.ClientSideTuple.ClientAddress.String() == "127.0.0.1" {
+		return nil
+	}
+	if ct.ClientSideTuple.ServerAddress != nil && ct.ClientSideTuple.ServerAddress.String() == "127.0.0.1" {
+		return nil
+	}
+
 	m["client_address"] = ct.ClientSideTuple.ClientAddress
 	m["client_port"] = ct.ClientSideTuple.ClientPort
 	m["server_address"] = ct.ClientSideTuple.ServerAddress
