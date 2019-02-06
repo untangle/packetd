@@ -26,7 +26,7 @@ func Startup() {
 	}
 
 	// Load the dict module
-	exec.Command("mobprobe", "nft_dict").Run()
+	exec.Command("modprobe", "nft_dict").Run()
 }
 
 // Shutdown dict service
