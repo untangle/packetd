@@ -9,9 +9,8 @@ import "C"
 
 import (
 	"net"
-	"runtime"
 	"sync"
-	"syscall"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -36,7 +35,7 @@ var conntrackCallback ConntrackCallback
 var nfqueueCallback NfqueueCallback
 var netloggerCallback NetloggerCallback
 var debugFlag = false
-var shutdownFlag = false
+var shutdownFlag uint32
 var shutdownChannel = make(chan bool)
 var shutdownChannelCloseOnce sync.Once
 
@@ -59,23 +58,23 @@ func StartCallbacks(numNfqueueThreads int, intervalSeconds int) {
 	}
 	for x := 0; x < numNfqueueThreads; x++ {
 		go func(x C.int) {
-			runtime.LockOSThread()
+			//runtime.LockOSThread()
 			C.nfqueue_thread(x)
 		}(C.int(x))
 	}
 
 	go func() {
-		runtime.LockOSThread()
+		//runtime.LockOSThread()
 		C.conntrack_thread()
 	}()
 	go func() {
-		runtime.LockOSThread()
+		//runtime.LockOSThread()
 		C.netlogger_thread()
 	}()
 
 	// start the conntrack interval-second update task
 	go func() {
-		runtime.LockOSThread()
+		//runtime.LockOSThread()
 		conntrackTask(intervalSeconds)
 	}()
 }
@@ -98,20 +97,20 @@ func StopCallbacks() {
 	case <-c:
 	case <-time.After(10 * time.Second):
 		logger.Err("Failed to properly shutdown conntrackPeriodicTask\n")
-		// print stack trace
-		syscall.Kill(syscall.Getpid(), syscall.SIGQUIT)
-		time.Sleep(1 * time.Second)
 	}
 }
 
 // GetShutdownFlag returns the shutdown flag for kernel
 func GetShutdownFlag() bool {
-	return shutdownFlag
+	if atomic.LoadUint32(&shutdownFlag) != 0 {
+		return true
+	}
+	return false
 }
 
 // SetShutdownFlag sets the shutdown flag for kernel
 func SetShutdownFlag() {
-	shutdownFlag = true
+	atomic.StoreUint32(&shutdownFlag, 1)
 	shutdownChannelCloseOnce.Do(func() {
 		close(shutdownChannel)
 	})
@@ -189,7 +188,7 @@ func RegisterNetloggerCallback(cb NetloggerCallback) {
 
 //export go_get_shutdown_flag
 func go_get_shutdown_flag() int32 {
-	if shutdownFlag {
+	if atomic.LoadUint32(&shutdownFlag) != 0 {
 		return 1
 	}
 	return 0
@@ -197,7 +196,7 @@ func go_get_shutdown_flag() int32 {
 
 //export go_set_shutdown_flag
 func go_set_shutdown_flag() {
-	shutdownFlag = true
+	SetShutdownFlag()
 }
 
 //export go_nfqueue_callback
@@ -387,7 +386,6 @@ func conntrackTask(intervalSeconds int) {
 	for {
 		select {
 		case <-shutdownConntrackTask:
-			shutdownConntrackTask <- true
 			return
 		case <-time.After(time.Second * time.Duration(intervalSeconds)):
 			//case <-time.After(timeUntilNextMin()):

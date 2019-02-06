@@ -39,7 +39,6 @@ import (
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/restd"
 	"github.com/untangle/packetd/services/settings"
-	"github.com/untangle/packetd/services/syscmd"
 )
 
 const rulesScript = "packetd_rules"
@@ -49,7 +48,7 @@ var cpuProfileTarget string
 var localFlag bool
 var cpuCount = getConcurrencyFactor()
 var queueRange = getQueueRange()
-var conntrackIntervalSeconds = 2
+var conntrackIntervalSeconds = 10
 
 func main() {
 	userinfo, err := user.Current()
@@ -66,11 +65,21 @@ func main() {
 		panic("This application must be run as root!")
 	}
 
-	handleSignals()
+	logger.Startup()
 	parseArguments()
 
 	// Start services
 	startServices()
+
+	handleSignals()
+
+	// for i := 0; i < 5; i++ {
+	// 	go func() {
+	// 		logger.Info("Starting infinite loop...\n")
+	// 		for {
+	// 		}
+	// 	}()
+	// }
 
 	if len(cpuProfileTarget) > 0 {
 		startCPUProfiling()
@@ -116,6 +125,7 @@ func main() {
 	for !kernel.GetShutdownFlag() {
 		select {
 		case <-kernel.GetShutdownChannel():
+			logger.Info("Shutdown channel initiated... %v\n", kernel.GetShutdownFlag())
 			break
 		case <-time.After(1 * time.Hour):
 			logger.Info(".\n")
@@ -128,13 +138,12 @@ func main() {
 		kernel.CloseWarehouseCapture()
 	}
 
-	// Remove netfilter rules
-	logger.Info("Removing netfilter rules...\n")
-	removeRules()
-
 	// Stop kernel callbacks
 	logger.Info("Removing kernel callbacks...\n")
 	kernel.StopCallbacks()
+
+	// Remove netfilter rules
+	removeRules()
 
 	// Stop all plugins
 	logger.Info("Stopping plugins...\n")
@@ -248,7 +257,6 @@ func parseArguments() {
 
 // startServices starts all the services
 func startServices() {
-	logger.Startup()
 	logger.Info("Starting services...\n")
 
 	printVersion()
@@ -256,7 +264,6 @@ func startServices() {
 
 	kernel.Startup()
 	dispatch.Startup(conntrackIntervalSeconds)
-	syscmd.Startup()
 	settings.Startup()
 	reports.Startup()
 	dict.Startup()
@@ -273,7 +280,6 @@ func stopServices() {
 		dict.Shutdown()
 		reports.Shutdown()
 		settings.Shutdown()
-		syscmd.Shutdown()
 		dispatch.Shutdown()
 		kernel.Shutdown()
 		logger.Shutdown()
@@ -343,7 +349,7 @@ func stopPlugins() {
 // Add signal handlers
 func handleSignals() {
 	// Add SIGINT & SIGTERM handler (exit)
-	ch := make(chan os.Signal)
+	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-ch
@@ -358,15 +364,8 @@ func handleSignals() {
 	signal.Notify(quitch, syscall.SIGQUIT)
 	go func() {
 		for {
-			sig := <-quitch
-			go func() {
-				buf := make([]byte, 1<<20)
-				stacklen := runtime.Stack(buf, true)
-				ioutil.WriteFile("/tmp/packetd.stack", buf[:stacklen], 0644)
-				logger.Warn("Received signal [%v]. Printing Thread Dump...\n", sig)
-				logger.Warn("\n\n%s\n\n", buf[:stacklen])
-				logger.Warn("Thread dump complete.\n")
-			}()
+			<-quitch
+			go dumpStack()
 		}
 	}()
 }
@@ -382,7 +381,7 @@ func insertRules() {
 	if ok && home != "" {
 		dir = home
 	}
-	output, err := syscmd.SystemCommand(dir+"/"+rulesScript, []string{queueRange})
+	output, err := exec.Command(dir+"/"+rulesScript, queueRange).CombinedOutput()
 	if err != nil {
 		logger.Warn("Error running %v: %v\n", rulesScript, err.Error())
 		kernel.SetShutdownFlag()
@@ -406,7 +405,12 @@ func removeRules() {
 	if ok && home != "" {
 		dir = home
 	}
-	syscmd.SystemCommand(dir+"/"+rulesScript, []string{"-r", queueRange})
+	logger.Info("Removing netfilter rules...\n")
+	err = exec.Command(dir+"/"+rulesScript, "-r", queueRange).Run()
+	if err != nil {
+		logger.Err("Failed to remove rules: %s\n", err.Error())
+	}
+	logger.Info("Removing netfilter rules...done\n")
 }
 
 // prints some basic stats about packetd
@@ -509,4 +513,14 @@ func getConcurrencyFactor() int {
 		return 4
 	}
 	return cpuinfo.NumCore()
+}
+
+// dumpStack to /tmp/packetd.stack and log
+func dumpStack() {
+	buf := make([]byte, 1<<20)
+	stacklen := runtime.Stack(buf, true)
+	ioutil.WriteFile("/tmp/packetd.stack", buf[:stacklen], 0644)
+	logger.Warn("Printing Thread Dump...\n")
+	logger.Warn("\n\n%s\n\n", buf[:stacklen])
+	logger.Warn("Thread dump complete.\n")
 }

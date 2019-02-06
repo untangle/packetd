@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/syscmd"
 )
 
 const pathBase string = "/proc/net/dict"
@@ -26,7 +26,7 @@ func Startup() {
 	}
 
 	// Load the dict module
-	syscmd.SystemCommand("modprobe", []string{"nft_dict"})
+	exec.Command("mobprobe", "nft_dict").Run()
 }
 
 // Shutdown dict service
