@@ -49,7 +49,7 @@ var cpuProfileTarget string
 var localFlag bool
 var cpuCount = getConcurrencyFactor()
 var queueRange = getQueueRange()
-var conntrackIntervalSeconds = 10
+var conntrackIntervalSeconds = 2
 
 func main() {
 	userinfo, err := user.Current()
