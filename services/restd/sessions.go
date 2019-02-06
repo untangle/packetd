@@ -109,6 +109,12 @@ func parseConntrack(ct *dispatch.Conntrack) map[string]interface{} {
 	if ct.ClientSideTuple.ServerAddress != nil && ct.ClientSideTuple.ServerAddress.String() == "127.0.0.1" {
 		return nil
 	}
+	if ct.ClientSideTuple.ClientAddress != nil && ct.ClientSideTuple.ClientAddress.String() == "::1" {
+		return nil
+	}
+	if ct.ClientSideTuple.ServerAddress != nil && ct.ClientSideTuple.ServerAddress.String() == "::1" {
+		return nil
+	}
 
 	m["client_address"] = ct.ClientSideTuple.ClientAddress
 	m["client_port"] = ct.ClientSideTuple.ClientPort
