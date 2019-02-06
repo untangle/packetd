@@ -91,7 +91,7 @@ func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmar
 		mess.MsgTuple.ServerAddress = dupIP(mess.IP4Layer.DstIP)
 	} else if ip6Layer != nil {
 		mess.IP6Layer = ip6Layer.(*layers.IPv6)
-		mess.MsgTuple.Protocol = uint8(mess.IP6Layer.NextHeader) // FIXME - is this the correct field?
+		mess.MsgTuple.Protocol = uint8(mess.IP6Layer.NextHeader)
 		mess.MsgTuple.ClientAddress = dupIP(mess.IP6Layer.SrcIP)
 		mess.MsgTuple.ServerAddress = dupIP(mess.IP6Layer.DstIP)
 	} else {

@@ -22,7 +22,6 @@ type Session struct {
 	CreationTime time.Time
 
 	// LastActivityTime stores the last time we got any nfqueue/conntrack event for this session
-	// FIXME - this may need to be atomic
 	LastActivityTime time.Time
 
 	// ClientSideTuple stores the client-side (pre-NAT) session tuple
