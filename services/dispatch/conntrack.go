@@ -241,6 +241,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 
 		conntrack.TimeoutSeconds = timeout
 		conntrack.TCPState = tcpState
+		conntrack.TimestampStart = timestampStart
 		conntrack.TimestampStop = timestampStop
 
 		updateStatsAndRates(conntrack, clientBytes, serverBytes, clientPackets, serverPackets, secondsSinceLastUpdate)
