@@ -484,6 +484,10 @@ func loadRequirements() {
 	if err != nil {
 		logger.Err("Failed to enable nf_conntrack_acct %s", err.Error())
 	}
+	err = ioutil.WriteFile("/proc/sys/net/netfilter/nf_conntrack_timestamp", []byte("1"), 0644)
+	if err != nil {
+		logger.Err("Failed to enable nf_conntrack_timestamp %s", err.Error())
+	}
 }
 
 // startCPUProfiling starts the CPU profiling processing

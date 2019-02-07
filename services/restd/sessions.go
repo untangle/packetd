@@ -130,6 +130,9 @@ func parseConntrack(ct *dispatch.Conntrack) map[string]interface{} {
 	m["client_packets"] = ct.ClientPackets
 	m["server_packets"] = ct.ServerPackets
 
+	m["timestamp_start"] = ct.TimestampStart
+	m["timestamp_stop"] = ct.TimestampStop
+
 	var mark uint32
 	mark = ct.ConnMark
 	clientInterfaceID := mark & 0x000000ff
