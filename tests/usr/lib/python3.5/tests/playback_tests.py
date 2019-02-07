@@ -93,18 +93,18 @@ class PlaybackTests(unittest.TestCase):
     "Tests the playback functionality"
 
     play_file_name = "playtest.cap"
-    play_file_hash = "f8388c823679da7db0a4cb7856bf717c".encode('UTF-8')
+    play_file_hash = "2919c7e9afdd0f4dfa5ad60f6ba58c99".encode('UTF-8')
 
     hint_file_name = "dnshint.cap"
-    hint_file_hash = "33e7c4182a233ad689811467a4d92608".encode('UTF-8')
+    hint_file_hash = "01621161d5e5a8544b356619a1b01dc4".encode('UTF-8')
 
     revd_file_name = "dnsreverse.cap"
-    revd_file_hash = "be323000b89a2b6c29591832c895c850".encode('UTF-8')
+    revd_file_hash = "681e38b1abae359bcfba70cd8bbefa4a".encode('UTF-8')
 
-    https_ctid = "4073347072"
-    http_ctid = "4073346816"
-    hint_ctid = "4107412992"
-    revd_ctid = "4107413760"
+    https_ctid = "4073966848"
+    http_ctid = "4073965568"
+    hint_ctid = "4243993088"
+    revd_ctid = "4258670592"
     normtime = 0.0
 
     @staticmethod
