@@ -412,9 +412,9 @@ func updateStatsAndRates(conntrack *Conntrack, clientBytes uint64, serverBytes u
 	serverRate := float32(diffServerBytes) / secondsSinceLastUpdate
 	totalRate := float32(diffTotalBytes) / secondsSinceLastUpdate
 
-	clientPacketRate := float32(diffClientBytes) / secondsSinceLastUpdate
-	serverPacketRate := float32(diffServerBytes) / secondsSinceLastUpdate
-	totalPacketRate := float32(diffTotalBytes) / secondsSinceLastUpdate
+	clientPacketRate := float32(diffClientPackets) / secondsSinceLastUpdate
+	serverPacketRate := float32(diffServerPackets) / secondsSinceLastUpdate
+	totalPacketRate := float32(diffTotalPackets) / secondsSinceLastUpdate
 
 	conntrack.ClientBytes = newClientBytes
 	conntrack.ServerBytes = newServerBytes
