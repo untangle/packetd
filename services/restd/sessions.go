@@ -137,20 +137,11 @@ func parseConntrack(ct *dispatch.Conntrack) map[string]interface{} {
 	serverInterfaceID := mark & 0x0000ff00 >> 8
 	serverInterfaceType := mark & 0x0c000000 >> 26
 	priority := mark & 0x00ff0000 >> 16
-
 	m["mark"] = mark
-	if clientInterfaceID != 0 {
-		m["client_interface_id"] = clientInterfaceID
-	}
-	if clientInterfaceType != 0 {
-		m["client_interface_type"] = clientInterfaceType
-	}
-	if serverInterfaceID != 0 {
-		m["server_interface_id"] = serverInterfaceID
-	}
-	if serverInterfaceType != 0 {
-		m["server_interface_type"] = serverInterfaceType
-	}
+	m["client_interface_id"] = clientInterfaceID
+	m["client_interface_type"] = clientInterfaceType
+	m["server_interface_id"] = serverInterfaceID
+	m["server_interface_type"] = serverInterfaceType
 	m["priority"] = priority
 
 	return m
