@@ -92,16 +92,6 @@ func getSessions() ([]map[string]interface{}, error) {
 func parseConntrack(ct *dispatch.Conntrack) map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["conntrack_id"] = ct.ConntrackID
-	m["session_id"] = ct.SessionID
-	//m["protocol"] = FIXME
-	m["ip_protocol"] = ct.ClientSideTuple.Protocol
-
-	//FIXME get timeout
-	//FIXME get tcp conn state
-	//FIXME get packet count
-	//FIXME get ASSURED/UNREPLIED flags
-
 	// ignore 127.0.0.1 traffic
 	if ct.ClientSideTuple.ClientAddress != nil && ct.ClientSideTuple.ClientAddress.String() == "127.0.0.1" {
 		return nil
@@ -116,6 +106,14 @@ func parseConntrack(ct *dispatch.Conntrack) map[string]interface{} {
 		return nil
 	}
 
+	m["conntrack_id"] = ct.ConntrackID
+	m["session_id"] = ct.SessionID
+	m["family"] = ct.Family
+	m["ip_protocol"] = ct.ClientSideTuple.Protocol
+
+	m["timeout_seconds"] = ct.TimeoutSeconds
+	m["tcp_state"] = ct.TCPState
+
 	m["client_address"] = ct.ClientSideTuple.ClientAddress
 	m["client_port"] = ct.ClientSideTuple.ClientPort
 	m["server_address"] = ct.ClientSideTuple.ServerAddress
@@ -126,8 +124,11 @@ func parseConntrack(ct *dispatch.Conntrack) map[string]interface{} {
 	m["server_port_new"] = ct.ServerSideTuple.ServerPort
 
 	m["bytes"] = ct.TotalBytes
-	m["c2s_bytes"] = ct.C2SBytes
-	m["s2c_bytes"] = ct.S2CBytes
+	m["client_bytes"] = ct.ClientBytes
+	m["server_bytes"] = ct.ServerBytes
+	m["packets"] = ct.TotalPackets
+	m["client_packets"] = ct.ClientPackets
+	m["server_packets"] = ct.ServerPackets
 
 	var mark uint32
 	mark = ct.ConnMark

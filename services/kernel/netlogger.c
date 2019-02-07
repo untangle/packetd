@@ -23,10 +23,9 @@ int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct n
 	struct iphdr            *iphead;
 	char                    *packet_data;
 	char                    *prefix;
-	char                    *srcaddr;
-	char                    *dstaddr;
-	int                     packet_size;
-
+	uint                    packet_size;
+    uint32_t                family;
+    
 	// get the raw packet and check for sanity
 	packet_size = nflog_get_payload(nfa,&packet_data);
 	if ((packet_data == NULL) || (packet_size < 20)) return(0);
@@ -48,15 +47,16 @@ int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct n
 	icmphead = (struct icmphdr *)&packet_data[iphead->ihl << 2];
 
 	// grab the protocol
+    family = nfmsg->nfgen_family;
 	info.protocol = iphead->protocol;
-
+    
     // start with unknown in case we don't extract the addresses
 	strcpy(info.src_addr,"UNKNOWN");
 	strcpy(info.dst_addr,"UNKNOWN");
     info.version = 0;
 
 	// grab the source and destination addresses for IPv4 packets
-	if (nfmsg->nfgen_family == AF_INET) {
+	if (family == AF_INET) {
         info.version = 4;
         if (packet_size >= sizeof(struct iphdr)) {
             inet_ntop(AF_INET,&((struct iphdr *)packet_data)->saddr,info.src_addr,sizeof(info.src_addr));
@@ -65,7 +65,7 @@ int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct n
 	}
 
 	// grab the source and destination addresses for IPv6 packets
-	if (nfmsg->nfgen_family == AF_INET6) {
+	if (family == AF_INET6) {
         info.version = 6;
         if (packet_size >= sizeof(struct ip6_hdr)) {
             inet_ntop(AF_INET6,&((struct ip6_hdr *)packet_data)->ip6_src,info.src_addr,sizeof(info.src_addr));
@@ -91,7 +91,7 @@ int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct n
 		break;
 	}
 
-	if (get_warehouse_flag() == 'C') warehouse_capture('L',&info,sizeof(info),0,0,0);
+	if (get_warehouse_flag() == 'C') warehouse_capture('L',&info,sizeof(info),0,0,0,family);
 	if (get_bypass_flag() == 0) go_netlogger_callback(&info,0);
 
 	return(0);

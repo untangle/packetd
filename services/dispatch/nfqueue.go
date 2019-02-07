@@ -28,6 +28,7 @@ type NfqueueHandlerFunction func(NfqueueMessage, uint32, bool) NfqueueResult
 type NfqueueMessage struct {
 	Session        *Session
 	MsgTuple       Tuple
+	Family         int
 	Packet         gopacket.Packet
 	PacketMark     uint32
 	Length         int
@@ -72,10 +73,11 @@ func ReleaseSession(session *Session, owner string) {
 
 // nfqueueCallback is the callback for the packet
 // return the mark to set on the packet
-func nfqueueCallback(ctid uint32, packet gopacket.Packet, packetLength int, pmark uint32) int {
+func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetLength int, pmark uint32) int {
 	var mess NfqueueMessage
 	//printSessionTable()
 
+	mess.Family = int(family)
 	mess.Packet = packet
 	mess.PacketMark = pmark
 	mess.Length = packetLength

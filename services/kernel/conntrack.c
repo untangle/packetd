@@ -84,10 +84,24 @@ static int conntrack_callback(enum nf_conntrack_msg_type type,struct nf_conntrac
 	info.orig_bytes = nfct_get_attr_u64(ct,ATTR_ORIG_COUNTER_BYTES);
 	info.repl_bytes = nfct_get_attr_u64(ct,ATTR_REPL_COUNTER_BYTES);
 
+    // get the packet counts
+    info.orig_packets = nfct_get_attr_u64(ct,ATTR_ORIG_COUNTER_PACKETS);
+    info.repl_packets = nfct_get_attr_u64(ct,ATTR_REPL_COUNTER_PACKETS);
+
+    // get the timeout
+    info.timeout = nfct_get_attr_u32(ct,ATTR_TIMEOUT);
+
+    // get the timestamps
+    info.timestamp_start = nfct_get_attr_u64(ct,ATTR_TIMESTAMP_START);
+    info.timestamp_stop = nfct_get_attr_u64(ct,ATTR_TIMESTAMP_STOP);
+
+    // get tcp state
+    info.tcp_state = nfct_get_attr_u8(ct,ATTR_TCP_STATE);
+    
     // get the mark
 	info.conn_mark = nfct_get_attr_u32(ct,ATTR_MARK);
 
-	if (get_warehouse_flag() == 'C') warehouse_capture('C',&info,sizeof(info),0,0,0);
+	if (get_warehouse_flag() == 'C') warehouse_capture('C',&info,sizeof(info),0,0,0,info.family);
 
     // FIXME - its not ok to just throw away events when the bypass flag is set
     // we will be missing important events like NEW/DELETE events such that

@@ -14,25 +14,39 @@ type ConntrackHandlerFunction func(int, *Conntrack)
 
 // Conntrack stores the details of a conntrack entry
 type Conntrack struct {
-	ConntrackID      uint32
-	ConnMark         uint32
-	Session          *Session
-	SessionID        uint64
-	CreationTime     time.Time
-	LastActivityTime time.Time
-	LastUpdateTime   time.Time
-	ClientSideTuple  Tuple
-	ServerSideTuple  Tuple
-	EventCount       uint64
-	C2SBytes         uint64
-	S2CBytes         uint64
-	TotalBytes       uint64
-	C2SBytesDiff     uint64  // the C2SBytes diff since last update
-	S2CBytesDiff     uint64  // the S2CBytes diff since last update
-	TotalBytesDiff   uint64  // the TotalBytes diff since last update
-	C2SRate          float32 // the c2s byte rate site the last update
-	S2CRate          float32 // the s2c byte rate site the last update
-	TotalRate        float32 // the total byte rate site the last update
+	ConntrackID       uint32
+	ConnMark          uint32
+	Session           *Session
+	SessionID         uint64
+	Family            uint8
+	CreationTime      time.Time
+	LastActivityTime  time.Time
+	LastUpdateTime    time.Time
+	ClientSideTuple   Tuple
+	ServerSideTuple   Tuple
+	TimeoutSeconds    uint32
+	TimestampStart    uint64
+	TimestampStop     uint64
+	TCPState          uint8
+	EventCount        uint64
+	ClientBytes       uint64
+	ServerBytes       uint64
+	TotalBytes        uint64
+	ClientPackets     uint64
+	ServerPackets     uint64
+	TotalPackets      uint64
+	ClientBytesDiff   uint64  // the ClientBytes diff since last update
+	ServerBytesDiff   uint64  // the ServerBytes diff since last update
+	TotalBytesDiff    uint64  // the TotalBytes diff since last update
+	ClientPacketsDiff uint64  // the ClientPackets diff since last update
+	ServerPacketsDiff uint64  // the ServerPackets diff since last update
+	TotalPacketsDiff  uint64  // the TotalPackets diff since last update
+	ClientByteRate    float32 // the Client byte rate site the last update
+	ServerByteRate    float32 // the Server byte rate site the last update
+	TotalByteRate     float32 // the Total byte rate site the last update
+	ClientPacketRate  float32 // the Client packet rate site the last update
+	ServerPacketRate  float32 // the Server packet rate site the last update
+	TotalPacketRate   float32 // the Total packet rate site the last update
 }
 
 var conntrackTable map[uint32]*Conntrack
@@ -59,7 +73,8 @@ func removeConntrack2(ctid uint32, conntrack *Conntrack) {
 func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uint8, protocol uint8,
 	client net.IP, server net.IP, clientPort uint16, serverPort uint16,
 	clientNew net.IP, serverNew net.IP, clientPortNew uint16, serverPortNew uint16,
-	c2sBytes uint64, s2cBytes uint64) {
+	clientBytes uint64, serverBytes uint64, clientPackets uint64, serverPackets uint64,
+	timestampStart uint64, timestampStop uint64, timeout uint32, tcpState uint8) {
 
 	var conntrack *Conntrack
 	var conntrackFound bool
@@ -127,7 +142,8 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		conntrack = createConntrack(ctid, connmark, family, eventType, protocol,
 			client, server, clientPort, serverPort,
 			clientNew, serverNew, clientPortNew, serverPortNew,
-			c2sBytes, s2cBytes)
+			clientBytes, serverBytes, clientPackets, serverPackets,
+			timestampStart, timestampStop, timeout, tcpState)
 
 		// look for the session entry
 		session := findSession(ctid)
@@ -198,7 +214,8 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			conntrack = createConntrack(ctid, connmark, family, eventType, protocol,
 				client, server, clientPort, serverPort,
 				clientNew, serverNew, clientPortNew, serverPortNew,
-				c2sBytes, s2cBytes)
+				clientBytes, serverBytes, clientPackets, serverPackets,
+				timestampStart, timestampStop, timeout, tcpState)
 			insertConntrack(ctid, conntrack)
 		}
 
@@ -222,41 +239,78 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			conntrack.Session.AddEventCount(1)
 		}
 
-		oldC2sBytes := conntrack.C2SBytes
-		oldS2cBytes := conntrack.S2CBytes
+		conntrack.TimeoutSeconds = timeout
+		conntrack.TCPState = tcpState
+		conntrack.TimestampStop = timestampStop
+
+		updateStatsAndRates(conntrack, clientBytes, serverBytes, clientPackets, serverPackets, secondsSinceLastUpdate)
+
+		oldClientBytes := conntrack.ClientBytes
+		oldServerBytes := conntrack.ServerBytes
 		oldTotalBytes := conntrack.TotalBytes
-		newC2sBytes := c2sBytes
-		newS2cBytes := s2cBytes
-		newTotalBytes := (newC2sBytes + newS2cBytes)
-		diffC2sBytes := (newC2sBytes - oldC2sBytes)
-		diffS2cBytes := (newS2cBytes - oldS2cBytes)
+		newClientBytes := clientBytes
+		newServerBytes := serverBytes
+		newTotalBytes := (newClientBytes + newServerBytes)
+		diffClientBytes := (newClientBytes - oldClientBytes)
+		diffServerBytes := (newServerBytes - oldServerBytes)
 		diffTotalBytes := (newTotalBytes - oldTotalBytes)
+
+		oldClientPackets := conntrack.ClientPackets
+		oldServerPackets := conntrack.ServerPackets
+		oldTotalPackets := conntrack.TotalPackets
+		newClientPackets := clientPackets
+		newServerPackets := serverPackets
+		newTotalPackets := (newClientPackets + newServerPackets)
+		diffClientPackets := (newClientPackets - oldClientPackets)
+		diffServerPackets := (newServerPackets - oldServerPackets)
+		diffTotalPackets := (newTotalPackets - oldTotalPackets)
 
 		// In some cases, specifically UDP, a new session takes the place of an old session with the same tuple.
 		// In this case the counts go down because its actually a new session. If the total Bytes is low, this
 		// is probably the case so treat it as a new conntrack.
-		if (diffC2sBytes < 0) || (diffS2cBytes < 0) {
-			newC2sBytes = c2sBytes
-			diffC2sBytes = newC2sBytes
-			newS2cBytes = s2cBytes
-			diffS2cBytes = newS2cBytes
-			newTotalBytes = (newC2sBytes + newS2cBytes)
+		if diffClientBytes < 0 || diffServerBytes < 0 || diffClientPackets < 0 || diffServerPackets < 0 {
+			newClientBytes = clientBytes
+			diffClientBytes = newClientBytes
+			newServerBytes = serverBytes
+			diffServerBytes = newServerBytes
+			newTotalBytes = (newClientBytes + newServerBytes)
 			diffTotalBytes = newTotalBytes
+
+			newClientPackets = clientPackets
+			diffClientPackets = newClientPackets
+			newServerPackets = serverPackets
+			diffServerPackets = newServerPackets
+			newTotalPackets = (newClientPackets + newServerPackets)
+			diffTotalPackets = newTotalPackets
 		}
 
-		c2sRate := float32(diffC2sBytes) / secondsSinceLastUpdate
-		s2cRate := float32(diffS2cBytes) / secondsSinceLastUpdate
+		clientRate := float32(diffClientBytes) / secondsSinceLastUpdate
+		serverRate := float32(diffServerBytes) / secondsSinceLastUpdate
 		totalRate := float32(diffTotalBytes) / secondsSinceLastUpdate
 
-		conntrack.C2SBytes = newC2sBytes
-		conntrack.S2CBytes = newS2cBytes
+		clientPacketRate := float32(diffClientBytes) / secondsSinceLastUpdate
+		serverPacketRate := float32(diffServerBytes) / secondsSinceLastUpdate
+		totalPacketRate := float32(diffTotalBytes) / secondsSinceLastUpdate
+
+		conntrack.ClientBytes = newClientBytes
+		conntrack.ServerBytes = newServerBytes
 		conntrack.TotalBytes = newTotalBytes
-		conntrack.C2SBytesDiff = diffC2sBytes
-		conntrack.S2CBytesDiff = diffS2cBytes
+		conntrack.ClientBytesDiff = diffClientBytes
+		conntrack.ServerBytesDiff = diffServerBytes
 		conntrack.TotalBytesDiff = diffTotalBytes
-		conntrack.C2SRate = c2sRate
-		conntrack.S2CRate = s2cRate
-		conntrack.TotalRate = totalRate
+		conntrack.ClientByteRate = clientRate
+		conntrack.ServerByteRate = serverRate
+		conntrack.TotalByteRate = totalRate
+
+		conntrack.ClientPackets = newClientPackets
+		conntrack.ServerPackets = newServerPackets
+		conntrack.TotalPackets = newTotalPackets
+		conntrack.ClientPacketsDiff = diffClientPackets
+		conntrack.ServerPacketsDiff = diffServerPackets
+		conntrack.TotalPacketsDiff = diffTotalPackets
+		conntrack.ClientPacketRate = clientPacketRate
+		conntrack.ServerPacketRate = serverPacketRate
+		conntrack.TotalPacketRate = totalPacketRate
 	}
 
 	// We loop and increment the priority until all subscriptions have been called
@@ -346,11 +400,13 @@ func cleanConntrackTable() {
 func createConntrack(ctid uint32, connmark uint32, family uint8, eventType uint8, protocol uint8,
 	client net.IP, server net.IP, clientPort uint16, serverPort uint16,
 	clientNew net.IP, serverNew net.IP, clientPortNew uint16, serverPortNew uint16,
-	c2sBytes uint64, s2cBytes uint64) *Conntrack {
+	clientBytes uint64, serverBytes uint64, clientPackets uint64, serverPackets uint64,
+	timestampStart uint64, timestampStop uint64, timeout uint32, tcpState uint8) *Conntrack {
 	conntrack := new(Conntrack)
 	conntrack.ConntrackID = ctid
 	conntrack.ConnMark = connmark
 	conntrack.CreationTime = time.Now()
+	conntrack.Family = family
 	conntrack.LastActivityTime = time.Now()
 	conntrack.EventCount = 1
 	conntrack.ClientSideTuple.Protocol = protocol
@@ -363,5 +419,87 @@ func createConntrack(ctid uint32, connmark uint32, family uint8, eventType uint8
 	conntrack.ServerSideTuple.ClientPort = clientPortNew
 	conntrack.ServerSideTuple.ServerAddress = dupIP(serverNew)
 	conntrack.ServerSideTuple.ServerPort = serverPortNew
+	conntrack.ClientBytes = clientBytes
+	conntrack.ServerBytes = serverBytes
+	conntrack.TotalBytes = serverBytes + clientBytes
+	conntrack.ClientPackets = clientPackets
+	conntrack.ServerPackets = serverPackets
+	conntrack.TotalPackets = serverPackets + clientPackets
+	conntrack.TimeoutSeconds = timeout
+	conntrack.TimestampStart = timestampStart
+	conntrack.TimestampStop = timestampStop
+	conntrack.TCPState = tcpState
+
 	return conntrack
+}
+
+// updateStatsAndRates updates all the Byte and Packet counters and rates
+// provided the new total counts, and the seconds since the last update
+func updateStatsAndRates(conntrack *Conntrack, clientBytes uint64, serverBytes uint64, clientPackets uint64, serverPackets uint64, secondsSinceLastUpdate float32) {
+	oldClientBytes := conntrack.ClientBytes
+	oldServerBytes := conntrack.ServerBytes
+	oldTotalBytes := conntrack.TotalBytes
+	newClientBytes := clientBytes
+	newServerBytes := serverBytes
+	newTotalBytes := (newClientBytes + newServerBytes)
+	diffClientBytes := (newClientBytes - oldClientBytes)
+	diffServerBytes := (newServerBytes - oldServerBytes)
+	diffTotalBytes := (newTotalBytes - oldTotalBytes)
+
+	oldClientPackets := conntrack.ClientPackets
+	oldServerPackets := conntrack.ServerPackets
+	oldTotalPackets := conntrack.TotalPackets
+	newClientPackets := clientPackets
+	newServerPackets := serverPackets
+	newTotalPackets := (newClientPackets + newServerPackets)
+	diffClientPackets := (newClientPackets - oldClientPackets)
+	diffServerPackets := (newServerPackets - oldServerPackets)
+	diffTotalPackets := (newTotalPackets - oldTotalPackets)
+
+	// In some cases, specifically UDP, a new session takes the place of an old session with the same tuple.
+	// In this case the counts go down because its actually a new session. If the total Bytes is low, this
+	// is probably the case so treat it as a new conntrack.
+	if diffClientBytes < 0 || diffServerBytes < 0 || diffClientPackets < 0 || diffServerPackets < 0 {
+		newClientBytes = clientBytes
+		diffClientBytes = newClientBytes
+		newServerBytes = serverBytes
+		diffServerBytes = newServerBytes
+		newTotalBytes = (newClientBytes + newServerBytes)
+		diffTotalBytes = newTotalBytes
+
+		newClientPackets = clientPackets
+		diffClientPackets = newClientPackets
+		newServerPackets = serverPackets
+		diffServerPackets = newServerPackets
+		newTotalPackets = (newClientPackets + newServerPackets)
+		diffTotalPackets = newTotalPackets
+	}
+
+	clientRate := float32(diffClientBytes) / secondsSinceLastUpdate
+	serverRate := float32(diffServerBytes) / secondsSinceLastUpdate
+	totalRate := float32(diffTotalBytes) / secondsSinceLastUpdate
+
+	clientPacketRate := float32(diffClientBytes) / secondsSinceLastUpdate
+	serverPacketRate := float32(diffServerBytes) / secondsSinceLastUpdate
+	totalPacketRate := float32(diffTotalBytes) / secondsSinceLastUpdate
+
+	conntrack.ClientBytes = newClientBytes
+	conntrack.ServerBytes = newServerBytes
+	conntrack.TotalBytes = newTotalBytes
+	conntrack.ClientBytesDiff = diffClientBytes
+	conntrack.ServerBytesDiff = diffServerBytes
+	conntrack.TotalBytesDiff = diffTotalBytes
+	conntrack.ClientByteRate = clientRate
+	conntrack.ServerByteRate = serverRate
+	conntrack.TotalByteRate = totalRate
+
+	conntrack.ClientPackets = newClientPackets
+	conntrack.ServerPackets = newServerPackets
+	conntrack.TotalPackets = newTotalPackets
+	conntrack.ClientPacketsDiff = diffClientPackets
+	conntrack.ServerPacketsDiff = diffServerPackets
+	conntrack.TotalPacketsDiff = diffTotalPackets
+	conntrack.ClientPacketRate = clientPacketRate
+	conntrack.ServerPacketRate = serverPacketRate
+	conntrack.TotalPacketRate = totalPacketRate
 }
