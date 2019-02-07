@@ -20,10 +20,10 @@ import (
 )
 
 // ConntrackCallback is a function to handle conntrack events
-type ConntrackCallback func(uint32, uint32, uint8, uint8, uint8, net.IP, net.IP, uint16, uint16, net.IP, net.IP, uint16, uint16, uint64, uint64)
+type ConntrackCallback func(uint32, uint32, uint8, uint8, uint8, net.IP, net.IP, uint16, uint16, net.IP, net.IP, uint16, uint16, uint64, uint64, uint64, uint64, uint64, uint64, uint32, uint8)
 
 // NfqueueCallback is a function to handle nfqueue events
-type NfqueueCallback func(uint32, gopacket.Packet, int, uint32) int
+type NfqueueCallback func(uint32, uint32, gopacket.Packet, int, uint32) int
 
 // NetloggerCallback is a function to handle netlogger events
 type NetloggerCallback func(uint8, uint8, uint16, uint8, uint8, string, string, uint16, uint16, uint32, string)
@@ -200,7 +200,7 @@ func go_set_shutdown_flag() {
 }
 
 //export go_nfqueue_callback
-func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.char, playflag C.int, index C.int) {
+func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, family C.uint32_t, buffer *C.char, playflag C.int, index C.int) {
 	if nfqueueCallback == nil {
 		logger.Warn("No queue callback registered. Ignoring packet.\n")
 		C.nfqueue_set_verdict(index, nfid, C.NF_ACCEPT)
@@ -213,12 +213,13 @@ func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint
 		nfCleanList[uint32(C.int(ctid))] = true
 	}
 
-	f := func(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, buffer *C.char) {
+	f := func(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, family C.uint32_t, buffer *C.char) {
 
 		var packet gopacket.Packet
 		var packetLength int
 		var conntrackID uint32 = uint32(C.int(ctid))
 		var pmark uint32 = uint32(C.int(mark))
+		var fam uint32 = uint32(C.int(family))
 
 		// create a Go pointer and gopacket from the packet data
 		pointer := (*[0xFFFF]byte)(unsafe.Pointer(data))[:int(size):int(size)]
@@ -231,7 +232,7 @@ func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint
 
 		packetLength = int(size)
 
-		verdict := nfqueueCallback(conntrackID, packet, packetLength, pmark)
+		verdict := nfqueueCallback(conntrackID, fam, packet, packetLength, pmark)
 		if playflag == 0 {
 			C.nfqueue_set_verdict(index, nfid, C.uint32_t(verdict))
 		}
@@ -250,9 +251,9 @@ func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint
 	// if this is not a playback, handle this packet is a goroutine
 	// and return the main thread immediately so it can handle more packets
 	if playflag != 0 {
-		f(mark, data, size, ctid, nfid, buffer)
+		f(mark, data, size, ctid, nfid, family, buffer)
 	} else {
-		go f(mark, data, size, ctid, nfid, buffer)
+		go f(mark, data, size, ctid, nfid, family, buffer)
 	}
 
 	return
@@ -265,6 +266,8 @@ func go_conntrack_callback(info *C.struct_conntrack_info, playflag C.int) {
 	var eventType uint8
 	var c2sBytes uint64
 	var s2cBytes uint64
+	var c2sPackets uint64
+	var s2cPackets uint64
 	var protocol uint8
 	var client net.IP
 	var server net.IP
@@ -275,6 +278,10 @@ func go_conntrack_callback(info *C.struct_conntrack_info, playflag C.int) {
 	var clientPortNew uint16
 	var serverPortNew uint16
 	var connmark uint32
+	var tcpState uint8
+	var timestampStart uint64
+	var timestampStop uint64
+	var timeout uint32
 
 	if conntrackCallback == nil {
 		logger.Warn("No conntrack callback registered. Ignoring event.\n")
@@ -292,8 +299,15 @@ func go_conntrack_callback(info *C.struct_conntrack_info, playflag C.int) {
 	eventType = uint8(info.msg_type)
 	c2sBytes = uint64(info.orig_bytes)
 	s2cBytes = uint64(info.repl_bytes)
+	c2sPackets = uint64(info.orig_packets)
+	s2cPackets = uint64(info.repl_packets)
+
 	protocol = uint8(info.orig_proto)
 	connmark = uint32(info.conn_mark)
+	tcpState = uint8(info.tcp_state)
+	timestampStart = uint64(info.timestamp_start)
+	timestampStop = uint64(info.timestamp_stop)
+	timeout = uint32(info.timeout)
 
 	if family == C.AF_INET {
 		client = make(net.IP, 4)
@@ -337,7 +351,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info, playflag C.int) {
 	conntrackCallback(ctid, connmark, family, eventType, protocol,
 		client, server, clientPort, serverPort,
 		clientNew, serverNew, clientPortNew, serverPortNew,
-		c2sBytes, s2cBytes)
+		c2sBytes, s2cBytes, c2sPackets, s2cPackets, timestampStart, timestampStop, timeout, tcpState)
 }
 
 //export go_netlogger_callback

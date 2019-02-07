@@ -68,6 +68,7 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
     uint32_t                        nfid;
 	struct iphdr*                   iphead;
 	int								rawlen;
+    uint32_t                        family;
     intptr_t                        index = (intptr_t)data;
     char*                           buff = buffer[index];
 
@@ -79,6 +80,7 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
     }
     nfid = ntohl(hdr->packet_id);
 	mark = nfq_get_nfmark(nfad);
+    family = nfmsg->nfgen_family;
 
 	// get the packet length and data
 	rawlen = nfq_get_payload(nfad,(unsigned char **)&rawpkt);
@@ -100,7 +102,7 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
     }
 
 	// get the conntrack ID
-	if ((ctid = nfq_get_conntrack_id(nfad,nfmsg->nfgen_family)) <= 0) {
+	if ((ctid = nfq_get_conntrack_id(nfad,family)) <= 0) {
         if (iphead->version == 4) {
             struct in_addr ip_addr;
             logmessage(LOG_DEBUG,logsrc,"Error: Failed to retrieve conntrack ID\n");
@@ -114,9 +116,9 @@ int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data
         return 0;
     }
 
-	if (get_warehouse_flag() == 'C') warehouse_capture('Q',rawpkt,rawlen,mark,ctid,nfid);
+	if (get_warehouse_flag() == 'C') warehouse_capture('Q',rawpkt,rawlen,mark,ctid,nfid,family);
 
-	if (get_bypass_flag() == 0) go_nfqueue_callback(mark,rawpkt,rawlen,ctid,nfid,buff,0,index);
+	if (get_bypass_flag() == 0) go_nfqueue_callback(mark,rawpkt,rawlen,ctid,nfid,family,buff,0,index);
 	else nfqueue_set_verdict(index, nfid, NF_ACCEPT);
 
 	return(0);

@@ -209,3 +209,14 @@ func HandleWarehouseCleanup() {
 		ctCleanupHolder = nil
 	}
 }
+
+// GetConntrackTable table
+// Note: this returns a copy of the table, but with the same pointers
+// do not modify the values in the conntrack entries
+func GetConntrackTable() map[uint32]*Conntrack {
+	newMap := make(map[uint32]*Conntrack)
+	for k, v := range conntrackTable {
+		newMap[k] = v
+	}
+	return newMap
+}

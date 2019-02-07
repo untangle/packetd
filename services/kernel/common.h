@@ -39,10 +39,11 @@
  * data and fill them based on the value of family (AF_INET or AF_INET6)
  */
 struct conntrack_info {
+	u_int32_t		conn_id;
 	u_int8_t		msg_type;
 	u_int8_t		family;
-	u_int32_t		conn_id;
 	u_int8_t		orig_proto;
+	u_int8_t		tcp_state;
 	char			orig_saddr[16];
 	char			orig_daddr[16];
 	char			repl_saddr[16];
@@ -53,7 +54,12 @@ struct conntrack_info {
 	u_int16_t		repl_dport;
 	u_int64_t		orig_bytes;
 	u_int64_t		repl_bytes;
+	u_int64_t		orig_packets;
+	u_int64_t		repl_packets;
+	u_int64_t		timestamp_start;
+	u_int64_t		timestamp_stop;
 	u_int32_t		conn_mark;
+	u_int32_t		timeout;
 };
 
 /*
@@ -82,7 +88,7 @@ struct nfq_data {
 	struct nfattr	**data;
 };
 
-extern void go_nfqueue_callback(uint32_t mark,unsigned char* data,int len,uint32_t ctid,uint32_t nfid,char* memory,int playflag,int index);
+extern void go_nfqueue_callback(uint32_t mark,unsigned char* data,int len,uint32_t ctid,uint32_t nfid,uint32_t family,char* memory,int playflag,int index);
 extern void go_netlogger_callback(struct netlogger_info* info,int playflag);
 extern void go_conntrack_callback(struct conntrack_info* info,int playflag);
 
@@ -138,6 +144,6 @@ void netlogger_shutdown(void);
 
 int warehouse_startup(void);
 void warehouse_shutdown(void);
-void warehouse_capture(const char origin,void *buffer,uint32_t length,uint32_t mark,uint32_t ctid,uint32_t nfid);
+void warehouse_capture(const char origin,void *buffer,uint32_t length,uint32_t mark,uint32_t ctid,uint32_t nfid,uint32_t family);
 void warehouse_playback(void);
 struct timespec calculate_pause(struct timespec start,struct timespec end,int speed);

@@ -138,19 +138,30 @@ func PluginNetloggerHandler(netlogger *dispatch.NetloggerMessage) {
 
 // doAccounting does the session_minutes accounting
 func doAccounting(entry *dispatch.Conntrack, sessionID uint64, ctid uint32) {
-	columns := map[string]interface{}{
-		"time_stamp": time.Now(),
-		"session_id": sessionID,
-		"c2s_bytes":  entry.C2SBytesDiff,
-		"s2c_bytes":  entry.S2CBytesDiff,
-		"bytes":      entry.TotalBytesDiff,
-		"c2s_rate":   int32(entry.C2SRate),
-		"s2c_rate":   int32(entry.S2CRate),
-		"rate":       int32(entry.TotalRate),
-	}
-	reports.LogEvent(reports.CreateEvent("session_stat", "session_stats", 1, columns, nil))
+	dict.AddSessionEntry(ctid, "byte_rate", uint32(entry.TotalByteRate))
+	dict.AddSessionEntry(ctid, "client_byte_rate", uint32(entry.ClientByteRate))
+	dict.AddSessionEntry(ctid, "server_byte_rate", uint32(entry.ServerByteRate))
+	dict.AddSessionEntry(ctid, "packet_rate", uint32(entry.TotalPacketRate))
+	dict.AddSessionEntry(ctid, "client_packet_rate", uint32(entry.ClientPacketRate))
+	dict.AddSessionEntry(ctid, "server_packet_rate", uint32(entry.ServerPacketRate))
 
-	dict.AddSessionEntry(ctid, "rate", uint32(entry.TotalRate))
-	dict.AddSessionEntry(ctid, "c2s_rate", uint32(entry.C2SRate))
-	dict.AddSessionEntry(ctid, "s2c_rate", uint32(entry.S2CRate))
+	if entry.TotalByteRate != 0 && entry.ClientByteRate != 0 && entry.ServerByteRate != 0 && entry.TotalPacketRate != 0 && entry.ClientPacketRate != 0 && entry.ServerPacketRate != 0 {
+		columns := map[string]interface{}{
+			"time_stamp":         time.Now(),
+			"session_id":         sessionID,
+			"client_bytes":       entry.ClientBytesDiff,
+			"server_bytes":       entry.ServerBytesDiff,
+			"bytes":              entry.TotalBytesDiff,
+			"client_byte_rate":   int32(entry.ClientByteRate),
+			"server_byte_rate":   int32(entry.ServerByteRate),
+			"byte_rate":          int32(entry.TotalByteRate),
+			"client_packets":     entry.ClientPacketsDiff,
+			"server_packets":     entry.ServerPacketsDiff,
+			"packets":            entry.TotalPacketsDiff,
+			"client_packet_rate": int32(entry.ClientPacketRate),
+			"server_packet_rate": int32(entry.ServerPacketRate),
+			"packet_rate":        int32(entry.TotalPacketRate),
+		}
+		reports.LogEvent(reports.CreateEvent("session_stat", "session_stats", 1, columns, nil))
+	}
 }

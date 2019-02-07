@@ -33,6 +33,7 @@ struct data_header {
 	u_int32_t		mark;
 	u_int32_t		ctid;
 	u_int32_t		nfid;
+	u_int32_t		family;
 };
 
 void start_warehouse_capture(void)
@@ -63,7 +64,7 @@ void close_warehouse_capture(void)
 	capfile = NULL;
 }
 
-void warehouse_capture(const char origin,void *buffer,uint32_t length,uint32_t mark,uint32_t ctid,uint32_t nfid)
+void warehouse_capture(const char origin,void *buffer,uint32_t length,uint32_t mark,uint32_t ctid,uint32_t nfid,uint32_t family)
 {
 	struct data_header		dh;
 	struct timespec			now;
@@ -79,6 +80,7 @@ void warehouse_capture(const char origin,void *buffer,uint32_t length,uint32_t m
 	dh.mark = mark;
 	dh.ctid = ctid;
 	dh.nfid = nfid;
+	dh.family = family;
 	fwrite(&dh,sizeof(dh),1,capfile);
 	fwrite(buffer,length,1,capfile);
 }
@@ -204,7 +206,7 @@ void warehouse_playback(void)
 		{
 			case 'Q':
 				dh.ctid |= 0xF0000000;
-				go_nfqueue_callback(dh.mark,buffer,dh.length,dh.ctid,dh.nfid,buffer,1,0);
+				go_nfqueue_callback(dh.mark,buffer,dh.length,dh.ctid,dh.nfid,dh.family,buffer,1,0);
 				break;
 
 			case 'C':

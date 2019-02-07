@@ -20,7 +20,7 @@ TWO_CONDITION = {
         "operator": "EQ",
         "value": "17"
     }, {
-        "column": "c2s_bytes",
+        "column": "client_bytes",
         "operator": "GT",
         "value": "0"
     }]
