@@ -489,18 +489,18 @@ func createTables() {
 		`CREATE TABLE IF NOT EXISTS session_stats (
                      session_id int8 NOT NULL,
                      time_stamp bigint NOT NULL,
+                     bytes int8,
                      client_bytes int8,
                      server_bytes int8,
-                     bytes int8,
+                     byte_rate int8,
                      client_byte_rate int8,
                      server_byte_rate int8,
-                     byte_rate int8,
+                     packets int8,
                      client_packets int8,
                      server_packets int8,
-                     packets int8,
+                     packet_rate int8,
                      client_packet_rate int8,
-                     server_packet_rate int8,
-                     packet_rate int8)`)
+                     server_packet_rate int8)`)
 
 	if err != nil {
 		logger.Err("Failed to create table: %s\n", err.Error())
