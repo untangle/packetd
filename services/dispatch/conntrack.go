@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/logger"
 )
 
@@ -325,6 +326,7 @@ func cleanConntrackTable() {
 			// The the entry exists, the LastActivityTime is a long time ago
 			// some constraint has failed
 			logger.Err("Removing stale (%v) conntrack entry [%d] %v\n", time.Now().Sub(conntrack.LastActivityTime), ctid, conntrack.ClientSideTuple)
+			dict.DeleteSession(ctid)
 			delete(conntrackTable, ctid)
 		}
 	}
