@@ -132,7 +132,7 @@ func parseConntrack(ct *dispatch.Conntrack) map[string]interface{} {
 	m["server_packets"] = ct.ServerPackets
 
 	m["timestamp_start"] = ct.TimestampStart
-	m["age_millis"] = (uint64(time.Now().UnixNano()) / 1000000) - ct.TimestampStart
+	m["age_milliseconds"] = (uint64(time.Now().UnixNano()) / 1000000) - ct.TimestampStart
 
 	var mark uint32
 	mark = ct.ConnMark
