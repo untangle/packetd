@@ -93,6 +93,9 @@ insert_packetd_rules()
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd dict sessions ct id bypass_packetd bool true counter return
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct mark and 0x80000000 == 0x80000000 counter return
 
+    # Only catch unicast traffic
+    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd fid daddr type != unicast counter return
+
     # Set the new packet mark
     # We must actually set this mark so that packetd can tell this is a "new" packet
     # If it tries to predict if its a new packet based on the tuple and/or the conntrack ID it will sometimes fail
