@@ -185,6 +185,17 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 
 	mess.Session = session
 
+	// Sanity check - if this is a new session we should not have an existing conntrack entry (yet)
+	if newSession {
+		conntrack, _ := findConntrack(ctid)
+		if conntrack != nil {
+			logger.Warn("Found existing conntrack for new session:\n")
+			logger.Warn("New Session        : %v\n", mess.MsgTuple)
+			logger.Warn("Existing Conntrack : %v\n", conntrack.ClientSideTuple)
+		}
+		removeConntrack(ctid)
+	}
+
 	if mess.MsgTuple.ClientAddress.Equal(session.ClientSideTuple.ClientAddress) {
 		mess.ClientToServer = true
 	} else {
