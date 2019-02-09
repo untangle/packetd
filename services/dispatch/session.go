@@ -165,15 +165,26 @@ func (sess *Session) AddEventCount(value uint64) uint64 {
 	return atomic.AddUint64(&sess.eventCount, value)
 }
 
-// destroy is called to end the session
-// it removes the session from the session table, and calls
-// the finialization event to all subscribers
-func (sess *Session) destroy() {
+// removeFromSessionTable removes the session from the session table
+// it does a sanity check to make sure the session in question
+// is actually in the table
+func (sess *Session) removeFromSessionTable() {
+	sessionMutex.Lock()
+	sessInTable, found := sessionTable[sess.ConntrackID]
+	if found && sess == sessInTable {
+		delete(sessionTable, sess.ConntrackID)
+	}
+	sessionMutex.Unlock()
+}
+
+// flushDict flushes the dict for the session
+// it does a sanity check to make sure it ows its ctid
+// by doing a lookup in the session table
+func (sess *Session) flushDict() {
 	sessionMutex.Lock()
 	sessInTable, found := sessionTable[sess.ConntrackID]
 	if found && sess == sessInTable {
 		dict.DeleteSession(sess.ConntrackID)
-		delete(sessionTable, sess.ConntrackID)
 	}
 	sessionMutex.Unlock()
 }

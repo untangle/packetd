@@ -129,6 +129,12 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		}
 
 		removeConntrackStale(ctid, conntrack)
+
+		// just return now, we don't pass DELETE events to subscribers
+		// DELETE events are not reliable (they can be missed)
+		// As such, for now, we don't pass them to subscribers so that plugins
+		// will not rely on DELETE events for cleanup
+		return
 	}
 
 	// handle NEW events
@@ -170,7 +176,8 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 				}
 
 				// Remove that session from the sessionTable - we can conclude its not valid anymore
-				session.destroy()
+				session.flushDict()
+				session.removeFromSessionTable()
 				session = nil
 			}
 		}
@@ -312,7 +319,8 @@ func removeConntrackStale(ctid uint32, conntrack *Conntrack) {
 	// There is a race, we may get this DELETE event after the ctid has been reused by a new session
 	// and we don't want to remove that mapping from the session table
 	if conntrack != nil && conntrack.Session != nil {
-		conntrack.Session.destroy()
+		conntrack.Session.flushDict()
+		conntrack.Session.removeFromSessionTable()
 	}
 }
 
@@ -324,13 +332,15 @@ func cleanConntrackTable() {
 	for ctid, conntrack := range conntrackTable {
 		// We use 10000 seconds because 7440 is the established idle tcp timeout default
 		if time.Now().Sub(conntrack.LastActivityTime) > 10000*time.Second {
-			// This should never happen, log an error
+			// In theory this should never happen,
 			// entries should be removed by DELETE events
 			// otherwise they should be getting UPDATE events and the LastActivityTime
 			// would be at least within interval seconds.
 			// The the entry exists, the LastActivityTime is a long time ago
 			// some constraint has failed
-			logger.Err("Removing stale (%v) conntrack entry [%d] %v\n", time.Now().Sub(conntrack.LastActivityTime), ctid, conntrack.ClientSideTuple)
+			// In reality sometimes we miss DELETE events (if the buffer fills)
+			// so sometimes we do see this happen in the real world under heavy load
+			logger.Warn("Removing stale (%v) conntrack entry [%d] %v\n", time.Now().Sub(conntrack.LastActivityTime), ctid, conntrack.ClientSideTuple)
 			dict.DeleteSession(ctid)
 			delete(conntrackTable, ctid)
 		}

@@ -178,7 +178,9 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 				// it in the conntrack table for the conntrack handle to handle
 
 				logger.Debug("Conflicting session [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
-				session.destroy()
+				// We don't need to flush here - this is a new session its already been flushed
+				// session.flushDict()
+				session.removeFromSessionTable()
 				session = createSession(mess, ctid)
 				mess.Session = session
 			}
@@ -193,10 +195,12 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 	mess.Session = session
 
 	// Sanity check - if this is a new session we should not have an existing conntrack entry (yet)
+	// This does occur under normal circumstatnces when a ctid gets reused, and we get an
+	// nfqueue event for the new session (same ctid) before we get the conntrack delete event
 	if newSession {
 		conntrack, _ := findConntrack(ctid)
 		if conntrack != nil {
-			logger.Warn("Found existing conntrack for new session:\n")
+			logger.Warn("Found existing conntrack (ctid: %v) for new session:\n", ctid)
 			logger.Warn("New Session        : %v\n", mess.MsgTuple)
 			logger.Warn("Existing Conntrack : %v\n", conntrack.ClientSideTuple)
 		}
