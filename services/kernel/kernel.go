@@ -348,7 +348,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info, playflag C.int) {
 	clientPortNew = uint16(info.repl_dport)
 	serverPortNew = uint16(info.repl_sport)
 
-	conntrackCallback(ctid, connmark, family, eventType, protocol,
+	go conntrackCallback(ctid, connmark, family, eventType, protocol,
 		client, server, clientPort, serverPort,
 		clientNew, serverNew, clientPortNew, serverPortNew,
 		c2sBytes, s2cBytes, c2sPackets, s2cPackets, timestampStart, timestampStop, timeout, tcpState)

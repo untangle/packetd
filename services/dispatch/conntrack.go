@@ -58,18 +58,6 @@ func (c Conntrack) String() string {
 	return strconv.Itoa(int(c.ConntrackID)) + "|" + c.ClientSideTuple.String()
 }
 
-// removeConntrack remove an entry from the conntrackTable that is obsolete/dead/invalid
-func removeConntrack2(ctid uint32, conntrack *Conntrack) {
-	removeConntrack(ctid)
-
-	// We only want to remove the specific session
-	// There is a race, we may get this DELETE event after the ctid has been reused by a new session
-	// and we don't want to remove that mapping from the session table
-	if conntrack != nil && conntrack.Session != nil {
-		conntrack.Session.destroy()
-	}
-}
-
 // conntrackCallback is the global conntrack event handler
 func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uint8, protocol uint8,
 	client net.IP, server net.IP, clientPort uint16, serverPort uint16,
@@ -113,7 +101,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 				logger.Err("Session SessionID: %v\n", conntrack.Session.SessionID)
 			}
 			logger.Err("Deleting obsolete conntrack entry %v.\n", ctid)
-			removeConntrack2(ctid, conntrack)
+			removeConntrackStale(ctid, conntrack)
 			conntrackFound = false
 			conntrack = nil
 		} else if !clientSideTuple.Equal(conntrack.ClientSideTuple) {
@@ -121,7 +109,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			logger.Warn("Conntrack event[%c] tuple mismatch %v\n", eventType, ctid)
 			logger.Warn("Actual: %s Expected: %s\n", clientSideTuple.String(), conntrack.ClientSideTuple.String())
 			logger.Err("Deleting obsolete conntrack entry %v.\n", ctid)
-			removeConntrack2(ctid, conntrack)
+			removeConntrackStale(ctid, conntrack)
 			conntrackFound = false
 			conntrack = nil
 		}
@@ -135,7 +123,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			return
 		}
 
-		removeConntrack2(ctid, conntrack)
+		removeConntrackStale(ctid, conntrack)
 	}
 
 	// handle NEW events
@@ -309,6 +297,18 @@ func removeConntrack(ctid uint32) {
 	conntrackTableMutex.Lock()
 	defer conntrackTableMutex.Unlock()
 	delete(conntrackTable, ctid)
+}
+
+// removeConntrackSpecific remove an entry from the conntrackTable that is obsolete/dead/invalid
+func removeConntrackStale(ctid uint32, conntrack *Conntrack) {
+	removeConntrack(ctid)
+
+	// We only want to remove the specific session
+	// There is a race, we may get this DELETE event after the ctid has been reused by a new session
+	// and we don't want to remove that mapping from the session table
+	if conntrack != nil && conntrack.Session != nil {
+		conntrack.Session.destroy()
+	}
 }
 
 // cleanConntrackTable cleans the conntrack table by removing stale entries
