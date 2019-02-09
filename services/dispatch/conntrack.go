@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/logger"
 )
 
@@ -311,7 +310,7 @@ func removeConntrack(ctid uint32) {
 	delete(conntrackTable, ctid)
 }
 
-// removeConntrackSpecific remove an entry from the conntrackTable that is obsolete/dead/invalid
+// removeConntrackStale remove an entry from the conntrackTable that is obsolete/dead/invalid
 func removeConntrackStale(ctid uint32, conntrack *Conntrack) {
 	removeConntrack(ctid)
 
@@ -341,7 +340,10 @@ func cleanConntrackTable() {
 			// In reality sometimes we miss DELETE events (if the buffer fills)
 			// so sometimes we do see this happen in the real world under heavy load
 			logger.Warn("Removing stale (%v) conntrack entry [%d] %v\n", time.Now().Sub(conntrack.LastActivityTime), ctid, conntrack.ClientSideTuple)
-			dict.DeleteSession(ctid)
+			if conntrack != nil && conntrack.Session != nil {
+				conntrack.Session.flushDict()
+				conntrack.Session.removeFromSessionTable()
+			}
 			delete(conntrackTable, ctid)
 		}
 	}
