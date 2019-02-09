@@ -75,6 +75,11 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		logger.Trace("conntrack event[%c]: %v %v:%v->%v:%v\n", eventType, ctid, client, clientPort, server, serverPort)
 	}
 
+	// We don't care about any loopback traffic
+	if client.IsLoopback() || server.IsLoopback() {
+		return
+	}
+
 	// sanity check tuple for all eventType
 	if conntrackFound && conntrack != nil {
 		var clientSideTuple Tuple

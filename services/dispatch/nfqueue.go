@@ -100,6 +100,13 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 		return NfAccept
 	}
 
+	// we shouldn't be queueing loopback packets
+	// if we catch one throw a warning
+	if mess.MsgTuple.ClientAddress.IsLoopback() || mess.MsgTuple.ServerAddress.IsLoopback() {
+		logger.Warn("nfqueue event for loopback packet: %v\n", mess.MsgTuple)
+		return NfAccept
+	}
+
 	newSession := ((pmark & 0x10000000) != 0)
 
 	// get the TCP layer
