@@ -193,7 +193,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			session.ServerInterfaceType = uint8((conntrack.ConnMark & 0x0C000000) >> 26)
 			session.ConntrackConfirmed = true
 			session.Conntrack = conntrack
-			session.LastActivityTime = time.Now()
+			session.SetLastActivity(time.Now())
 			session.AddEventCount(1)
 			conntrack.Session = session
 			conntrack.SessionID = session.SessionID
@@ -235,7 +235,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			conntrack.ConnMark = connmark
 		}
 		if conntrack.Session != nil {
-			conntrack.Session.LastActivityTime = time.Now()
+			conntrack.Session.SetLastActivity(time.Now())
 			conntrack.Session.AddEventCount(1)
 		}
 

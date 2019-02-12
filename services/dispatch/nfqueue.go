@@ -131,7 +131,9 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 		mess.Payload = appLayer.Payload()
 	}
 
-	logger.Trace("nfqueue event[%d]: %v 0x%08x\n", ctid, mess.MsgTuple, pmark)
+	if logger.IsTraceEnabled() {
+		logger.Trace("nfqueue event[%d]: %v 0x%08x\n", ctid, mess.MsgTuple, pmark)
+	}
 
 	session := findSession(ctid)
 
@@ -221,7 +223,7 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 	}
 
 	// Update some accounting bits
-	session.LastActivityTime = time.Now()
+	session.SetLastActivity(time.Now())
 	session.AddPacketCount(1)
 	session.AddByteCount(uint64(mess.Length))
 	session.AddEventCount(1)
@@ -267,8 +269,11 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 			if val.Priority != priority {
 				continue
 			}
-			logger.Trace("Calling nfqueue PLUGIN:%s PRI:%d CTID:%d\n", key, priority, ctid)
-			go func(key string, val SubscriptionHolder) {
+			go func(key string, val SubscriptionHolder, pri int) {
+				if logger.IsTraceEnabled() {
+					logger.Trace("Calling nfqueue PLUGIN:%s PRI:%d CTID:%d\n", key, pri, ctid)
+				}
+
 				timeoutTimer := time.NewTimer(maxAllowedTime)
 				c := make(chan subscriberResult, 1)
 				t1 := getMicroseconds()
@@ -292,8 +297,10 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 				timeMap[val.Owner] = timediff
 				timeMapLock.Unlock()
 
-				logger.Trace("Finished nfqueue PLUGIN:%s PRI:%d CTID:%d ms:%.1f\n", key, priority, ctid, timediff)
-			}(key, val)
+				if logger.IsTraceEnabled() {
+					logger.Trace("Finished nfqueue PLUGIN:%s PRI:%d CTID:%d ms:%.1f\n", key, pri, ctid, timediff)
+				}
+			}(key, val, priority)
 			hitcount++
 			subcount++
 		}
@@ -336,13 +343,12 @@ func createSession(mess NfqueueMessage, ctid uint32) *Session {
 	session.CreationTime = time.Now()
 	session.SetPacketCount(1)
 	session.SetByteCount(uint64(mess.Length))
-	session.LastActivityTime = time.Now()
-	session.ClientSideTuple = mess.MsgTuple
 	session.SetEventCount(1)
+	session.SetLastActivity(time.Now())
+	session.ClientSideTuple = mess.MsgTuple
 	session.ConntrackConfirmed = false
 	session.attachments = make(map[string]interface{})
 	AttachNfqueueSubscriptions(session)
-	logger.Trace("Session Adding %d to table\n", ctid)
 	insertSessionTable(ctid, session)
 	return session
 }
