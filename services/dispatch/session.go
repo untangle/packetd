@@ -21,9 +21,6 @@ type Session struct {
 	// CreationTime stores the creation time of the session
 	CreationTime time.Time
 
-	// LastActivityTime stores the last time we got any nfqueue/conntrack event for this session
-	LastActivityTime time.Time
-
 	// ClientSideTuple stores the client-side (pre-NAT) session tuple
 	ClientSideTuple Tuple
 
@@ -63,9 +60,13 @@ type Session struct {
 	// attachmentLock is the lock for attachments
 	attachmentLock sync.Mutex
 
-	packetCount uint64
-	byteCount   uint64
-	eventCount  uint64
+	// activityLock is the lock for the last activity time
+	activityLock sync.Mutex
+
+	lastActivity time.Time
+	packetCount  uint64
+	byteCount    uint64
+	eventCount   uint64
 }
 
 // sessionTable is the global session table
@@ -165,15 +166,41 @@ func (sess *Session) AddEventCount(value uint64) uint64 {
 	return atomic.AddUint64(&sess.eventCount, value)
 }
 
-// destroy is called to end the session
-// it removes the session from the session table, and calls
-// the finialization event to all subscribers
-func (sess *Session) destroy() {
+// GetLastActivity gets the time of the last session activity
+func (sess *Session) GetLastActivity() time.Time {
+	sess.activityLock.Lock()
+	defer sess.activityLock.Unlock()
+	value := sess.lastActivity
+	return value
+}
+
+// SetLastActivity sets the time of the last session activity
+func (sess *Session) SetLastActivity(value time.Time) {
+	sess.activityLock.Lock()
+	defer sess.activityLock.Unlock()
+	sess.lastActivity = value
+}
+
+// removeFromSessionTable removes the session from the session table
+// it does a sanity check to make sure the session in question
+// is actually in the table
+func (sess *Session) removeFromSessionTable() {
+	sessionMutex.Lock()
+	sessInTable, found := sessionTable[sess.ConntrackID]
+	if found && sess == sessInTable {
+		delete(sessionTable, sess.ConntrackID)
+	}
+	sessionMutex.Unlock()
+}
+
+// flushDict flushes the dict for the session
+// it does a sanity check to make sure it ows its ctid
+// by doing a lookup in the session table
+func (sess *Session) flushDict() {
 	sessionMutex.Lock()
 	sessInTable, found := sessionTable[sess.ConntrackID]
 	if found && sess == sessInTable {
 		dict.DeleteSession(sess.ConntrackID)
-		delete(sessionTable, sess.ConntrackID)
 	}
 	sessionMutex.Unlock()
 }
@@ -230,9 +257,9 @@ func cleanSessionTable() {
 		// However, if we find a a stale conntrack-confirmed session that is bad.
 
 		// We use 10000 seconds because 7440 is the established idle tcp timeout default
-		if time.Now().Sub(session.LastActivityTime) > 10000*time.Second {
+		if time.Now().Sub(session.GetLastActivity()) > 10000*time.Second {
 			if session.ConntrackConfirmed {
-				logger.Err("Removing stale (%v) session [%v] %v\n", time.Now().Sub(session.LastActivityTime), ctid, session.ClientSideTuple)
+				logger.Err("Removing stale (%v) session [%v] %v\n", time.Now().Sub(session.GetLastActivity()), ctid, session.ClientSideTuple)
 			}
 			dict.DeleteSession(ctid)
 			delete(sessionTable, ctid)

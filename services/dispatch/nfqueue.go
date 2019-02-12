@@ -100,6 +100,13 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 		return NfAccept
 	}
 
+	// we shouldn't be queueing loopback packets
+	// if we catch one throw a warning
+	if mess.MsgTuple.ClientAddress.IsLoopback() || mess.MsgTuple.ServerAddress.IsLoopback() {
+		logger.Warn("nfqueue event for loopback packet: %v\n", mess.MsgTuple)
+		return NfAccept
+	}
+
 	newSession := ((pmark & 0x10000000) != 0)
 
 	// get the TCP layer
@@ -124,7 +131,9 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 		mess.Payload = appLayer.Payload()
 	}
 
-	logger.Trace("nfqueue event[%d]: %v 0x%08x\n", ctid, mess.MsgTuple, pmark)
+	if logger.IsTraceEnabled() {
+		logger.Trace("nfqueue event[%d]: %v 0x%08x\n", ctid, mess.MsgTuple, pmark)
+	}
 
 	session := findSession(ctid)
 
@@ -171,7 +180,9 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 				// it in the conntrack table for the conntrack handle to handle
 
 				logger.Debug("Conflicting session [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
-				session.destroy()
+				// We don't need to flush here - this is a new session its already been flushed
+				// session.flushDict()
+				session.removeFromSessionTable()
 				session = createSession(mess, ctid)
 				mess.Session = session
 			}
@@ -184,6 +195,20 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 	}
 
 	mess.Session = session
+
+	// Sanity check - if this is a new session we should not have an existing conntrack entry (yet)
+	// This does occur under normal circumstatnces when a ctid gets reused, and we get an
+	// nfqueue event for the new session (same ctid) before we get the conntrack delete event
+	if newSession {
+		conntrack, _ := findConntrack(ctid)
+		if conntrack != nil {
+			logger.Debug("Found existing conntrack (ctid: %v) for new session:\n", ctid)
+			logger.Debug("New Session        : %v\n", mess.MsgTuple)
+			logger.Debug("Existing Conntrack : %v\n", conntrack.ClientSideTuple)
+			logger.Debug("Removing previous conntrack.\n")
+		}
+		removeConntrack(ctid)
+	}
 
 	if mess.MsgTuple.ClientAddress.Equal(session.ClientSideTuple.ClientAddress) {
 		mess.ClientToServer = true
@@ -198,7 +223,7 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 	}
 
 	// Update some accounting bits
-	session.LastActivityTime = time.Now()
+	session.SetLastActivity(time.Now())
 	session.AddPacketCount(1)
 	session.AddByteCount(uint64(mess.Length))
 	session.AddEventCount(1)
@@ -208,7 +233,7 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 	// to avoid flooding logs with a "> X" condition
 	packetcount := session.GetPacketCount()
 	if packetcount == 100 || packetcount == 200 {
-		logger.Warn("Deep session scan. %v ctid:%v Packets:%v Bytes:%v Subscribers:%v\n", session.ClientSideTuple, ctid, session.GetPacketCount(), session.GetByteCount(), session.subscriptions)
+		logger.Warn("Deep session scan. %v ctid:%v Packets:%v Bytes:%v Subscribers:%v Age:%v\n", session.ClientSideTuple, ctid, session.GetPacketCount(), session.GetByteCount(), session.subscriptions, time.Since(session.CreationTime))
 	}
 
 	return callSubscribers(ctid, session, mess, pmark, newSession)
@@ -244,8 +269,11 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 			if val.Priority != priority {
 				continue
 			}
-			logger.Trace("Calling nfqueue PLUGIN:%s PRI:%d CTID:%d\n", key, priority, ctid)
-			go func(key string, val SubscriptionHolder) {
+			go func(key string, val SubscriptionHolder, pri int) {
+				if logger.IsTraceEnabled() {
+					logger.Trace("Calling nfqueue PLUGIN:%s PRI:%d CTID:%d\n", key, pri, ctid)
+				}
+
 				timeoutTimer := time.NewTimer(maxAllowedTime)
 				c := make(chan subscriberResult, 1)
 				t1 := getMicroseconds()
@@ -269,8 +297,10 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 				timeMap[val.Owner] = timediff
 				timeMapLock.Unlock()
 
-				logger.Trace("Finished nfqueue PLUGIN:%s PRI:%d CTID:%d ms:%.1f\n", key, priority, ctid, timediff)
-			}(key, val)
+				if logger.IsTraceEnabled() {
+					logger.Trace("Finished nfqueue PLUGIN:%s PRI:%d CTID:%d ms:%.1f\n", key, pri, ctid, timediff)
+				}
+			}(key, val, priority)
 			hitcount++
 			subcount++
 		}
@@ -313,13 +343,12 @@ func createSession(mess NfqueueMessage, ctid uint32) *Session {
 	session.CreationTime = time.Now()
 	session.SetPacketCount(1)
 	session.SetByteCount(uint64(mess.Length))
-	session.LastActivityTime = time.Now()
-	session.ClientSideTuple = mess.MsgTuple
 	session.SetEventCount(1)
+	session.SetLastActivity(time.Now())
+	session.ClientSideTuple = mess.MsgTuple
 	session.ConntrackConfirmed = false
 	session.attachments = make(map[string]interface{})
 	AttachNfqueueSubscriptions(session)
-	logger.Trace("Session Adding %d to table\n", ctid)
 	insertSessionTable(ctid, session)
 	return session
 }

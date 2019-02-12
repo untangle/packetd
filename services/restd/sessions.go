@@ -2,6 +2,7 @@ package restd
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/untangle/packetd/services/dict"
@@ -131,7 +132,9 @@ func parseConntrack(ct *dispatch.Conntrack) map[string]interface{} {
 	m["server_packets"] = ct.ServerPackets
 
 	m["timestamp_start"] = ct.TimestampStart
-	m["timestamp_stop"] = ct.TimestampStop
+	if ct.TimestampStart != 0 {
+		m["age_milliseconds"] = (uint64(time.Now().UnixNano()) - ct.TimestampStart) / 1000000
+	}
 
 	var mark uint32
 	mark = ct.ConnMark

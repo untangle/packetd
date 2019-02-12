@@ -195,7 +195,8 @@ func HandleWarehouseCleanup() {
 			logger.Debug("Removing playback session for %d\n", ctid)
 			sess := findSession(ctid)
 			if sess != nil {
-				sess.destroy()
+				sess.flushDict()
+				sess.removeFromSessionTable()
 			}
 		}
 		nfCleanupHolder = nil
