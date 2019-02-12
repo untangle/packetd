@@ -97,7 +97,7 @@ var queryID uint64
 var eventQueue = make(chan Event, 10000)
 
 // EventsLogged records the number of events logged
-var EventsLogged = 0
+var EventsLogged uint64
 
 // DbFilename is the sqlite db filename
 const dbFilename = "/tmp/reports.db"
@@ -266,7 +266,7 @@ func eventLogger() {
 			}
 		}
 		logger.Debug("Log Event: %s %v\n", summary, event.SQLOp)
-		EventsLogged++
+		atomic.AddUint64(&EventsLogged, 1)
 
 		if event.SQLOp == 1 {
 			logInsertEvent(event)
