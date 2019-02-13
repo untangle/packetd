@@ -12,17 +12,19 @@ import (
 
 // ReverseHolder is used to cache a list of DNS names for an IP address
 type ReverseHolder struct {
-	CreationTime time.Time
-	ExpireTime   time.Time
-	NameList     []string
-	Available    bool
-	WaitGroup    sync.WaitGroup
+	AccessTime time.Time
+	NameList   []string
+	Available  bool
+	WaitGroup  sync.WaitGroup
+	DataMutex  sync.Mutex
 }
 
 const pluginName = "revdns"
 const clientSuffix = "_client"
 const serverSuffix = "_server"
-const reverseTimeout = 3600
+
+//const reverseTimeout = 3600
+const reverseTimeout = 120
 
 var shutdownChannel = make(chan bool)
 var reverseTable map[string]*ReverseHolder
@@ -89,6 +91,7 @@ func PluginNfqueueClientHandler(mess dispatch.NfqueueMessage, ctid uint32, newSe
 		clientMutex.Unlock()
 
 		list, err := net.LookupAddr(findkey)
+		holder.DataMutex.Lock()
 
 		if err == nil && len(list) > 0 {
 			logger.Debug("Successfully fetched reverse names for %s ctid:%d\n", findkey, ctid)
@@ -98,7 +101,9 @@ func PluginNfqueueClientHandler(mess dispatch.NfqueueMessage, ctid uint32, newSe
 			logger.Debug("Could not fetch reverse names for %s ctid:%d\n", findkey, ctid)
 			holder.Available = false
 		}
-		holder.CreationTime = time.Now()
+
+		holder.AccessTime = time.Now()
+		holder.DataMutex.Unlock()
 		holder.WaitGroup.Done()
 	}
 
@@ -114,7 +119,7 @@ func PluginNfqueueClientHandler(mess dispatch.NfqueueMessage, ctid uint32, newSe
 	holder.WaitGroup.Wait()
 	logger.Debug("Reverse DNS holder for %s found - ctid:%d available:%v list:%v\n", findkey, ctid, holder.Available, holder.NameList)
 
-	// if the cert is available for this server attach the cert to the session
+	// if the holder is available for this server attach the names to the session
 	// and put the details in the dictionary
 	if holder.Available {
 		attachReverseNamesToSession("client_reverse_dns", mess.Session, holder.NameList)
@@ -158,6 +163,7 @@ func PluginNfqueueServerHandler(mess dispatch.NfqueueMessage, ctid uint32, newSe
 		serverMutex.Unlock()
 
 		list, err := net.LookupAddr(findkey)
+		holder.DataMutex.Lock()
 
 		if err == nil && len(list) > 0 {
 			logger.Debug("Successfully fetched reverse names for %s ctid:%d\n", findkey, ctid)
@@ -167,7 +173,9 @@ func PluginNfqueueServerHandler(mess dispatch.NfqueueMessage, ctid uint32, newSe
 			logger.Debug("Could not fetch reverse names for %s ctid:%d\n", findkey, ctid)
 			holder.Available = false
 		}
-		holder.CreationTime = time.Now()
+
+		holder.AccessTime = time.Now()
+		holder.DataMutex.Unlock()
 		holder.WaitGroup.Done()
 	}
 
@@ -183,7 +191,7 @@ func PluginNfqueueServerHandler(mess dispatch.NfqueueMessage, ctid uint32, newSe
 	holder.WaitGroup.Wait()
 	logger.Debug("Reverse DNS holder for %s found - ctid:%d available:%v list:%v\n", findkey, ctid, holder.Available, holder.NameList)
 
-	// if the cert is available for this server attach the cert to the session
+	// if the holder is available for this server attach the names to the session
 	// and put the details in the dictionary
 	if holder.Available {
 		attachReverseNamesToSession("server_reverse_dns", mess.Session, holder.NameList)
@@ -218,8 +226,6 @@ func findReverse(finder string) *ReverseHolder {
 
 // insertReverse adds an address and list of names to the cache
 func insertReverse(finder string, holder *ReverseHolder) {
-	holder.ExpireTime = time.Now()
-	holder.ExpireTime.Add(time.Second * time.Duration(reverseTimeout))
 	reverseMutex.Lock()
 	if reverseTable[finder] != nil {
 		delete(reverseTable, finder)
@@ -244,12 +250,15 @@ func cleanReverseTable() {
 	defer reverseMutex.Unlock()
 
 	for key, val := range reverseTable {
-		if val.ExpireTime.Unix() < nowtime.Unix() {
+		val.DataMutex.Lock()
+		if nowtime.Unix() < (val.AccessTime.Unix() + reverseTimeout) {
 			logger.Trace("revdns leaving ADDR:%s LIST:%v in table\n", key, val.NameList)
+			val.DataMutex.Unlock()
 			continue
 		}
 		logger.Trace("revdns removing ADDR:%s LIST:%v from table\n", key, val.NameList)
 		delete(reverseTable, key)
+		val.DataMutex.Unlock()
 		counter++
 	}
 
