@@ -20,7 +20,6 @@ type Conntrack struct {
 	SessionID         uint64
 	Family            uint8
 	CreationTime      time.Time
-	LastActivityTime  time.Time
 	LastUpdateTime    time.Time
 	ClientSideTuple   Tuple
 	ServerSideTuple   Tuple
@@ -47,14 +46,17 @@ type Conntrack struct {
 	ClientPacketRate  float32 // the Client packet rate site the last update
 	ServerPacketRate  float32 // the Server packet rate site the last update
 	TotalPacketRate   float32 // the Total packet rate site the last update
+
+	activityLock sync.Mutex
+	lastActivity time.Time
 }
 
 var conntrackTable map[uint32]*Conntrack
 var conntrackTableMutex sync.Mutex
 
 // String returns string representation of conntrack
-func (c Conntrack) String() string {
-	return strconv.Itoa(int(c.ConntrackID)) + "|" + c.ClientSideTuple.String()
+func (ct *Conntrack) String() string {
+	return strconv.Itoa(int(ct.ConntrackID)) + "|" + ct.ClientSideTuple.String()
 }
 
 // conntrackCallback is the global conntrack event handler
@@ -96,7 +98,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			logger.Err("ClientSideTuple: %v\n", conntrack.ClientSideTuple)
 			logger.Err("ServerSideTuple: %v\n", conntrack.ServerSideTuple)
 			logger.Err("CreationTime: %v ago\n", time.Now().Sub(conntrack.CreationTime))
-			logger.Err("LastActivityTime: %v ago\n", time.Now().Sub(conntrack.LastActivityTime))
+			logger.Err("LastActivityTime: %v ago\n", time.Now().Sub(conntrack.GetLastActivity()))
 			logger.Err("ConntrackID: %v\n", conntrack.ConntrackID)
 			logger.Err("SessionID: %v\n", conntrack.SessionID)
 			if conntrack.Session != nil {
@@ -220,8 +222,8 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		}
 
 		previousUpdateTime := conntrack.LastUpdateTime
-		conntrack.LastActivityTime = time.Now()
-		conntrack.LastUpdateTime = conntrack.LastActivityTime
+		conntrack.SetLastActivity(time.Now())
+		conntrack.LastUpdateTime = conntrack.GetLastActivity()
 		var secondsSinceLastUpdate float32
 		if previousUpdateTime.IsZero() {
 			secondsSinceLastUpdate = float32(conntrackIntervalSeconds)
@@ -330,7 +332,7 @@ func cleanConntrackTable() {
 
 	for ctid, conntrack := range conntrackTable {
 		// We use 10000 seconds because 7440 is the established idle tcp timeout default
-		if time.Now().Sub(conntrack.LastActivityTime) > 10000*time.Second {
+		if time.Now().Sub(conntrack.GetLastActivity()) > 10000*time.Second {
 			// In theory this should never happen,
 			// entries should be removed by DELETE events
 			// otherwise they should be getting UPDATE events and the LastActivityTime
@@ -339,7 +341,7 @@ func cleanConntrackTable() {
 			// some constraint has failed
 			// In reality sometimes we miss DELETE events (if the buffer fills)
 			// so sometimes we do see this happen in the real world under heavy load
-			logger.Warn("Removing stale (%v) conntrack entry [%d] %v\n", time.Now().Sub(conntrack.LastActivityTime), ctid, conntrack.ClientSideTuple)
+			logger.Warn("Removing stale (%v) conntrack entry [%d] %v\n", time.Now().Sub(conntrack.GetLastActivity()), ctid, conntrack.ClientSideTuple)
 			if conntrack != nil && conntrack.Session != nil {
 				conntrack.Session.flushDict()
 				conntrack.Session.removeFromSessionTable()
@@ -360,7 +362,7 @@ func createConntrack(ctid uint32, connmark uint32, family uint8, eventType uint8
 	conntrack.ConnMark = connmark
 	conntrack.CreationTime = time.Now()
 	conntrack.Family = family
-	conntrack.LastActivityTime = time.Now()
+	conntrack.SetLastActivity(time.Now())
 	conntrack.EventCount = 1
 	conntrack.ClientSideTuple.Protocol = protocol
 	conntrack.ClientSideTuple.ClientAddress = dupIP(client)
@@ -455,4 +457,19 @@ func updateStatsAndRates(conntrack *Conntrack, clientBytes uint64, serverBytes u
 	conntrack.ClientPacketRate = clientPacketRate
 	conntrack.ServerPacketRate = serverPacketRate
 	conntrack.TotalPacketRate = totalPacketRate
+}
+
+// GetLastActivity gets the time of the last session activity
+func (ct *Conntrack) GetLastActivity() time.Time {
+	ct.activityLock.Lock()
+	defer ct.activityLock.Unlock()
+	value := ct.lastActivity
+	return value
+}
+
+// SetLastActivity sets the time of the last session activity
+func (ct *Conntrack) SetLastActivity(value time.Time) {
+	ct.activityLock.Lock()
+	defer ct.activityLock.Unlock()
+	ct.lastActivity = value
 }

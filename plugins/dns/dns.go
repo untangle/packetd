@@ -9,6 +9,7 @@ import (
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/reports"
 )
 
 const pluginName = "dns"
@@ -63,17 +64,24 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// for new sessions we look for the client and server IP in our DNS cache
 	if newSession {
-		var name string
-		name = FindAddress(mess.MsgTuple.ClientAddress)
-		if len(name) > 0 {
-			logger.Debug("Setting client_dns_hint %s ctid:%d\n", name, ctid)
-			dict.AddSessionEntry(mess.Session.ConntrackID, "client_dns_hint", name)
+		var clientHint string
+		var serverHint string
+
+		clientHint = FindAddress(mess.MsgTuple.ClientAddress)
+		if len(clientHint) > 0 {
+			logger.Debug("Setting client_dns_hint %s ctid:%d\n", clientHint, ctid)
+			dict.AddSessionEntry(mess.Session.ConntrackID, "client_dns_hint", clientHint)
+			mess.Session.PutAttachment("client_dns_hint", clientHint)
 		}
-		name = FindAddress(mess.MsgTuple.ServerAddress)
-		if len(name) > 0 {
-			logger.Debug("Setting server_dns_hint %s ctid:%d\n", name, ctid)
-			dict.AddSessionEntry(mess.Session.ConntrackID, "server_dns_hint", name)
+
+		serverHint = FindAddress(mess.MsgTuple.ServerAddress)
+		if len(serverHint) > 0 {
+			logger.Debug("Setting server_dns_hint %s ctid:%d\n", serverHint, ctid)
+			dict.AddSessionEntry(mess.Session.ConntrackID, "server_dns_hint", serverHint)
+			mess.Session.PutAttachment("server_dns_hint", serverHint)
 		}
+
+		logEvent(mess.Session, clientHint, serverHint)
 	}
 
 	// get the DNS layer
@@ -198,4 +206,29 @@ func cleanupTask() {
 			cleanAddressTable()
 		}
 	}
+}
+
+// logEvent logs an update event that updates the *_dns_hint columns
+// provide the session, and the client and server hints
+func logEvent(session *dispatch.Session, clientHint string, serverHint string) {
+	columns := map[string]interface{}{
+		"session_id": session.SessionID,
+	}
+	total := 0
+
+	modifiedColumns := make(map[string]interface{})
+	if len(clientHint) > 0 {
+		modifiedColumns["client_dns_hint"] = clientHint
+		total++
+	}
+	if len(serverHint) > 0 {
+		modifiedColumns["server_dns_hint"] = serverHint
+		total++
+	}
+
+	if total == 0 {
+		return
+	}
+
+	reports.LogEvent(reports.CreateEvent("session_dns", "sessions", 2, columns, modifiedColumns))
 }
