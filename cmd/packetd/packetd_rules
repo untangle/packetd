@@ -49,12 +49,14 @@ is_queue_open()
 
 remove_packetd_rules()
 {
-    ${NFT} flush chain inet ${TABLE_NAME} prerouting-packetd 2>/dev/null
-    ${NFT} flush chain inet ${TABLE_NAME} input-packetd 2>/dev/null
-    ${NFT} flush chain inet ${TABLE_NAME} output-packetd 2>/dev/null
-    ${NFT} delete chain inet ${TABLE_NAME} prerouting-packetd 2>/dev/null
-    ${NFT} delete chain inet ${TABLE_NAME} input-packetd 2>/dev/null
-    ${NFT} delete chain inet ${TABLE_NAME} output-packetd 2>/dev/null
+    ${NFT} flush chain inet ${TABLE_NAME} packetd-prerouting 2>/dev/null
+    ${NFT} flush chain inet ${TABLE_NAME} packetd-input 2>/dev/null
+    ${NFT} flush chain inet ${TABLE_NAME} packetd-output 2>/dev/null
+    ${NFT} flush chain inet ${TABLE_NAME} packetd-queue 2>/dev/null
+    ${NFT} delete chain inet ${TABLE_NAME} packetd-prerouting 2>/dev/null
+    ${NFT} delete chain inet ${TABLE_NAME} packetd-input 2>/dev/null
+    ${NFT} delete chain inet ${TABLE_NAME} packetd-output 2>/dev/null
+    ${NFT} delete chain inet ${TABLE_NAME} packetd-queue 2>/dev/null
     ${NFT} delete table inet ${TABLE_NAME} 2>/dev/null
 }
 
@@ -62,41 +64,54 @@ insert_packetd_rules()
 {
     # create the tables if needed
     ${NFT} add table inet ${TABLE_NAME}
-    ${NFT} add chain inet ${TABLE_NAME} prerouting-packetd "{ type filter hook prerouting priority $QUEUE_PRIORITY ; }"
-    ${NFT} flush chain inet ${TABLE_NAME} prerouting-packetd
 
-    # Create chains for setting the connmark on input/output
-    ${NFT} add chain inet ${TABLE_NAME} output-packetd "{ type filter hook output priority $MANGLE_PRIORITY ; }"
-    ${NFT} add chain inet ${TABLE_NAME} input-packetd "{ type filter hook input priority $MANGLE_PRIORITY ; }"
-    ${NFT} flush chain inet ${TABLE_NAME} output-packetd
-    ${NFT} flush chain inet ${TABLE_NAME} input-packetd
+    # create chains
+    ${NFT} add chain inet ${TABLE_NAME} packetd-prerouting "{ type filter hook prerouting priority $QUEUE_PRIORITY ; }"
+    ${NFT} flush chain inet ${TABLE_NAME} packetd-prerouting
+    ${NFT} add chain inet ${TABLE_NAME} packetd-output "{ type filter hook output priority $MANGLE_PRIORITY ; }"
+    ${NFT} flush chain inet ${TABLE_NAME} packetd-output
+    ${NFT} add chain inet ${TABLE_NAME} packetd-input "{ type filter hook input priority $MANGLE_PRIORITY ; }"
+    ${NFT} flush chain inet ${TABLE_NAME} packetd-input
+    ${NFT} add chain inet ${TABLE_NAME} packetd-queue
+    ${NFT} flush chain inet ${TABLE_NAME} packetd-queue
 
-    # Set bypass bit on local traffic
-    ${NFT} add rule inet ${TABLE_NAME} output-packetd ct mark set ct mark or 0x80000000
-    ${NFT} add rule inet ${TABLE_NAME} input-packetd udp dport 53 return
-    ${NFT} add rule inet ${TABLE_NAME} input-packetd tcp dport 53 return
-    ${NFT} add rule inet ${TABLE_NAME} input-packetd ct mark set ct mark or 0x80000000
+    # Set bypass bit on all local-outbound sessions
+    ${NFT} add rule inet ${TABLE_NAME} packetd-output ct state new ct mark set ct mark or 0x80000000
+    ${NFT} add rule inet ${TABLE_NAME} packetd-output goto packetd-queue
+
+    # Set bypass bit on all local-inbound sessions (except DNS)
+    ${NFT} add rule inet ${TABLE_NAME} packetd-input udp dport 53 return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-input tcp dport 53 return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-input ct state new ct mark set ct mark or 0x80000000
+
+    # Catch packets in prerouting
+    ${NFT} add rule inet ${TABLE_NAME} packetd-prerouting goto packetd-queue
 
     # Don't catch loopback traffic
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ip saddr 127.0.0.1/8 return
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ip daddr 127.0.0.1/8 return
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ip6 saddr ::1 return
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ip6 daddr ::1 return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ip saddr 127.0.0.1/8 return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ip daddr 127.0.0.1/8 return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ip6 saddr ::1 return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ip6 daddr ::1 return
 
     # Do not queue invalid or untracked packets
     # These will not have a valid conntrack ID so there is nothing for packetd to attach metadata to
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state invalid return
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state untracked return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct state invalid return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct state untracked return
 
     # In case we are quickly reusing a conntrack id, flush the sessions dictionary on new connections
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state new counter dict sessions ct id flush
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct state new counter dict sessions ct id flush
 
     # Don't catch bypassed traffic
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd dict sessions ct id bypass_packetd bool true counter return
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct mark and 0x80000000 == 0x80000000 counter return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue dict sessions ct id bypass_packetd bool true counter return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct mark and 0x80000000 == 0x80000000 counter return
 
     # Only catch unicast traffic
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd fib daddr type != unicast counter return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue fib saddr type anycast counter return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue fib daddr type anycast counter return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue fib saddr type broadcast counter return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue fib daddr type broadcast counter return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue fib saddr type multicast counter return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue fib daddr type multicast counter return
 
     # Set the new packet mark
     # We must actually set this mark so that packetd can tell this is a "new" packet
@@ -105,10 +120,10 @@ insert_packetd_rules()
     # that may have the same tuple, and actually may get exactly the same semi-random conntrack ID.
     # To packetd this will look like a second packet, but netfilter considers this a new packet.
     # The only reliable way to let packetd know this is a new packet is by setting the mark before queueing
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ct state new mark set "mark|0x10000000"
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct state new mark set "mark|0x10000000"
 
     # Queue the traffic
-    ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd counter queue num ${PACKETD_QUEUE} fanout,bypass
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue counter queue num ${PACKETD_QUEUE} fanout,bypass
 }
 
 usage() {
