@@ -73,7 +73,7 @@ insert_packetd_rules()
 
     # Set bypass bit on local traffic
     ${NFT} add rule inet ${TABLE_NAME} output-packetd ct mark set ct mark or 0x80000000
-    ${NFT} add rule inet ${TABLE_NAME} input-packetd ct mark set ct mark or 0x80000000
+    ${NFT} add rule inet ${TABLE_NAME} input-packetd udp dport != 53 ct mark set ct mark or 0x80000000
 
     # Don't catch loopback traffic
     ${NFT} add rule inet ${TABLE_NAME} prerouting-packetd ip saddr 127.0.0.1/8 return
