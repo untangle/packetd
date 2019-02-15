@@ -26,12 +26,18 @@ This will install several dependencies automatically, or you can do so manually:
 ```
 go get -u github.com/gin-gonic/gin
 go get -u github.com/gin-contrib/cors
+go get -u github.com/gin-contrib/contrib
 go get -u github.com/gin-contrib/location
+go get -u github.com/gin-contrib/sessions
+go get -u github.com/gorilla/context
+go get -u github.com/gorilla/sessions
+go get -u github.com/gorilla/securecookie
 go get -u github.com/google/gopacket
 go get -u github.com/mattn/go-sqlite3
 go get -u github.com/oschwald/geoip2-golang
 go get -u github.com/GehirnInc/crypt
 go get -u github.com/c9s/goprocinfo/linux
+
 ```
 
 If you want to use the golint tool, you can install it with this command:
