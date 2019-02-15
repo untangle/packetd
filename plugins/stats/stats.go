@@ -15,6 +15,7 @@ const pluginName = "stats"
 const listSize = 1
 
 var latencyTracker [256]*MovingAverage
+var latencyLocker  [256]sync.Mutex
 var interfaceStatsMap map[string]*linux.NetworkStat
 var interfaceNameMap map[string]int
 var shutdownChannel = make(chan bool)
@@ -104,7 +105,9 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		// release the session and add to the average once we have collected a useful amount of data
 		if stats.latencyCount == listSize {
 			value := calculateAverageLatency(stats)
+			latencyLocker[mess.Session.ServerInterfaceID].Lock()
 			latencyTracker[mess.Session.ServerInterfaceID].AddValue(value.Nanoseconds())
+			latencyLocker[mess.Session.ServerInterfaceID].Unlock()
 			mess.Session.DeleteAttachment("stats_holder")
 			result.SessionRelease = true
 		}
@@ -137,9 +140,11 @@ func interfaceTask() {
 			collectInterfaceStats(60)
 
 			for i := 0; i < 256; i++ {
+				latencyLocker[i].Lock()
 				if !latencyTracker[i].IsEmpty() {
 					latencyTracker[i].dumpStatistics(i)
 				}
+				latencyLocker[i].Unlock()
 			}
 		}
 	}
@@ -221,7 +226,9 @@ func collectInterfaceStats(seconds uint64) {
 			if faceval < 0 {
 				latency = 0
 			} else {
+				latencyLocker[faceval].Lock()
 				latency = latencyTracker[faceval].GetTotalAverage()
+				latencyLocker[faceval].Unlock()
 			}
 
 			columns := map[string]interface{}{
