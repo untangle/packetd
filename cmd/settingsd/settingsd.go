@@ -189,15 +189,15 @@ func getSettings(c *gin.Context) {
 		}
 	}
 	if shaStr == "" {
-		c.JSON(200, gin.H{"error": "No settings file (SHA1) specified"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "No settings file (SHA1) specified"})
 		return
 	}
 	if !validSha(shaStr) {
-		c.JSON(200, gin.H{"error": "Invalid SHA1"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid SHA1"})
 	}
 
 	jsonResult := settings.GetSettingsFile(segments, "/var/lib/settingsd/"+shaStr+".json")
-	c.JSON(200, jsonResult)
+	c.JSON(http.StatusOK, jsonResult)
 	return
 }
 
@@ -213,48 +213,48 @@ func getDefaultSettings(c *gin.Context) {
 	}
 
 	jsonResult := settings.GetDefaultSettings(segments)
-	c.JSON(200, jsonResult)
+	c.JSON(http.StatusOK, jsonResult)
 	return
 }
 
 func setSettings(c *gin.Context) {
-	c.JSON(200, map[string]interface{}{"result": "OK"})
+	c.JSON(http.StatusOK, map[string]interface{}{"result": "OK"})
 }
 
 func trimSettings(c *gin.Context) {
-	c.JSON(200, map[string]interface{}{"result": "OK"})
+	c.JSON(http.StatusOK, map[string]interface{}{"result": "OK"})
 	return
 }
 
 func uploadFile(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(200, gin.H{"error": fmt.Sprintf("File missing: %s", err.Error())})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("File missing: %s", err.Error())})
 		return
 	}
 
 	filename := tmpFileName("upload-", ".json")
 
 	if err := c.SaveUploadedFile(file, filename); err != nil {
-		c.JSON(200, gin.H{"error": fmt.Sprintf("Save error: %s", err.Error())})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Save error: %s", err.Error())})
 		return
 	}
 
 	shaStr, err := fileSha1(filename)
 	if err != nil {
-		c.JSON(200, gin.H{"error": fmt.Sprintf("Error computing SHA1: %s", err.Error())})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error computing SHA1: %s", err.Error())})
 		return
 	}
 
 	if !validSha(shaStr) {
-		c.JSON(200, gin.H{"error": "Invalid SHA1"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid SHA1"})
 		return
 	}
 
 	finalFilename := "/var/lib/settingsd/" + shaStr + ".json"
 	err = os.Rename(filename, finalFilename)
 	if err != nil {
-		c.JSON(200, gin.H{"error": fmt.Sprintf("Save error: %s", err.Error())})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Save error: %s", err.Error())})
 		return
 	}
 
@@ -262,7 +262,7 @@ func uploadFile(c *gin.Context) {
 	url := location.Get(c)
 
 	html := fmt.Sprintf("File successfully uploaded.<br/><a href=\"http://%s.%s/settings/\">Click here to view settings.</a>", shaStr, url.Host)
-	c.Data(200, "text/html; charset=utf-8", []byte(html))
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
 }
 
 func validSha(shaStr string) bool {

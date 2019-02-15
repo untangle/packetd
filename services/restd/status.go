@@ -1,6 +1,8 @@
 package restd
 
 import (
+	"net/http"
+
 	"github.com/c9s/goprocinfo/linux"
 	"github.com/gin-gonic/gin"
 	"github.com/untangle/packetd/services/logger"
@@ -54,7 +56,7 @@ func statusSystem(c *gin.Context) {
 		stats["tmpfs"] = tmpfs
 	}
 
-	c.JSON(200, stats)
+	c.JSON(http.StatusOK, stats)
 }
 
 // statusHardware is the RESTD /api/status/system handler
@@ -70,5 +72,5 @@ func statusHardware(c *gin.Context) {
 		stats["cpuinfo"] = cpuinfo
 	}
 
-	c.JSON(200, stats)
+	c.JSON(http.StatusOK, stats)
 }

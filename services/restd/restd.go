@@ -136,7 +136,7 @@ func rootHandler(c *gin.Context) {
 }
 
 func pingHandler(c *gin.Context) {
-	c.JSON(200, gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"message": "pong",
 	})
 }
@@ -144,64 +144,61 @@ func pingHandler(c *gin.Context) {
 func reportsGetData(c *gin.Context) {
 	queryStr := c.Param("query_id")
 	if queryStr == "" {
-		c.JSON(200, gin.H{"error": "query_id not found"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "query_id not found"})
 		return
 	}
 	queryID, err := strconv.ParseUint(queryStr, 10, 64)
 	if err != nil {
-		c.JSON(200, gin.H{"error": err})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
 	}
 
 	str, err := reports.GetData(queryID)
 	if err != nil {
-		c.JSON(200, gin.H{"error": err})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
 	}
 
-	c.String(200, str)
+	c.String(http.StatusOK, str)
 	return
 }
 
 func reportsCreateQuery(c *gin.Context) {
 	body, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(200, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	q, err := reports.CreateQuery(string(body))
 	if err != nil {
-		c.JSON(200, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	str := fmt.Sprintf("%v", q.ID)
 	logger.Debug("CreateQuery(%s)\n", str)
-	c.String(200, str)
-	// c.JSON(200, gin.H{
-	// 	"queryID": q.ID,
-	// })
+	c.String(http.StatusOK, str)
 }
 
 func reportsCloseQuery(c *gin.Context) {
 	queryStr := c.Param("query_id")
 	if queryStr == "" {
-		c.JSON(200, gin.H{"error": "query_id not found"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "query_id not found"})
 		return
 	}
 	queryID, err := strconv.ParseUint(queryStr, 10, 64)
 	if err != nil {
-		c.JSON(200, gin.H{"error": err})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
 	}
 
 	str, err := reports.CloseQuery(queryID)
 	if err != nil {
-		c.JSON(200, gin.H{"error": err})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
 	}
 
-	c.String(200, str)
+	c.String(http.StatusOK, str)
 	return
 }
 
@@ -216,19 +213,19 @@ func warehousePlayback(c *gin.Context) {
 
 	body, err = ioutil.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(200, gin.H{"error": err})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
 	}
 
 	err = json.Unmarshal(body, &data)
 	if err != nil {
-		c.JSON(200, gin.H{"error": err})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
 	}
 
 	filename, found = data["filename"]
 	if found != true {
-		c.JSON(200, gin.H{"error": "filename not specified"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "filename not specified"})
 		return
 	}
 
@@ -249,17 +246,17 @@ func warehousePlayback(c *gin.Context) {
 	logger.Info("Beginning playback of file:%s speed:%d\n", filename, speedval)
 	dispatch.HandleWarehousePlayback()
 
-	c.JSON(200, "Playback started")
+	c.JSON(http.StatusOK, "Playback started")
 }
 
 func warehouseCapture(c *gin.Context) {
 	// FIXME - some day
-	c.JSON(200, "THIS FUNCTION IS NOT YET IMPLEMENTED")
+	c.JSON(http.StatusOK, "THIS FUNCTION IS NOT YET IMPLEMENTED")
 }
 
 func warehouseCleanup(c *gin.Context) {
 	dispatch.HandleWarehouseCleanup()
-	c.JSON(200, "Cleanup success\n")
+	c.JSON(http.StatusOK, "Cleanup success\n")
 }
 
 func warehouseStatus(c *gin.Context) {
@@ -278,7 +275,7 @@ func warehouseStatus(c *gin.Context) {
 		status = "CAPTURE"
 		break
 	}
-	c.JSON(200, status)
+	c.JSON(http.StatusOK, status)
 }
 
 func trafficControl(c *gin.Context) {
@@ -290,13 +287,13 @@ func trafficControl(c *gin.Context) {
 
 	body, err = ioutil.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(200, gin.H{"error": err})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
 	}
 
 	err = json.Unmarshal(body, &data)
 	if err != nil {
-		c.JSON(200, gin.H{"error": err})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
 	}
 
@@ -305,18 +302,18 @@ func trafficControl(c *gin.Context) {
 		if strings.EqualFold(bypass, "TRUE") {
 			logger.Info("Setting traffic bypass flag\n")
 			kernel.SetBypassFlag(1)
-			c.JSON(200, "Traffic bypass flag ENABLED")
+			c.JSON(http.StatusOK, "Traffic bypass flag ENABLED")
 		} else if strings.EqualFold(bypass, "FALSE") {
 			logger.Info("Clearing traffic bypass flag\n")
 			kernel.SetBypassFlag(0)
-			c.JSON(200, "Traffic bypass flag CLEARED")
+			c.JSON(http.StatusOK, "Traffic bypass flag CLEARED")
 		} else {
-			c.JSON(200, gin.H{"error": "Parameter must be TRUE or FALSE"})
+			c.JSON(http.StatusOK, gin.H{"error": "Parameter must be TRUE or FALSE"})
 		}
 		return
 	}
 
-	c.JSON(200, gin.H{"error": "Invalid or missing traffic control command"})
+	c.JSON(http.StatusOK, gin.H{"error": "Invalid or missing traffic control command"})
 }
 
 func getSettings(c *gin.Context) {
@@ -331,7 +328,7 @@ func getSettings(c *gin.Context) {
 	}
 
 	jsonResult := settings.GetSettings(segments)
-	c.JSON(200, jsonResult)
+	c.JSON(http.StatusOK, jsonResult)
 	return
 }
 
@@ -347,7 +344,7 @@ func getDefaultSettings(c *gin.Context) {
 	}
 
 	jsonResult := settings.GetDefaultSettings(segments)
-	c.JSON(200, jsonResult)
+	c.JSON(http.StatusOK, jsonResult)
 	return
 }
 
@@ -363,18 +360,18 @@ func setSettings(c *gin.Context) {
 
 	body, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(200, gin.H{"error": err})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
 	}
 
 	var bodyJSONObject interface{}
 	err = json.Unmarshal(body, &bodyJSONObject)
 	if err != nil {
-		c.JSON(200, gin.H{"error": err})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 	}
 
 	jsonResult := settings.SetSettings(segments, bodyJSONObject)
-	c.JSON(200, jsonResult)
+	c.JSON(http.StatusOK, jsonResult)
 	return
 }
 
@@ -389,7 +386,7 @@ func trimSettings(c *gin.Context) {
 	}
 
 	jsonResult := settings.TrimSettings(segments)
-	c.JSON(200, jsonResult)
+	c.JSON(http.StatusOK, jsonResult)
 	return
 }
 

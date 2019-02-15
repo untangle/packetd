@@ -20,7 +20,7 @@ func statusSessions(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, sessions)
+	c.JSON(http.StatusOK, sessions)
 }
 
 // getSessions returns the fully merged list of sessions
