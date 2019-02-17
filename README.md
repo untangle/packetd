@@ -112,7 +112,7 @@ Getting the image
 They're at https://hub.docker.com/r/untangleinc/mfw/tags
 
 ```
-docker pull untangleinc/mfw:x86-64
+docker pull untangleinc/mfw:x86-64_latest
 ```
 
 You can also build one yourself:
@@ -130,7 +130,7 @@ Running a container from it
 ```
 docker network create --subnet 172.50.0.0/16 eth1-extnet
 docker network create --subnet 172.51.0.0/16 eth0-intnet
-docker create --privileged --rm --net eth1-extnet --name mfw untangleinc/mfw:x86-64_dmorris
+docker create --privileged --rm --net eth1-extnet --name mfw untangleinc/mfw:x86-64_latest
 docker network connect eth0-intnet mfw
 docker start -i mfw
 ```
