@@ -120,41 +120,45 @@ You can also build one yourself:
 ```
 git clone https://github.com/untangle/mfw_build.git
 cd mfw_build
-curl -o x86-64-rootfs.tar.gz http://jenkins.untangle.int/.../artifacts/openwrt-x86-64-generic-rootfs_openwrt-18.06_<timestamp>.tar.gz
-docker build -f Dockerfile.test.mfw --build-arg ROOTFS_TARBALL=x86-64-rootfs.tar.gz -t untangleinc/mfw:x86-64_my-own-image .
+curl -o openwrt-x86-64-generic-rootfs.tar.gz http://jenkins.untangle.int/.../artifacts/openwrt-x86-64-generic-rootfs_openwrt-18.06_<timestamp>.tar.gz
+docker build -f Dockerfile.test.mfw --build-arg ROOTFS_TARBALL=openwrt-x86-64-generic-rootfs.tar.gz -t untangleinc/mfw:x86-64_mytag .
 ```
 
 Running a container from it
 ---------------------------
 
 ```
-docker run -it --rm untangleinc/mfw:x86-64_20190207
+docker network create --subnet 172.50.0.0/16 eth1-extnet
+docker network create --subnet 172.51.0.0/16 eth0-intnet
+docker create --privileged --rm --net eth1-extnet --name mfw untangleinc/mfw:x86-64_dmorris
+docker network connect eth0-intnet mfw
+docker start -i mfw
 ```
 
-Getting a shell in that container
----------------------------------
-
-In another terminal:
+To get a shell in container (in another window):
 
 ```
-# docker ps | grep mfw
-fe6947926f3f        untangleinc/mfw:x86-64_20190207   "/sbin/init"             7 seconds ago       Up 6 seconds        22/tcp              optimistic_haslett
-# docker exec -it fe6947926f3f sh
+docker exec -it mfw sh
+```
 
-BusyBox v1.28.4 () built-in shell (ash)
+Redirect your local host traffic through the container
+------------------------------------------------------
 
-/ # ps w
-  PID USER       VSZ STAT COMMAND
-    1 root     13316 S    /sbin/procd
-   77 root      8988 S    /sbin/ubusd
-  244 root      7048 S    /sbin/logd -S 64
-  603 root     15540 S    /sbin/netifd
-  689 root      2900 S    /usr/sbin/dropbear -F -P /var/run/dropbear.1.pid -p 22 -K 300 -T 3
-  704 root     11224 S    /usr/sbin/odhcpd
-  818 root      3084 S    udhcpc -p /var/run/udhcpc-eth0.pid -s /lib/netifd/dhcp.script -f -t 0 -i eth0 -x hostname:fe6947926f3f -C
-  824 root      4856 S    odhcp6c -s /lib/netifd/dhcpv6.script -P0 -t120 eth0
- 1176 root      3084 S    sh
- 1192 root      3084 R    ps w
+```
+EXTNETID=`docker network inspect eth1-extnet | grep '"Id"' | sed 's/.*: "\(.*\)",/\1/g' | cut -c -12`
+INTNETID=`docker network inspect eth0-intnet | grep '"Id"' | sed 's/.*: "\(.*\)",/\1/g' | cut -c -12`
+GATEWAY=`ip route show table main | awk '/default/ {print $3}'`
+if [ "$GATEWAY" == "172.51.0.2" ] ; then
+    echo "WARNING gateway already changed!"
+else	
+    echo "Replacing original gateway ${GATEWAY} with container 172.51.0.2"	
+    docker exec -it mfw iptables -t nat -A POSTROUTING -j MASQUERADE
+    ip route add default via ${GATEWAY} table 1000
+    ip rule add priority 100 dev br-$EXTNETID table 1000
+    ip rule add priority 100 dev br-$INTNETID table 1000
+    ip route del default via ${GATEWAY} table main
+    ip route add default via 172.51.0.2 table main
+fi
 ```
 
 Copying a new packetd inside that container
