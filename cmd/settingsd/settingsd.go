@@ -196,8 +196,12 @@ func getSettings(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid SHA1"})
 	}
 
-	jsonResult := settings.GetSettingsFile(segments, "/var/lib/settingsd/"+shaStr+".json")
-	c.JSON(http.StatusOK, jsonResult)
+	jsonResult, err := settings.GetSettingsFile(segments, "/var/lib/settingsd/"+shaStr+".json")
+    if err != nil {
+		c.JSON(http.StatusInternalServerError, jsonResult)
+    } else {
+		c.JSON(http.StatusOK, jsonResult)
+    }
 	return
 }
 
@@ -212,8 +216,12 @@ func getDefaultSettings(c *gin.Context) {
 		segments = restd.RemoveEmptyStrings(strings.Split(path, "/"))
 	}
 
-	jsonResult := settings.GetDefaultSettings(segments)
-	c.JSON(http.StatusOK, jsonResult)
+	jsonResult, err := settings.GetDefaultSettings(segments)
+    if err != nil {
+		c.JSON(http.StatusInternalServerError, jsonResult)
+    } else {
+		c.JSON(http.StatusOK, jsonResult)
+    }
 	return
 }
 

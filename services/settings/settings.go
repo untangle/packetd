@@ -29,45 +29,45 @@ func Shutdown() {
 }
 
 // GetSettings returns the settings from the specified path
-func GetSettings(segments []string) interface{} {
+func GetSettings(segments []string) (interface{}, error) {
 	return GetSettingsFile(segments, settingsFile)
 }
 
 // SetSettings updates the settings
-func SetSettings(segments []string, value interface{}) interface{} {
+func SetSettings(segments []string, value interface{}) (interface{}, error) {
 	return SetSettingsFile(segments, value, settingsFile)
 }
 
 // TrimSettings trims the settings
-func TrimSettings(segments []string) interface{} {
+func TrimSettings(segments []string) (interface{}, error) {
 	return TrimSettingsFile(segments, settingsFile)
 }
 
 // GetDefaultSettings returns the default settings from the specified path
-func GetDefaultSettings(segments []string) interface{} {
+func GetDefaultSettings(segments []string) (interface{}, error) {
 	return GetSettingsFile(segments, defaultsFile)
 }
 
 // GetSettingsFile returns the settings from the specified path of the specified filename
-func GetSettingsFile(segments []string, filename string) interface{} {
+func GetSettingsFile(segments []string, filename string) (interface{}, error) {
 	var err error
 	var jsonObject interface{}
 
 	jsonObject, err = readSettingsFileJSON(filename)
 	if err != nil {
-		return createJSONErrorObject(err)
+		return createJSONErrorObject(err), err
 	}
 
 	jsonObject, err = getSettingsFromJSON(jsonObject, segments)
 	if err != nil {
-		return createJSONErrorObject(err)
+		return createJSONErrorObject(err), err
 	}
 
-	return jsonObject
+	return jsonObject, nil
 }
 
 // SetSettingsFile updates the settings
-func SetSettingsFile(segments []string, value interface{}, filename string) interface{} {
+func SetSettingsFile(segments []string, value interface{}, filename string) (interface{}, error) {
 	var ok bool
 	var err error
 	var jsonSettings map[string]interface{}
@@ -75,24 +75,25 @@ func SetSettingsFile(segments []string, value interface{}, filename string) inte
 
 	jsonSettings, err = readSettingsFileJSON(filename)
 	if err != nil {
-		return createJSONErrorObject(err)
+		return createJSONErrorObject(err), err
 	}
 
 	newSettings, err = setSettingsInJSON(jsonSettings, segments, value)
 	if err != nil {
-		return createJSONErrorObject(err)
+		return createJSONErrorObject(err), err
 	}
 	jsonSettings, ok = newSettings.(map[string]interface{})
 	if !ok {
-		return createJSONErrorObject(errors.New("Invalid global settings object"))
+        err = errors.New("Invalid global settings object")
+		return createJSONErrorObject(err), err
 	}
 
 	output, err := syncAndSave(jsonSettings, filename)
 	if err != nil {
-		return map[string]interface{}{"error": err.Error(), "output": output}
+		return map[string]interface{}{"error": err.Error(), "output": output}, err
 	}
 
-	return map[string]interface{}{"result": "OK", "output": output}
+	return map[string]interface{}{"result": "OK", "output": output}, err
 }
 
 // readSettingsFileJSON reads the settings file and return the corresponding JSON object
@@ -142,11 +143,6 @@ func createJSONObject(key string, value string) map[string]interface{} {
 // Create a JSON object with an error based on the object
 func createJSONErrorObject(e error) map[string]interface{} {
 	return createJSONObject("error", e.Error())
-}
-
-// Create a JSON object with an error based on the string
-func createJSONErrorString(str string) map[string]interface{} {
-	return createJSONObject("error", str)
 }
 
 // getArrayIndex get an array value by index as a string
@@ -213,19 +209,20 @@ func setObjectIndex(obj interface{}, idx string, value interface{}) (interface{}
 }
 
 // TrimSettingsFile trims the settings in the specified file
-func TrimSettingsFile(segments []string, filename string) interface{} {
+func TrimSettingsFile(segments []string, filename string) (interface{}, error) {
 	var ok bool
 	var err error
 	var iterJSONObject map[string]interface{}
 	var jsonSettings map[string]interface{}
 
 	if segments == nil {
-		return createJSONErrorString("Invalid trim settings path")
+        err = errors.New("Invalid trim settings path")
+		return createJSONErrorObject(err),err
 	}
 
 	jsonSettings, err = readSettingsFileJSON(filename)
 	if err != nil {
-		return createJSONErrorObject(err)
+		return createJSONErrorObject(err), err
 	}
 
 	iterJSONObject = jsonSettings
@@ -254,17 +251,18 @@ func TrimSettingsFile(segments []string, filename string) interface{} {
 				iterJSONObject[value] = j
 				iterJSONObject = j // for next iteration
 			} else {
-				return createJSONErrorString("Non-dict found in path: " + string(value))
+                err = errors.New("Non-dict found in path: " + string(value))
+				return createJSONErrorObject(err), err
 			}
 		}
 	}
 
 	output, err := syncAndSave(jsonSettings, filename)
 	if err != nil {
-		return map[string]interface{}{"error": err.Error(), "output": output}
+		return map[string]interface{}{"error": err.Error(), "output": output}, err
 	}
 
-	return map[string]interface{}{"result": "OK", "output": output}
+	return map[string]interface{}{"result": "OK", "output": output}, err
 }
 
 // setSettingsInJSON sets the value attribute specified of the segments path to the specified value

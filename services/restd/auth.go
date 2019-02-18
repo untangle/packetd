@@ -186,8 +186,8 @@ func authStatus(c *gin.Context) {
 }
 
 func getCredentials(username string) map[string]interface{} {
-	credentialsJSON := settings.GetSettings([]string{"accounts", "credentials"})
-	if credentialsJSON == nil {
+	credentialsJSON, err := settings.GetSettings([]string{"accounts", "credentials"})
+	if credentialsJSON == nil || err != nil {
 		logger.Warn("Failed to read accounts settings: %v\n", credentialsJSON)
 		return nil
 	}

@@ -312,8 +312,8 @@ func loadInterfaceNameMap() {
 	var netName string
 	var netID int
 
-	networkJSON := settings.GetSettings([]string{"network", "interfaces"})
-	if networkJSON == nil {
+	networkJSON, err := settings.GetSettings([]string{"network", "interfaces"})
+	if networkJSON == nil || err != nil {
 		logger.Warn("Unable to read network settings\n")
 	}
 

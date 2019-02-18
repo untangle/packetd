@@ -330,8 +330,12 @@ func getSettings(c *gin.Context) {
 		segments = RemoveEmptyStrings(strings.Split(path, "/"))
 	}
 
-	jsonResult := settings.GetSettings(segments)
-	c.JSON(http.StatusOK, jsonResult)
+	jsonResult, err := settings.GetSettings(segments)
+    if err != nil {
+		c.JSON(http.StatusInternalServerError, jsonResult)
+    } else {
+		c.JSON(http.StatusOK, jsonResult)
+    }
 	return
 }
 
@@ -346,8 +350,12 @@ func getDefaultSettings(c *gin.Context) {
 		segments = RemoveEmptyStrings(strings.Split(path, "/"))
 	}
 
-	jsonResult := settings.GetDefaultSettings(segments)
-	c.JSON(http.StatusOK, jsonResult)
+	jsonResult, err := settings.GetDefaultSettings(segments)
+    if err != nil {
+		c.JSON(http.StatusInternalServerError, jsonResult)
+    } else {
+		c.JSON(http.StatusOK, jsonResult)
+    }
 	return
 }
 
@@ -373,8 +381,12 @@ func setSettings(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 	}
 
-	jsonResult := settings.SetSettings(segments, bodyJSONObject)
-	c.JSON(http.StatusOK, jsonResult)
+	jsonResult, err := settings.SetSettings(segments, bodyJSONObject)
+    if err != nil {
+		c.JSON(http.StatusInternalServerError, jsonResult)
+    } else {
+		c.JSON(http.StatusOK, jsonResult)
+    }
 	return
 }
 
@@ -388,8 +400,12 @@ func trimSettings(c *gin.Context) {
 		segments = RemoveEmptyStrings(strings.Split(path, "/"))
 	}
 
-	jsonResult := settings.TrimSettings(segments)
-	c.JSON(http.StatusOK, jsonResult)
+	jsonResult, err := settings.TrimSettings(segments)
+    if err != nil {
+		c.JSON(http.StatusInternalServerError, jsonResult)
+    } else {
+		c.JSON(http.StatusOK, jsonResult)
+    }
 	return
 }
 
@@ -405,7 +421,11 @@ func addHeaders(c *gin.Context) {
 // returns true if the setup wizard is completed, or false if not
 // if any error occurs it returns true (assumes the wizard is completed)
 func isSetupWizardCompleted() bool {
-	wizardCompletedJSON := settings.GetSettings([]string{"system", "setupWizard", "completed"})
+	wizardCompletedJSON, err := settings.GetSettings([]string{"system", "setupWizard", "completed"})
+    if err != nil {
+		logger.Warn("Failed to read setup wizard completed settings: %v\n", err.Error())
+		return true
+    }
 	if wizardCompletedJSON == nil {
 		logger.Warn("Failed to read setup wizard completed settings: %v\n", wizardCompletedJSON)
 		return true
