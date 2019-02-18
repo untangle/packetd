@@ -149,10 +149,9 @@ EXTNETID=`docker network inspect eth1-extnet | grep '"Id"' | sed 's/.*: "\(.*\)"
 INTNETID=`docker network inspect eth0-intnet | grep '"Id"' | sed 's/.*: "\(.*\)",/\1/g' | cut -c -12`
 GATEWAY=`ip route show table main | awk '/default/ {print $3}'`
 if [ "$GATEWAY" == "172.51.0.2" ] ; then
-    echo "WARNING gateway already changed!"
-else	
+    echo "WARNING gateway already changed."
+else
     echo "Replacing original gateway ${GATEWAY} with container 172.51.0.2"	
-    docker exec -it mfw iptables -t nat -A POSTROUTING -j MASQUERADE
     ip route add default via ${GATEWAY} table 1000
     ip rule add priority 100 dev br-$EXTNETID table 1000
     ip rule add priority 100 dev br-$INTNETID table 1000
