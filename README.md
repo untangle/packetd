@@ -148,7 +148,7 @@ Or manually with docker
 ```
 docker network create --subnet 172.50.0.0/16 eth1-extnet
 docker network create --subnet 172.51.0.0/16 eth0-intnet
-docker create --privileged --rm --net eth1-extnet --name mfw --volume ./cmd/packetd/packetd::/usr/bin/packetd untangleinc/mfw:x86-64_latest
+docker create --privileged --rm --net eth1-extnet --name mfw --volume ./cmd/packetd/packetd:/usr/bin/packetd untangleinc/mfw:x86-64_latest
 docker network connect eth0-intnet mfw
 docker start -i mfw
 ```
@@ -173,13 +173,13 @@ Redirect your local host traffic through the container
 To redirect traffic from the host through your container
 
 ```
-./util/reroute_host.sh
+./util/reroute_container.sh
 ```
 
 To undo the "redirect"
 
 ```
-./util/unroute_host.sh
+./util/unroute_container.sh
 ```
 
 Copying a new packetd inside that container
