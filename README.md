@@ -106,6 +106,10 @@ Then:
 Running in an OpenWrt container
 ===============================
 
+Make sure your packetd binary is build against MUSL, or it won't be able
+to run in the MFW container: see "Building in Docker -> MUSL target"
+above.
+
 Getting the image
 -----------------
 
@@ -124,13 +128,27 @@ curl -o openwrt-x86-64-generic-rootfs.tar.gz http://jenkins.untangle.int/.../art
 docker build -f Dockerfile.test.mfw --build-arg ROOTFS_TARBALL=openwrt-x86-64-generic-rootfs.tar.gz -t untangleinc/mfw:x86-64_mytag .
 ```
 
-Running a container from it
----------------------------
+Running packetd in a container
+------------------------------
+
+First run this on the host:
+
+```
+modprobe nft_dict
+```
+
+Then launch the container with docker-compose:
+
+```
+docker-compose -f docker-compose.yml run --name mfw --rm packetd
+```
+
+Or manually with docker
 
 ```
 docker network create --subnet 172.50.0.0/16 eth1-extnet
 docker network create --subnet 172.51.0.0/16 eth0-intnet
-docker create --privileged --rm --net eth1-extnet --name mfw untangleinc/mfw:x86-64_latest
+docker create --privileged --rm --net eth1-extnet --name mfw --volume ./cmd/packetd/packetd::/usr/bin/packetd untangleinc/mfw:x86-64_latest
 docker network connect eth0-intnet mfw
 docker start -i mfw
 ```
@@ -141,23 +159,27 @@ To get a shell in container (in another window):
 docker exec -it mfw sh
 ```
 
+or
+
+```
+ssh root@172.51.0.2
+```
+
+To open web admin from the host goto URL: http:/172.51.0.2/
+
 Redirect your local host traffic through the container
 ------------------------------------------------------
 
+To redirect traffic from the host through your container
+
 ```
-EXTNETID=`docker network inspect eth1-extnet | grep '"Id"' | sed 's/.*: "\(.*\)",/\1/g' | cut -c -12`
-INTNETID=`docker network inspect eth0-intnet | grep '"Id"' | sed 's/.*: "\(.*\)",/\1/g' | cut -c -12`
-GATEWAY=`ip route show table main | awk '/default/ {print $3}'`
-if [ "$GATEWAY" == "172.51.0.2" ] ; then
-    echo "WARNING gateway already changed."
-else
-    echo "Replacing original gateway ${GATEWAY} with container 172.51.0.2"	
-    ip route add default via ${GATEWAY} table 1000
-    ip rule add priority 100 dev br-$EXTNETID table 1000
-    ip rule add priority 100 dev br-$INTNETID table 1000
-    ip route del default via ${GATEWAY} table main
-    ip route add default via 172.51.0.2 table main
-fi
+./util/reroute_host.sh
+```
+
+To undo the "redirect"
+
+```
+./util/unroute_host.sh
 ```
 
 Copying a new packetd inside that container
@@ -166,10 +188,6 @@ Copying a new packetd inside that container
 ```
 docker cp cmd/packetd/packetd fe6947926f3f:/usr/bin/packetd
 ```
-
-Make sure your packetd binary is build against MUSL, or it won't be able
-to run in the MFW container: see "Building in Docker -> MUSL target"
-above.
 
 golint
 ======

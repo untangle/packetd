@@ -1,0 +1,26 @@
+version: '3'
+services:
+  packetd:
+    image: "untangleinc/mfw:x86-64_latest"
+    privileged: true
+    networks:
+      - eth1-extnet
+      - eth0-intnet
+    expose:
+      - "80"
+      - "22"
+    volumes:
+      - ./cmd/packetd/packetd:/usr/bin/packetd
+networks:
+  eth1-extnet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.50.0.0/16
+  eth0-intnet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.51.0.0/16
