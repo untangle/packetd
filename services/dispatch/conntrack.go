@@ -191,8 +191,8 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			session.ServerSideTuple.ClientPort = clientPortNew
 			session.ServerSideTuple.ServerAddress = dupIP(serverNew)
 			session.ServerSideTuple.ServerPort = serverPortNew
-			session.ServerInterfaceID = uint8((conntrack.ConnMark & 0x0000FF00) >> 8)
-			session.ServerInterfaceType = uint8((conntrack.ConnMark & 0x0C000000) >> 26)
+			session.SetServerInterfaceID(uint8((conntrack.ConnMark & 0x0000FF00) >> 8))
+			session.SetServerInterfaceType(uint8((conntrack.ConnMark & 0x0C000000) >> 26))
 			session.ConntrackConfirmed = true
 			session.Conntrack = conntrack
 			session.SetLastActivity(time.Now())

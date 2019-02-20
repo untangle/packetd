@@ -52,7 +52,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var remoteAddress net.IP
 
 	// if client is on LAN (type 2)
-	if session.ClientInterfaceType == 2 {
+	if session.GetClientInterfaceType() == 2 {
 		localAddress = session.ClientSideTuple.ClientAddress
 		// the server may not actually be on a WAN, but we consider it remote if the client is on a LAN
 		remoteAddress = session.ClientSideTuple.ServerAddress
@@ -66,8 +66,8 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		"time_stamp":            time.Now(),
 		"session_id":            session.SessionID,
 		"ip_protocol":           session.ClientSideTuple.Protocol,
-		"client_interface_id":   session.ClientInterfaceID,
-		"client_interface_type": session.ClientInterfaceType,
+		"client_interface_id":   session.GetClientInterfaceID(),
+		"client_interface_type": session.GetClientInterfaceType(),
 		"local_address":         localAddress.String(),
 		"remote_address":        remoteAddress.String(),
 		"client_address":        session.ClientSideTuple.ClientAddress.String(),
@@ -104,8 +104,8 @@ func PluginConntrackHandler(message int, entry *dispatch.Conntrack) {
 				"server_address_new":    session.ServerSideTuple.ServerAddress.String(),
 				"client_port_new":       session.ServerSideTuple.ClientPort,
 				"server_port_new":       session.ServerSideTuple.ServerPort,
-				"server_interface_id":   session.ServerInterfaceID,
-				"server_interface_type": session.ServerInterfaceType,
+				"server_interface_id":   session.GetServerInterfaceID(),
+				"server_interface_type": session.GetServerInterfaceType(),
 			}
 			reports.LogEvent(reports.CreateEvent("session_nat", "sessions", 2, columns, modifiedColumns))
 			for k, v := range modifiedColumns {

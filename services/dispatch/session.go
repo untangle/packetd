@@ -24,20 +24,15 @@ type Session struct {
 	// ClientSideTuple stores the client-side (pre-NAT) session tuple
 	ClientSideTuple Tuple
 
-	// ClientSideInterfaceIndex stores the client-side interface index
-	ClientInterfaceID uint8
-
-	// ClientSideInterfaceType stores the client-side interface type
-	ClientInterfaceType uint8
-
 	// ServerSideTuple stores the server-side (post-NAT) session tuple
 	ServerSideTuple Tuple
 
-	// ServerSideInterfaceIndex stores the server-side interface index
-	ServerInterfaceID uint8
-
-	// ServerSideInterfaceType stores the server-side interface type
-	ServerInterfaceType uint8
+	// stores the client and server side interface index and type using int32 because the atomic
+	// package doesn't have anything smaller but the get and set take and return them as uint8
+	clientInterfaceID   uint32
+	clientInterfaceType uint32
+	serverInterfaceID   uint32
+	serverInterfaceType uint32
 
 	// ConntrackConfirmed is true if this session has been confirmed by conntrack. false otherwise
 	// A session becomes confirmed by conntrack once its packet reaches the final CONNTRACK_CONFIRM
@@ -50,23 +45,20 @@ type Session struct {
 
 	// subscriptions stores the nfqueue subscribers
 	subscriptions map[string]SubscriptionHolder
-
-	// subLocker is the lock for subscriptions
-	subLocker sync.Mutex
+	subLocker     sync.Mutex
 
 	// attachments stores the metadata attachments
-	attachments map[string]interface{}
-
-	// attachmentLock is the lock for attachments
+	attachments    map[string]interface{}
 	attachmentLock sync.Mutex
 
-	// activityLock is the lock for the last activity time
-	activityLock sync.Mutex
+	// used to keep track of the last session activity
+	lastActivityTime time.Time
+	lastActivityLock sync.Mutex
 
-	lastActivity time.Time
-	packetCount  uint64
-	byteCount    uint64
-	eventCount   uint64
+	// used to keep track of the session packet, byte, and event counts
+	packetCount uint64
+	byteCount   uint64
+	eventCount  uint64
 }
 
 // sessionTable is the global session table
@@ -116,6 +108,50 @@ func (sess *Session) LockAttachments() map[string]interface{} {
 // UnlockAttachments unlocks the attachments mutex
 func (sess *Session) UnlockAttachments() {
 	sess.attachmentLock.Unlock()
+}
+
+// GetServerInterfaceID gets the server interface ID
+func (sess *Session) GetServerInterfaceID() uint8 {
+	return uint8(atomic.LoadUint32(&sess.serverInterfaceID))
+}
+
+// SetServerInterfaceID sets the server interface ID
+func (sess *Session) SetServerInterfaceID(value uint8) uint8 {
+	atomic.StoreUint32(&sess.serverInterfaceID, uint32(value))
+	return value
+}
+
+// GetServerInterfaceType gets the server interface type
+func (sess *Session) GetServerInterfaceType() uint8 {
+	return uint8(atomic.LoadUint32(&sess.serverInterfaceType))
+}
+
+// SetServerInterfaceType sets the server interface type
+func (sess *Session) SetServerInterfaceType(value uint8) uint8 {
+	atomic.StoreUint32(&sess.serverInterfaceType, uint32(value))
+	return value
+}
+
+// GetClientInterfaceID gets the client interface ID
+func (sess *Session) GetClientInterfaceID() uint8 {
+	return uint8(atomic.LoadUint32(&sess.clientInterfaceID))
+}
+
+// SetClientInterfaceID sets the client interface ID
+func (sess *Session) SetClientInterfaceID(value uint8) uint8 {
+	atomic.StoreUint32(&sess.clientInterfaceID, uint32(value))
+	return value
+}
+
+// GetClientInterfaceType gets the client interface type
+func (sess *Session) GetClientInterfaceType() uint8 {
+	return uint8(atomic.LoadUint32(&sess.clientInterfaceType))
+}
+
+// SetClientInterfaceType sets the client interface type
+func (sess *Session) SetClientInterfaceType(value uint8) uint8 {
+	atomic.StoreUint32(&sess.clientInterfaceType, uint32(value))
+	return value
 }
 
 // GetPacketCount gets the packet count
@@ -168,17 +204,17 @@ func (sess *Session) AddEventCount(value uint64) uint64 {
 
 // GetLastActivity gets the time of the last session activity
 func (sess *Session) GetLastActivity() time.Time {
-	sess.activityLock.Lock()
-	defer sess.activityLock.Unlock()
-	value := sess.lastActivity
+	sess.lastActivityLock.Lock()
+	defer sess.lastActivityLock.Unlock()
+	value := sess.lastActivityTime
 	return value
 }
 
 // SetLastActivity sets the time of the last session activity
 func (sess *Session) SetLastActivity(value time.Time) {
-	sess.activityLock.Lock()
-	defer sess.activityLock.Unlock()
-	sess.lastActivity = value
+	sess.lastActivityLock.Lock()
+	defer sess.lastActivityLock.Unlock()
+	sess.lastActivityTime = value
 }
 
 // removeFromSessionTable removes the session from the session table

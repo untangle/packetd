@@ -105,9 +105,10 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		// release the session and add to the average once we have collected a useful amount of data
 		if stats.latencyCount == listSize {
 			value := calculateAverageLatency(stats)
-			latencyLocker[mess.Session.ServerInterfaceID].Lock()
-			latencyTracker[mess.Session.ServerInterfaceID].AddValue(value.Nanoseconds())
-			latencyLocker[mess.Session.ServerInterfaceID].Unlock()
+			iface := mess.Session.GetServerInterfaceID()
+			latencyLocker[iface].Lock()
+			latencyTracker[iface].AddValue(value.Nanoseconds())
+			latencyLocker[iface].Unlock()
 			mess.Session.DeleteAttachment("stats_holder")
 			result.SessionRelease = true
 		}
@@ -219,16 +220,16 @@ func collectInterfaceStats(seconds uint64) {
 			diffInfo.TxCompressed = calculateDifference(&statInfo.TxCompressed, item.TxCompressed)
 
 			// convert the interface name to the ID value
-			faceval := getInterfaceIDValue(diffInfo.Iface)
+			iface := getInterfaceIDValue(diffInfo.Iface)
 
 			// negative return means we don't know the ID so we set latency to zero
 			// otherwise we get the total moving average
-			if faceval < 0 {
+			if iface < 0 {
 				latency = 0
 			} else {
-				latencyLocker[faceval].Lock()
-				latency = latencyTracker[faceval].GetTotalAverage()
-				latencyLocker[faceval].Unlock()
+				latencyLocker[iface].Lock()
+				latency = latencyTracker[iface].GetTotalAverage()
+				latencyLocker[iface].Unlock()
 			}
 
 			columns := map[string]interface{}{

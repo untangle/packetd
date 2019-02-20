@@ -218,8 +218,8 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 
 	// if this is a new session set the client side interface index and type
 	if newSession {
-		session.ClientInterfaceID = uint8((pmark & 0x000000FF))
-		session.ClientInterfaceType = uint8((pmark & 0x03000000) >> 24)
+		session.SetClientInterfaceID(uint8((pmark & 0x000000FF)))
+		session.SetClientInterfaceType(uint8((pmark & 0x03000000) >> 24))
 	}
 
 	// Update some accounting bits
