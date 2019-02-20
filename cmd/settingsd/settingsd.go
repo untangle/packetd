@@ -197,11 +197,11 @@ func getSettings(c *gin.Context) {
 	}
 
 	jsonResult, err := settings.GetSettingsFile(segments, "/var/lib/settingsd/"+shaStr+".json")
-    if err != nil {
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, jsonResult)
-    } else {
+	} else {
 		c.JSON(http.StatusOK, jsonResult)
-    }
+	}
 	return
 }
 
@@ -217,11 +217,11 @@ func getDefaultSettings(c *gin.Context) {
 	}
 
 	jsonResult, err := settings.GetDefaultSettings(segments)
-    if err != nil {
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, jsonResult)
-    } else {
+	} else {
 		c.JSON(http.StatusOK, jsonResult)
-    }
+	}
 	return
 }
 

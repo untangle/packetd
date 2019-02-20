@@ -331,11 +331,11 @@ func getSettings(c *gin.Context) {
 	}
 
 	jsonResult, err := settings.GetSettings(segments)
-    if err != nil {
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, jsonResult)
-    } else {
+	} else {
 		c.JSON(http.StatusOK, jsonResult)
-    }
+	}
 	return
 }
 
@@ -351,11 +351,11 @@ func getDefaultSettings(c *gin.Context) {
 	}
 
 	jsonResult, err := settings.GetDefaultSettings(segments)
-    if err != nil {
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, jsonResult)
-    } else {
+	} else {
 		c.JSON(http.StatusOK, jsonResult)
-    }
+	}
 	return
 }
 
@@ -382,11 +382,11 @@ func setSettings(c *gin.Context) {
 	}
 
 	jsonResult, err := settings.SetSettings(segments, bodyJSONObject)
-    if err != nil {
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, jsonResult)
-    } else {
+	} else {
 		c.JSON(http.StatusOK, jsonResult)
-    }
+	}
 	return
 }
 
@@ -401,11 +401,11 @@ func trimSettings(c *gin.Context) {
 	}
 
 	jsonResult, err := settings.TrimSettings(segments)
-    if err != nil {
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, jsonResult)
-    } else {
+	} else {
 		c.JSON(http.StatusOK, jsonResult)
-    }
+	}
 	return
 }
 
@@ -422,10 +422,10 @@ func addHeaders(c *gin.Context) {
 // if any error occurs it returns true (assumes the wizard is completed)
 func isSetupWizardCompleted() bool {
 	wizardCompletedJSON, err := settings.GetSettings([]string{"system", "setupWizard", "completed"})
-    if err != nil {
+	if err != nil {
 		logger.Warn("Failed to read setup wizard completed settings: %v\n", err.Error())
 		return true
-    }
+	}
 	if wizardCompletedJSON == nil {
 		logger.Warn("Failed to read setup wizard completed settings: %v\n", wizardCompletedJSON)
 		return true

@@ -15,7 +15,7 @@ const pluginName = "stats"
 const listSize = 1
 
 var latencyTracker [256]*MovingAverage
-var latencyLocker  [256]sync.Mutex
+var latencyLocker [256]sync.Mutex
 var interfaceStatsMap map[string]*linux.NetworkStat
 var interfaceNameMap map[string]int
 var shutdownChannel = make(chan bool)

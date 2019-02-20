@@ -84,7 +84,7 @@ func SetSettingsFile(segments []string, value interface{}, filename string) (int
 	}
 	jsonSettings, ok = newSettings.(map[string]interface{})
 	if !ok {
-        err = errors.New("Invalid global settings object")
+		err = errors.New("Invalid global settings object")
 		return createJSONErrorObject(err), err
 	}
 
@@ -216,8 +216,8 @@ func TrimSettingsFile(segments []string, filename string) (interface{}, error) {
 	var jsonSettings map[string]interface{}
 
 	if segments == nil {
-        err = errors.New("Invalid trim settings path")
-		return createJSONErrorObject(err),err
+		err = errors.New("Invalid trim settings path")
+		return createJSONErrorObject(err), err
 	}
 
 	jsonSettings, err = readSettingsFileJSON(filename)
@@ -251,7 +251,7 @@ func TrimSettingsFile(segments []string, filename string) (interface{}, error) {
 				iterJSONObject[value] = j
 				iterJSONObject = j // for next iteration
 			} else {
-                err = errors.New("Non-dict found in path: " + string(value))
+				err = errors.New("Non-dict found in path: " + string(value))
 				return createJSONErrorObject(err), err
 			}
 		}
