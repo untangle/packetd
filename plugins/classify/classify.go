@@ -9,13 +9,9 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"net"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
-	"sync"
-	"syscall"
 	"time"
 
 	"github.com/untangle/packetd/services/dict"
@@ -39,8 +35,9 @@ type applicationInfo struct {
 }
 
 const pluginName = "classify"
-const daemonBinary = "/usr/bin/classd"
 const guidInfoFile = "/usr/share/untangle-classd/protolist.csv"
+
+var applicationTable map[string]applicationInfo
 
 const navlStateTerminated = 0 // Indicates the connection has been terminated
 const navlStateInspecting = 1 // Indicates the connection is under inspection
@@ -50,15 +47,22 @@ const navlStateClassified = 3 // Indicates the connection is fully classified
 const maxPacketCount = 64      // The maximum number of packets to inspect before releasing
 const maxTrafficSize = 0x10000 // The maximum number of bytes to inspect before releasing
 
-var applicationTable map[string]applicationInfo
-var shutdownFlag = false
+type daemonSignal int
 
-var daemonProcess *exec.Cmd
-var daemonSocket net.Conn
-var daemonChannel = make(chan bool, 1)
+const (
+	daemonNoop daemonSignal = iota
+	daemonStartup
+	daemonShutdown
+	daemonFinished
+	socketConnect
+	systemStartup
+	systemShutdown
+)
 
+var processChannel = make(chan daemonSignal, 8)
+var socketChannel = make(chan daemonSignal, 8)
+var shutdownChannel = make(chan bool)
 var classdHostPort = "127.0.0.1:8123"
-var classdMutex sync.Mutex
 
 // PluginStartup is called to allow plugin specific initialization
 func PluginStartup() {
@@ -80,12 +84,16 @@ func PluginStartup() {
 		return
 	}
 
+	// load the application details
 	loadApplicationTable()
 
-	// start the daemon manager to handle running the daemon and connecting the socket
-	go daemonManager()
+	// start the daemon manager to handle running the daemon process
+	go daemonProcessManager()
 
-	// insert our nfqueue and conntrack subscriptions
+	// start the socket manager to handle the daemon socket connection
+	go daemonSocketManager()
+
+	// insert our nfqueue subscription
 	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
 }
 
@@ -93,21 +101,26 @@ func PluginStartup() {
 func PluginShutdown() {
 	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
 
-	// first signal the shutdown channel to stop the daemon manager
-	shutdownFlag = true
-	daemonChannel <- true
+	// signal the socket manager that the system is shutting down
+	signalSocketManager(systemShutdown)
 
 	select {
-	case <-daemonChannel:
-		logger.Info("Successful shutdown of daemonManager\n")
+	case <-shutdownChannel:
+		logger.Info("Successful shutdown of daemonSocketManager\n")
 	case <-time.After(10 * time.Second):
-		logger.Warn("Failed to properly shutdown daemonManager\n")
+		logger.Warn("Failed to properly shutdown daemonSocketManager\n")
 	}
-}
 
-// SetHostPort sets the address for the classdDaemon. Default is "127.0.0.1:8123"
-func SetHostPort(value string) {
-	classdHostPort = value
+	// signal the process manager that the system is shutting down
+	signalProcessManager(systemShutdown)
+
+	select {
+	case <-shutdownChannel:
+		logger.Info("Successful shutdown of daemonProcessManager\n")
+	case <-time.After(10 * time.Second):
+		logger.Warn("Failed to properly shutdown daemonProcessManager\n")
+	}
+
 }
 
 // PluginNfqueueHandler is called for raw nfqueue packets. We pass the
@@ -134,23 +147,10 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
-	// if not connected to the daemon we can't do anything
-	if daemonSocket == nil {
-		logger.Warn("Connection to classd failed. Restarting classd...\n")
-
-		// signal the daemon manager to check the daemon process and socket
-		signalDaemonManager()
-
-		// Release this session just in case.
-		// If this is happening something is wrong
-		// While releasing is not ideal, its better if the daemon
-		// has crashed and can't be brought back
-		return dispatch.NfqueueResult{SessionRelease: true}
-	}
-
 	// send the data to classd and read reply
-	reply = daemonClassify(&mess)
+	reply = classifyTraffic(&mess)
 
+	// an empty reply means we can't talk to the daemon so just release the session
 	if len(reply) == 0 {
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
@@ -171,11 +171,11 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	return dispatch.NfqueueResult{SessionRelease: false}
 }
 
-// daemonClassify sends classd the commands and returns the reply
-func daemonClassify(mess *dispatch.NfqueueMessage) string {
+// classifyTraffic sends the packet to the daemon manager for classification and returns the result
+func classifyTraffic(mess *dispatch.NfqueueMessage) string {
+	var command string
 	var proto string
 	var reply string
-	var err error
 
 	if mess.IP4Layer != nil {
 		proto = "IP4"
@@ -186,18 +186,9 @@ func daemonClassify(mess *dispatch.NfqueueMessage) string {
 		return ""
 	}
 
-	// send the packet data to the daemon
-	reply, err = daemonCommand(mess.Packet.Data(), "PACKET|%d|%s|%d\r\n", mess.Session.SessionID, proto, len(mess.Packet.Data()))
-
-	if err != nil {
-		logger.Err("daemonCommand error: %s\n", err.Error())
-		return ""
-	}
-
-	if logger.IsTraceEnabled() {
-		logger.Trace("daemonCommand result: %s\n", strings.Replace(strings.Replace(reply, "\n", "|", -1), "\r", "", -1))
-	}
-
+	// send the packet to the daemon for classification
+	command = fmt.Sprintf("PACKET|%d|%s|%d\r\n", mess.Session.SessionID, proto, len(mess.Packet.Data()))
+	reply = daemonClassifyPacket(command, mess.Packet.Data())
 	return reply
 }
 
@@ -304,25 +295,20 @@ func parseReply(replyString string) (string, string, string, string, uint64, str
 		switch rawpair[0] {
 		case "APPLICATION: ":
 			appid = rawpair[1]
-			break
 		case "PROTOCHAIN: ":
 			protochain = rawpair[1]
-			break
 		case "DETAIL: ":
 			detail = rawpair[1]
-			break
 		case "CONFIDENCE: ":
 			confidence, err = strconv.ParseUint(rawpair[1], 10, 64)
 			if err != nil {
 				confidence = 0
 			}
-			break
 		case "STATE: ":
 			state, err = strconv.Atoi(rawpair[1])
 			if err != nil {
 				state = 0
 			}
-			break
 		}
 	}
 
@@ -354,72 +340,6 @@ func logEvent(session *dispatch.Session, attachments map[string]interface{}, cha
 	reports.LogEvent(reports.CreateEvent("session_classify", "sessions", 2, columns, modifiedColumns))
 }
 
-// daemonCommand will send a command to the untangle-classd daemon and return the result message
-func daemonCommand(rawdata []byte, format string, args ...interface{}) (string, error) {
-	buffer := make([]byte, 1024)
-	var command string
-	var err error
-	var tot int
-
-	classdMutex.Lock()
-	defer classdMutex.Unlock()
-
-	// if daemon not connected we can't do anything
-	if daemonSocket == nil {
-		return "", fmt.Errorf("Connction to classify daemon not established")
-	}
-
-	// if there are no arguments use the format as the command otherwise create command from the arguments
-	if len(args) == 0 {
-		command = format
-	} else {
-		command = fmt.Sprintf(format, args...)
-	}
-
-	// write the command to the daemon socket
-	tot, err = daemonSocket.Write([]byte(command))
-
-	// on write error shutdown the socket and return error
-	if err != nil {
-		daemonSocketClose()
-		return string(buffer), err
-	}
-
-	// on short write shutdown the socket and return error
-	if tot != len(command) {
-		daemonSocketClose()
-		return string(buffer), fmt.Errorf("Underrun %d of %d calling daemon.Write(%s)", tot, len(command), command)
-	}
-
-	// if we have packet data send to the daemon socket after the command
-	if rawdata != nil {
-		tot, err = daemonSocket.Write(rawdata)
-
-		// on write error shutdown the socket and return error
-		if err != nil {
-			daemonSocketClose()
-			return string(buffer), err
-		}
-
-		// on short write shutdown the socket and return error
-		if tot != len(rawdata) {
-			daemonSocketClose()
-			return string(buffer), fmt.Errorf("Underrun %d of %d calling daemon.Write(rawdata)", tot, len(rawdata))
-		}
-	}
-
-	// read the reply from the daemon
-	_, err = daemonSocket.Read(buffer)
-
-	// on read error shutdown the socket and return error
-	if err != nil {
-		daemonSocketClose()
-		return string(buffer), err
-	}
-
-	return string(buffer), nil
-}
-
 // loadApplicationTable loads the details for each application
 func loadApplicationTable() {
 	var file *os.File
@@ -443,11 +363,12 @@ func loadApplicationTable() {
 	reader := csv.NewReader(bufio.NewReader(file))
 	for {
 		list, err = reader.Read()
-		// on end of file just break out of the read loop
+
 		if err == io.EOF {
+			// on end of file just break out of the read loop
 			break
-			// for anything else log the error and break
 		} else if err != nil {
+			// for anything else log the error and break
 			logger.Err("Unable to parse application details: %v\n", err)
 			break
 		}
@@ -544,181 +465,22 @@ func updateClassifyDetail(attachments map[string]interface{}, ctid uint32, pairn
 	return true
 }
 
-// daemonManager is a goroutine to start, connect, monitor, restart, and reconnect the untangle-classd daemon
-// we also watch the shutdown channel and exit when the shutdown signal is received
-func daemonManager() {
-	// signal the daemon manager to trigger the initial connect
-	signalDaemonManager()
-
-	for {
-		<-daemonChannel
-
-		if shutdownFlag {
-			daemonSocketClose()
-			daemonProcessShutdown()
-			signalDaemonManager()
-			return
-		}
-
-		if daemonProcess == nil {
-			daemonProcessStartup()
-
-			// Use a goroutine to wait for the process to finish. In normal operation Wait() will
-			// return when the daemon shuts down in response to SIGINT which is sent after the
-			// daemon manager has shutdown. If the daemon exits for any other reason the manager
-			// will see the nil process and attempt to restart the daemon.
-			go func(proc *exec.Cmd) {
-				err := proc.Wait()
-				if err != nil {
-					logger.Info("The classd daemon has exited. Error:%v\n", err)
-				} else {
-					logger.Info("The classd daemon has exited.\n")
-				}
-				daemonProcessShutdown()
-				daemonSocketClose()
-				signalDaemonManager()
-			}(daemonProcess)
-		}
-
-		if daemonSocket == nil {
-			daemonSocketConnect()
-		}
-
-		// sleep to prevent spinning when the process is dead or socket not connected
-		time.Sleep(time.Second)
-	}
+// SetHostPort sets the address for the classdDaemon. Default is "127.0.0.1:8123"
+func SetHostPort(value string) {
+	classdHostPort = value
 }
 
-// starts the daemon and uses a goroutine to wait for it to finish
-func daemonProcessStartup() {
-	var err error
-	var daemonStdout io.ReadCloser
-	var daemonStderr io.ReadCloser
-
-	// start the classd daemon with the mfw flag to enable our mode of operation
-	// include the local flag so we can capture the log output
-	// include the debug flag when our own debug mode is enabled
-	if logger.IsDebugEnabled() {
-		daemonProcess = exec.Command(daemonBinary, "-mfw", "-l", "-d")
-	} else {
-		daemonProcess = exec.Command(daemonBinary, "-mfw", "-l")
-	}
-
-	// set a different process group so it doesn't get packetd signals
-	daemonProcess.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-	}
-
-	// not sure why we do this since we don't actually save or use the pipe
-	_, err = daemonProcess.StdinPipe()
-	if err != nil {
-		logger.Err("Error %v getting daemon stdin pipe\n", err)
-		daemonProcess.Process.Release()
-		daemonProcess = nil
-		return
-	}
-
-	// get a pipe to the process stderr so we can grab the output and send to the logger
-	daemonStderr, err = daemonProcess.StderrPipe()
-	if err != nil {
-		logger.Err("Error %v getting daemon stderr pipe\n", err)
-		daemonProcess.Process.Release()
-		daemonProcess = nil
-		return
-	}
-
-	// get a pipe to the process stdout so we can grab the output and send to the logger
-	daemonStdout, err = daemonProcess.StdoutPipe()
-	if err != nil {
-		logger.Err("Error %v getting daemon stdout pipe\n", err)
-		daemonProcess.Process.Release()
-		daemonProcess = nil
-		return
-	}
-
-	// call the start function, check for error, and cleanup if things go bad
-	err = daemonProcess.Start()
-	if err != nil {
-		logger.Err("Error starting classify daemon %s (%v)\n", daemonBinary, err)
-		daemonProcess.Process.Release()
-		daemonProcess = nil
-		return
-	}
-
-	// Wait for startup to complete
-	scanner := bufio.NewScanner(daemonStdout)
-	for scanner.Scan() {
-		// look for "starting" message
-		txt := scanner.Text()
-		logger.Info("classd: %v\n", txt)
-		if strings.Contains(txt, "netserver thread is starting") {
-			break
-		}
-	}
-
-	go daemonOutputWriter(daemonStdout)
-	go daemonOutputWriter(daemonStderr)
-
-	logger.Info("The classd daemon has been started. PID:%d\n", daemonProcess.Process.Pid)
-}
-
-// called to send SIGINT to the classify daemon which will cause normal shutdown
-func daemonProcessShutdown() {
-	if daemonProcess == nil {
-		return
-	}
-
-	// signal an interrupt signal to the daemon
-	err := daemonProcess.Process.Signal(os.Interrupt)
-	if err != nil {
-		logger.Err("Error stopping classd daemon: %v\n", err)
-	} else {
-		logger.Info("The classd daemon has been stopped\n")
-	}
-
-	daemonProcess = nil
-}
-
-func daemonSocketConnect() {
-	var err error
-
-	// we can't connect if the daemon isn't running
-	if daemonProcess == nil {
-		return
-	}
-
-	// establish our connection to the daemon
-	daemonSocket, err = net.DialTimeout("tcp", classdHostPort, 5*time.Second)
-	if err != nil {
-		logger.Err("Error calling net.DialTimeout(%s): %v\n", classdHostPort, err)
-		signalDaemonManager()
-	} else {
-		logger.Info("Successfully connected to classify daemon(%s)\n", classdHostPort)
-	}
-}
-
-// Called to shutdown the daemon connection. We close the connection if valid
-// and clear the daemonSocket which will trigger the manager to reconnect
-func daemonSocketClose() {
-	if daemonSocket == nil {
-		return
-	}
-
-	daemonSocket.Close()
-	daemonSocket = nil
-}
-
-// daemonOutputWriter just writes any output from the daemon to stdout
-func daemonOutputWriter(reader io.ReadCloser) {
-	scanner := bufio.NewScanner(reader)
-	for scanner.Scan() {
-		logger.Info("classd: %v\n", scanner.Text())
-	}
-}
-
-func signalDaemonManager() {
+// signalProcessManager sends a signal to the daemon manager goroutine
+func signalProcessManager(signal daemonSignal) {
 	select {
-	case daemonChannel <- true:
+	case processChannel <- signal:
+	default:
+	}
+}
+
+func signalSocketManager(signal daemonSignal) {
+	select {
+	case socketChannel <- signal:
 	default:
 	}
 }
