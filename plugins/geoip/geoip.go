@@ -7,8 +7,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 
-	geoip2 "github.com/oschwald/geoip2-golang"
+	"github.com/oschwald/geoip2-golang"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
@@ -17,7 +18,8 @@ import (
 
 const pluginName = "geoip"
 
-var geodb *geoip2.Reader
+var geoDatabase *geoip2.Reader
+var geoMutex sync.Mutex
 
 // PluginStartup is called to allow plugin specific initialization.
 // We initialize an instance of the GeoIP engine using any existing
@@ -25,10 +27,11 @@ var geodb *geoip2.Reader
 // argumented WaitGroup so the main process can wait for our shutdown function
 // to return during shutdown.
 func PluginStartup() {
+	var filename string
 
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
-
-	var filename string
+	geoMutex.Lock()
+	defer geoMutex.Unlock()
 
 	// start by looking for the NGFW city database file
 	db, err := geoip2.Open(findGeoFile(true))
@@ -36,7 +39,7 @@ func PluginStartup() {
 		logger.Warn("Unable to load GeoIP Database: %s\n", err)
 	} else {
 		logger.Info("Loading GeoIP Database: %s\n", filename)
-		geodb = db
+		geoDatabase = db
 	}
 
 	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
@@ -47,8 +50,11 @@ func PluginStartup() {
 // process know we're finished.
 func PluginShutdown() {
 	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
-	if geodb != nil {
-		geodb.Close()
+	geoMutex.Lock()
+	defer geoMutex.Unlock()
+
+	if geoDatabase != nil {
+		geoDatabase.Close()
 	}
 }
 
@@ -60,10 +66,16 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// release immediately as we only care about the first packet
 	dispatch.ReleaseSession(mess.Session, pluginName)
+
+	// we only do the lookup for new sessions
 	if !newSession {
 		return result
 	}
-	if geodb == nil {
+
+	geoMutex.Lock()
+	defer geoMutex.Unlock()
+
+	if geoDatabase == nil {
 		return result
 	}
 
@@ -86,12 +98,12 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		return result
 	}
 
-	SrcRecord, err := geodb.City(srcAddr)
+	SrcRecord, err := geoDatabase.City(srcAddr)
 	if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
 		clientCountry = SrcRecord.Country.IsoCode
 	}
 
-	DstRecord, err := geodb.City(dstAddr)
+	DstRecord, err := geoDatabase.City(dstAddr)
 	if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
 		serverCountry = DstRecord.Country.IsoCode
 	}

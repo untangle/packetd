@@ -59,8 +59,8 @@ const (
 	systemShutdown
 )
 
-var processChannel = make(chan daemonSignal, 8)
-var socketChannel = make(chan daemonSignal, 8)
+var processChannel = make(chan daemonSignal, 1)
+var socketChannel = make(chan daemonSignal, 1)
 var shutdownChannel = make(chan bool)
 var classdHostPort = "127.0.0.1:8123"
 
