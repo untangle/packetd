@@ -39,8 +39,10 @@ var shutdownFlag uint32
 var shutdownChannel = make(chan bool)
 var shutdownChannelCloseOnce sync.Once
 
-var nfCleanList map[uint32]bool
-var ctCleanList map[uint32]bool
+// These maps are used to track ctid's we see during playback. They are set to the
+// maps passed to the playback function and cleared when playback is finished.
+var nfCleanTracker map[uint32]bool
+var ctCleanTracker map[uint32]bool
 
 // Startup starts kernel services
 func Startup() {
@@ -209,8 +211,8 @@ func go_nfqueue_callback(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint
 	}
 
 	// if the playback flag is set add the ctid to our cleanup list
-	if playflag != 0 && nfCleanList != nil {
-		nfCleanList[uint32(C.int(ctid))] = true
+	if playflag != 0 && nfCleanTracker != nil {
+		nfCleanTracker[uint32(C.int(ctid))] = true
 	}
 
 	f := func(mark C.uint32_t, data *C.uchar, size C.int, ctid C.uint32_t, nfid C.uint32_t, family C.uint32_t, buffer *C.char) {
@@ -291,8 +293,8 @@ func go_conntrack_callback(info *C.struct_conntrack_info, playflag C.int) {
 	ctid = uint32(info.conn_id)
 
 	// if the playback flag is set add the ctid to our cleanup list
-	if playflag != 0 && ctCleanList != nil {
-		ctCleanList[ctid] = true
+	if playflag != 0 && ctCleanTracker != nil {
+		ctCleanTracker[ctid] = true
 	}
 
 	family = uint8(info.family)
@@ -422,9 +424,10 @@ func timeUntilNextMin() time.Duration {
 
 // WarehousePlaybackFile plays a warehouse capture file and returns the list of netfilter
 // conntrack sessions that were detected so the caller can clean them up
-func WarehousePlaybackFile() (map[uint32]bool, map[uint32]bool) {
-	nfCleanList = make(map[uint32]bool)
-	ctCleanList = make(map[uint32]bool)
+func WarehousePlaybackFile(nflist map[uint32]bool, ctlist map[uint32]bool) {
+	nfCleanTracker = nflist
+	ctCleanTracker = ctlist
 	C.warehouse_playback()
-	return nfCleanList, ctCleanList
+	nfCleanTracker = nil
+	ctCleanTracker = nil
 }

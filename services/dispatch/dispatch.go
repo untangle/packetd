@@ -36,8 +36,9 @@ var conntrackSubMutex sync.Mutex
 var netloggerSubMutex sync.Mutex
 
 // maps to hold the netfilter and conntrack cleanup lists returned from warehouse playback
-var nfCleanupHolder map[uint32]bool
-var ctCleanupHolder map[uint32]bool
+var nfCleanupList map[uint32]bool
+var ctCleanupList map[uint32]bool
+var cleanupMutex sync.Mutex
 
 // channel used to shutdown the cleaner task
 var shutdownCleanerTask = make(chan bool)
@@ -183,15 +184,22 @@ func InsertNetloggerSubscription(owner string, priority int, function NetloggerH
 // cleanup lists that are returned from the playback function
 func HandleWarehousePlayback() {
 	go func() {
-		nfCleanupHolder, ctCleanupHolder = kernel.WarehousePlaybackFile()
+		cleanupMutex.Lock()
+		defer cleanupMutex.Unlock()
+		nfCleanupList = make(map[uint32]bool)
+		ctCleanupList = make(map[uint32]bool)
+		kernel.WarehousePlaybackFile(nfCleanupList, ctCleanupList)
 	}()
 }
 
 // HandleWarehouseCleanup removes the nfqueue and conntrack entries that
 // were created by the previous warehouse playback operation
 func HandleWarehouseCleanup() {
-	if nfCleanupHolder != nil {
-		for ctid := range nfCleanupHolder {
+	cleanupMutex.Lock()
+	defer cleanupMutex.Unlock()
+
+	if nfCleanupList != nil {
+		for ctid := range nfCleanupList {
 			logger.Debug("Removing playback session for %d\n", ctid)
 			sess := findSession(ctid)
 			if sess != nil {
@@ -199,15 +207,15 @@ func HandleWarehouseCleanup() {
 				sess.removeFromSessionTable()
 			}
 		}
-		nfCleanupHolder = nil
+		nfCleanupList = nil
 	}
 
-	if ctCleanupHolder != nil {
-		for ctid := range ctCleanupHolder {
+	if ctCleanupList != nil {
+		for ctid := range ctCleanupList {
 			logger.Debug("Removing playback conntrack for %d\n", ctid)
 			removeConntrack(ctid)
 		}
-		ctCleanupHolder = nil
+		ctCleanupList = nil
 	}
 }
 
