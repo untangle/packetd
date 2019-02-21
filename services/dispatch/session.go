@@ -9,23 +9,28 @@ import (
 	"github.com/untangle/packetd/services/logger"
 )
 
-// Session stores information of a packetd session
+// Session stores information about a packetd session
+// All fields are private and must be access with the get and set functions
+// defined below to ensure there are no data races
 type Session struct {
 
-	// SessionID is the globally unique ID for this session (created in packetd)
-	SessionID uint64
+	// sessionID is the globally unique ID for this session (created in packetd)
+	sessionID uint64
 
-	// ConntrackID is the conntrack ID. ConntrackIDs (ctid) are unique but reused.
-	ConntrackID uint32
+	// conntrackID is the conntrack ID. ConntrackIDs (ctid) are unique but reused.
+	conntrackID uint32
 
-	// CreationTime stores the creation time of the session
-	CreationTime time.Time
+	// creationTime stores the creation time of the session
+	creationTime time.Time
+	creationLock sync.Mutex
 
-	// ClientSideTuple stores the client-side (pre-NAT) session tuple
-	ClientSideTuple Tuple
+	// clientSideTuple stores the client-side (pre-NAT) session tuple
+	clientSideTuple Tuple
+	clientSideLock  sync.Mutex
 
-	// ServerSideTuple stores the server-side (post-NAT) session tuple
-	ServerSideTuple Tuple
+	// serverSideTuple stores the server-side (post-NAT) session tuple
+	serverSideTuple Tuple
+	serverSideLock  sync.Mutex
 
 	// stores the client and server side interface index and type using int32 because the atomic
 	// package doesn't have anything smaller but the get and set take and return them as uint8
@@ -34,14 +39,15 @@ type Session struct {
 	serverInterfaceID   uint32
 	serverInterfaceType uint32
 
-	// ConntrackConfirmed is true if this session has been confirmed by conntrack. false otherwise
+	// conntrackConfirmed is true if this session has been confirmed by conntrack. false otherwise
 	// A session becomes confirmed by conntrack once its packet reaches the final CONNTRACK_CONFIRM
 	// priority in netfilter, and we get an conntrack "NEW" event for it.
 	// Packets that never reach this point (blocked packets) often never get confirmed
-	ConntrackConfirmed bool
+	conntrackConfirmed uint32
 
 	// The conntrack entry associated with this session
-	Conntrack *Conntrack
+	conntrackPointer *Conntrack
+	conntrackLock    sync.Mutex
 
 	// subscriptions stores the nfqueue subscribers
 	subscriptions map[string]SubscriptionHolder
@@ -108,6 +114,58 @@ func (sess *Session) LockAttachments() map[string]interface{} {
 // UnlockAttachments unlocks the attachments mutex
 func (sess *Session) UnlockAttachments() {
 	sess.attachmentLock.Unlock()
+}
+
+// GetSessionID gets the session ID
+func (sess *Session) GetSessionID() uint64 {
+	return atomic.LoadUint64(&sess.sessionID)
+}
+
+// SetSessionID sets the seession ID
+func (sess *Session) SetSessionID(value uint64) uint64 {
+	atomic.StoreUint64(&sess.sessionID, value)
+	return value
+}
+
+// GetConntrackID gets the conntrack ID
+func (sess *Session) GetConntrackID() uint32 {
+	return atomic.LoadUint32(&sess.conntrackID)
+}
+
+// SetConntrackID sets the conntrack ID
+func (sess *Session) SetConntrackID(value uint32) uint32 {
+	atomic.StoreUint32(&sess.conntrackID, value)
+	return value
+}
+
+// GetClientSideTuple gets the client side Tuple
+func (sess *Session) GetClientSideTuple() Tuple {
+	sess.clientSideLock.Lock()
+	defer sess.clientSideLock.Unlock()
+	value := sess.clientSideTuple
+	return value
+}
+
+// SetClientSideTuple sets the client side Tuple
+func (sess *Session) SetClientSideTuple(tuple Tuple) {
+	sess.clientSideLock.Lock()
+	defer sess.clientSideLock.Unlock()
+	sess.clientSideTuple = tuple
+}
+
+// GetServerSideTuple gets the server side Tuple
+func (sess *Session) GetServerSideTuple() Tuple {
+	sess.serverSideLock.Lock()
+	defer sess.serverSideLock.Unlock()
+	value := sess.serverSideTuple
+	return value
+}
+
+// SetServerSideTuple sets the server side Tuple
+func (sess *Session) SetServerSideTuple(tuple Tuple) {
+	sess.serverSideLock.Lock()
+	defer sess.serverSideLock.Unlock()
+	sess.serverSideTuple = tuple
 }
 
 // GetServerInterfaceID gets the server interface ID
@@ -202,6 +260,21 @@ func (sess *Session) AddEventCount(value uint64) uint64 {
 	return atomic.AddUint64(&sess.eventCount, value)
 }
 
+// GetCreationTime gets the time the entry was created
+func (sess *Session) GetCreationTime() time.Time {
+	sess.creationLock.Lock()
+	defer sess.creationLock.Unlock()
+	value := sess.creationTime
+	return value
+}
+
+// SetCreationTime sets the time the entry was created
+func (sess *Session) SetCreationTime(value time.Time) {
+	sess.creationLock.Lock()
+	defer sess.creationLock.Unlock()
+	sess.creationTime = value
+}
+
 // GetLastActivity gets the time of the last session activity
 func (sess *Session) GetLastActivity() time.Time {
 	sess.lastActivityLock.Lock()
@@ -217,14 +290,46 @@ func (sess *Session) SetLastActivity(value time.Time) {
 	sess.lastActivityTime = value
 }
 
+// GetConntrackConfirmed gets the conntrack confirmed flag
+func (sess *Session) GetConntrackConfirmed() bool {
+	if atomic.LoadUint32(&sess.conntrackConfirmed) == 0 {
+		return false
+	}
+	return true
+}
+
+// SetConntrackConfirmed sets the conntrack confirmed flag
+func (sess *Session) SetConntrackConfirmed(argument bool) {
+	if argument {
+		atomic.StoreUint32(&sess.conntrackConfirmed, 1)
+	} else {
+		atomic.StoreUint32(&sess.conntrackConfirmed, 0)
+	}
+}
+
+// GetConntrackPointer gets the conntrack pointer
+func (sess *Session) GetConntrackPointer() *Conntrack {
+	sess.conntrackLock.Lock()
+	defer sess.conntrackLock.Unlock()
+	value := sess.conntrackPointer
+	return value
+}
+
+// SetConntrackPointer sets the conntrack pointer
+func (sess *Session) SetConntrackPointer(pointer *Conntrack) {
+	sess.conntrackLock.Lock()
+	defer sess.conntrackLock.Unlock()
+	sess.conntrackPointer = pointer
+}
+
 // removeFromSessionTable removes the session from the session table
 // it does a sanity check to make sure the session in question
 // is actually in the table
 func (sess *Session) removeFromSessionTable() {
 	sessionMutex.Lock()
-	sessInTable, found := sessionTable[sess.ConntrackID]
+	sessInTable, found := sessionTable[sess.GetConntrackID()]
 	if found && sess == sessInTable {
-		delete(sessionTable, sess.ConntrackID)
+		delete(sessionTable, sess.GetConntrackID())
 	}
 	sessionMutex.Unlock()
 }
@@ -234,9 +339,9 @@ func (sess *Session) removeFromSessionTable() {
 // by doing a lookup in the session table
 func (sess *Session) flushDict() {
 	sessionMutex.Lock()
-	sessInTable, found := sessionTable[sess.ConntrackID]
+	sessInTable, found := sessionTable[sess.GetConntrackID()]
 	if found && sess == sessInTable {
-		dict.DeleteSession(sess.ConntrackID)
+		dict.DeleteSession(sess.GetConntrackID())
 	}
 	sessionMutex.Unlock()
 }
@@ -270,7 +375,7 @@ func findSession(ctid uint32) *Session {
 
 // insertSessionTable adds an sess to the session table
 func insertSessionTable(ctid uint32, sess *Session) {
-	logger.Trace("Insert session index %v -> %v\n", ctid, sess.ClientSideTuple)
+	logger.Trace("Insert session index %v -> %v\n", ctid, sess.GetClientSideTuple())
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
 	if sessionTable[ctid] != nil {
@@ -278,7 +383,7 @@ func insertSessionTable(ctid uint32, sess *Session) {
 		delete(sessionTable, ctid)
 	}
 	sessionTable[ctid] = sess
-	dict.AddSessionEntry(sess.ConntrackID, "session_id", sess.SessionID)
+	dict.AddSessionEntry(sess.GetConntrackID(), "session_id", sess.GetSessionID())
 }
 
 // cleanSessionTable cleans the session table by removing stale entries
@@ -294,8 +399,8 @@ func cleanSessionTable() {
 
 		// We use 10000 seconds because 7440 is the established idle tcp timeout default
 		if time.Now().Sub(session.GetLastActivity()) > 10000*time.Second {
-			if session.ConntrackConfirmed {
-				logger.Err("Removing stale (%v) session [%v] %v\n", time.Now().Sub(session.GetLastActivity()), ctid, session.ClientSideTuple)
+			if session.GetConntrackConfirmed() {
+				logger.Err("Removing stale (%v) session [%v] %v\n", time.Now().Sub(session.GetLastActivity()), ctid, session.GetClientSideTuple())
 			}
 			dict.DeleteSession(ctid)
 			delete(sessionTable, ctid)
@@ -308,6 +413,6 @@ func printSessionTable() {
 	sessionMutex.Lock()
 	defer sessionMutex.Unlock()
 	for k, v := range sessionTable {
-		logger.Debug("Session[%v] = %s\n", k, v.ClientSideTuple.String())
+		logger.Debug("Session[%v] = %s\n", k, v.GetClientSideTuple().String())
 	}
 }

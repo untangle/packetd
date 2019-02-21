@@ -108,7 +108,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// we only look for certs in TCP traffic not going to server port 443
 	// since those session will be handled by the certfetch plugin
-	if mess.TCPLayer == nil || mess.Session.ClientSideTuple.ServerPort == 443 {
+	if mess.TCPLayer == nil || mess.Session.GetClientSideTuple().ServerPort == 443 {
 		result.SessionRelease = true
 		return result
 	}
@@ -121,7 +121,8 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	// look in the cache to see if we already have a certificate for this server:port
-	findkey := fmt.Sprintf("%s:%d", mess.Session.ClientSideTuple.ServerAddress, mess.Session.ClientSideTuple.ServerPort)
+	clientSideTuple := mess.Session.GetClientSideTuple()
+	findkey := fmt.Sprintf("%s:%d", clientSideTuple.ServerAddress, clientSideTuple.ServerPort)
 	certHolder, found = certcache.FindCertificate(findkey)
 	if found {
 		if certHolder.Available {
@@ -348,7 +349,8 @@ func findCertificates(buffer []byte, mess dispatch.NfqueueMessage) bool {
 				if err != nil {
 					logger.Err("Error %v extracting certificate\n", err)
 				} else {
-					findkey := fmt.Sprintf("%s:%d", mess.Session.ClientSideTuple.ServerAddress, mess.Session.ClientSideTuple.ServerPort)
+					clientSideTuple := mess.Session.GetClientSideTuple()
+					findkey := fmt.Sprintf("%s:%d", clientSideTuple.ServerAddress, clientSideTuple.ServerPort)
 					logger.Debug("Creating cached certificate for %s [%v]\n", findkey, cert.Subject)
 					holder := new(certcache.CertificateHolder)
 					holder.CreationTime = time.Now()

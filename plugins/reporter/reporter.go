@@ -53,27 +53,28 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// if client is on LAN (type 2)
 	if session.GetClientInterfaceType() == 2 {
-		localAddress = session.ClientSideTuple.ClientAddress
+		localAddress = session.GetClientSideTuple().ClientAddress
 		// the server may not actually be on a WAN, but we consider it remote if the client is on a LAN
-		remoteAddress = session.ClientSideTuple.ServerAddress
+		remoteAddress = session.GetClientSideTuple().ServerAddress
 	} else {
-		remoteAddress = session.ClientSideTuple.ClientAddress
+		remoteAddress = session.GetClientSideTuple().ClientAddress
 		// the server could in theory be on another WAN (WAN1 -> WAN2 traffic) but it is very unlikely so we consider
 		// the local address to be the server
-		localAddress = session.ClientSideTuple.ServerAddress
+		localAddress = session.GetClientSideTuple().ServerAddress
 	}
+	clientSideTuple := session.GetClientSideTuple()
 	columns := map[string]interface{}{
 		"time_stamp":            time.Now(),
-		"session_id":            session.SessionID,
-		"ip_protocol":           session.ClientSideTuple.Protocol,
+		"session_id":            session.GetSessionID(),
+		"ip_protocol":           clientSideTuple.Protocol,
 		"client_interface_id":   session.GetClientInterfaceID(),
 		"client_interface_type": session.GetClientInterfaceType(),
 		"local_address":         localAddress.String(),
 		"remote_address":        remoteAddress.String(),
-		"client_address":        session.ClientSideTuple.ClientAddress.String(),
-		"server_address":        session.ClientSideTuple.ServerAddress.String(),
-		"client_port":           session.ClientSideTuple.ClientPort,
-		"server_port":           session.ClientSideTuple.ServerPort,
+		"client_address":        clientSideTuple.ClientAddress.String(),
+		"server_address":        clientSideTuple.ServerAddress.String(),
+		"client_port":           clientSideTuple.ClientPort,
+		"server_port":           clientSideTuple.ServerPort,
 	}
 	reports.LogEvent(reports.CreateEvent("session_new", "sessions", 1, columns, nil))
 	for k, v := range columns {
@@ -81,7 +82,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		if k == "time_stamp" {
 			continue
 		}
-		dict.AddSessionEntry(session.ConntrackID, k, v)
+		dict.AddSessionEntry(session.GetConntrackID(), k, v)
 	}
 	return result
 }
@@ -91,26 +92,27 @@ func PluginConntrackHandler(message int, entry *dispatch.Conntrack) {
 	var session *dispatch.Session
 
 	if entry.Session != nil {
-		logger.Trace("Conntrack Event: %c %v 0x%08x\n", message, entry.Session.ClientSideTuple, entry.ConnMark)
+		logger.Trace("Conntrack Event: %c %v 0x%08x\n", message, entry.Session.GetClientSideTuple(), entry.ConnMark)
 	}
 	session = entry.Session
 	if message == 'N' {
 		if session != nil {
 			columns := map[string]interface{}{
-				"session_id": session.SessionID,
+				"session_id": session.GetSessionID(),
 			}
+			serverSideTuple := session.GetServerSideTuple()
 			modifiedColumns := map[string]interface{}{
-				"client_address_new":    session.ServerSideTuple.ClientAddress.String(),
-				"server_address_new":    session.ServerSideTuple.ServerAddress.String(),
-				"client_port_new":       session.ServerSideTuple.ClientPort,
-				"server_port_new":       session.ServerSideTuple.ServerPort,
+				"client_address_new":    serverSideTuple.ClientAddress.String(),
+				"server_address_new":    serverSideTuple.ServerAddress.String(),
+				"client_port_new":       serverSideTuple.ClientPort,
+				"server_port_new":       serverSideTuple.ServerPort,
 				"server_interface_id":   session.GetServerInterfaceID(),
 				"server_interface_type": session.GetServerInterfaceType(),
 			}
 			reports.LogEvent(reports.CreateEvent("session_nat", "sessions", 2, columns, modifiedColumns))
 			for k, v := range modifiedColumns {
 				session.PutAttachment(k, v)
-				dict.AddSessionEntry(session.ConntrackID, k, v)
+				dict.AddSessionEntry(session.GetConntrackID(), k, v)
 			}
 
 		} else {
@@ -122,7 +124,7 @@ func PluginConntrackHandler(message int, entry *dispatch.Conntrack) {
 
 	if message == 'U' {
 		if session != nil {
-			doAccounting(entry, session.SessionID, entry.ConntrackID)
+			doAccounting(entry, session.GetSessionID(), entry.ConntrackID)
 		} else {
 			// Still account for unknown session data
 			doAccounting(entry, 0, entry.ConntrackID)

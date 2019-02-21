@@ -102,9 +102,9 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			logger.Err("ConntrackID: %v\n", conntrack.ConntrackID)
 			logger.Err("SessionID: %v\n", conntrack.SessionID)
 			if conntrack.Session != nil {
-				logger.Err("Session ClientSideTuple: %v\n", conntrack.Session.ClientSideTuple)
-				logger.Err("Session ServerSideTuple: %v\n", conntrack.Session.ServerSideTuple)
-				logger.Err("Session SessionID: %v\n", conntrack.Session.SessionID)
+				logger.Err("Session ClientSideTuple: %v\n", conntrack.Session.GetClientSideTuple())
+				logger.Err("Session ServerSideTuple: %v\n", conntrack.Session.GetServerSideTuple())
+				logger.Err("Session SessionID: %v\n", conntrack.Session.GetSessionID())
 			}
 			logger.Err("Deleting obsolete conntrack entry %v.\n", ctid)
 			removeConntrackStale(ctid, conntrack)
@@ -151,13 +151,13 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 
 		// Do some sanity checks on the session we just found
 		if session != nil {
-			if session.ConntrackID != ctid {
+			if session.GetConntrackID() != ctid {
 				// We found a session, if its conntrackID does not match the one of the event
 				// This should never happen as we lookup the session using the ctid
-				logger.Err("Conntrack NEW ID mismatch: %s  %d != %d\n", session.ClientSideTuple.String(), ctid, session.ConntrackID)
+				logger.Err("Conntrack NEW ID mismatch: %s  %d != %d\n", session.GetClientSideTuple().String(), ctid, session.GetConntrackID())
 				return
 			}
-			if !session.ClientSideTuple.Equal(conntrack.ClientSideTuple) {
+			if !session.GetClientSideTuple().Equal(conntrack.ClientSideTuple) {
 				// We found a session, but the tuple is not what we expect.
 
 				// This happens in some scenarios. For example:
@@ -170,10 +170,10 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 
 				// This is a problem, however if the previous session was confirmed, and we have now received a NEW event
 				// before receiving a DELETE event for the old ctid
-				if session.ConntrackConfirmed {
-					logger.Err("Conntrack NEW session tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrack.ClientSideTuple.String())
+				if session.GetConntrackConfirmed() {
+					logger.Err("Conntrack NEW session tuple mismatch: %v  %v != %v\n", ctid, session.GetClientSideTuple().String(), conntrack.ClientSideTuple.String())
 				} else {
-					logger.Debug("Conntrack NEW session tuple mismatch: %v  %v != %v\n", ctid, session.ClientSideTuple.String(), conntrack.ClientSideTuple.String())
+					logger.Debug("Conntrack NEW session tuple mismatch: %v  %v != %v\n", ctid, session.GetClientSideTuple().String(), conntrack.ClientSideTuple.String())
 				}
 
 				// Remove that session from the sessionTable - we can conclude its not valid anymore
@@ -186,19 +186,22 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		// if we find the session entry update with the server side tuple and
 		// create another index for the session using the server side tuple
 		if session != nil {
-			session.ServerSideTuple.Protocol = protocol
-			session.ServerSideTuple.ClientAddress = dupIP(clientNew)
-			session.ServerSideTuple.ClientPort = clientPortNew
-			session.ServerSideTuple.ServerAddress = dupIP(serverNew)
-			session.ServerSideTuple.ServerPort = serverPortNew
+			var serverSideTuple Tuple
+
+			serverSideTuple.Protocol = protocol
+			serverSideTuple.ClientAddress = dupIP(clientNew)
+			serverSideTuple.ClientPort = clientPortNew
+			serverSideTuple.ServerAddress = dupIP(serverNew)
+			serverSideTuple.ServerPort = serverPortNew
+			session.SetServerSideTuple(serverSideTuple)
 			session.SetServerInterfaceID(uint8((conntrack.ConnMark & 0x0000FF00) >> 8))
 			session.SetServerInterfaceType(uint8((conntrack.ConnMark & 0x0C000000) >> 26))
-			session.ConntrackConfirmed = true
-			session.Conntrack = conntrack
+			session.SetConntrackConfirmed(true)
+			session.SetConntrackPointer(conntrack)
 			session.SetLastActivity(time.Now())
 			session.AddEventCount(1)
 			conntrack.Session = session
-			conntrack.SessionID = session.SessionID
+			conntrack.SessionID = session.GetSessionID()
 		} else {
 			conntrack.SessionID = nextSessionID()
 		}

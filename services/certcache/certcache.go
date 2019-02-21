@@ -47,29 +47,30 @@ func Shutdown() {
 // AttachCertificateToSession is called to attach a certificate to a session entry and
 // to populate the dictionary  with details about the certificate
 func AttachCertificateToSession(session *dispatch.Session, certificate x509.Certificate) {
+	ctid := session.GetConntrackID()
 
 	session.PutAttachment("certificate", certificate)
 
-	setSessionEntry(session, "certificate_subject_cn", certificate.Subject.CommonName, session.ConntrackID)
-	setSessionEntry(session, "certificate_subject_sn", certificate.Subject.SerialNumber, session.ConntrackID)
-	setSessionList(session, "certificate_subject_c", certificate.Subject.Country, session.ConntrackID)
-	setSessionList(session, "certificate_subject_o", certificate.Subject.Organization, session.ConntrackID)
-	setSessionList(session, "certificate_subject_ou", certificate.Subject.OrganizationalUnit, session.ConntrackID)
-	setSessionList(session, "certificate_subject_l", certificate.Subject.Locality, session.ConntrackID)
-	setSessionList(session, "certificate_subject_p", certificate.Subject.Province, session.ConntrackID)
-	setSessionList(session, "certificate_subject_sa", certificate.Subject.StreetAddress, session.ConntrackID)
-	setSessionList(session, "certificate_subject_pc", certificate.Subject.PostalCode, session.ConntrackID)
-	setSessionList(session, "certificate_subject_san", certificate.DNSNames, session.ConntrackID)
+	setSessionEntry(session, "certificate_subject_cn", certificate.Subject.CommonName, ctid)
+	setSessionEntry(session, "certificate_subject_sn", certificate.Subject.SerialNumber, ctid)
+	setSessionList(session, "certificate_subject_c", certificate.Subject.Country, ctid)
+	setSessionList(session, "certificate_subject_o", certificate.Subject.Organization, ctid)
+	setSessionList(session, "certificate_subject_ou", certificate.Subject.OrganizationalUnit, ctid)
+	setSessionList(session, "certificate_subject_l", certificate.Subject.Locality, ctid)
+	setSessionList(session, "certificate_subject_p", certificate.Subject.Province, ctid)
+	setSessionList(session, "certificate_subject_sa", certificate.Subject.StreetAddress, ctid)
+	setSessionList(session, "certificate_subject_pc", certificate.Subject.PostalCode, ctid)
+	setSessionList(session, "certificate_subject_san", certificate.DNSNames, ctid)
 
-	setSessionEntry(session, "certificate_issuer_cn", certificate.Issuer.CommonName, session.ConntrackID)
-	setSessionEntry(session, "certificate_issuer_sn", certificate.Issuer.SerialNumber, session.ConntrackID)
-	setSessionList(session, "certificate_issuer_c", certificate.Issuer.Country, session.ConntrackID)
-	setSessionList(session, "certificate_issuer_o", certificate.Issuer.Organization, session.ConntrackID)
-	setSessionList(session, "certificate_issuer_ou", certificate.Issuer.OrganizationalUnit, session.ConntrackID)
-	setSessionList(session, "certificate_issuer_l", certificate.Issuer.Locality, session.ConntrackID)
-	setSessionList(session, "certificate_issuer_p", certificate.Issuer.Province, session.ConntrackID)
-	setSessionList(session, "certificate_issuer_sa", certificate.Issuer.StreetAddress, session.ConntrackID)
-	setSessionList(session, "certificate_issuer_pc", certificate.Issuer.PostalCode, session.ConntrackID)
+	setSessionEntry(session, "certificate_issuer_cn", certificate.Issuer.CommonName, ctid)
+	setSessionEntry(session, "certificate_issuer_sn", certificate.Issuer.SerialNumber, ctid)
+	setSessionList(session, "certificate_issuer_c", certificate.Issuer.Country, ctid)
+	setSessionList(session, "certificate_issuer_o", certificate.Issuer.Organization, ctid)
+	setSessionList(session, "certificate_issuer_ou", certificate.Issuer.OrganizationalUnit, ctid)
+	setSessionList(session, "certificate_issuer_l", certificate.Issuer.Locality, ctid)
+	setSessionList(session, "certificate_issuer_p", certificate.Issuer.Province, ctid)
+	setSessionList(session, "certificate_issuer_sa", certificate.Issuer.StreetAddress, ctid)
+	setSessionList(session, "certificate_issuer_pc", certificate.Issuer.PostalCode, ctid)
 
 	logEvent(session)
 }
@@ -168,7 +169,7 @@ func cleanupTask() {
 // provide the session, and the client and server country
 func logEvent(session *dispatch.Session) {
 	columns := map[string]interface{}{
-		"session_id": session.SessionID,
+		"session_id": session.GetSessionID(),
 	}
 
 	modifiedColumns := make(map[string]interface{})

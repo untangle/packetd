@@ -70,14 +70,14 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		clientHint = FindAddress(mess.MsgTuple.ClientAddress)
 		if len(clientHint) > 0 {
 			logger.Debug("Setting client_dns_hint name:%s addr:%v ctid:%d\n", clientHint, mess.MsgTuple.ClientAddress, ctid)
-			dict.AddSessionEntry(mess.Session.ConntrackID, "client_dns_hint", clientHint)
+			dict.AddSessionEntry(mess.Session.GetConntrackID(), "client_dns_hint", clientHint)
 			mess.Session.PutAttachment("client_dns_hint", clientHint)
 		}
 
 		serverHint = FindAddress(mess.MsgTuple.ServerAddress)
 		if len(serverHint) > 0 {
 			logger.Debug("Setting server_dns_hint name:%s addr:%v ctid:%d\n", serverHint, mess.MsgTuple.ServerAddress, ctid)
-			dict.AddSessionEntry(mess.Session.ConntrackID, "server_dns_hint", serverHint)
+			dict.AddSessionEntry(mess.Session.GetConntrackID(), "server_dns_hint", serverHint)
 			mess.Session.PutAttachment("server_dns_hint", serverHint)
 		}
 
@@ -212,7 +212,7 @@ func cleanupTask() {
 // provide the session, and the client and server hints
 func logEvent(session *dispatch.Session, clientHint string, serverHint string) {
 	columns := map[string]interface{}{
-		"session_id": session.SessionID,
+		"session_id": session.GetSessionID(),
 	}
 	total := 0
 

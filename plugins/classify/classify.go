@@ -135,15 +135,15 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
-	// make sure we have a valid conntrack id
-	if mess.Session.SessionID == 0 {
+	// make sure we have a valid session id
+	if mess.Session.GetSessionID() == 0 {
 		logger.Err("Ignoring event with invalid SessionID\n")
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
 	// make sure we have a valid IPv4 or IPv6 layer
 	if mess.IP4Layer == nil && mess.IP6Layer == nil {
-		logger.Err("Invalid packet: %v\n", mess.Session.ClientSideTuple.Protocol)
+		logger.Err("Invalid packet: %v\n", mess.Session.GetClientSideTuple())
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
@@ -182,12 +182,12 @@ func classifyTraffic(mess *dispatch.NfqueueMessage) string {
 	} else if mess.IP6Layer != nil {
 		proto = "IP6"
 	} else {
-		logger.Err("Unsupported protocol for %d\n", mess.Session.ConntrackID)
+		logger.Err("Unsupported protocol for %d\n", mess.Session.GetConntrackID())
 		return ""
 	}
 
 	// send the packet to the daemon for classification
-	command = fmt.Sprintf("PACKET|%d|%s|%d\r\n", mess.Session.SessionID, proto, len(mess.Packet.Data()))
+	command = fmt.Sprintf("PACKET|%d|%s|%d\r\n", mess.Session.GetSessionID(), proto, len(mess.Packet.Data()))
 	reply = daemonClassifyPacket(command, mess.Packet.Data())
 	return reply
 }
@@ -330,7 +330,7 @@ func logEvent(session *dispatch.Session, attachments map[string]interface{}, cha
 		return
 	}
 	columns := map[string]interface{}{
-		"session_id": session.SessionID,
+		"session_id": session.GetSessionID(),
 	}
 	modifiedColumns := make(map[string]interface{})
 	for _, v := range changed {

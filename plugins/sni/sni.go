@@ -206,7 +206,7 @@ func extractSNIhostname(buffer []byte) (bool, string) {
 // provide the session, and the sni string
 func logEvent(session *dispatch.Session, sslSni string) {
 	columns := map[string]interface{}{
-		"session_id": session.SessionID,
+		"session_id": session.GetSessionID(),
 	}
 
 	modifiedColumns := make(map[string]interface{})

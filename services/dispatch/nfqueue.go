@@ -63,11 +63,11 @@ func ReleaseSession(session *Session, owner string) {
 	delete(session.subscriptions, owner)
 	len := len(session.subscriptions)
 	if origLen != len {
-		logger.Debug("Removing %s session nfqueue subscription for session %d\n", owner, session.ConntrackID)
+		logger.Debug("Removing %s session nfqueue subscription for session %d\n", owner, session.GetConntrackID())
 	}
 	if len == 0 {
-		logger.Debug("Zero subscribers reached - settings bypass_packetd=true for session %d\n", session.ConntrackID)
-		dict.AddSessionEntry(session.ConntrackID, "bypass_packetd", true)
+		logger.Debug("Zero subscribers reached - settings bypass_packetd=true for session %d\n", session.GetConntrackID())
+		dict.AddSessionEntry(session.GetConntrackID(), "bypass_packetd", true)
 	}
 }
 
@@ -158,7 +158,7 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 		mess.Session = session
 	} else {
 		if newSession {
-			if mess.MsgTuple.Equal(session.ClientSideTuple) {
+			if mess.MsgTuple.Equal(session.GetClientSideTuple()) {
 				// netfilter considers this a "new" session, but the tuple is identical.
 				// this happens because netfilter's session tracking is more advanced
 				// and often parses deeper headers (ping/dns) to track sessions
@@ -179,7 +179,7 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 				// in this case we can also just delete the old mapping from the session table, but leave
 				// it in the conntrack table for the conntrack handle to handle
 
-				logger.Debug("Conflicting session [%d] %v != %v\n", ctid, mess.MsgTuple, session.ClientSideTuple)
+				logger.Debug("Conflicting session [%d] %v != %v\n", ctid, mess.MsgTuple, session.GetClientSideTuple())
 				// We don't need to flush here - this is a new session its already been flushed
 				// session.flushDict()
 				session.removeFromSessionTable()
@@ -189,8 +189,8 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 		}
 
 		// Also check that the conntrack ID matches. Log an error if it does not
-		if session.ConntrackID != ctid {
-			logger.Err("Conntrack ID mismatch: %s  %d != %d %v\n", mess.MsgTuple, ctid, session.ConntrackID, session.ConntrackConfirmed)
+		if session.GetConntrackID() != ctid {
+			logger.Err("Conntrack ID mismatch: %s  %d != %d %v\n", mess.MsgTuple, ctid, session.GetConntrackID(), session.GetConntrackConfirmed())
 		}
 	}
 
@@ -210,7 +210,7 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 		removeConntrack(ctid)
 	}
 
-	if mess.MsgTuple.ClientAddress.Equal(session.ClientSideTuple.ClientAddress) {
+	if mess.MsgTuple.ClientAddress.Equal(session.GetClientSideTuple().ClientAddress) {
 		mess.ClientToServer = true
 	} else {
 		mess.ClientToServer = false
@@ -233,7 +233,7 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 	// to avoid flooding logs with a "> X" condition
 	packetcount := session.GetPacketCount()
 	if packetcount == 100 || packetcount == 200 {
-		logger.Warn("Deep session scan. %v ctid:%v Packets:%v Bytes:%v Subscribers:%v Age:%v\n", session.ClientSideTuple, ctid, session.GetPacketCount(), session.GetByteCount(), session.subscriptions, time.Since(session.CreationTime))
+		logger.Warn("Deep session scan. %v ctid:%v Packets:%v Bytes:%v Subscribers:%v Age:%v\n", session.GetClientSideTuple(), ctid, session.GetPacketCount(), session.GetByteCount(), session.subscriptions, time.Since(session.GetCreationTime()))
 	}
 
 	return callSubscribers(ctid, session, mess, pmark, newSession)
@@ -250,7 +250,7 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 
 	// If there are no subscribers anymore, just release now
 	if subtotal == 0 {
-		dict.AddSessionEntry(session.ConntrackID, "bypass_packetd", true)
+		dict.AddSessionEntry(session.GetConntrackID(), "bypass_packetd", true)
 		return NfAccept
 	}
 
@@ -338,15 +338,15 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 // into the session table
 func createSession(mess NfqueueMessage, ctid uint32) *Session {
 	session := new(Session)
-	session.SessionID = nextSessionID()
-	session.ConntrackID = ctid
-	session.CreationTime = time.Now()
+	session.SetSessionID(nextSessionID())
+	session.SetConntrackID(ctid)
+	session.SetCreationTime(time.Now())
 	session.SetPacketCount(1)
 	session.SetByteCount(uint64(mess.Length))
 	session.SetEventCount(1)
 	session.SetLastActivity(time.Now())
-	session.ClientSideTuple = mess.MsgTuple
-	session.ConntrackConfirmed = false
+	session.SetClientSideTuple(mess.MsgTuple)
+	session.SetConntrackConfirmed(false)
 	session.attachments = make(map[string]interface{})
 	AttachNfqueueSubscriptions(session)
 	insertSessionTable(ctid, session)

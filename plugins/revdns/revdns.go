@@ -213,7 +213,7 @@ func attachReverseNamesToSession(keyname string, session *dispatch.Session, list
 	}
 
 	session.PutAttachment(keyname, builder)
-	dict.AddSessionEntry(session.ConntrackID, keyname, builder)
+	dict.AddSessionEntry(session.GetConntrackID(), keyname, builder)
 }
 
 // findReverse fetches the cached names for the argumented address.

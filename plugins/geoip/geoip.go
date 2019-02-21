@@ -201,7 +201,7 @@ func findGeoFile(download bool) string {
 // provide the session, and the client and server country
 func logEvent(session *dispatch.Session, clientCountry string, serverCountry string) {
 	columns := map[string]interface{}{
-		"session_id": session.SessionID,
+		"session_id": session.GetSessionID(),
 	}
 
 	modifiedColumns := make(map[string]interface{})
