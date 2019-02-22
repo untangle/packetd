@@ -219,6 +219,7 @@ func (sess *Session) GetPacketCount() uint64 {
 
 // SetPacketCount sets the packet count
 func (sess *Session) SetPacketCount(value uint64) uint64 {
+    logger.Warn("XXX %T %p\n", sess, sess)
 	atomic.StoreUint64(&sess.packetCount, value)
 	return value
 }
