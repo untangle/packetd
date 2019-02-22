@@ -14,8 +14,30 @@ import (
 // defined below to ensure there are no data races
 type Session struct {
 
+	/*
+		***** WARNING - WARNING - WARNING - WARNING - WARNING *****
+
+		There is an issue with atomic operations on 64 bit values on
+		ARM platforms that can cause an exeception when values are not
+		64 bit aligned.
+
+		On both ARM and x86-32, it is the caller's responsibility to arrange
+		for 64-bit alignment of 64-bit words accessed atomically. The first
+		word in a variable or in an allocated struct, array, or slice can
+		be relied upon to be 64-bit aligned.
+
+		It is for that reason we put all of the 64 bit values at the top.
+
+		https://github.com/golang/go/issues/23345
+	*/
+
 	// sessionID is the globally unique ID for this session (created in packetd)
 	sessionID uint64
+
+	// used to keep track of the session packet, byte, and event counts
+	packetCount uint64
+	byteCount   uint64
+	eventCount  uint64
 
 	// conntrackID is the conntrack ID. ConntrackIDs (ctid) are unique but reused.
 	conntrackID uint32
@@ -60,11 +82,6 @@ type Session struct {
 	// used to keep track of the last session activity
 	lastActivityTime time.Time
 	lastActivityLock sync.Mutex
-
-	// used to keep track of the session packet, byte, and event counts
-	packetCount uint64
-	byteCount   uint64
-	eventCount  uint64
 }
 
 // sessionTable is the global session table
@@ -219,7 +236,6 @@ func (sess *Session) GetPacketCount() uint64 {
 
 // SetPacketCount sets the packet count
 func (sess *Session) SetPacketCount(value uint64) uint64 {
-    logger.Warn("XXX %T %p\n", sess, sess)
 	atomic.StoreUint64(&sess.packetCount, value)
 	return value
 }
