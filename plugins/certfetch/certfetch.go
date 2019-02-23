@@ -91,6 +91,8 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 			defer conn.Close()
 		}
 
+		holder.CertLocker.Lock()
+
 		if conn != nil && len(conn.ConnectionState().PeerCertificates) > 0 {
 			logger.Debug("Successfully fetched certificate from %s ctid:%d\n", findkey, ctid)
 			holder.Certificate = *conn.ConnectionState().PeerCertificates[0]
@@ -100,6 +102,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 			holder.Available = false
 		}
 		holder.CreationTime = time.Now()
+		holder.CertLocker.Unlock()
 		holder.WaitGroup.Done()
 	}
 
@@ -115,11 +118,15 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	holder.WaitGroup.Wait()
 	logger.Debug("Certificate %v found: %v ctid:%d\n", findkey, holder.Available, ctid)
 
+	holder.CertLocker.Lock()
+
 	// if the cert is available for this server attach the cert to the session
 	// and put the details in the dictionary
 	if holder.Available {
 		certcache.AttachCertificateToSession(mess.Session, holder.Certificate)
 	}
+
+	holder.CertLocker.Unlock()
 
 	return result
 }

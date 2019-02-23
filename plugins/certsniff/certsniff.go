@@ -125,10 +125,12 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	findkey := fmt.Sprintf("%s:%d", clientSideTuple.ServerAddress, clientSideTuple.ServerPort)
 	certHolder, found = certcache.FindCertificate(findkey)
 	if found {
+		certHolder.CertLocker.Lock()
 		if certHolder.Available {
 			logger.Debug("Loading cached certificate for %s ctid:%d\n", findkey, ctid)
 			certcache.AttachCertificateToSession(mess.Session, certHolder.Certificate)
 		}
+		certHolder.CertLocker.Unlock()
 		result.SessionRelease = true
 		return result
 	}
@@ -356,8 +358,8 @@ func findCertificates(buffer []byte, mess dispatch.NfqueueMessage) bool {
 					holder.CreationTime = time.Now()
 					holder.Certificate = *cert
 					holder.Available = true
-					certcache.InsertCertificate(findkey, holder)
 					certcache.AttachCertificateToSession(mess.Session, *cert)
+					certcache.InsertCertificate(findkey, holder)
 				}
 				return true
 			}
