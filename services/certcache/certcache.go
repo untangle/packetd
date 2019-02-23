@@ -21,6 +21,7 @@ type CertificateHolder struct {
 	Certificate  x509.Certificate
 	Available    bool
 	WaitGroup    sync.WaitGroup
+	CertLocker   sync.Mutex
 }
 
 var shutdownChannel = make(chan bool)
@@ -143,7 +144,10 @@ func cleanCertificateTable() {
 	defer certificateMutex.Unlock()
 
 	for key, val := range certificateTable {
-		if (nowtime.Unix() - val.CreationTime.Unix()) < cleanTimeout {
+		val.CertLocker.Lock()
+		creation := val.CreationTime.Unix()
+		val.CertLocker.Unlock()
+		if (nowtime.Unix() - creation) < cleanTimeout {
 			continue
 		}
 		delete(certificateTable, key)
