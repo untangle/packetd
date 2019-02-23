@@ -33,7 +33,9 @@ func getSessions() ([]map[string]interface{}, error) {
 	conntrackTable := dispatch.GetConntrackTable()
 
 	for _, v := range conntrackTable {
+		v.Guardian.RLock()
 		m := parseConntrack(v)
+		v.Guardian.RUnlock()
 		if m != nil {
 			sessions = append(sessions, m)
 		}

@@ -224,6 +224,10 @@ func HandleWarehouseCleanup() {
 // do not modify the values in the conntrack entries
 func GetConntrackTable() map[uint32]*Conntrack {
 	newMap := make(map[uint32]*Conntrack)
+
+	conntrackTableMutex.Lock()
+	defer conntrackTableMutex.Unlock()
+
 	for k, v := range conntrackTable {
 		newMap[k] = v
 	}

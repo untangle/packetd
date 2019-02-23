@@ -91,6 +91,9 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 func PluginConntrackHandler(message int, entry *dispatch.Conntrack) {
 	var session *dispatch.Session
 
+	entry.Guardian.RLock()
+	defer entry.Guardian.RUnlock()
+
 	if entry.Session != nil {
 		logger.Trace("Conntrack Event: %c %v 0x%08x\n", message, entry.Session.GetClientSideTuple(), entry.ConnMark)
 	}

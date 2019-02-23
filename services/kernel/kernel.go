@@ -28,7 +28,7 @@ type NfqueueCallback func(uint32, uint32, gopacket.Packet, int, uint32) int
 // NetloggerCallback is a function to handle netlogger events
 type NetloggerCallback func(uint8, uint8, uint16, uint8, uint8, string, string, uint16, uint16, uint32, string)
 
-// To give C child functions access we export go_child_startup and shutdown functions.
+// To give C child functions access we export go_child_startup and shutdown functions which
 var childsync sync.WaitGroup
 var shutdownConntrackTask = make(chan bool)
 var conntrackCallback ConntrackCallback
@@ -83,14 +83,26 @@ func StartCallbacks(numNfqueueThreads int, intervalSeconds int) {
 
 // StopCallbacks stops all C services and callbacks
 func StopCallbacks() {
+	c := make(chan bool)
+
 	// make sure the shutdown flag is set
 	SetShutdownFlag()
 
-	// Send shutdown signal to periodicTask and wait for it to return
-	// wait on above shutdowns
-	c := make(chan bool)
+	// send shutdown signal to periodicTask and wait for it to return
 	go func() {
 		shutdownConntrackTask <- true
+		c <- true
+	}()
+
+	select {
+	case <-c:
+		logger.Info("Successful shutdown of conntrackTask\n")
+	case <-time.After(10 * time.Second):
+		logger.Err("Failed to properly shutdown conntrackPeriodicTask\n")
+	}
+
+	// wait for everything else to finish
+	go func() {
 		childsync.Wait()
 		c <- true
 	}()
@@ -98,7 +110,7 @@ func StopCallbacks() {
 	select {
 	case <-c:
 	case <-time.After(10 * time.Second):
-		logger.Err("Failed to properly shutdown conntrackPeriodicTask\n")
+		logger.Err("Timeout waiting for childsync WaitGroup\n")
 	}
 }
 
