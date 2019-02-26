@@ -26,7 +26,6 @@ This will install several dependencies automatically, or you can do so manually:
 ```
 go get -u github.com/gin-gonic/gin
 go get -u github.com/gin-contrib/cors
-go get -u github.com/gin-contrib/contrib
 go get -u github.com/gin-contrib/location
 go get -u github.com/gin-contrib/sessions
 go get -u github.com/gorilla/context
@@ -143,20 +142,21 @@ Then launch the container with docker-compose:
 docker-compose -f docker-compose.yml run --name mfw --rm packetd
 ```
 
-Or manually with docker
+To launch the container with packetd and a slave:
 
 ```
-docker network create --subnet 172.50.0.0/16 eth1-extnet
-docker network create --subnet 172.51.0.0/16 eth0-intnet
-docker create --privileged --rm --net eth1-extnet --name mfw --volume ./cmd/packetd/packetd:/usr/bin/packetd untangleinc/mfw:x86-64_latest
-docker network connect eth0-intnet mfw
-docker start -i mfw
+docker-compose -f docker-compose.yml up
+```
+
+To see the containers:
+```
+docker container ls
 ```
 
 To get a shell in container (in another window):
 
 ```
-docker exec -it mfw sh
+docker exec -it <container_id> sh
 ```
 
 or
@@ -167,19 +167,24 @@ ssh root@172.51.0.2
 
 To open web admin from the host goto URL: http:/172.51.0.2/
 
-Redirect your local host traffic through the container
+Redirect your local traffic through the container
 ------------------------------------------------------
 
 To redirect traffic from the host through your container
 
 ```
-./util/reroute_container.sh
+./util/reroute_host.sh
 ```
 
 To undo the "redirect"
 
 ```
-./util/unroute_container.sh
+./util/unroute_host.sh
+```
+
+To redirect traffic from the slave throught the packetd container:
+```
+./util/reroute_slave.sh
 ```
 
 Copying a new packetd inside that container

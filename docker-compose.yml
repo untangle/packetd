@@ -4,13 +4,21 @@ services:
     image: "untangleinc/mfw:x86-64_latest"
     privileged: true
     networks:
-      - eth1-extnet
-      - eth0-intnet
+      eth1-extnet:
+        ipv4_address: 172.50.0.2
+      eth0-intnet:
+        ipv4_address: 172.51.0.2
     expose:
       - "80"
       - "22"
     volumes:
       - ./cmd/packetd/packetd:/usr/bin/packetd
+  slave:
+    image: "debian:stretch"
+    networks:
+      eth0-intnet:
+        ipv4_address: 172.51.0.3
+    entrypoint: /bin/sleep 999999999
 networks:
   eth1-extnet:
     driver: bridge
