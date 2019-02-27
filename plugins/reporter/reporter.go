@@ -17,7 +17,7 @@ const pluginName = "reporter"
 // PluginStartup starts the reporter
 func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
-	dispatch.InsertNfqueueSubscription(pluginName, 1, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(pluginName, dispatch.ReporterPriority, PluginNfqueueHandler)
 	dispatch.InsertConntrackSubscription(pluginName, 1, PluginConntrackHandler)
 	dispatch.InsertNetloggerSubscription(pluginName, 1, PluginNetloggerHandler)
 }

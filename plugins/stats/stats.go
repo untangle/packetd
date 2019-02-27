@@ -12,20 +12,12 @@ import (
 )
 
 const pluginName = "stats"
-const listSize = 1
 
 var latencyTracker [256]*MovingAverage
 var latencyLocker [256]sync.Mutex
 var interfaceStatsMap map[string]*linux.NetworkStat
 var interfaceNameMap map[string]int
 var shutdownChannel = make(chan bool)
-
-type latencyInfo struct {
-	latencyList  [listSize]time.Duration
-	latencyCount int
-	listLocker   sync.Mutex
-	xmitTime     time.Time
-}
 
 // PluginStartup function is called to allow plugin specific initialization.
 func PluginStartup() {
@@ -41,7 +33,7 @@ func PluginStartup() {
 	loadInterfaceNameMap()
 
 	go interfaceTask()
-	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(pluginName, dispatch.StatsPriority, PluginNfqueueHandler)
 }
 
 // PluginShutdown function called when the daemon is shutting down.
@@ -61,72 +53,27 @@ func PluginShutdown() {
 // PluginNfqueueHandler is called to handle nfqueue packet data.
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
-	var stats *latencyInfo
 
-	// create and attach latencyInfo for new sessions and retrieve for existing sessions
-	if newSession {
-		stats = new(latencyInfo)
-		mess.Session.PutAttachment("stats_holder", stats)
-	} else {
-		pointer := mess.Session.GetAttachment("stats_holder")
-		if pointer != nil {
-			stats = pointer.(*latencyInfo)
-		}
-	}
-
-	if stats == nil {
-		logger.Err("Missing stats_holder for session %d\n", ctid)
-		result.SessionRelease = true
+	// We ignore the newSession since that is the first C2S packet which creates the session and
+	// sets the creation time. We ignore any other C2S packets and wait for the first S2C packet.
+	if newSession || mess.ClientToServer {
+		result.SessionRelease = false
 		return result
 	}
 
-	stats.listLocker.Lock()
-	defer stats.listLocker.Unlock()
+	// We have a packet from the server so we calculate the latency as the time
+	// elapsed since creation, add it to the correct interface tracker, and release
+	duration := time.Since(mess.Session.GetCreationTime())
+	iface := mess.Session.GetServerInterfaceID()
 
-	// for C2S packets we store the current time as the transmit time
-	// for S2C packets we calculate the latency as the time elapsed since transmit
-	// we don't update the xmit time if already set while waiting for a server packet
-	// and we clear the xmit time after each calculation so we only look at time between
-	// the client sending a packet and reciving the next packet from the server
-	if mess.ClientToServer {
-		if !stats.xmitTime.IsZero() {
-			return result
-		}
-		stats.xmitTime = time.Now()
-	} else {
-		if stats.xmitTime.IsZero() {
-			return result
-		}
-		duration := time.Since(stats.xmitTime)
-		stats.xmitTime = time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC)
-		stats.latencyList[stats.latencyCount] = duration
-		stats.latencyCount++
+	logger.Info("SESSION %d LATENCY = %v\n", ctid, duration) // FIXME - remove this
 
-		// release the session and add to the average once we have collected a useful amount of data
-		if stats.latencyCount == listSize {
-			value := calculateAverageLatency(stats)
-			iface := mess.Session.GetServerInterfaceID()
-			latencyLocker[iface].Lock()
-			latencyTracker[iface].AddValue(value.Nanoseconds())
-			latencyLocker[iface].Unlock()
-			mess.Session.DeleteAttachment("stats_holder")
-			result.SessionRelease = true
-		}
-	}
+	latencyLocker[iface].Lock()
+	latencyTracker[iface].AddValue(duration.Nanoseconds())
+	latencyLocker[iface].Unlock()
 
+	result.SessionRelease = true
 	return result
-}
-
-func calculateAverageLatency(holder *latencyInfo) time.Duration {
-	var total int64
-	var count int64
-
-	for i := 0; i < holder.latencyCount; i++ {
-		total += holder.latencyList[i].Nanoseconds()
-		count++
-	}
-
-	return time.Duration(total / count)
 }
 
 func interfaceTask() {

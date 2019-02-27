@@ -37,8 +37,8 @@ func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
 	reverseTable = make(map[string]*ReverseHolder)
 	go cleanupTask()
-	dispatch.InsertNfqueueSubscription(pluginName+clientSuffix, 2, PluginNfqueueClientHandler)
-	dispatch.InsertNfqueueSubscription(pluginName+serverSuffix, 2, PluginNfqueueServerHandler)
+	dispatch.InsertNfqueueSubscription(pluginName+clientSuffix, dispatch.RevDNSPriority, PluginNfqueueClientHandler)
+	dispatch.InsertNfqueueSubscription(pluginName+serverSuffix, dispatch.RevDNSPriority, PluginNfqueueServerHandler)
 }
 
 // PluginShutdown function called when the daemon is shutting down.

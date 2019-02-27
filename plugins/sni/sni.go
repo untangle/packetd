@@ -13,7 +13,7 @@ const maxPacketCount = 5
 // PluginStartup function is called to allow plugin specific initialization.
 func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
-	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(pluginName, dispatch.SniPriority, PluginNfqueueHandler)
 }
 
 // PluginShutdown function called when the daemon is shutting down.

@@ -33,7 +33,7 @@ func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
 	addressTable = make(map[string]*AddressHolder)
 	go cleanupTask()
-	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(pluginName, dispatch.DNSPriority, PluginNfqueueHandler)
 }
 
 // PluginShutdown function called when the daemon is shutting down. We call Done

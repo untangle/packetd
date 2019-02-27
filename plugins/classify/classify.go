@@ -94,7 +94,7 @@ func PluginStartup() {
 	go daemonSocketManager()
 
 	// insert our nfqueue subscription
-	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(pluginName, dispatch.ClassifyPriority, PluginNfqueueHandler)
 }
 
 // PluginShutdown is called when the daemon is shutting down

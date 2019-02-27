@@ -14,7 +14,7 @@ const pluginName = "example"
 // our shutdown function to return during shutdown.
 func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
-	dispatch.InsertNfqueueSubscription(pluginName, 2, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(pluginName, dispatch.ExamplePriority, PluginNfqueueHandler)
 	dispatch.InsertConntrackSubscription(pluginName, 2, PluginConntrackHandler)
 	dispatch.InsertNetloggerSubscription(pluginName, 2, PluginNetloggerHandler)
 }
