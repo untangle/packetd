@@ -66,8 +66,6 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	duration := time.Since(mess.Session.GetCreationTime())
 	iface := mess.Session.GetServerInterfaceID()
 
-	logger.Info("SESSION %d LATENCY = %v\n", ctid, duration) // FIXME - remove this
-
 	latencyLocker[iface].Lock()
 	latencyTracker[iface].AddValue(duration.Nanoseconds())
 	latencyLocker[iface].Unlock()
