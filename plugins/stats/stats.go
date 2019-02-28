@@ -184,7 +184,7 @@ func collectInterfaceStats(seconds uint64) {
 			// negative return means we don't know the ID so we set latency to zero
 			// otherwise we get the total moving average
 			if iface < 0 {
-				logger.Warn("Skipping unknown interface: %s\n", diffInfo.Iface)
+				logger.Debug("Skipping unknown interface: %s\n", diffInfo.Iface)
 			} else {
 				latencyLocker[iface].Lock()
 				latency = latencyTracker[iface].GetTotalAverage()
