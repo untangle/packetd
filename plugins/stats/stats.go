@@ -72,6 +72,10 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	if interfaceID == 255 {
 		return result
 	}
+	if interfaceID == 0 {
+		logger.Warn("Unknown interface ID: %v\n", mess.Session.GetClientSideTuple())
+		return
+	}
 
 	latencyLocker[interfaceID].Lock()
 	latencyTracker[interfaceID].AddValue(duration.Nanoseconds())
