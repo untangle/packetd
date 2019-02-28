@@ -70,6 +70,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	latencyLocker[iface].Lock()
 	latencyTracker[iface].AddValue(duration.Nanoseconds())
+	logger.Debug("Logging latency sample: %v, %v ms\n", mess.Session.GetServerSideTuple().ServerAddress, (duration.Nanoseconds() / 1000000))
 	latencyLocker[iface].Unlock()
 
 	result.SessionRelease = true
