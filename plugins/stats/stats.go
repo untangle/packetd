@@ -292,8 +292,11 @@ func loadInterfaceNameMap() {
 	// walk the list of interfaces and store each name/id in the map
 	for _, value := range networkSlice {
 		item := value.(map[string]interface{})
-		netName = item["device"].(string)
-		netID = int(item["interfaceId"].(float64))
-		interfaceNameMap[netName] = netID
+		hid, found := item["hidden"]
+		if !found || !hid.(bool) {
+			netName = item["device"].(string)
+			netID = int(item["interfaceId"].(float64))
+			interfaceNameMap[netName] = netID
+		}
 	}
 }
