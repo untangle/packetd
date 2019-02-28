@@ -66,12 +66,17 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	// We have a packet from the server so we calculate the latency as the time
 	// elapsed since creation, add it to the correct interface tracker, and release
 	duration := time.Since(mess.Session.GetCreationTime())
-	iface := mess.Session.GetServerInterfaceID()
+	interfaceID := mess.Session.GetServerInterfaceID()
 
-	latencyLocker[iface].Lock()
-	latencyTracker[iface].AddValue(duration.Nanoseconds())
-	logger.Debug("Logging latency sample: %d, %v, %v ms\n", iface, mess.Session.GetServerSideTuple().ServerAddress, (duration.Nanoseconds() / 1000000))
-	latencyLocker[iface].Unlock()
+	// ignore local traffic
+	if interfaceID == 255 {
+		return result
+	}
+
+	latencyLocker[interfaceID].Lock()
+	latencyTracker[interfaceID].AddValue(duration.Nanoseconds())
+	logger.Debug("Logging latency sample: %d, %v, %v ms\n", interfaceID, mess.Session.GetServerSideTuple().ServerAddress, (duration.Nanoseconds() / 1000000))
+	latencyLocker[interfaceID].Unlock()
 
 	result.SessionRelease = true
 	return result
@@ -180,27 +185,27 @@ func collectInterfaceStats(seconds uint64) {
 			interfaceStatsMap[item.Iface] = &item
 
 			// convert the interface name to the ID value
-			iface := getInterfaceIDValue(diffInfo.Iface)
+			interfaceID := getInterfaceIDValue(diffInfo.Iface)
 
 			// negative return means we don't know the ID so we set latency to zero
 			// otherwise we get the total moving average
-			if iface < 0 {
+			if interfaceID < 0 {
 				logger.Debug("Skipping unknown interface: %s\n", diffInfo.Iface)
 			} else {
-				latencyLocker[iface].Lock()
-				latency = latencyTracker[iface].GetTotalAverage()
-				latencyLocker[iface].Unlock()
+				latencyLocker[interfaceID].Lock()
+				latency = latencyTracker[interfaceID].GetTotalAverage()
+				latencyLocker[interfaceID].Unlock()
 
-				logInterfaceStats(seconds, iface, diffInfo.Iface, latency, &diffInfo)
+				logInterfaceStats(seconds, interfaceID, latency, &diffInfo)
 			}
 		}
 	}
 }
 
-func logInterfaceStats(seconds uint64, interface_id int, device_name string, latency int64, diffInfo *linux.NetworkStat) {
+func logInterfaceStats(seconds uint64, interfaceID int, latency int64, diffInfo *linux.NetworkStat) {
 	columns := map[string]interface{}{
 		"time_stamp":         time.Now(),
-		"interface_id":       interface_id,
+		"interface_id":       interfaceID,
 		"device_name":        diffInfo.Iface,
 		"avg_latency":        latency,
 		"rx_bytes":           diffInfo.RxBytes,
