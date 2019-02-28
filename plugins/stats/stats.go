@@ -15,7 +15,7 @@ import (
 const pluginName = "stats"
 const interfaceStatLogIntervalSec = 10
 
-var latencyTracker [256]*MovingAverage
+var latencyTracker [256]*Collector
 var latencyLocker [256]sync.Mutex
 var interfaceStatsMap map[string]*linux.NetworkStat
 var interfaceNameMap map[string]int
@@ -26,7 +26,7 @@ func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
 
 	for x := 0; x < 256; x++ {
-		latencyTracker[x] = CreateMovingAverage(10000)
+		latencyTracker[x] = CreateCollector()
 	}
 
 	interfaceStatsMap = make(map[string]*linux.NetworkStat)
@@ -78,7 +78,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 
 	latencyLocker[interfaceID].Lock()
-	latencyTracker[interfaceID].AddValue(duration.Nanoseconds())
+	latencyTracker[interfaceID].AddDataPointLimited(float64(duration.Nanoseconds())/1000000.0, 2.0)
 	logger.Debug("Logging latency sample: %d, %v, %v ms\n", interfaceID, mess.Session.GetServerSideTuple().ServerAddress, (duration.Nanoseconds() / 1000000))
 	latencyLocker[interfaceID].Unlock()
 
@@ -93,14 +93,14 @@ func interfaceTask() {
 		case <-shutdownChannel:
 			shutdownChannel <- true
 			return
-		//case <-time.After(timeUntilNextMin()):
+			//case <-time.After(timeUntilNextMin()):
 		case <-time.After(time.Second * time.Duration(interfaceStatLogIntervalSec)):
 			logger.Debug("Collecting interface statistics\n")
 			collectInterfaceStats(interfaceStatLogIntervalSec)
 
 			for i := 0; i < 256; i++ {
 				latencyLocker[i].Lock()
-				if !latencyTracker[i].IsEmpty() {
+				if latencyTracker[i].Latency1Min.Value != 0.0 {
 					latencyTracker[i].dumpStatistics(i)
 				}
 				latencyLocker[i].Unlock()
@@ -197,7 +197,7 @@ func collectInterfaceStats(seconds uint64) {
 				logger.Debug("Skipping unknown interface: %s\n", diffInfo.Iface)
 			} else {
 				latencyLocker[interfaceID].Lock()
-				latency = latencyTracker[interfaceID].GetTotalAverage()
+				latency = int64(latencyTracker[interfaceID].Latency1Min.Value) * 1000000
 				latencyLocker[interfaceID].Unlock()
 
 				logInterfaceStats(seconds, interfaceID, latency, &diffInfo)
