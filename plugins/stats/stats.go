@@ -1,6 +1,7 @@
 package stats
 
 import (
+	"strings"
 	"sync"
 	"time"
 
@@ -164,6 +165,9 @@ func collectInterfaceStats(seconds uint64) {
 			diffInfo.TxCarrier = calculateDifference(&statInfo.TxCarrier, item.TxCarrier)
 			diffInfo.TxCompressed = calculateDifference(&statInfo.TxCompressed, item.TxCompressed)
 
+			// Update current values
+			interfaceStatsMap[item.Iface] = &item
+
 			// convert the interface name to the ID value
 			iface := getInterfaceIDValue(diffInfo.Iface)
 
@@ -177,48 +181,58 @@ func collectInterfaceStats(seconds uint64) {
 				latencyLocker[iface].Unlock()
 			}
 
-			columns := map[string]interface{}{
-				"time_stamp":         time.Now(),
-				"interface_id":       iface,
-				"device_name":        diffInfo.Iface,
-				"avg_latency":        latency,
-				"rx_bytes":           diffInfo.RxBytes,
-				"rx_bytes_rate":      diffInfo.RxBytes / seconds,
-				"rx_packets":         diffInfo.RxPackets,
-				"rx_packets_rate":    diffInfo.RxPackets / seconds,
-				"rx_errs":            diffInfo.RxErrs,
-				"rx_errs_rate":       diffInfo.RxErrs / seconds,
-				"rx_drop":            diffInfo.RxDrop,
-				"rx_drop_rate":       diffInfo.RxDrop / seconds,
-				"rx_fifo":            diffInfo.RxFifo,
-				"rx_fifo_rate":       diffInfo.RxFifo / seconds,
-				"rx_frame":           diffInfo.RxFrame,
-				"rx_frame_rate":      diffInfo.RxFrame / seconds,
-				"rx_compressed":      diffInfo.RxCompressed,
-				"rx_compressed_rate": diffInfo.RxCompressed / seconds,
-				"rx_multicast":       diffInfo.RxMulticast,
-				"rx_multicast_rate":  diffInfo.RxMulticast / seconds,
-				"tx_bytes":           diffInfo.TxBytes,
-				"tx_bytes_rate":      diffInfo.TxBytes / seconds,
-				"tx_packets":         diffInfo.TxPackets,
-				"tx_packets_rate":    diffInfo.TxPackets / seconds,
-				"tx_errs":            diffInfo.TxErrs,
-				"tx_errs_rate":       diffInfo.TxErrs / seconds,
-				"tx_drop":            diffInfo.TxDrop,
-				"tx_drop_rate":       diffInfo.TxDrop / seconds,
-				"tx_fifo":            diffInfo.TxFifo,
-				"tx_fifo_rate":       diffInfo.TxFifo / seconds,
-				"tx_colls":           diffInfo.TxColls,
-				"tx_colls_rate":      diffInfo.TxColls / seconds,
-				"tx_carrier":         diffInfo.TxCarrier,
-				"tx_carrier_rate":    diffInfo.TxCarrier / seconds,
-				"tx_compressed":      diffInfo.TxCompressed,
-				"tx_compressed_rate": diffInfo.TxCompressed / seconds,
+			if diffInfo.Iface == "lo" ||
+				strings.HasPrefix(diffInfo.Iface, "dummy") {
+				// do not log stats
+				logger.Trace("Skipping logging stats for %s\n", diffInfo.Iface)
+			} else {
+				logInterfaceStats(seconds, iface, diffInfo.Iface, latency, &diffInfo)
 			}
-
-			reports.LogEvent(reports.CreateEvent("interface_stats", "interface_stats", 1, columns, nil))
 		}
 	}
+}
+
+func logInterfaceStats(seconds uint64, interface_id int, device_name string, latency int64, diffInfo *linux.NetworkStat) {
+	columns := map[string]interface{}{
+		"time_stamp":         time.Now(),
+		"interface_id":       interface_id,
+		"device_name":        diffInfo.Iface,
+		"avg_latency":        latency,
+		"rx_bytes":           diffInfo.RxBytes,
+		"rx_bytes_rate":      diffInfo.RxBytes / seconds,
+		"rx_packets":         diffInfo.RxPackets,
+		"rx_packets_rate":    diffInfo.RxPackets / seconds,
+		"rx_errs":            diffInfo.RxErrs,
+		"rx_errs_rate":       diffInfo.RxErrs / seconds,
+		"rx_drop":            diffInfo.RxDrop,
+		"rx_drop_rate":       diffInfo.RxDrop / seconds,
+		"rx_fifo":            diffInfo.RxFifo,
+		"rx_fifo_rate":       diffInfo.RxFifo / seconds,
+		"rx_frame":           diffInfo.RxFrame,
+		"rx_frame_rate":      diffInfo.RxFrame / seconds,
+		"rx_compressed":      diffInfo.RxCompressed,
+		"rx_compressed_rate": diffInfo.RxCompressed / seconds,
+		"rx_multicast":       diffInfo.RxMulticast,
+		"rx_multicast_rate":  diffInfo.RxMulticast / seconds,
+		"tx_bytes":           diffInfo.TxBytes,
+		"tx_bytes_rate":      diffInfo.TxBytes / seconds,
+		"tx_packets":         diffInfo.TxPackets,
+		"tx_packets_rate":    diffInfo.TxPackets / seconds,
+		"tx_errs":            diffInfo.TxErrs,
+		"tx_errs_rate":       diffInfo.TxErrs / seconds,
+		"tx_drop":            diffInfo.TxDrop,
+		"tx_drop_rate":       diffInfo.TxDrop / seconds,
+		"tx_fifo":            diffInfo.TxFifo,
+		"tx_fifo_rate":       diffInfo.TxFifo / seconds,
+		"tx_colls":           diffInfo.TxColls,
+		"tx_colls_rate":      diffInfo.TxColls / seconds,
+		"tx_carrier":         diffInfo.TxCarrier,
+		"tx_carrier_rate":    diffInfo.TxCarrier / seconds,
+		"tx_compressed":      diffInfo.TxCompressed,
+		"tx_compressed_rate": diffInfo.TxCompressed / seconds,
+	}
+
+	reports.LogEvent(reports.CreateEvent("interface_stats", "interface_stats", 1, columns, nil))
 }
 
 // calculateDifference determines the difference between the two argumented values
