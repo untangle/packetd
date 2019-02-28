@@ -361,6 +361,7 @@ func initLoggerConfig() {
 	config["reporter"] = "INFO"
 	config["revdns"] = "INFO"
 	config["sni"] = "INFO"
+	config["stats"] = "INFO"
 	config["tls"] = "INFO"
 
 	// services
