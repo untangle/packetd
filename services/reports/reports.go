@@ -509,7 +509,8 @@ func createTables() {
 	_, err = db.Exec(
 		`CREATE TABLE IF NOT EXISTS interface_stats (
                      time_stamp bigint NOT NULL,
-					 interface text,
+					 interface_id int1,
+					 device_name text,
 					 avg_latency int8,
 					 rx_bytes int8,
 					 rx_bytes_rate int8,

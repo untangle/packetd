@@ -179,7 +179,8 @@ func collectInterfaceStats(seconds uint64) {
 
 			columns := map[string]interface{}{
 				"time_stamp":         time.Now(),
-				"interface":          diffInfo.Iface,
+				"inteface_id":        iface,
+				"device_name":        diffInfo.Iface,
 				"avg_latency":        latency,
 				"rx_bytes":           diffInfo.RxBytes,
 				"rx_bytes_rate":      diffInfo.RxBytes / seconds,
