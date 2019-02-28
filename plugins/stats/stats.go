@@ -13,6 +13,7 @@ import (
 )
 
 const pluginName = "stats"
+const interfaceStatLogIntervalSec = 10
 
 var latencyTracker [256]*MovingAverage
 var latencyLocker [256]sync.Mutex
@@ -82,9 +83,10 @@ func interfaceTask() {
 		case <-shutdownChannel:
 			shutdownChannel <- true
 			return
-		case <-time.After(timeUntilNextMin()):
+		//case <-time.After(timeUntilNextMin()):
+		case <-time.After(time.Second * time.Duration(interfaceStatLogIntervalSec)):
 			logger.Debug("Collecting interface statistics\n")
-			collectInterfaceStats(60)
+			collectInterfaceStats(interfaceStatLogIntervalSec)
 
 			for i := 0; i < 256; i++ {
 				latencyLocker[i].Lock()
