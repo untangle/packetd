@@ -122,7 +122,15 @@ func collectInterfaceStats(seconds uint64) {
 
 	for i := 0; i < len(procData); i++ {
 		item := procData[i]
+
+		// ignore loopback and dummy interfaces
+		if item.Iface == "lo" ||
+			strings.HasPrefix(item.Iface, "dummy") {
+			continue
+		}
+
 		statInfo = interfaceStatsMap[item.Iface]
+
 		if statInfo == nil {
 			// if no entry for the interface use the existing values as the starting point
 			statInfo = new(linux.NetworkStat)
@@ -181,13 +189,7 @@ func collectInterfaceStats(seconds uint64) {
 				latencyLocker[iface].Unlock()
 			}
 
-			if diffInfo.Iface == "lo" ||
-				strings.HasPrefix(diffInfo.Iface, "dummy") {
-				// do not log stats
-				logger.Trace("Skipping logging stats for %s\n", diffInfo.Iface)
-			} else {
-				logInterfaceStats(seconds, iface, diffInfo.Iface, latency, &diffInfo)
-			}
+			logInterfaceStats(seconds, iface, diffInfo.Iface, latency, &diffInfo)
 		}
 	}
 }
