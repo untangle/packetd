@@ -353,7 +353,11 @@ func loadInterfaceInfoMap() {
 
 	// walk the list of interfaces and store each name/id in the map
 	for _, value := range networkSlice {
-		item := value.(map[string]interface{})
+		item, ok := value.(map[string]interface{})
+		if !ok {
+			logger.Warn("Invalid interface in settings: %T\n", value)
+			continue
+		}
 		hid, found := item["hidden"]
 		if !found || !hid.(bool) {
 			holder := new(interfaceDetail)
