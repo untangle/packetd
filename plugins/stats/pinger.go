@@ -19,16 +19,19 @@ import (
 	"golang.org/x/net/ipv6"
 )
 
-const protoICMP4 = 1
-const protoICMP6 = 58
+const (
+	protoIGNORE = 0
+	protoICMP4  = 1
+	protoICMP6  = 58
+)
 
-func pingNetworkAddress(localAddr string, targetAddr string, protocol int) (time.Duration, error) {
+func pingNetworkAddress(protocol int, localAddr string, targetAddr string) (time.Duration, error) {
 	var netaddr *net.IPAddr
 	var conn *icmp.PacketConn
 	var reply *icmp.Message
 	var mess icmp.Message
 	var buffer []byte
-	var netstr string
+	var protstr string
 	var err error
 	var ourpid int
 	var ourseq int
@@ -55,14 +58,14 @@ func pingNetworkAddress(localAddr string, targetAddr string, protocol int) (time
 	}
 
 	if protocol == protoICMP6 {
-		netstr = "ip6:ipv6-icmp"
+		protstr = "ip6:ipv6-icmp"
 		mess.Type = ipv6.ICMPTypeEchoRequest
 	} else {
-		netstr = "ip4:icmp"
+		protstr = "ip4:icmp"
 		mess.Type = ipv4.ICMPTypeEcho
 	}
 
-	conn, err = icmp.ListenPacket(netstr, localAddr)
+	conn, err = icmp.ListenPacket(protstr, localAddr)
 	if err != nil {
 		return 0, err
 	}

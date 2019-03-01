@@ -2,6 +2,7 @@ package stats
 
 import (
 	"math/rand"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -32,14 +33,18 @@ var randSrc rand.Source
 var randGen *rand.Rand
 
 type interfaceDetail struct {
-	interfaceID     int
-	v4StaticAddress string
+	interfaceID int
+	deviceName  string
+	netAddress  string
+	pingMode    int
+	wanFlag     bool
 }
 
 // PluginStartup function is called to allow plugin specific initialization.
 func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
 
+	// we use random numbers in our active ping packets to help detect valid replies
 	randSrc = rand.NewSource(time.Now().UnixNano())
 	randGen = rand.New(randSrc)
 
@@ -332,8 +337,6 @@ func getInterfaceIDValue(name string) int {
 }
 
 func loadInterfaceInfoMap() {
-	var netName string
-
 	networkJSON, err := settings.GetSettings([]string{"network", "interfaces"})
 	if networkJSON == nil || err != nil {
 		logger.Warn("Unable to read network settings\n")
@@ -351,7 +354,7 @@ func loadInterfaceInfoMap() {
 	// start with an empty map
 	interfaceInfoMap = make(map[string]*interfaceDetail)
 
-	// walk the list of interfaces and store each name/id in the map
+	// walk the list of interfaces and store each name and ID in the map
 	for _, value := range networkSlice {
 		item, ok := value.(map[string]interface{})
 		if !ok {
@@ -367,17 +370,99 @@ func loadInterfaceInfoMap() {
 		if found && hid.(bool) {
 			continue
 		}
-
-		// Ignore if any of the fields we need are missing
-		if item["device"] == nil || item["interfaceId"] == nil || item["v4StaticAddress"] == nil {
+		// We at least need the device name and interface ID
+		if item["device"] == nil || item["interfaceId"] == nil {
 			continue
 		}
 
+		// create a detail holder for the interface
 		holder := new(interfaceDetail)
-		netName = item["device"].(string)
 		holder.interfaceID = int(item["interfaceId"].(float64))
-		holder.v4StaticAddress = item["v4StaticAddress"].(string)
-		interfaceInfoMap[netName] = holder
+		holder.deviceName = item["device"].(string)
+
+		// grab the wan flag for the interface
+		wan, found := item["wan"]
+		if found && wan.(bool) {
+			holder.wanFlag = true
+		}
+
+		// put the interface details in the map
+		interfaceInfoMap[holder.deviceName] = holder
+	}
+
+	// now that we have our name to ID map we want to add details to each
+	// WAN interface that we can use to do our active ping latency checks
+	// so we start with the system list of network interfaces
+	facelist, err := net.Interfaces()
+	if err != nil {
+		return
+	}
+
+	for _, item := range facelist {
+		// ignore interfaces not in our map
+		if interfaceInfoMap[item.Name] == nil {
+			continue
+		}
+
+		// ignore interfaces not flagged as WAN in our map
+		if interfaceInfoMap[item.Name].wanFlag == false {
+			continue
+		}
+
+		// ignore if we can't get the address list
+		nets, err := item.Addrs()
+		if err != nil {
+			continue
+		}
+
+		// look for the first IPv4 address
+		for _, addr := range nets {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil {
+				continue
+			}
+			// we ignore anything that isn't an IPv4 address
+			if ip.To4() == nil {
+				continue
+			}
+			interfaceInfoMap[item.Name].netAddress = ip.String()
+			interfaceInfoMap[item.Name].pingMode = protoICMP4
+			logger.Info("Adding IPv4 active ping interface: %v\n", ip)
+			break
+		}
+
+		// if we found an IPv4 address for the interface we are finished
+		if interfaceInfoMap[item.Name].pingMode != protoIGNORE {
+			continue
+		}
+
+		// we didn't find an IPv4 address so try again
+		for _, addr := range nets {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil {
+				continue
+			}
+			// this time we ignore IPv4 addresses
+			if ip.To4 != nil {
+				continue
+			}
+			interfaceInfoMap[item.Name].netAddress = ip.String()
+			interfaceInfoMap[item.Name].pingMode = protoICMP6
+			logger.Info("Adding IPv6 active ping interface: %v\n", ip)
+			break
+		}
 	}
 }
 
@@ -391,6 +476,9 @@ func pingTask() {
 		case <-time.After(time.Second * time.Duration(pingCheckIntervalSec)):
 			interfaceInfoLocker.RLock()
 			for _, value := range interfaceInfoMap {
+				if value.pingMode == protoIGNORE {
+					continue
+				}
 				collectPingSample(value)
 			}
 			interfaceInfoLocker.RUnlock()
@@ -401,7 +489,7 @@ func pingTask() {
 func collectPingSample(detail *interfaceDetail) {
 	logger.Debug("Pinging %s with interfaceDetail[%v]\n", pingCheckTarget, *detail)
 
-	duration, err := pingNetworkAddress(detail.v4StaticAddress, pingCheckTarget, protoICMP4)
+	duration, err := pingNetworkAddress(detail.pingMode, detail.netAddress, pingCheckTarget)
 
 	if err != nil {
 		logger.Warn("Error returned from pingIPv4Address: %v\n", err)
@@ -409,6 +497,6 @@ func collectPingSample(detail *interfaceDetail) {
 
 	statsLocker[detail.interfaceID].Lock()
 	statsCollector[detail.interfaceID].AddDataPoint(float64(duration.Nanoseconds()) / 1000000.0)
-	logger.Debug("Logging periodic sample: %d, %v, %v ms\n", detail.interfaceID, detail.v4StaticAddress, (duration.Nanoseconds() / 1000000))
+	logger.Debug("Logging periodic sample: %d, %v, %v ms\n", detail.interfaceID, detail.netAddress, (duration.Nanoseconds() / 1000000))
 	statsLocker[detail.interfaceID].Unlock()
 }
