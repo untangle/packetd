@@ -358,14 +358,20 @@ func loadInterfaceInfoMap() {
 			logger.Warn("Invalid interface in settings: %T\n", value)
 			continue
 		}
-		hid, found := item["hidden"]
-		if !found || !hid.(bool) {
-			holder := new(interfaceDetail)
-			netName = item["device"].(string)
-			holder.interfaceID = int(item["interfaceId"].(float64))
-			holder.v4StaticAddress = item["v4StaticAddress"].(string)
-			interfaceInfoMap[netName] = holder
+		if item == nil {
+			logger.Warn("nil interface in interface list\n")
+			continue
 		}
+		// Ignore hidden interfaces
+		hid, found := item["hidden"]
+		if found && hid.(bool) {
+			continue
+		}
+		holder := new(interfaceDetail)
+		netName = item["device"].(string)
+		holder.interfaceID = int(item["interfaceId"].(float64))
+		holder.v4StaticAddress = item["v4StaticAddress"].(string)
+		interfaceInfoMap[netName] = holder
 	}
 }
 
