@@ -56,22 +56,38 @@ func PluginShutdown() {
 func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool) dispatch.NfqueueResult {
 	var result dispatch.NfqueueResult
 
-	// We ignore the newSession since that is the first C2S packet which creates the session and
-	// sets the creation time. We ignore any other C2S packets and wait for the first S2C packet.
-	if newSession || mess.ClientToServer {
+	// we release by default unless logic below changes the flag
+	result.SessionRelease = true
+
+	// if this is a new session attach the current time
+	if newSession {
+		mess.Session.PutAttachment("stats_timer", time.Now())
+	}
+
+	// ignore C2S packets but keep scanning until we get the first server response
+	if mess.ClientToServer {
 		result.SessionRelease = false
 		return result
 	}
 
-	// We have a packet from the server so we calculate the latency as the time
-	// elapsed since creation, add it to the correct interface tracker, and release
-	duration := time.Since(mess.Session.GetCreationTime())
+	// We have a packet from the server so we calculate the latency as the
+	// time elapsed since the first client packet was transmitted
+	xmittime := mess.Session.GetAttachment("stats_timer")
+	if xmittime == nil {
+		logger.Warn("Missing stats_timer for session %d\n", ctid)
+		return result
+	}
+
+	// We have a packet from the server so we calculate the latency as the
+	// time elapsed sincethe first client packet was transmitted
+	duration := time.Since(xmittime.(time.Time))
 	interfaceID := mess.Session.GetServerInterfaceID()
 
 	// ignore local traffic
 	if interfaceID == 255 {
 		return result
 	}
+	// log and ignore traffic to unknown interface
 	if interfaceID == 0 {
 		logger.Warn("Unknown interface ID: %v\n", mess.Session.GetClientSideTuple())
 		return result
