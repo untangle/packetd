@@ -367,6 +367,12 @@ func loadInterfaceInfoMap() {
 		if found && hid.(bool) {
 			continue
 		}
+
+		// Ignore if any of the fields we need are missing
+		if item["device"] == nil || item["interfaceId"] == nil || item["v4StaticAddress"] == nil {
+			continue
+		}
+
 		holder := new(interfaceDetail)
 		netName = item["device"].(string)
 		holder.interfaceID = int(item["interfaceId"].(float64))
