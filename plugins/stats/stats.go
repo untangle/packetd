@@ -1,6 +1,7 @@
 package stats
 
 import (
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -14,27 +15,46 @@ import (
 
 const pluginName = "stats"
 const interfaceStatLogIntervalSec = 10
+const pingCheckIntervalSec = 5
+const pingCheckTarget = "www.google.com"
 
 var statsCollector [256]*Collector
 var statsLocker [256]sync.Mutex
+
+var interfaceInfoMap map[string]*interfaceDetail
+var interfaceInfoLocker sync.RWMutex
+
 var interfaceStatsMap map[string]*linux.NetworkStat
-var interfaceNameMap map[string]int
-var shutdownChannel = make(chan bool)
+var interfaceChannel = make(chan bool)
+var pingChannel = make(chan bool)
+
+var randSrc rand.Source
+var randGen *rand.Rand
+
+type interfaceDetail struct {
+	interfaceID     int
+	v4StaticAddress string
+}
 
 // PluginStartup function is called to allow plugin specific initialization.
 func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
+
+	randSrc = rand.NewSource(time.Now().UnixNano())
+	randGen = rand.New(randSrc)
 
 	for x := 0; x < 256; x++ {
 		statsCollector[x] = CreateCollector()
 	}
 
 	interfaceStatsMap = make(map[string]*linux.NetworkStat)
-	interfaceNameMap = make(map[string]int)
+	interfaceInfoMap = make(map[string]*interfaceDetail)
 
-	loadInterfaceNameMap()
+	loadInterfaceInfoMap()
 
 	go interfaceTask()
+	go pingTask()
+
 	dispatch.InsertNfqueueSubscription(pluginName, dispatch.StatsPriority, PluginNfqueueHandler)
 }
 
@@ -42,14 +62,24 @@ func PluginStartup() {
 func PluginShutdown() {
 	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
 
-	shutdownChannel <- true
+	interfaceChannel <- true
 
 	select {
-	case <-shutdownChannel:
+	case <-interfaceChannel:
 		logger.Info("Successful shutdown of interfaceTask\n")
 	case <-time.After(10 * time.Second):
 		logger.Warn("Failed to properly shutdown interfaceTask\n")
 	}
+
+	pingChannel <- true
+
+	select {
+	case <-pingChannel:
+		logger.Info("Successful shutdown of pingTask\n")
+	case <-time.After(10 * time.Second):
+		logger.Warn("Failed to properly shutdown pingTask\n")
+	}
+
 }
 
 // PluginNfqueueHandler is called to handle nfqueue packet data.
@@ -106,10 +136,9 @@ func interfaceTask() {
 
 	for {
 		select {
-		case <-shutdownChannel:
-			shutdownChannel <- true
+		case <-interfaceChannel:
+			interfaceChannel <- true
 			return
-			//case <-time.After(timeUntilNextMin()):
 		case <-time.After(time.Second * time.Duration(interfaceStatLogIntervalSec)):
 			logger.Debug("Collecting interface statistics\n")
 			collectInterfaceStats(interfaceStatLogIntervalSec)
@@ -123,16 +152,6 @@ func interfaceTask() {
 			}
 		}
 	}
-}
-
-// timeUntilNextMin provides the exact duration until the start of the next minute
-func timeUntilNextMin() time.Duration {
-	t := time.Now()
-	var secondsToWait = 59 - t.Second()
-	var millisecondsToWait = 1000 - (t.Nanosecond() / 1000000)
-	var duration = (time.Duration(secondsToWait) * time.Second) + (time.Duration(millisecondsToWait) * time.Millisecond)
-
-	return duration
 }
 
 // collectInterfaceStats gets the stats for every interface and then
@@ -289,28 +308,31 @@ func calculateDifference(previous *uint64, current uint64) uint64 {
 // map to pick up interfaces that have been added since last time we loaded
 // FIXME - probably need to rethink this to handle re-numbering
 func getInterfaceIDValue(name string) int {
-	var val int
-	var ok bool
+	var val *interfaceDetail
 
-	val, ok = interfaceNameMap[name]
-	if ok {
-		return val
+	interfaceInfoLocker.RLock()
+	val = interfaceInfoMap[name]
+	interfaceInfoLocker.RUnlock()
+
+	if val != nil {
+		return val.interfaceID
 	}
 
-	loadInterfaceNameMap()
+	loadInterfaceInfoMap()
 
-	val, ok = interfaceNameMap[name]
-	if ok {
-		return val
+	interfaceInfoLocker.RLock()
+	val = interfaceInfoMap[name]
+	interfaceInfoLocker.RUnlock()
+
+	if val != nil {
+		return val.interfaceID
 	}
 
 	return -1
 }
 
-// loadInterfaceNameMap
-func loadInterfaceNameMap() {
+func loadInterfaceInfoMap() {
 	var netName string
-	var netID int
 
 	networkJSON, err := settings.GetSettings([]string{"network", "interfaces"})
 	if networkJSON == nil || err != nil {
@@ -323,17 +345,54 @@ func loadInterfaceNameMap() {
 		return
 	}
 
+	interfaceInfoLocker.Lock()
+	defer interfaceInfoLocker.Unlock()
+
 	// start with an empty map
-	interfaceNameMap = make(map[string]int)
+	interfaceInfoMap = make(map[string]*interfaceDetail)
 
 	// walk the list of interfaces and store each name/id in the map
 	for _, value := range networkSlice {
 		item := value.(map[string]interface{})
 		hid, found := item["hidden"]
 		if !found || !hid.(bool) {
+			holder := new(interfaceDetail)
 			netName = item["device"].(string)
-			netID = int(item["interfaceId"].(float64))
-			interfaceNameMap[netName] = netID
+			holder.interfaceID = int(item["interfaceId"].(float64))
+			holder.v4StaticAddress = item["v4StaticAddress"].(string)
+			interfaceInfoMap[netName] = holder
 		}
 	}
+}
+
+func pingTask() {
+
+	for {
+		select {
+		case <-pingChannel:
+			pingChannel <- true
+			return
+		case <-time.After(time.Second * time.Duration(pingCheckIntervalSec)):
+			interfaceInfoLocker.RLock()
+			for _, value := range interfaceInfoMap {
+				collectPingSample(value)
+			}
+			interfaceInfoLocker.RUnlock()
+		}
+	}
+}
+
+func collectPingSample(detail *interfaceDetail) {
+	logger.Debug("Pinging %s with interfaceDetail[%v]\n", pingCheckTarget, *detail)
+
+	duration, err := pingNetworkAddress(detail.v4StaticAddress, pingCheckTarget, protoICMP4)
+
+	if err != nil {
+		logger.Warn("Error returned from pingIPv4Address: %v\n", err)
+	}
+
+	statsLocker[detail.interfaceID].Lock()
+	statsCollector[detail.interfaceID].AddDataPoint(float64(duration.Nanoseconds()) / 1000000.0)
+	logger.Debug("Logging periodic sample: %d, %v, %v ms\n", detail.interfaceID, detail.v4StaticAddress, (duration.Nanoseconds() / 1000000))
+	statsLocker[detail.interfaceID].Unlock()
 }
