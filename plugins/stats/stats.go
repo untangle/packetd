@@ -15,8 +15,8 @@ import (
 const pluginName = "stats"
 const interfaceStatLogIntervalSec = 10
 
-var latencyTracker [256]*Collector
-var latencyLocker [256]sync.Mutex
+var statsCollector [256]*Collector
+var statsLocker [256]sync.Mutex
 var interfaceStatsMap map[string]*linux.NetworkStat
 var interfaceNameMap map[string]int
 var shutdownChannel = make(chan bool)
@@ -26,7 +26,7 @@ func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
 
 	for x := 0; x < 256; x++ {
-		latencyTracker[x] = CreateCollector()
+		statsCollector[x] = CreateCollector()
 	}
 
 	interfaceStatsMap = make(map[string]*linux.NetworkStat)
@@ -93,10 +93,10 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		return result
 	}
 
-	latencyLocker[interfaceID].Lock()
-	latencyTracker[interfaceID].AddDataPointLimited(float64(duration.Nanoseconds())/1000000.0, 2.0)
+	statsLocker[interfaceID].Lock()
+	statsCollector[interfaceID].AddDataPointLimited(float64(duration.Nanoseconds())/1000000.0, 2.0)
 	logger.Debug("Logging latency sample: %d, %v, %v ms\n", interfaceID, mess.Session.GetServerSideTuple().ServerAddress, (duration.Nanoseconds() / 1000000))
-	latencyLocker[interfaceID].Unlock()
+	statsLocker[interfaceID].Unlock()
 
 	result.SessionRelease = true
 	return result
@@ -115,11 +115,11 @@ func interfaceTask() {
 			collectInterfaceStats(interfaceStatLogIntervalSec)
 
 			for i := 0; i < 256; i++ {
-				latencyLocker[i].Lock()
-				if latencyTracker[i].Latency1Min.Value != 0.0 {
-					latencyTracker[i].dumpStatistics(i)
+				statsLocker[i].Lock()
+				if statsCollector[i].Latency1Min.Value != 0.0 {
+					statsCollector[i].dumpStatistics(i)
 				}
-				latencyLocker[i].Unlock()
+				statsLocker[i].Unlock()
 			}
 		}
 	}
@@ -140,7 +140,6 @@ func timeUntilNextMin() time.Duration {
 func collectInterfaceStats(seconds uint64) {
 	var statInfo *linux.NetworkStat
 	var diffInfo linux.NetworkStat
-	var latency int64
 
 	procData, err := linux.ReadNetworkStat("/proc/net/dev")
 	if err != nil {
@@ -148,6 +147,7 @@ func collectInterfaceStats(seconds uint64) {
 		return
 	}
 
+	var istats []InterfaceStatsJSON
 	for i := 0; i < len(procData); i++ {
 		item := procData[i]
 
@@ -212,22 +212,31 @@ func collectInterfaceStats(seconds uint64) {
 			if interfaceID < 0 {
 				logger.Debug("Skipping unknown interface: %s\n", diffInfo.Iface)
 			} else {
-				latencyLocker[interfaceID].Lock()
-				latency = int64(latencyTracker[interfaceID].Latency1Min.Value) * 1000000
-				latencyLocker[interfaceID].Unlock()
+				statsLocker[interfaceID].Lock()
+				c := statsCollector[interfaceID].MakeCopy()
+				statsLocker[interfaceID].Unlock()
 
-				logInterfaceStats(seconds, interfaceID, latency, &diffInfo)
+				istat := MakeInterfaceStatsJSON(interfaceID, c.Latency1Min.Value, c.Latency5Min.Value, c.Latency15Min.Value)
+				istats = append(istats, istat)
+
+				logInterfaceStats(seconds, interfaceID, c, &diffInfo)
 			}
 		}
 	}
+
+	allstats := MakeStatsJSON(istats)
+	WriteStatsJSON(allstats)
 }
 
-func logInterfaceStats(seconds uint64, interfaceID int, latency int64, diffInfo *linux.NetworkStat) {
+func logInterfaceStats(seconds uint64, interfaceID int, collector Collector, diffInfo *linux.NetworkStat) {
 	columns := map[string]interface{}{
 		"time_stamp":         time.Now(),
 		"interface_id":       interfaceID,
 		"device_name":        diffInfo.Iface,
-		"avg_latency":        latency,
+		"latency_1":          collector.Latency1Min.Value,
+		"latency_5":          collector.Latency5Min.Value,
+		"latency_15":         collector.Latency15Min.Value,
+		"latency_variance":   collector.LatencyVariance.StdDeviation,
 		"rx_bytes":           diffInfo.RxBytes,
 		"rx_bytes_rate":      diffInfo.RxBytes / seconds,
 		"rx_packets":         diffInfo.RxPackets,

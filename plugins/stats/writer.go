@@ -84,8 +84,11 @@ func MakeInterfaceStatsJSON(interfaceID int, latency1 float64, latency5 float64,
 			Value: 0.0,
 		},
 	}
+	// FIXME - available bandwidth
 	availableBandwidthStats := MakeStatisticJSON("available_bandwidth", "%", fakeMetrics100)
+	// FIXME - packet loss
 	packetLossStats := MakeStatisticJSON("packet_loss", "%", fakeMetrics0)
+	// FIXME - jitter
 	jitterStats := MakeStatisticJSON("jitter", "ms", fakeMetrics0)
 
 	istats.Stats = []StatisticJSON{

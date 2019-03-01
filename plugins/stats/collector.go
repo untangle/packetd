@@ -40,6 +40,12 @@ func (ea *ExponentialAverage) String() string {
 	return fmt.Sprintf("%.1fms", ea.Value)
 }
 
+// MakeCopy makes a copy of the collector
+func (c *Collector) MakeCopy() Collector {
+	newc := *c
+	return newc
+}
+
 // AddDataPointLimited adds a new datapoint to a collector
 // if it falls within the std deviation limit
 func (c *Collector) AddDataPointLimited(value float64, deviationLimit float64) {
@@ -69,11 +75,11 @@ func (c *Collector) AddDataPoint(value float64) {
 }
 
 func (c *Collector) dumpStatistics(index int) {
-	logger.Info("---------- INTERFACE %d STATS ----------\n", index)
-	logger.Info("latency (1-min): %s\n", c.Latency1Min.String())
-	logger.Info("latency (5-min): %s\n", c.Latency5Min.String())
-	logger.Info("latency (15-min): %s\n", c.Latency15Min.String())
-	logger.Info("variance: %s\n", c.LatencyVariance.String())
+	logger.Debug("---------- INTERFACE %d STATS ----------\n", index)
+	logger.Debug("latency (1-min): %s\n", c.Latency1Min.String())
+	logger.Debug("latency (5-min): %s\n", c.Latency5Min.String())
+	logger.Debug("latency (15-min): %s\n", c.Latency15Min.String())
+	logger.Debug("variance: %s\n", c.LatencyVariance.String())
 }
 
 // AdjustExpAvg adjust the exponential running average with the new datapoint
