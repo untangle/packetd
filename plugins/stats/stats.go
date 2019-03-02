@@ -55,6 +55,7 @@ func PluginStartup() {
 	interfaceStatsMap = make(map[string]*linux.NetworkStat)
 	interfaceInfoMap = make(map[string]*interfaceDetail)
 
+	// FIXME - this is currently only loaded once during startup
 	loadInterfaceInfoMap()
 
 	go interfaceTask()
@@ -307,23 +308,11 @@ func calculateDifference(previous *uint64, current uint64) uint64 {
 	return diff
 }
 
-// getInterfaceIDValue is called to get the interface ID value the corresponds
-// to the argumented interface name. If we don't find the name in the map on the
-// first try we refresh the map and look again. This lets us passively reload the
-// map to pick up interfaces that have been added since last time we loaded
-// FIXME - probably need to rethink this to handle re-numbering
+// getInterfaceIDValue is called to get the interface ID value that corresponds
+// to the argumented interface name. It is used to map the system interface names
+// we read from /proc/net/dev to the interface ID values we assign to each device
 func getInterfaceIDValue(name string) int {
 	var val *interfaceDetail
-
-	interfaceInfoLocker.RLock()
-	val = interfaceInfoMap[name]
-	interfaceInfoLocker.RUnlock()
-
-	if val != nil {
-		return val.interfaceID
-	}
-
-	loadInterfaceInfoMap()
 
 	interfaceInfoLocker.RLock()
 	val = interfaceInfoMap[name]
@@ -336,6 +325,7 @@ func getInterfaceIDValue(name string) int {
 	return -1
 }
 
+// loadInterfaceInfoMap creates a map of interface name to MFW interface ID values
 func loadInterfaceInfoMap() {
 	networkJSON, err := settings.GetSettings([]string{"network", "interfaces"})
 	if networkJSON == nil || err != nil {
@@ -389,20 +379,28 @@ func loadInterfaceInfoMap() {
 		// put the interface details in the map
 		interfaceInfoMap[holder.deviceName] = holder
 	}
+}
 
-	// now that we have our name to ID map we want to add details to each
-	// WAN interface that we can use to do our active ping latency checks
-	// so we start with the system list of network interfaces
+// refreshActivePingInfo adds details for each WAN interface that we
+// use to do our active ping latency checks
+func refreshActivePingInfo() {
 	facelist, err := net.Interfaces()
 	if err != nil {
 		return
 	}
+
+	interfaceInfoLocker.Lock()
+	defer interfaceInfoLocker.Unlock()
 
 	for _, item := range facelist {
 		// ignore interfaces not in our map
 		if interfaceInfoMap[item.Name] == nil {
 			continue
 		}
+
+		// found in the map so clear existing values
+		interfaceInfoMap[item.Name].netAddress = ""
+		interfaceInfoMap[item.Name].pingMode = protoIGNORE
 
 		// ignore interfaces not flagged as WAN in our map
 		if interfaceInfoMap[item.Name].wanFlag == false {
@@ -433,7 +431,7 @@ func loadInterfaceInfoMap() {
 			}
 			interfaceInfoMap[item.Name].netAddress = ip.String()
 			interfaceInfoMap[item.Name].pingMode = protoICMP4
-			logger.Info("Adding IPv4 active ping interface: %v\n", ip)
+			logger.Trace("Adding IPv4 active ping interface: %v\n", ip)
 			break
 		}
 
@@ -460,7 +458,7 @@ func loadInterfaceInfoMap() {
 			}
 			interfaceInfoMap[item.Name].netAddress = ip.String()
 			interfaceInfoMap[item.Name].pingMode = protoICMP6
-			logger.Info("Adding IPv6 active ping interface: %v\n", ip)
+			logger.Trace("Adding IPv6 active ping interface: %v\n", ip)
 			break
 		}
 	}
@@ -474,6 +472,7 @@ func pingTask() {
 			pingChannel <- true
 			return
 		case <-time.After(time.Second * time.Duration(pingCheckIntervalSec)):
+			refreshActivePingInfo()
 			interfaceInfoLocker.RLock()
 			for _, value := range interfaceInfoMap {
 				if value.pingMode == protoIGNORE {
