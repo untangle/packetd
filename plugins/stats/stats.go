@@ -453,7 +453,7 @@ func refreshActivePingInfo() {
 				continue
 			}
 			// this time we ignore IPv4 addresses
-			if ip.To4 != nil {
+			if ip.To4() != nil {
 				continue
 			}
 			interfaceInfoMap[item.Name].netAddress = ip.String()
