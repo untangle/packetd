@@ -125,6 +125,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	}
 	// log and ignore traffic to unknown interface
 	if interfaceID == 0 {
+		//the server interface is set in the conntrack new event
 		logger.Warn("Unknown interface ID: %v\n", mess.Session.GetClientSideTuple())
 		return result
 	}

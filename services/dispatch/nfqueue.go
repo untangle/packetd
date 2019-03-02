@@ -222,6 +222,14 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 		session.SetClientInterfaceType(uint8((pmark & 0x03000000) >> 24))
 	}
 
+	// if this is a server-to-client packet and the server interface info is not
+	// set yet, we can set it now (normally this is set during the conntrack new event)
+	// but in some cases we get the response packet first
+	if !mess.ClientToServer && session.GetServerInterfaceID() == 0 {
+		session.SetServerInterfaceID(uint8((pmark & 0x000000FF)))
+		session.SetServerInterfaceType(uint8((pmark & 0x03000000) >> 24))
+	}
+
 	// Update some accounting bits
 	session.SetLastActivity(time.Now())
 	session.AddPacketCount(1)
