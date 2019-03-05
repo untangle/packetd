@@ -638,6 +638,40 @@ func GetDictionary(table string, key interface{}) ([]Entry, error) {
 	return entries, err
 }
 
+// GetTable gets all of the dictionary entries in the supplied table
+// This function will return an error if it cannot open or read
+// /proc/net/dict/read
+func GetTable(table string) ([]Entry, error) {
+	file, err := os.OpenFile(pathBase+"/read", os.O_RDWR, 0660)
+	setstr := fmt.Sprintf("%s", generateTable(table))
+
+	if err != nil {
+		logger.Warn("GetTable: Failed to open %s\n", pathBase+"/read")
+		return nil, err
+	}
+
+	defer file.Close()
+
+	readMutex.Lock()
+	_, err = file.WriteString(setstr)
+
+	if err != nil {
+		logger.Warn("GetTable: Failed to write %s\n", setstr)
+		return nil, err
+	}
+
+	file.Sync()
+
+	var entries []Entry
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		entries = append(entries, parseEntry(scanner.Text()))
+	}
+	readMutex.Unlock()
+	return entries, err
+}
+
 // GetEntry gets the dictionary entry for the specified table, key and field
 // This function returns an error if the requested entry cannot be found
 func GetEntry(table string, key interface{}, field string) (Entry, error) {
