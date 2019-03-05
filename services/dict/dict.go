@@ -747,16 +747,13 @@ func GetAllEntries() ([]Entry, error) {
 
 // GetSessions returns the session table
 func GetSessions() (map[uint32]map[string]interface{}, error) {
-	entries, err := GetAllEntries()
+	entries, err := GetTable("sessions")
 	if err != nil {
 		return nil, err
 	}
 
 	m := make(map[uint32]map[string]interface{})
 	for _, e := range entries {
-		if e.Table != "sessions" {
-			continue
-		}
 		sessionID, ok := e.Key.(uint32)
 		if !ok {
 			logger.Warn("Invalid key is sessions table: %v %T %v\n", e.Key, e.Key, e)
