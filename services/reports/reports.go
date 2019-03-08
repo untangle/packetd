@@ -472,6 +472,8 @@ func createTables() {
                      certificate_subject_cn text,
                      certificate_subject_o text,
                      ssl_sni text,
+                     client_hops integer,
+                     server_hops integer,
                      client_dns_hint text,
                      server_dns_hint text)`)
 

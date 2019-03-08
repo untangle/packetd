@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/c9s/goprocinfo/linux"
+	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
@@ -98,6 +99,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	// if this is a new session attach the current time
 	if newSession {
 		mess.Session.PutAttachment("stats_timer", time.Now())
+		logHopCount(ctid, mess, "client_hops")
 	}
 
 	// ignore C2S packets but keep scanning until we get the first server response
@@ -105,6 +107,9 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		result.SessionRelease = false
 		return result
 	}
+
+	// get the hop count for the server
+	logHopCount(ctid, mess, "server_hops")
 
 	// We have a packet from the server so we calculate the latency as the
 	// time elapsed since the first client packet was transmitted
@@ -135,7 +140,6 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	logger.Debug("Logging latency sample: %d, %v, %v ms\n", interfaceID, mess.Session.GetServerSideTuple().ServerAddress, (duration.Nanoseconds() / 1000000))
 	statsLocker[interfaceID].Unlock()
 
-	result.SessionRelease = true
 	return result
 }
 
@@ -499,4 +503,45 @@ func collectPingSample(detail *interfaceDetail) {
 	statsCollector[detail.interfaceID].AddDataPoint(float64(duration.Nanoseconds()) / 1000000.0)
 	logger.Debug("Logging periodic sample: %d, %v, %v ms\n", detail.interfaceID, detail.netAddress, (duration.Nanoseconds() / 1000000))
 	statsLocker[detail.interfaceID].Unlock()
+}
+
+// We guesstimate the hop count based on the most common TTL values
+// which are 32, 64, 128, and 255
+// Article: Using abnormal TTL values to detect malicious IP packets
+// Ryo Yamada and Shigeki Goto
+// http://journals.sfu.ca/apan/index.php/apan/article/download/14/5
+func logHopCount(ctid uint32, mess dispatch.NfqueueMessage, name string) {
+	var hops uint8
+	var ttl uint8
+
+	// we only look for TTL in IPv4 and IPv6 packets
+	if mess.IP4Layer != nil {
+		ttl = mess.IP4Layer.TTL
+	} else if mess.IP6Layer != nil {
+		ttl = mess.IP6Layer.HopLimit
+	} else {
+		return
+	}
+
+	if ttl <= 32 {
+		hops = (32 - ttl)
+	} else if (ttl > 32) && (ttl <= 64) {
+		hops = (64 - ttl)
+	} else if (ttl > 64) && (ttl <= 128) {
+		hops = (128 - ttl)
+	} else {
+		hops = (255 - ttl)
+	}
+
+	// put the hop count in the dictionary
+	dict.AddSessionEntry(ctid, name, hops)
+
+	columns := map[string]interface{}{
+		"session_id": mess.Session.GetSessionID(),
+	}
+
+	modifiedColumns := make(map[string]interface{})
+	modifiedColumns[name] = hops
+
+	reports.LogEvent(reports.CreateEvent(name, "sessions", 2, columns, modifiedColumns))
 }
