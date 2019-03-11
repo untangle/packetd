@@ -1,6 +1,7 @@
 package restd
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -20,6 +21,7 @@ import (
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/overseer"
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/settings"
 )
@@ -56,6 +58,7 @@ func Startup() {
 	engine.GET("/", rootHandler)
 
 	engine.GET("/ping", pingHandler)
+	engine.GET("/debug", debugHandler)
 
 	engine.POST("/account/login", authLogin)
 	//engine.GET("/account/login", authLogin)
@@ -144,6 +147,12 @@ func pingHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "pong",
 	})
+}
+
+func debugHandler(c *gin.Context) {
+	var buffer bytes.Buffer
+	buffer = overseer.GenerateReport()
+	c.Data(http.StatusOK, "text/html; chareset=utf-8", buffer.Bytes())
 }
 
 func reportsGetData(c *gin.Context) {

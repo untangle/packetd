@@ -38,6 +38,7 @@ import (
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/overseer"
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/restd"
 	"github.com/untangle/packetd/services/settings"
@@ -271,12 +272,14 @@ func startServices() {
 	dict.Startup()
 	restd.Startup()
 	certcache.Startup()
+	overseer.Startup()
 }
 
 // stopServices stops all the services
 func stopServices() {
 	c := make(chan bool)
 	go func() {
+		overseer.Shutdown()
 		certcache.Shutdown()
 		restd.Shutdown()
 		dict.Shutdown()

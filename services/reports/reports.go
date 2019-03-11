@@ -14,6 +14,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3" // blank import required for runtime binding
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/overseer"
 )
 
 // Event stores an arbitrary event
@@ -239,7 +240,10 @@ func LogEvent(event Event) error {
 	select {
 	case eventQueue <- event:
 	default:
-		logger.Warn("Event queue at capacity[%d] Dropping event: %v\n", cap(eventQueue), event)
+		count := overseer.AddCounter("reports_event_queue_full", 1)
+		if count == 1 || (count%100) == 0 {
+			logger.Warn("Event queue at capacity[%d] %d times. Dropping event: %v\n", cap(eventQueue), count, event)
+		}
 		return errors.New("Event Queue at Capacity")
 	}
 	return nil
