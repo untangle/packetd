@@ -5,8 +5,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
@@ -53,6 +56,8 @@ func Startup() {
 	engine.GET("/", rootHandler)
 
 	engine.GET("/ping", pingHandler)
+
+	engine.POST("/sysupgrade", sysupgradeHandler)
 
 	engine.POST("/account/login", authLogin)
 	//engine.GET("/account/login", authLogin)
@@ -444,4 +449,40 @@ func ginlogger() gin.HandlerFunc {
 		logger.Info("GIN: %v %v\n", c.Request.Method, c.Request.RequestURI)
 		c.Next()
 	}
+}
+
+func sysupgradeHandler(c *gin.Context) {
+	filename := "/tmp/sysupgrade.img"
+
+	file, _, err := c.Request.FormFile("file")
+	if err != nil {
+		logger.Warn("Failed to upload file: %s\n", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	out, err := os.Create(filename)
+	if err != nil {
+		logger.Warn("Failed to create %s: %s\n", filename, err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err = io.Copy(out, file)
+	out.Close()
+	if err != nil {
+		logger.Warn("Failed to upload image: %s\n", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = exec.Command("/sbin/sysupgrade", filename).Run()
+	if err != nil {
+		logger.Warn("sysupgrade failed: %s\n", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, "success\n")
+	return
 }
