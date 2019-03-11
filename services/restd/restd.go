@@ -57,8 +57,6 @@ func Startup() {
 
 	engine.GET("/ping", pingHandler)
 
-	engine.POST("/sysupgrade", sysupgradeHandler)
-
 	engine.POST("/account/login", authLogin)
 	//engine.GET("/account/login", authLogin)
 	engine.POST("/account/logout", authLogout)
@@ -91,6 +89,8 @@ func Startup() {
 	api.GET("/status/sessions", statusSessions)
 	api.GET("/status/system", statusSystem)
 	api.GET("/status/hardware", statusHardware)
+
+	api.POST("/sysupgrade", sysupgradeHandler)
 
 	// files
 	engine.Static("/admin", "/www/admin")
@@ -476,12 +476,15 @@ func sysupgradeHandler(c *gin.Context) {
 		return
 	}
 
+	logger.Info("Launching sysupgrade...")
+
 	err = exec.Command("/sbin/sysupgrade", filename).Run()
 	if err != nil {
 		logger.Warn("sysupgrade failed: %s\n", err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	logger.Info("Launching sysupgrade... done")
 
 	c.JSON(http.StatusOK, "success\n")
 	return
