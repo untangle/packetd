@@ -485,7 +485,7 @@ func sysupgradeHandler(c *gin.Context) {
 		return
 	}
 
-	logger.Info("Launching sysupgrade...")
+	logger.Info("Launching sysupgrade...\n")
 
 	err = exec.Command("/sbin/sysupgrade", filename).Run()
 	if err != nil {
@@ -493,8 +493,8 @@ func sysupgradeHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	logger.Info("Launching sysupgrade... done")
+	logger.Info("Launching sysupgrade... done\n")
 
-	c.JSON(http.StatusOK, "success\n")
+	c.JSON(http.StatusOK, gin.H{"success": true})
 	return
 }
