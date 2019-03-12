@@ -135,6 +135,9 @@ func LogFormatter(format string, args ...interface{}) string {
 	// if we find the overseer counter verb the first argument is the counter name
 	// the second is the log repeat limit value and the rest go to the formatter
 	if strings.HasPrefix(format, "%OC|") {
+		if len(args) < 2 {
+			panic("LogFormatter OC verb - invalid number of arguments")
+		}
 		ocname := args[0].(string)
 		limit := uint64(args[1].(int))
 		total := overseer.AddCounter(ocname, 1)
