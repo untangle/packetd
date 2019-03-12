@@ -139,8 +139,15 @@ func LogFormatter(format string, args ...interface{}) string {
 		limit := uint64(args[1].(int))
 		total := overseer.AddCounter(ocname, 1)
 
-		// only format the message on the first and ever nnn messages thereafter
+		// only format the message on the first and every nnn messages thereafter
+		// or if limit is zero which means no limit on logging
 		if total == 1 || limit == 0 || (total%limit) == 0 {
+			// if there are only two arguments everything after the verb is the message
+			if len(args) == 2 {
+				return format[4:]
+			}
+
+			// more than two arguments so use the remaining format and arguments
 			return fmt.Sprintf(format[4:], args[2:]...)
 		}
 
