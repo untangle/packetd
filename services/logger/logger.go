@@ -140,7 +140,7 @@ func LogFormatter(format string, args ...interface{}) string {
 		total := overseer.AddCounter(ocname, 1)
 
 		// only format the message on the first and ever nnn messages thereafter
-		if total == 1 || (total%limit) == 0 {
+		if total == 1 || limit == 0 || (total%limit) == 0 {
 			return fmt.Sprintf(format[4:], args[2:]...)
 		}
 
