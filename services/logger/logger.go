@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/untangle/packetd/services/overseer"
 )
 
 const logConfigFile = "/tmp/logconfig.js"
@@ -63,22 +65,17 @@ func Shutdown() {
 }
 
 // GetLogLevel returns the log level for the specified source(s)
-func GetLogLevel(source string) int {
-	lvl, stat := appLogLevel[source]
-	if stat == true {
-		return lvl
-	}
-
-	return LogLevelInfo //default
-}
-
-// GetLogLevel2 returns the log level for the specified source(s)
 // it uses altsource only if a specification for source is not found
-func GetLogLevel2(source string, altsource string) int {
+func GetLogLevel(source string, altsource string) int {
 	lvl, stat := appLogLevel[source]
 	if stat == true {
 		return lvl
 	}
+
+	if len(altsource) == 0 {
+		return LogLevelInfo //default
+	}
+
 	altlvl, stat := appLogLevel[altsource]
 	if stat == true {
 		return altlvl
@@ -91,14 +88,17 @@ func GetLogLevel2(source string, altsource string) int {
 func LogMessage(level int, format string, args ...interface{}) {
 	caller, packagename, comboname, _, _ := findCaller()
 
-	if level > GetLogLevel2(comboname, packagename) {
+	if level > GetLogLevel(comboname, packagename) {
 		return
 	}
 
 	if len(args) == 0 {
 		fmt.Printf("%s%-5s %26s: %s", getPrefix(), logLevelName[level], caller, format)
 	} else {
-		buffer := fmt.Sprintf(format, args...)
+		buffer := LogFormatter(format, args...)
+		if len(buffer) == 0 {
+			return
+		}
 		fmt.Printf("%s%-5s %26s: %s", getPrefix(), logLevelName[level], caller, buffer)
 	}
 }
@@ -121,9 +121,35 @@ func LogMessageSource(level int, source string, format string, args ...interface
 	if len(args) == 0 {
 		fmt.Printf("%s%-5s %26s: %s", getPrefix(), logLevelName[level], source, format)
 	} else {
-		buffer := fmt.Sprintf(format, args...)
+		buffer := LogFormatter(format, args...)
+		if len(buffer) == 0 {
+			return
+		}
 		fmt.Printf("%s%-5s %26s: %s", getPrefix(), logLevelName[level], source, buffer)
 	}
+}
+
+// LogFormatter creats a log message using the format and arguments provided
+// We look for and handle special format verbs that trigger additional processing
+func LogFormatter(format string, args ...interface{}) string {
+	// if we find the overseer counter verb the first argument is the counter name
+	// the second is the log repeat limit value and the rest go to the formatter
+	if strings.HasPrefix(format, "%OC|") {
+		ocname := args[0].(string)
+		limit := uint64(args[1].(int))
+		total := overseer.AddCounter(ocname, 1)
+
+		// only format the message on the first and ever nnn messages thereafter
+		if total == 1 || (total%limit) == 0 {
+			return fmt.Sprintf(format[4:], args[2:]...)
+		}
+
+		// return empty string when a repeat is limited
+		return ""
+	}
+
+	buffer := fmt.Sprintf(format, args...)
+	return buffer
 }
 
 // IsLogEnabled returns true if logging is enabled for the caller at the specified level, false otherwise
@@ -140,7 +166,7 @@ func IsLogEnabled(level int) bool {
 
 // IsLogEnabledSource is the same as IsLogEnabled but for the manually specified source
 func IsLogEnabledSource(level int, source string) bool {
-	lvl := GetLogLevel(source)
+	lvl := GetLogLevel(source, "")
 	return (lvl >= level)
 }
 
