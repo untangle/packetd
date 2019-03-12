@@ -190,7 +190,7 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 
 		// Also check that the conntrack ID matches. Log an error if it does not
 		if session.GetConntrackID() != ctid {
-			logger.Err("Conntrack ID mismatch: %s  %d != %d %v\n", mess.MsgTuple, ctid, session.GetConntrackID(), session.GetConntrackConfirmed())
+			logger.Err("%OC|Conntrack ID mismatch: %s  %d != %d %v\n", "conntrack_id_missmatch", 0, mess.MsgTuple, ctid, session.GetConntrackID(), session.GetConntrackConfirmed())
 		}
 	}
 
@@ -296,7 +296,7 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 					resultsChannel <- result
 					timeoutTimer.Stop()
 				case <-timeoutTimer.C:
-					logger.Err("Timeout reached while processing nfqueue. plugin:%s\n", key)
+					logger.Err("%OC|Timeout reached while processing nfqueue. plugin:%s\n", "nfqueue_plugin_timeout", 0, key)
 					c <- subscriberResult{owner: key, sessionRelease: true}
 				}
 
@@ -327,7 +327,7 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 		// Increment the priority and keep looping until we've called all subscribers
 		priority++
 		if priority > 100 {
-			logger.Err("Priority > 100 Constraint failed! %d %d %d %v", subcount, subtotal, priority, sublist)
+			logger.Err("%OC|Priority > 100 Constraint failed! %d %d %d %v", "nfqueue_priority_constraint", 0, subcount, subtotal, priority, sublist)
 			panic("Constraint failed - infinite loop detected")
 		}
 	}

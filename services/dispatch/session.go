@@ -417,7 +417,7 @@ func cleanSessionTable() {
 		// We use 10000 seconds because 7440 is the established idle tcp timeout default
 		if time.Now().Sub(session.GetLastActivity()) > 10000*time.Second {
 			if session.GetConntrackConfirmed() {
-				logger.Err("Removing stale (%v) session [%v] %v\n", time.Now().Sub(session.GetLastActivity()), ctid, session.GetClientSideTuple())
+				logger.Err("%OC|Removing stale (%v) session [%v] %v\n", "stale_session_removed", 0, time.Now().Sub(session.GetLastActivity()), ctid, session.GetClientSideTuple())
 			}
 			dict.DeleteSession(ctid)
 			delete(sessionTable, ctid)

@@ -106,7 +106,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 				logger.Err("Session ServerSideTuple: %v\n", conntrack.Session.GetServerSideTuple())
 				logger.Err("Session SessionID: %v\n", conntrack.Session.GetSessionID())
 			}
-			logger.Err("Deleting obsolete conntrack entry %v.\n", ctid)
+			logger.Err("%OC|Deleting obsolete conntrack entry %v.\n", "contrack_obsolete_duplicate", 0, ctid)
 			conntrack.Guardian.RUnlock()
 			removeConntrackStale(ctid, conntrack)
 			conntrackFound = false
@@ -116,7 +116,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			conntrack.Guardian.RLock()
 			logger.Warn("Conntrack event[%c] tuple mismatch %v\n", eventType, ctid)
 			logger.Warn("Actual: %s Expected: %s\n", clientSideTuple.String(), conntrack.ClientSideTuple.String())
-			logger.Err("Deleting obsolete conntrack entry %v.\n", ctid)
+			logger.Err("%OC|Deleting obsolete conntrack entry %v.\n", "contrack_obsolete_missmatch", 0, ctid)
 			conntrack.Guardian.RUnlock()
 			removeConntrackStale(ctid, conntrack)
 			conntrackFound = false
@@ -157,7 +157,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			if session.GetConntrackID() != ctid {
 				// We found a session, if its conntrackID does not match the one of the event
 				// This should never happen as we lookup the session using the ctid
-				logger.Err("Conntrack NEW ID mismatch: %s  %d != %d\n", session.GetClientSideTuple().String(), ctid, session.GetConntrackID())
+				logger.Err("%OC|Conntrack NEW ID mismatch: %s  %d != %d\n", "conntrack_new_id_mismatch", 0, session.GetClientSideTuple().String(), ctid, session.GetConntrackID())
 				return
 			}
 			if !session.GetClientSideTuple().Equal(conntrack.ClientSideTuple) {
@@ -174,7 +174,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 				// This is a problem, however if the previous session was confirmed, and we have now received a NEW event
 				// before receiving a DELETE event for the old ctid
 				if session.GetConntrackConfirmed() {
-					logger.Err("Conntrack NEW session tuple mismatch: %v  %v != %v\n", ctid, session.GetClientSideTuple().String(), conntrack.ClientSideTuple.String())
+					logger.Err("%OC|Conntrack NEW session tuple mismatch: %v  %v != %v\n", "conntrack_new_session_mismatch", 0, ctid, session.GetClientSideTuple().String(), conntrack.ClientSideTuple.String())
 				} else {
 					logger.Debug("Conntrack NEW session tuple mismatch: %v  %v != %v\n", ctid, session.GetClientSideTuple().String(), conntrack.ClientSideTuple.String())
 				}
@@ -287,7 +287,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		// Increment the priority and keep looping until we've called all subscribers
 		priority++
 		if priority > 100 {
-			logger.Err("Priority > 100 Constraint failed! %d %d %d %v", subcount, subtotal, priority, sublist)
+			logger.Err("%OC:Priority > 100 Constraint failed! %d %d %d %v", "conntrack_priority_constraint", 0, subcount, subtotal, priority, sublist)
 			panic("Constraint failed - infinite loop detected")
 		}
 	}

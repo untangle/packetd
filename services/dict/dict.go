@@ -365,7 +365,7 @@ func deleteEntry(setstr string) error {
 
 	_, err = file.WriteString(setstr)
 	if err != nil {
-		logger.Err("dict: deleteEntry: Failed to write %s\n", setstr)
+		logger.Err("%OC|dict: deleteEntry: Failed to write %s\n", "dict_write_failure", 0, setstr)
 		return (err)
 	}
 
