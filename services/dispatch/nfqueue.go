@@ -190,7 +190,7 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 
 		// Also check that the conntrack ID matches. Log an error if it does not
 		if session.GetConntrackID() != ctid {
-			logger.Err("%OC|Conntrack ID mismatch: %s  %d != %d %v\n", "conntrack_id_missmatch", 0, mess.MsgTuple, ctid, session.GetConntrackID(), session.GetConntrackConfirmed())
+			logger.Err("%OC|Conntrack ID mismatch: %s  %d != %d %v\n", "conntrack_id_mismatch", 0, mess.MsgTuple, ctid, session.GetConntrackID(), session.GetConntrackConfirmed())
 		}
 	}
 

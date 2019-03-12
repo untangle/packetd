@@ -173,7 +173,7 @@ func collectInterfaceStats(seconds uint64) {
 
 	procData, err := linux.ReadNetworkStat("/proc/net/dev")
 	if err != nil {
-		logger.Err("%OC|Error reading interface statistics:%v\n", "interface_stats_read_failure", 0, err)
+		logger.Err("Error reading interface statistics:%v\n", err)
 		return
 	}
 

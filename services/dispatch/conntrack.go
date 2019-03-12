@@ -116,7 +116,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			conntrack.Guardian.RLock()
 			logger.Warn("Conntrack event[%c] tuple mismatch %v\n", eventType, ctid)
 			logger.Warn("Actual: %s Expected: %s\n", clientSideTuple.String(), conntrack.ClientSideTuple.String())
-			logger.Err("%OC|Deleting obsolete conntrack entry %v.\n", "contrack_obsolete_missmatch", 0, ctid)
+			logger.Err("%OC|Deleting obsolete conntrack entry %v.\n", "contrack_obsolete_mismatch", 0, ctid)
 			conntrack.Guardian.RUnlock()
 			removeConntrackStale(ctid, conntrack)
 			conntrackFound = false
