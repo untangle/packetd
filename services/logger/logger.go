@@ -135,11 +135,30 @@ func LogFormatter(format string, args ...interface{}) string {
 	// if we find the overseer counter verb the first argument is the counter name
 	// the second is the log repeat limit value and the rest go to the formatter
 	if strings.HasPrefix(format, "%OC|") {
+		var ocname string
+		var limit uint64
+
+		// make sure we have at least two arguments
 		if len(args) < 2 {
 			panic("LogFormatter OC verb - invalid number of arguments")
 		}
-		ocname := args[0].(string)
-		limit := uint64(args[1].(int))
+
+		// make sure the first argument is string
+		switch args[0].(type) {
+		case string:
+			ocname = args[0].(string)
+		default:
+			panic("LogFormatter OC verb - first argument is not string")
+		}
+
+		// make sure the second argument is int
+		switch args[1].(type) {
+		case int:
+			limit = uint64(args[1].(int))
+		default:
+			panic("LogFormatter OC verb - second argument is not int")
+		}
+
 		total := overseer.AddCounter(ocname, 1)
 
 		// only format the message on the first and every nnn messages thereafter
