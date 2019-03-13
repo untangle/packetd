@@ -142,11 +142,14 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		return result
 	}
 
+	logger.Debug("Logging passive latency: %d, %v, %v ms\n", interfaceID, mess.Session.GetServerSideTuple().ServerAddress, (duration.Nanoseconds() / 1000000))
+
 	statsLocker[interfaceID].Lock()
+	passiveLocker[interfaceID].Lock()
 	statsCollector[interfaceID].AddDataPointLimited(float64(duration.Nanoseconds())/1000000.0, 2.0)
 	passiveCollector[interfaceID].AddDataPointLimited(float64(duration.Nanoseconds())/1000000.0, 2.0)
-	logger.Debug("Logging latency sample: %d, %v, %v ms\n", interfaceID, mess.Session.GetServerSideTuple().ServerAddress, (duration.Nanoseconds() / 1000000))
 	statsLocker[interfaceID].Unlock()
+	passiveLocker[interfaceID].Unlock()
 
 	return result
 }
@@ -515,11 +518,14 @@ func collectPingSample(detail *interfaceDetail) {
 		logger.Warn("Error returned from pingIPv4Address: %v\n", err)
 	}
 
+	logger.Debug("Logging active latency: %d, %v, %v ms\n", detail.interfaceID, detail.netAddress, (duration.Nanoseconds() / 1000000))
+
 	statsLocker[detail.interfaceID].Lock()
+	activeLocker[detail.interfaceID].Lock()
 	statsCollector[detail.interfaceID].AddDataPoint(float64(duration.Nanoseconds()) / 1000000.0)
 	activeCollector[detail.interfaceID].AddDataPoint(float64(duration.Nanoseconds()) / 1000000.0)
-	logger.Debug("Logging periodic sample: %d, %v, %v ms\n", detail.interfaceID, detail.netAddress, (duration.Nanoseconds() / 1000000))
 	statsLocker[detail.interfaceID].Unlock()
+	activeLocker[detail.interfaceID].Unlock()
 }
 
 // We guesstimate the hop count based on the most common TTL values
