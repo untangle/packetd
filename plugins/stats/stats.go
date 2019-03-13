@@ -21,7 +21,12 @@ const pingCheckIntervalSec = 5
 const pingCheckTarget = "www.google.com"
 
 var statsCollector [256]*Collector
+var passiveCollector [256]*Collector
+var activeCollector [256]*Collector
+
 var statsLocker [256]sync.Mutex
+var passiveLocker [256]sync.Mutex
+var activeLocker [256]sync.Mutex
 
 var interfaceInfoMap map[string]*interfaceDetail
 var interfaceInfoLocker sync.RWMutex
@@ -51,6 +56,8 @@ func PluginStartup() {
 
 	for x := 0; x < 256; x++ {
 		statsCollector[x] = CreateCollector()
+		passiveCollector[x] = CreateCollector()
+		activeCollector[x] = CreateCollector()
 	}
 
 	interfaceStatsMap = make(map[string]*linux.NetworkStat)
@@ -137,6 +144,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	statsLocker[interfaceID].Lock()
 	statsCollector[interfaceID].AddDataPointLimited(float64(duration.Nanoseconds())/1000000.0, 2.0)
+	passiveCollector[interfaceID].AddDataPointLimited(float64(duration.Nanoseconds())/1000000.0, 2.0)
 	logger.Debug("Logging latency sample: %d, %v, %v ms\n", interfaceID, mess.Session.GetServerSideTuple().ServerAddress, (duration.Nanoseconds() / 1000000))
 	statsLocker[interfaceID].Unlock()
 
@@ -153,14 +161,6 @@ func interfaceTask() {
 		case <-time.After(time.Second * time.Duration(interfaceStatLogIntervalSec)):
 			logger.Debug("Collecting interface statistics\n")
 			collectInterfaceStats(interfaceStatLogIntervalSec)
-
-			for i := 0; i < 256; i++ {
-				statsLocker[i].Lock()
-				if statsCollector[i].Latency1Min.Value != 0.0 {
-					statsCollector[i].dumpStatistics(i)
-				}
-				statsLocker[i].Unlock()
-			}
 		}
 	}
 }
@@ -243,13 +243,21 @@ func collectInterfaceStats(seconds uint64) {
 				logger.Debug("Skipping unknown interface: %s\n", diffInfo.Iface)
 			} else {
 				statsLocker[interfaceID].Lock()
-				c := statsCollector[interfaceID].MakeCopy()
+				combo := statsCollector[interfaceID].MakeCopy()
 				statsLocker[interfaceID].Unlock()
 
-				istat := MakeInterfaceStatsJSON(interfaceID, c.Latency1Min.Value, c.Latency5Min.Value, c.Latency15Min.Value)
+				passiveLocker[interfaceID].Lock()
+				passive := passiveCollector[interfaceID].MakeCopy()
+				passiveLocker[interfaceID].Unlock()
+
+				activeLocker[interfaceID].Lock()
+				active := activeCollector[interfaceID].MakeCopy()
+				activeLocker[interfaceID].Unlock()
+
+				istat := MakeInterfaceStatsJSON(interfaceID, combo.Latency1Min.Value, combo.Latency5Min.Value, combo.Latency15Min.Value)
 				istats = append(istats, istat)
 
-				logInterfaceStats(seconds, interfaceID, c, &diffInfo)
+				logInterfaceStats(seconds, interfaceID, combo, passive, active, &diffInfo)
 			}
 		}
 	}
@@ -258,47 +266,55 @@ func collectInterfaceStats(seconds uint64) {
 	WriteStatsJSON(allstats)
 }
 
-func logInterfaceStats(seconds uint64, interfaceID int, collector Collector, diffInfo *linux.NetworkStat) {
+func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive Collector, active Collector, diffInfo *linux.NetworkStat) {
 	columns := map[string]interface{}{
-		"time_stamp":         time.Now(),
-		"interface_id":       interfaceID,
-		"device_name":        diffInfo.Iface,
-		"latency_1":          collector.Latency1Min.Value,
-		"latency_5":          collector.Latency5Min.Value,
-		"latency_15":         collector.Latency15Min.Value,
-		"latency_variance":   collector.LatencyVariance.StdDeviation,
-		"rx_bytes":           diffInfo.RxBytes,
-		"rx_bytes_rate":      diffInfo.RxBytes / seconds,
-		"rx_packets":         diffInfo.RxPackets,
-		"rx_packets_rate":    diffInfo.RxPackets / seconds,
-		"rx_errs":            diffInfo.RxErrs,
-		"rx_errs_rate":       diffInfo.RxErrs / seconds,
-		"rx_drop":            diffInfo.RxDrop,
-		"rx_drop_rate":       diffInfo.RxDrop / seconds,
-		"rx_fifo":            diffInfo.RxFifo,
-		"rx_fifo_rate":       diffInfo.RxFifo / seconds,
-		"rx_frame":           diffInfo.RxFrame,
-		"rx_frame_rate":      diffInfo.RxFrame / seconds,
-		"rx_compressed":      diffInfo.RxCompressed,
-		"rx_compressed_rate": diffInfo.RxCompressed / seconds,
-		"rx_multicast":       diffInfo.RxMulticast,
-		"rx_multicast_rate":  diffInfo.RxMulticast / seconds,
-		"tx_bytes":           diffInfo.TxBytes,
-		"tx_bytes_rate":      diffInfo.TxBytes / seconds,
-		"tx_packets":         diffInfo.TxPackets,
-		"tx_packets_rate":    diffInfo.TxPackets / seconds,
-		"tx_errs":            diffInfo.TxErrs,
-		"tx_errs_rate":       diffInfo.TxErrs / seconds,
-		"tx_drop":            diffInfo.TxDrop,
-		"tx_drop_rate":       diffInfo.TxDrop / seconds,
-		"tx_fifo":            diffInfo.TxFifo,
-		"tx_fifo_rate":       diffInfo.TxFifo / seconds,
-		"tx_colls":           diffInfo.TxColls,
-		"tx_colls_rate":      diffInfo.TxColls / seconds,
-		"tx_carrier":         diffInfo.TxCarrier,
-		"tx_carrier_rate":    diffInfo.TxCarrier / seconds,
-		"tx_compressed":      diffInfo.TxCompressed,
-		"tx_compressed_rate": diffInfo.TxCompressed / seconds,
+		"time_stamp":               time.Now(),
+		"interface_id":             interfaceID,
+		"device_name":              diffInfo.Iface,
+		"latency_1":                combo.Latency1Min.Value,
+		"latency_5":                combo.Latency5Min.Value,
+		"latency_15":               combo.Latency15Min.Value,
+		"latency_variance":         combo.LatencyVariance.StdDeviation,
+		"passive_latency_1":        passive.Latency1Min.Value,
+		"passive_latency_5":        passive.Latency5Min.Value,
+		"passive_latency_15":       passive.Latency15Min.Value,
+		"passive_latency_variance": passive.LatencyVariance.StdDeviation,
+		"active_latency_1":         active.Latency1Min.Value,
+		"active_latency_5":         active.Latency5Min.Value,
+		"active_latency_15":        active.Latency15Min.Value,
+		"active_latency_variance":  active.LatencyVariance.StdDeviation,
+		"rx_bytes":                 diffInfo.RxBytes,
+		"rx_bytes_rate":            diffInfo.RxBytes / seconds,
+		"rx_packets":               diffInfo.RxPackets,
+		"rx_packets_rate":          diffInfo.RxPackets / seconds,
+		"rx_errs":                  diffInfo.RxErrs,
+		"rx_errs_rate":             diffInfo.RxErrs / seconds,
+		"rx_drop":                  diffInfo.RxDrop,
+		"rx_drop_rate":             diffInfo.RxDrop / seconds,
+		"rx_fifo":                  diffInfo.RxFifo,
+		"rx_fifo_rate":             diffInfo.RxFifo / seconds,
+		"rx_frame":                 diffInfo.RxFrame,
+		"rx_frame_rate":            diffInfo.RxFrame / seconds,
+		"rx_compressed":            diffInfo.RxCompressed,
+		"rx_compressed_rate":       diffInfo.RxCompressed / seconds,
+		"rx_multicast":             diffInfo.RxMulticast,
+		"rx_multicast_rate":        diffInfo.RxMulticast / seconds,
+		"tx_bytes":                 diffInfo.TxBytes,
+		"tx_bytes_rate":            diffInfo.TxBytes / seconds,
+		"tx_packets":               diffInfo.TxPackets,
+		"tx_packets_rate":          diffInfo.TxPackets / seconds,
+		"tx_errs":                  diffInfo.TxErrs,
+		"tx_errs_rate":             diffInfo.TxErrs / seconds,
+		"tx_drop":                  diffInfo.TxDrop,
+		"tx_drop_rate":             diffInfo.TxDrop / seconds,
+		"tx_fifo":                  diffInfo.TxFifo,
+		"tx_fifo_rate":             diffInfo.TxFifo / seconds,
+		"tx_colls":                 diffInfo.TxColls,
+		"tx_colls_rate":            diffInfo.TxColls / seconds,
+		"tx_carrier":               diffInfo.TxCarrier,
+		"tx_carrier_rate":          diffInfo.TxCarrier / seconds,
+		"tx_compressed":            diffInfo.TxCompressed,
+		"tx_compressed_rate":       diffInfo.TxCompressed / seconds,
 	}
 
 	reports.LogEvent(reports.CreateEvent("interface_stats", "interface_stats", 1, columns, nil))
@@ -501,6 +517,7 @@ func collectPingSample(detail *interfaceDetail) {
 
 	statsLocker[detail.interfaceID].Lock()
 	statsCollector[detail.interfaceID].AddDataPoint(float64(duration.Nanoseconds()) / 1000000.0)
+	activeCollector[detail.interfaceID].AddDataPoint(float64(duration.Nanoseconds()) / 1000000.0)
 	logger.Debug("Logging periodic sample: %d, %v, %v ms\n", detail.interfaceID, detail.netAddress, (duration.Nanoseconds() / 1000000))
 	statsLocker[detail.interfaceID].Unlock()
 }

@@ -74,14 +74,6 @@ func (c *Collector) AddDataPoint(value float64) {
 		c.Latency1Min.String(), c.Latency5Min.String(), c.Latency15Min.String(), c.LatencyVariance.String())
 }
 
-func (c *Collector) dumpStatistics(index int) {
-	logger.Debug("---------- INTERFACE %d STATS ----------\n", index)
-	logger.Debug("latency (1-min): %s\n", c.Latency1Min.String())
-	logger.Debug("latency (5-min): %s\n", c.Latency5Min.String())
-	logger.Debug("latency (15-min): %s\n", c.Latency15Min.String())
-	logger.Debug("variance: %s\n", c.LatencyVariance.String())
-}
-
 // AdjustExpAvg adjust the exponential running average with the new datapoint
 func (ea *ExponentialAverage) AdjustExpAvg(value float64) {
 	var elapsedMilliSec float64
