@@ -140,7 +140,7 @@ func LogFormatter(format string, args ...interface{}) string {
 
 		// make sure we have at least two arguments
 		if len(args) < 2 {
-			panic("LogFormatter OC verb - invalid number of arguments")
+			return fmt.Sprintf("ERROR: LogFormatter OC verb missing arguments:%s", format)
 		}
 
 		// make sure the first argument is string
@@ -148,7 +148,7 @@ func LogFormatter(format string, args ...interface{}) string {
 		case string:
 			ocname = args[0].(string)
 		default:
-			panic("LogFormatter OC verb - first argument is not string")
+			return fmt.Sprintf("ERROR: LogFormatter OC verb args[0] not string:%s", format)
 		}
 
 		// make sure the second argument is int
@@ -156,7 +156,7 @@ func LogFormatter(format string, args ...interface{}) string {
 		case int:
 			limit = uint64(args[1].(int))
 		default:
-			panic("LogFormatter OC verb - second argument is not int")
+			return fmt.Sprintf("ERROR: LogFormatter OC verb args[1] not int:%s", format)
 		}
 
 		total := overseer.AddCounter(ocname, 1)
