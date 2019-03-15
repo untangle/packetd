@@ -31,6 +31,9 @@ var activeLocker [256]sync.Mutex
 var interfaceInfoMap map[string]*interfaceDetail
 var interfaceInfoLocker sync.RWMutex
 
+var interfaceMetricList [256]*interfaceMetric
+var interfaceMetricLocker sync.Mutex
+
 var interfaceStatsMap map[string]*linux.NetworkStat
 var interfaceChannel = make(chan bool)
 var pingChannel = make(chan bool)
@@ -46,6 +49,11 @@ type interfaceDetail struct {
 	wanFlag     bool
 }
 
+type interfaceMetric struct {
+	PingTimeout     uint64
+	lastPingTimeout uint64
+}
+
 // PluginStartup function is called to allow plugin specific initialization.
 func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
@@ -58,6 +66,7 @@ func PluginStartup() {
 		statsCollector[x] = CreateCollector()
 		passiveCollector[x] = CreateCollector()
 		activeCollector[x] = CreateCollector()
+		interfaceMetricList[x] = new(interfaceMetric)
 	}
 
 	interfaceStatsMap = make(map[string]*linux.NetworkStat)
@@ -173,6 +182,7 @@ func interfaceTask() {
 func collectInterfaceStats(seconds uint64) {
 	var statInfo *linux.NetworkStat
 	var diffInfo linux.NetworkStat
+	var istats []InterfaceStatsJSON
 
 	procData, err := linux.ReadNetworkStat("/proc/net/dev")
 	if err != nil {
@@ -180,7 +190,6 @@ func collectInterfaceStats(seconds uint64) {
 		return
 	}
 
-	var istats []InterfaceStatsJSON
 	for i := 0; i < len(procData); i++ {
 		item := procData[i]
 
@@ -193,7 +202,7 @@ func collectInterfaceStats(seconds uint64) {
 		statInfo = interfaceStatsMap[item.Iface]
 
 		if statInfo == nil {
-			// if no entry for the interface use the existing values as the starting point
+			// if no entry for the interface use the existing values to create the entry
 			statInfo = new(linux.NetworkStat)
 			statInfo.Iface = item.Iface
 			statInfo.RxBytes = item.RxBytes
@@ -215,26 +224,25 @@ func collectInterfaceStats(seconds uint64) {
 			interfaceStatsMap[item.Iface] = statInfo
 		} else {
 			// found the interface entry so calculate the difference since last time
-			// pass previous values as pointers so they can be updated after the calculation
 			diffInfo.Iface = item.Iface
-			diffInfo.RxBytes = calculateDifference(&statInfo.RxBytes, item.RxBytes)
-			diffInfo.RxPackets = calculateDifference(&statInfo.RxPackets, item.RxPackets)
-			diffInfo.RxErrs = calculateDifference(&statInfo.RxErrs, item.RxErrs)
-			diffInfo.RxDrop = calculateDifference(&statInfo.RxDrop, item.RxDrop)
-			diffInfo.RxFifo = calculateDifference(&statInfo.RxFifo, item.RxFifo)
-			diffInfo.RxFrame = calculateDifference(&statInfo.RxFrame, item.RxFrame)
-			diffInfo.RxCompressed = calculateDifference(&statInfo.RxCompressed, item.RxCompressed)
-			diffInfo.RxMulticast = calculateDifference(&statInfo.RxMulticast, item.RxMulticast)
-			diffInfo.TxBytes = calculateDifference(&statInfo.TxBytes, item.TxBytes)
-			diffInfo.TxPackets = calculateDifference(&statInfo.TxPackets, item.TxPackets)
-			diffInfo.TxErrs = calculateDifference(&statInfo.TxErrs, item.TxErrs)
-			diffInfo.TxDrop = calculateDifference(&statInfo.TxDrop, item.TxDrop)
-			diffInfo.TxFifo = calculateDifference(&statInfo.TxFifo, item.TxFifo)
-			diffInfo.TxColls = calculateDifference(&statInfo.TxColls, item.TxColls)
-			diffInfo.TxCarrier = calculateDifference(&statInfo.TxCarrier, item.TxCarrier)
-			diffInfo.TxCompressed = calculateDifference(&statInfo.TxCompressed, item.TxCompressed)
+			diffInfo.RxBytes = calculateDifference(statInfo.RxBytes, item.RxBytes)
+			diffInfo.RxPackets = calculateDifference(statInfo.RxPackets, item.RxPackets)
+			diffInfo.RxErrs = calculateDifference(statInfo.RxErrs, item.RxErrs)
+			diffInfo.RxDrop = calculateDifference(statInfo.RxDrop, item.RxDrop)
+			diffInfo.RxFifo = calculateDifference(statInfo.RxFifo, item.RxFifo)
+			diffInfo.RxFrame = calculateDifference(statInfo.RxFrame, item.RxFrame)
+			diffInfo.RxCompressed = calculateDifference(statInfo.RxCompressed, item.RxCompressed)
+			diffInfo.RxMulticast = calculateDifference(statInfo.RxMulticast, item.RxMulticast)
+			diffInfo.TxBytes = calculateDifference(statInfo.TxBytes, item.TxBytes)
+			diffInfo.TxPackets = calculateDifference(statInfo.TxPackets, item.TxPackets)
+			diffInfo.TxErrs = calculateDifference(statInfo.TxErrs, item.TxErrs)
+			diffInfo.TxDrop = calculateDifference(statInfo.TxDrop, item.TxDrop)
+			diffInfo.TxFifo = calculateDifference(statInfo.TxFifo, item.TxFifo)
+			diffInfo.TxColls = calculateDifference(statInfo.TxColls, item.TxColls)
+			diffInfo.TxCarrier = calculateDifference(statInfo.TxCarrier, item.TxCarrier)
+			diffInfo.TxCompressed = calculateDifference(statInfo.TxCompressed, item.TxCompressed)
 
-			// Update current values
+			// replace the current stats map object with the one returned from ReadNetworkStat
 			interfaceStatsMap[item.Iface] = &item
 
 			// convert the interface name to the ID value
@@ -245,6 +253,13 @@ func collectInterfaceStats(seconds uint64) {
 			if interfaceID < 0 {
 				logger.Debug("Skipping unknown interface: %s\n", diffInfo.Iface)
 			} else {
+
+				// calculate the difference for other metrics we track for each interface
+				interfaceMetricLocker.Lock()
+				metric := calculateMetrics(interfaceMetricList[interfaceID])
+				interfaceMetricLocker.Unlock()
+
+				// get copies of the three latency collectors
 				statsLocker[interfaceID].Lock()
 				combo := statsCollector[interfaceID].MakeCopy()
 				statsLocker[interfaceID].Unlock()
@@ -260,7 +275,7 @@ func collectInterfaceStats(seconds uint64) {
 				istat := MakeInterfaceStatsJSON(interfaceID, combo.Latency1Min.Value, combo.Latency5Min.Value, combo.Latency15Min.Value)
 				istats = append(istats, istat)
 
-				logInterfaceStats(seconds, interfaceID, combo, passive, active, &diffInfo)
+				logInterfaceStats(seconds, interfaceID, combo, passive, active, &diffInfo, &metric)
 			}
 		}
 	}
@@ -269,7 +284,7 @@ func collectInterfaceStats(seconds uint64) {
 	WriteStatsJSON(allstats)
 }
 
-func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive Collector, active Collector, diffInfo *linux.NetworkStat) {
+func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive Collector, active Collector, diffInfo *linux.NetworkStat, diffMetric *interfaceMetric) {
 	columns := map[string]interface{}{
 		"time_stamp":               time.Now(),
 		"interface_id":             interfaceID,
@@ -286,6 +301,8 @@ func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive
 		"active_latency_5":         active.Latency5Min.Value,
 		"active_latency_15":        active.Latency15Min.Value,
 		"active_latency_variance":  active.LatencyVariance.StdDeviation,
+		"ping_timeout":             diffMetric.PingTimeout,
+		"ping_timeout_rate":        diffMetric.PingTimeout / seconds,
 		"rx_bytes":                 diffInfo.RxBytes,
 		"rx_bytes_rate":            diffInfo.RxBytes / seconds,
 		"rx_packets":               diffInfo.RxPackets,
@@ -324,12 +341,19 @@ func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive
 }
 
 // calculateDifference determines the difference between the two argumented values
-// and then updates the pointer to the previous value with the current value
 // FIXME - need to handle integer wrap
-func calculateDifference(previous *uint64, current uint64) uint64 {
-	diff := (current - *previous)
-	*previous = current
+func calculateDifference(previous uint64, current uint64) uint64 {
+	diff := (current - previous)
 	return diff
+}
+
+// calculateMetrics calulates the difference for other values we track for interfaces
+func calculateMetrics(metric *interfaceMetric) interfaceMetric {
+	var result interfaceMetric
+
+	result.PingTimeout = metric.PingTimeout - metric.lastPingTimeout
+	metric.lastPingTimeout = metric.PingTimeout
+	return result
 }
 
 // getInterfaceIDValue is called to get the interface ID value that corresponds
@@ -515,7 +539,16 @@ func collectPingSample(detail *interfaceDetail) {
 	duration, err := pingNetworkAddress(detail.pingMode, detail.netAddress, pingCheckTarget)
 
 	if err != nil {
-		logger.Warn("Error returned from pingIPv4Address: %v\n", err)
+		if strings.Contains(err.Error(), "i/o timeout") {
+			// if no ping response we count as a timeout
+			interfaceMetricLocker.Lock()
+			interfaceMetricList[detail.interfaceID].PingTimeout++
+			interfaceMetricLocker.Unlock()
+		} else {
+			// otherwise log the error
+			logger.Warn("Error returned from pingIPv4Address: %v\n", err)
+		}
+		return
 	}
 
 	logger.Debug("Logging active latency: %d, %v, %v ms\n", detail.interfaceID, detail.netAddress, (duration.Nanoseconds() / 1000000))

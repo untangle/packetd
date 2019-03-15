@@ -526,6 +526,8 @@ func createTables() {
 					 active_latency_5 real,
 					 active_latency_15 real,
 					 active_latency_variance real,
+					 ping_timeout int8,
+					 ping_timeout_rate int8,
 					 rx_bytes int8,
 					 rx_bytes_rate int8,
 					 rx_packets int8,
