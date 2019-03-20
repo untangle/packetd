@@ -5,8 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -14,7 +12,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"runtime/pprof"
 	"strconv"
 	"strings"
 	"sync"
@@ -46,8 +43,6 @@ import (
 
 const rulesScript = "packetd_rules"
 
-var memProfileTarget string
-var cpuProfileTarget string
 var localFlag bool
 var cpuCount = getConcurrencyFactor()
 var queueRange = getQueueRange()
@@ -83,10 +78,6 @@ func main() {
 	// 		}
 	// 	}()
 	// }
-
-	if len(cpuProfileTarget) > 0 {
-		startCPUProfiling()
-	}
 
 	// Start the plugins
 	logger.Info("Starting plugins...\n")
@@ -155,19 +146,6 @@ func main() {
 	// Stop services
 	logger.Info("Stopping services...\n")
 
-	if len(cpuProfileTarget) > 0 {
-		stopCPUProfiling()
-	}
-
-	if len(memProfileTarget) > 0 {
-		f, err := os.Create(memProfileTarget)
-		if err == nil {
-			runtime.GC()
-			pprof.WriteHeapProfile(f)
-			f.Close()
-		}
-	}
-
 	stopServices()
 }
 
@@ -187,8 +165,6 @@ func parseArguments() {
 	playbackFilePtr := flag.String("playback", "", "playback traffic from specified file")
 	captureFilePtr := flag.String("capture", "", "capture traffic to specified file")
 	playSpeedPtr := flag.Int("playspeed", 100, "traffic playback speed percentage")
-	cpuProfilePtr := flag.String("cpuprofile", "", "write cpu profile to file")
-	memProfilePtr := flag.String("memprofile", "", "write memory profile to file")
 	logFilePtr := flag.String("logfile", "", "file to redirect stdout/stderr")
 	cpuCountPtr := flag.Int("cpucount", cpuCount, "override the cpucount manually")
 
@@ -235,16 +211,8 @@ func parseArguments() {
 		kernel.SetWarehouseSpeed(*playSpeedPtr)
 	}
 
-	if *cpuProfilePtr != "" {
-		cpuProfileTarget = *cpuProfilePtr
-	}
-
 	if cpuCountPtr != nil {
 		cpuCount = *cpuCountPtr
-	}
-
-	if *memProfilePtr != "" {
-		memProfileTarget = *memProfilePtr
 	}
 
 	if *logFilePtr != "" {
@@ -492,27 +460,6 @@ func loadRequirements() {
 	if err != nil {
 		logger.Err("Failed to enable nf_conntrack_timestamp %s", err.Error())
 	}
-}
-
-// startCPUProfiling starts the CPU profiling processing
-func startCPUProfiling() {
-	f, err := os.Create(cpuProfileTarget)
-	if err != nil {
-		logger.Err("Could not create CPU profile: ", err)
-	}
-	if err := pprof.StartCPUProfile(f); err != nil {
-		logger.Err("Could not start CPU profile: ", err)
-	}
-
-	logger.Info("pprof listening on localhost:6060\n")
-	go func() {
-		http.ListenAndServe("localhost:6060", nil)
-	}()
-}
-
-// stopCPUProfiling stops the CPU profiling processing
-func stopCPUProfiling() {
-	pprof.StopCPUProfile()
 }
 
 // getConcurrencyFactor returns the number of CPUs

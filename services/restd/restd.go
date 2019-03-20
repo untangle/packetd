@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/exec"
 	"reflect"
@@ -102,6 +103,21 @@ func Startup() {
 	engine.Static("/setup", "/www/setup")
 	engine.Static("/static", "/www/static")
 
+	prof := engine.Group("/pprof")
+	prof.Use(authRequired(engine))
+
+	prof.GET("/", pprofHandler(pprof.Index))
+	prof.GET("/cmdline", pprofHandler(pprof.Cmdline))
+	prof.GET("/profile", pprofHandler(pprof.Profile))
+	prof.POST("/symbol", pprofHandler(pprof.Symbol))
+	prof.GET("/symbol", pprofHandler(pprof.Symbol))
+	prof.GET("/trace", pprofHandler(pprof.Trace))
+	prof.GET("/block", pprofHandler(pprof.Handler("block").ServeHTTP))
+	prof.GET("/goroutine", pprofHandler(pprof.Handler("goroutine").ServeHTTP))
+	prof.GET("/heap", pprofHandler(pprof.Handler("heap").ServeHTTP))
+	prof.GET("/mutex", pprofHandler(pprof.Handler("mutex").ServeHTTP))
+	prof.GET("/threadcreate", pprofHandler(pprof.Handler("threadcreate").ServeHTTP))
+
 	// listen and serve on 0.0.0.0:80
 	go engine.Run(":80")
 
@@ -153,6 +169,13 @@ func debugHandler(c *gin.Context) {
 	var buffer bytes.Buffer
 	buffer = overseer.GenerateReport()
 	c.Data(http.StatusOK, "text/html; chareset=utf-8", buffer.Bytes())
+}
+
+func pprofHandler(h http.HandlerFunc) gin.HandlerFunc {
+	handler := http.HandlerFunc(h)
+	return func(c *gin.Context) {
+		handler.ServeHTTP(c.Writer, c.Request)
+	}
 }
 
 func reportsGetData(c *gin.Context) {
