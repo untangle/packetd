@@ -18,6 +18,7 @@ import (
 
 const settingsFile = "/etc/config/settings.json"
 const defaultsFile = "/etc/config/defaults.json"
+const currentFile = "/etc/config/current.json"
 
 // Startup settings service
 func Startup() {
@@ -26,6 +27,18 @@ func Startup() {
 // Shutdown settings service
 func Shutdown() {
 
+}
+
+// GetCurrentSettings returns the current settings from the specified path
+// the current settings are the settings after being synced
+func GetCurrentSettings(segments []string) (interface{}, error) {
+	// for backwards compatibility before we saved current.json
+	// if it does not exist, just read settings.json
+	// XXX this should be removed at some point in the future
+	if _, err := os.Stat(currentFile); os.IsNotExist(err) {
+		return GetSettingsFile(segments, settingsFile)
+	}
+	return GetSettingsFile(segments, currentFile)
 }
 
 // GetSettings returns the settings from the specified path
