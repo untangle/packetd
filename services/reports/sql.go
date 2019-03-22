@@ -226,7 +226,8 @@ func makeCategoriesSeriesSQLString(reportEntry *ReportEntry) (string, error) {
 		columns = append(columns, columnStr)
 	}
 	if len(columns) == 0 {
-		return "", errors.New("No values for series")
+		//return "", errors.New("No values for series")
+		return "SELECT null", nil
 	}
 	reportEntry.QuerySeries.Columns = columns
 
