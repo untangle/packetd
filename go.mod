@@ -6,7 +6,7 @@ require (
 	github.com/gin-contrib/location v0.0.0-20190301062650-0462caccbb9c
 	github.com/gin-contrib/sessions v0.0.0-20190226023029-1532893d996f
 	github.com/gin-gonic/contrib v0.0.0-20190302003538-54ff787f7c73
-	github.com/gin-gonic/gin v1.3.0
+	github.com/gin-gonic/gin v1.3.1-0.20190321071206-1d462bbe3713
 	github.com/google/gopacket v1.1.16
 	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/oschwald/geoip2-golang v1.2.1
