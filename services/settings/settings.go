@@ -9,9 +9,11 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/untangle/packetd/services/logger"
 )
@@ -357,7 +359,7 @@ func runSyncSettings(filename string) (string, error) {
 // if sync-settings does not succeed it returns the error and output
 // returns stdout, stderr, and an error
 func syncAndSave(jsonObject map[string]interface{}, filename string) (string, error) {
-	tmpfile, err := ioutil.TempFile("", "settings.json.")
+	tmpfile, err := tempFile("", "settings.json.")
 	if err != nil {
 		logger.Warn("Failed to generate tmpfile: %v\n", err.Error())
 		return "Failed to generate tmpfile.", err
@@ -396,4 +398,29 @@ func syncAndSave(jsonObject map[string]interface{}, filename string) (string, er
 	}
 
 	return output, nil
+}
+
+// tempFile is similar to ioutil.TempFile
+// except with more permissive permissions
+func tempFile(dir, pattern string) (f *os.File, err error) {
+	if dir == "" {
+		dir = os.TempDir()
+	}
+
+	var prefix, suffix string
+	if pos := strings.LastIndex(pattern, "*"); pos != -1 {
+		prefix, suffix = pattern[:pos], pattern[pos+1:]
+	} else {
+		prefix = pattern
+	}
+
+	for i := 0; i < 10000; i++ {
+		name := filepath.Join(dir, prefix+strconv.FormatInt(time.Now().Unix()-int64(i), 10)+suffix)
+		f, err = os.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
+		if os.IsExist(err) {
+			continue
+		}
+		break
+	}
+	return
 }
