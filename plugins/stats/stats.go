@@ -15,31 +15,30 @@ import (
 	"github.com/untangle/packetd/services/settings"
 )
 
-type statsBucket int
-
-const bucketCount = 20
-
+// const values used as index for the different stats we track for each interface
+// iota starts with zero so bucketCount at the end gives us the correct array size
 const (
-	passiveLatency  statsBucket = 0
-	activeLatency               = 1
-	combinedLatency             = 2
-	pingTimeout                 = 3
-	rxBytes                     = 4
-	rxPackets                   = 5
-	rxErrors                    = 6
-	rxDrop                      = 7
-	rxFifo                      = 8
-	rxFrame                     = 9
-	rxCompressed                = 10
-	rxMulticast                 = 11
-	txBytes                     = 12
-	txPackets                   = 13
-	txErrors                    = 14
-	txDrop                      = 15
-	txFifo                      = 16
-	txCollision                 = 17
-	txCarrier                   = 18
-	txCompressed                = 19
+	passiveLatency int = iota
+	activeLatency
+	combinedLatency
+	pingTimeout
+	rxBytes
+	rxPackets
+	rxErrors
+	rxDrop
+	rxFifo
+	rxFrame
+	rxCompressed
+	rxMulticast
+	txBytes
+	txPackets
+	txErrors
+	txDrop
+	txFifo
+	txCollision
+	txCarrier
+	txCompressed
+	bucketCount // this identifier should always be last
 )
 
 const pluginName = "stats"
