@@ -7,13 +7,13 @@ import (
 	"github.com/untangle/packetd/services/logger"
 )
 
-// MetricJSON stores an invididual metric for a stat
+// MetricJSON stores an individual metric for a stat
 type MetricJSON struct {
 	Name  string  `json:"name"`
 	Value float64 `json:"value"`
 }
 
-// StatisticJSON stores an invididual stat
+// StatisticJSON stores an individual stat
 type StatisticJSON struct {
 	Name    string       `json:"name"`
 	Unit    string       `json:"unit"`
@@ -47,13 +47,13 @@ func MakeInterfaceStatsJSON(interfaceID int, latency1 float64, latency5 float64,
 	istats.InterfaceID = interfaceID
 
 	latencyMetrics := []MetricJSON{
-		MetricJSON{
+		{
 			Name:  "1_minute",
 			Value: latency1,
-		}, MetricJSON{
+		}, {
 			Name:  "5_minute",
 			Value: latency5,
-		}, MetricJSON{
+		}, {
 			Name:  "15_minute",
 			Value: latency15,
 		},
@@ -61,25 +61,25 @@ func MakeInterfaceStatsJSON(interfaceID int, latency1 float64, latency5 float64,
 	latencyStats := MakeStatisticJSON("latency", "ms", latencyMetrics)
 
 	fakeMetrics100 := []MetricJSON{
-		MetricJSON{
+		{
 			Name:  "1_minute",
 			Value: 100.0,
-		}, MetricJSON{
+		}, {
 			Name:  "5_minute",
 			Value: 100.0,
-		}, MetricJSON{
+		}, {
 			Name:  "15_minute",
 			Value: 100.0,
 		},
 	}
 	fakeMetrics0 := []MetricJSON{
-		MetricJSON{
+		{
 			Name:  "1_minute",
 			Value: 0.0,
-		}, MetricJSON{
+		}, {
 			Name:  "5_minute",
 			Value: 0.0,
-		}, MetricJSON{
+		}, {
 			Name:  "15_minute",
 			Value: 0.0,
 		},
