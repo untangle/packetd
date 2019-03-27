@@ -3,6 +3,7 @@ package stats
 import (
 	"fmt"
 	"math"
+	"sync/atomic"
 	"time"
 
 	"github.com/untangle/packetd/services/logger"
@@ -26,10 +27,11 @@ type ExponentialAverage struct {
 
 // Collector collects all the stats for a given interface
 type Collector struct {
-	Latency1Min     ExponentialAverage
-	Latency5Min     ExponentialAverage
-	Latency15Min    ExponentialAverage
-	LatencyVariance RunningVariance
+	Avg1Min       ExponentialAverage
+	Avg5Min       ExponentialAverage
+	Avg15Min      ExponentialAverage
+	Variance      RunningVariance
+	activityCount uint64
 }
 
 func (rv *RunningVariance) String() string {
@@ -46,32 +48,39 @@ func (c *Collector) MakeCopy() Collector {
 	return newc
 }
 
+// GetActivityCount safely returns the activity count when the Mutex is not locked
+func (c *Collector) GetActivityCount() uint64 {
+	return atomic.LoadUint64(&c.activityCount)
+}
+
 // AddDataPointLimited adds a new datapoint to a collector
 // if it falls within the std deviation limit
 func (c *Collector) AddDataPointLimited(value float64, deviationLimit float64) {
-	c.LatencyVariance.AdjustVariance(value)
+	atomic.AddUint64(&c.activityCount, 1)
+	c.Variance.AdjustVariance(value)
 
-	diff := math.Abs(c.Latency1Min.Value - value)
-	if diff > (deviationLimit * c.LatencyVariance.StdDeviation) {
-		logger.Debug("Ignoring data value: %f (diff: %f) (var: %f)\n", value, diff, c.LatencyVariance.StdDeviation)
+	diff := math.Abs(c.Avg1Min.Value - value)
+	if diff > (deviationLimit * c.Variance.StdDeviation) {
+		logger.Debug("Ignoring data value: %f (diff: %f) (var: %f)\n", value, diff, c.Variance.StdDeviation)
 	} else {
-		c.Latency1Min.AdjustExpAvg(value)
-		c.Latency5Min.AdjustExpAvg(value)
-		c.Latency15Min.AdjustExpAvg(value)
+		c.Avg1Min.AdjustExpAvg(value)
+		c.Avg5Min.AdjustExpAvg(value)
+		c.Avg15Min.AdjustExpAvg(value)
 		logger.Debug("Adding new datapoint: %f 1m: %s 5m: %s 15m: %s var: %s\n", value,
-			c.Latency1Min.String(), c.Latency5Min.String(), c.Latency15Min.String(), c.LatencyVariance.String())
+			c.Avg1Min.String(), c.Avg5Min.String(), c.Avg15Min.String(), c.Variance.String())
 	}
 }
 
 // AddDataPoint adds a new datapoint to a collector
 // if it falls within the std deviation limit
 func (c *Collector) AddDataPoint(value float64) {
-	c.Latency1Min.AdjustExpAvg(value)
-	c.Latency5Min.AdjustExpAvg(value)
-	c.Latency15Min.AdjustExpAvg(value)
-	c.LatencyVariance.AdjustVariance(value)
+	atomic.AddUint64(&c.activityCount, 1)
+	c.Avg1Min.AdjustExpAvg(value)
+	c.Avg5Min.AdjustExpAvg(value)
+	c.Avg15Min.AdjustExpAvg(value)
+	c.Variance.AdjustVariance(value)
 	logger.Debug("Adding new datapoint: %f 1m: %s 5m: %s 15m: %s var: %s\n", value,
-		c.Latency1Min.String(), c.Latency5Min.String(), c.Latency15Min.String(), c.LatencyVariance.String())
+		c.Avg1Min.String(), c.Avg5Min.String(), c.Avg15Min.String(), c.Variance.String())
 }
 
 // AdjustExpAvg adjust the exponential running average with the new datapoint
@@ -111,22 +120,22 @@ func CreateCollector() *Collector {
 	c := new(Collector)
 
 	now := time.Now()
-	c.Latency1Min = ExponentialAverage{
+	c.Avg1Min = ExponentialAverage{
 		TimeframeMilliSeconds:  60 * 1000.0,
 		LastDatapointTimestamp: now,
 		CreationTime:           now,
 	}
-	c.Latency5Min = ExponentialAverage{
+	c.Avg5Min = ExponentialAverage{
 		TimeframeMilliSeconds:  5 * 60 * 1000.0,
 		LastDatapointTimestamp: now,
 		CreationTime:           now,
 	}
-	c.Latency15Min = ExponentialAverage{
+	c.Avg5Min = ExponentialAverage{
 		TimeframeMilliSeconds:  15 * 60 * 1000.0,
 		LastDatapointTimestamp: now,
 		CreationTime:           now,
 	}
-	c.LatencyVariance = RunningVariance{
+	c.Variance = RunningVariance{
 		Alpha:    .01,
 		Mean:     0.0,
 		Variance: 0.0,
