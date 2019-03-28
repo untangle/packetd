@@ -44,7 +44,9 @@ const (
 const pluginName = "stats"
 const interfaceStatLogIntervalSec = 10
 const pingCheckIntervalSec = 5
-const pingCheckTarget = "www.google.com"
+const pingCheckTimeoutSec = 5
+
+var pingCheckTargets = [...]string{"www.google.com", "8.8.8.8", "1.1.1.1"}
 
 var statsCollector [256][bucketCount]*Collector
 var statsLocker [256]sync.Mutex
@@ -581,17 +583,19 @@ func pingTask() {
 				if value.pingMode == protoIGNORE {
 					continue
 				}
-				collectPingSample(value)
+				for x := 0; x < len(pingCheckTargets); x++ {
+					collectPingSample(value, pingCheckTargets[x])
+				}
 			}
 			interfaceInfoLocker.RUnlock()
 		}
 	}
 }
 
-func collectPingSample(detail *interfaceDetail) {
-	logger.Debug("Pinging %s with interfaceDetail[%v]\n", pingCheckTarget, *detail)
+func collectPingSample(detail *interfaceDetail, target string) {
+	logger.Debug("Pinging %s with interfaceDetail[%v]\n", target, *detail)
 
-	duration, err := pingNetworkAddress(detail.pingMode, detail.netAddress, pingCheckTarget)
+	duration, err := pingNetworkAddress(detail.pingMode, detail.netAddress, target)
 
 	if err != nil {
 		if strings.Contains(err.Error(), "i/o timeout") {
