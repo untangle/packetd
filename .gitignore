@@ -1,4 +1,3 @@
-./packetd
 cmd/packetd/packetd
 cmd/packetd/packetd-*
 cmd/settingsd/settingsd*
