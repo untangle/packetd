@@ -84,7 +84,7 @@ func pingNetworkAddress(protocol int, localAddr string, targetAddr string) (time
 		return 0, err
 	}
 
-	conn.SetReadDeadline(time.Now().Add(time.Millisecond * 1000 * pingCheckTimeoutSec))
+	conn.SetReadDeadline(time.Now().Add(time.Millisecond * 2000))
 	size, peer, err := conn.ReadFrom(buffer)
 
 	duration := time.Since(transmit)

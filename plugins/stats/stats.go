@@ -15,41 +15,18 @@ import (
 	"github.com/untangle/packetd/services/settings"
 )
 
-// const values used as index for the different stats we track for each interface
-// iota starts with zero so bucketCount at the end gives us the correct array size
-const (
-	passiveLatency int = iota
-	activeLatency
-	combinedLatency
-	pingTimeout
-	rxBytes
-	rxPackets
-	rxErrors
-	rxDrop
-	rxFifo
-	rxFrame
-	rxCompressed
-	rxMulticast
-	txBytes
-	txPackets
-	txErrors
-	txDrop
-	txFifo
-	txCollision
-	txCarrier
-	txCompressed
-	bucketCount // this identifier should always be last
-)
-
 const pluginName = "stats"
 const interfaceStatLogIntervalSec = 10
 const pingCheckIntervalSec = 5
-const pingCheckTimeoutSec = 5
+const pingCheckTarget = "www.google.com"
 
-var pingCheckTargets = [...]string{"www.google.com", "8.8.8.8", "1.1.1.1"}
+var statsCollector [256]*Collector
+var passiveCollector [256]*Collector
+var activeCollector [256]*Collector
 
-var statsCollector [256][bucketCount]*Collector
 var statsLocker [256]sync.Mutex
+var passiveLocker [256]sync.Mutex
+var activeLocker [256]sync.Mutex
 
 var interfaceInfoMap map[string]*interfaceDetail
 var interfaceInfoLocker sync.RWMutex
@@ -86,10 +63,10 @@ func PluginStartup() {
 	randGen = rand.New(randSrc)
 
 	for x := 0; x < 256; x++ {
-		for y := 0; y < bucketCount; y++ {
-			statsCollector[x][y] = CreateCollector()
-			interfaceMetricList[x] = new(interfaceMetric)
-		}
+		statsCollector[x] = CreateCollector()
+		passiveCollector[x] = CreateCollector()
+		activeCollector[x] = CreateCollector()
+		interfaceMetricList[x] = new(interfaceMetric)
 	}
 
 	interfaceStatsMap = make(map[string]*linux.NetworkStat)
@@ -177,9 +154,11 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	logger.Debug("Logging passive latency: %d, %v, %v ms\n", interfaceID, mess.Session.GetServerSideTuple().ServerAddress, (duration.Nanoseconds() / 1000000))
 
 	statsLocker[interfaceID].Lock()
-	statsCollector[interfaceID][combinedLatency].AddDataPointLimited(float64(duration.Nanoseconds())/1000000.0, 2.0)
-	statsCollector[interfaceID][passiveLatency].AddDataPointLimited(float64(duration.Nanoseconds())/1000000.0, 2.0)
+	passiveLocker[interfaceID].Lock()
+	statsCollector[interfaceID].AddDataPointLimited(float64(duration.Nanoseconds())/1000000.0, 2.0)
+	passiveCollector[interfaceID].AddDataPointLimited(float64(duration.Nanoseconds())/1000000.0, 2.0)
 	statsLocker[interfaceID].Unlock()
+	passiveLocker[interfaceID].Unlock()
 
 	return result
 }
@@ -193,16 +172,17 @@ func interfaceTask() {
 			return
 		case <-time.After(time.Second * time.Duration(interfaceStatLogIntervalSec)):
 			logger.Debug("Collecting interface statistics\n")
-			collectInterfaceStats()
-			writeLatencyStatsFile()
+			collectInterfaceStats(interfaceStatLogIntervalSec)
 		}
 	}
 }
 
 // collectInterfaceStats gets the stats for every interface and then
 // calculates and logs the difference since the last time it was called
-func collectInterfaceStats() {
+func collectInterfaceStats(seconds uint64) {
 	var statInfo *linux.NetworkStat
+	var diffInfo linux.NetworkStat
+	var istats []InterfaceStatsJSON
 
 	procData, err := linux.ReadNetworkStat("/proc/net/dev")
 	if err != nil {
@@ -214,15 +194,8 @@ func collectInterfaceStats() {
 		item := procData[i]
 
 		// ignore loopback and dummy interfaces
-		if item.Iface == "lo" || strings.HasPrefix(item.Iface, "dummy") {
-			continue
-		}
-
-		// convert the interface name to the ID value
-		interfaceID := getInterfaceIDValue(item.Iface)
-
-		// ignore if we didn't find a valid interface ID value
-		if interfaceID < 0 {
+		if item.Iface == "lo" ||
+			strings.HasPrefix(item.Iface, "dummy") {
 			continue
 		}
 
@@ -250,151 +223,121 @@ func collectInterfaceStats() {
 			statInfo.TxCompressed = item.TxCompressed
 			interfaceStatsMap[item.Iface] = statInfo
 		} else {
-			// found the interface entry so lock collector and calculate changes since last time
-			statsLocker[interfaceID].Lock()
-			statsCollector[interfaceID][rxBytes].AddDataPoint(float64(calculateDifference(statInfo.RxBytes, item.RxBytes)))
-			statsCollector[interfaceID][rxPackets].AddDataPoint(float64(calculateDifference(statInfo.RxPackets, item.RxPackets)))
-			statsCollector[interfaceID][rxErrors].AddDataPoint(float64(calculateDifference(statInfo.RxErrs, item.RxErrs)))
-			statsCollector[interfaceID][rxDrop].AddDataPoint(float64(calculateDifference(statInfo.RxDrop, item.RxDrop)))
-			statsCollector[interfaceID][rxFifo].AddDataPoint(float64(calculateDifference(statInfo.RxFifo, item.RxFifo)))
-			statsCollector[interfaceID][rxFrame].AddDataPoint(float64(calculateDifference(statInfo.RxFrame, item.RxFrame)))
-			statsCollector[interfaceID][rxCompressed].AddDataPoint(float64(calculateDifference(statInfo.RxCompressed, item.RxCompressed)))
-			statsCollector[interfaceID][rxMulticast].AddDataPoint(float64(calculateDifference(statInfo.RxMulticast, item.RxMulticast)))
-			statsCollector[interfaceID][txBytes].AddDataPoint(float64(calculateDifference(statInfo.TxBytes, item.TxBytes)))
-			statsCollector[interfaceID][txPackets].AddDataPoint(float64(calculateDifference(statInfo.TxPackets, item.TxPackets)))
-			statsCollector[interfaceID][txErrors].AddDataPoint(float64(calculateDifference(statInfo.TxErrs, item.TxErrs)))
-			statsCollector[interfaceID][txDrop].AddDataPoint(float64(calculateDifference(statInfo.TxDrop, item.TxDrop)))
-			statsCollector[interfaceID][txFifo].AddDataPoint(float64(calculateDifference(statInfo.TxFifo, item.TxFifo)))
-			statsCollector[interfaceID][txCollision].AddDataPoint(float64(calculateDifference(statInfo.TxColls, item.TxColls)))
-			statsCollector[interfaceID][txCarrier].AddDataPoint(float64(calculateDifference(statInfo.TxCarrier, item.TxCarrier)))
-			statsCollector[interfaceID][txCompressed].AddDataPoint(float64(calculateDifference(statInfo.TxCompressed, item.TxCompressed)))
+			// found the interface entry so calculate the difference since last time
+			diffInfo.Iface = item.Iface
+			diffInfo.RxBytes = calculateDifference(statInfo.RxBytes, item.RxBytes)
+			diffInfo.RxPackets = calculateDifference(statInfo.RxPackets, item.RxPackets)
+			diffInfo.RxErrs = calculateDifference(statInfo.RxErrs, item.RxErrs)
+			diffInfo.RxDrop = calculateDifference(statInfo.RxDrop, item.RxDrop)
+			diffInfo.RxFifo = calculateDifference(statInfo.RxFifo, item.RxFifo)
+			diffInfo.RxFrame = calculateDifference(statInfo.RxFrame, item.RxFrame)
+			diffInfo.RxCompressed = calculateDifference(statInfo.RxCompressed, item.RxCompressed)
+			diffInfo.RxMulticast = calculateDifference(statInfo.RxMulticast, item.RxMulticast)
+			diffInfo.TxBytes = calculateDifference(statInfo.TxBytes, item.TxBytes)
+			diffInfo.TxPackets = calculateDifference(statInfo.TxPackets, item.TxPackets)
+			diffInfo.TxErrs = calculateDifference(statInfo.TxErrs, item.TxErrs)
+			diffInfo.TxDrop = calculateDifference(statInfo.TxDrop, item.TxDrop)
+			diffInfo.TxFifo = calculateDifference(statInfo.TxFifo, item.TxFifo)
+			diffInfo.TxColls = calculateDifference(statInfo.TxColls, item.TxColls)
+			diffInfo.TxCarrier = calculateDifference(statInfo.TxCarrier, item.TxCarrier)
+			diffInfo.TxCompressed = calculateDifference(statInfo.TxCompressed, item.TxCompressed)
 
 			// replace the current stats map object with the one returned from ReadNetworkStat
 			interfaceStatsMap[item.Iface] = &item
 
-			// calculate the difference for other metrics we track for each interface
-			interfaceMetricLocker.Lock()
-			metric := calculateMetrics(interfaceMetricList[interfaceID])
-			statsCollector[interfaceID][pingTimeout].AddDataPoint(float64(metric.PingTimeout))
-			interfaceMetricLocker.Unlock()
+			// convert the interface name to the ID value
+			interfaceID := getInterfaceIDValue(diffInfo.Iface)
 
-			// log the interface stats and unlock
-			logInterfaceStats(interfaceID, item.Iface)
-			statsLocker[interfaceID].Unlock()
+			// negative return means we don't know the ID so we set latency to zero
+			// otherwise we get the total moving average
+			if interfaceID < 0 {
+				logger.Debug("Skipping unknown interface: %s\n", diffInfo.Iface)
+			} else {
+
+				// calculate the difference for other metrics we track for each interface
+				interfaceMetricLocker.Lock()
+				metric := calculateMetrics(interfaceMetricList[interfaceID])
+				interfaceMetricLocker.Unlock()
+
+				// get copies of the three latency collectors
+				statsLocker[interfaceID].Lock()
+				combo := statsCollector[interfaceID].MakeCopy()
+				statsLocker[interfaceID].Unlock()
+
+				passiveLocker[interfaceID].Lock()
+				passive := passiveCollector[interfaceID].MakeCopy()
+				passiveLocker[interfaceID].Unlock()
+
+				activeLocker[interfaceID].Lock()
+				active := activeCollector[interfaceID].MakeCopy()
+				activeLocker[interfaceID].Unlock()
+
+				istat := MakeInterfaceStatsJSON(interfaceID, combo.Latency1Min.Value, combo.Latency5Min.Value, combo.Latency15Min.Value)
+				istats = append(istats, istat)
+
+				logInterfaceStats(seconds, interfaceID, combo, passive, active, &diffInfo, &metric)
+			}
 		}
-	}
-}
-
-func logInterfaceStats(ival int, iname string) {
-	columns := map[string]interface{}{
-		"time_stamp":                time.Now(),
-		"interface_id":              ival,
-		"device_name":               iname,
-		"combined_latency_1":        statsCollector[ival][combinedLatency].Avg1Min.Value,
-		"combined_latency_5":        statsCollector[ival][combinedLatency].Avg5Min.Value,
-		"combined_latency_15":       statsCollector[ival][combinedLatency].Avg15Min.Value,
-		"combined_latency_variance": statsCollector[ival][combinedLatency].Variance.StdDeviation,
-		"passive_latency_1":         statsCollector[ival][passiveLatency].Avg1Min.Value,
-		"passive_latency_5":         statsCollector[ival][passiveLatency].Avg5Min.Value,
-		"passive_latency_15":        statsCollector[ival][passiveLatency].Avg15Min.Value,
-		"passive_latency_variance":  statsCollector[ival][passiveLatency].Variance.StdDeviation,
-		"active_latency_1":          statsCollector[ival][activeLatency].Avg1Min.Value,
-		"active_latency_5":          statsCollector[ival][activeLatency].Avg5Min.Value,
-		"active_latency_15":         statsCollector[ival][activeLatency].Avg15Min.Value,
-		"active_latency_variance":   statsCollector[ival][activeLatency].Variance.StdDeviation,
-		"ping_timeout_1":            statsCollector[ival][pingTimeout].Avg1Min.Value,
-		"ping_timeout_5":            statsCollector[ival][pingTimeout].Avg5Min.Value,
-		"ping_timeout_15":           statsCollector[ival][pingTimeout].Avg15Min.Value,
-		"ping_timeout_variance":     statsCollector[ival][pingTimeout].Variance.StdDeviation,
-		"rx_bytes_1":                statsCollector[ival][rxBytes].Avg1Min.Value,
-		"rx_bytes_5":                statsCollector[ival][rxBytes].Avg5Min.Value,
-		"rx_bytes_15":               statsCollector[ival][rxBytes].Avg15Min.Value,
-		"rx_bytes_variance":         statsCollector[ival][rxBytes].Variance.StdDeviation,
-		"rx_packets_1":              statsCollector[ival][rxPackets].Avg1Min.Value,
-		"rx_packets_5":              statsCollector[ival][rxPackets].Avg5Min.Value,
-		"rx_packets_15":             statsCollector[ival][rxPackets].Avg15Min.Value,
-		"rx_packets_variance":       statsCollector[ival][rxPackets].Variance.StdDeviation,
-		"rx_errors_1":               statsCollector[ival][rxErrors].Avg1Min.Value,
-		"rx_errors_5":               statsCollector[ival][rxErrors].Avg5Min.Value,
-		"rx_errors_15":              statsCollector[ival][rxErrors].Avg15Min.Value,
-		"rx_errors_variance":        statsCollector[ival][rxErrors].Variance.StdDeviation,
-		"rx_drop_1":                 statsCollector[ival][rxDrop].Avg1Min.Value,
-		"rx_drop_5":                 statsCollector[ival][rxDrop].Avg5Min.Value,
-		"rx_drop_15":                statsCollector[ival][rxDrop].Avg15Min.Value,
-		"rx_drop_variance":          statsCollector[ival][rxDrop].Variance.StdDeviation,
-		"rx_fifo_1":                 statsCollector[ival][rxFifo].Avg1Min.Value,
-		"rx_fifo_5":                 statsCollector[ival][rxFifo].Avg5Min.Value,
-		"rx_fifo_15":                statsCollector[ival][rxFifo].Avg15Min.Value,
-		"rx_fifo_variance":          statsCollector[ival][rxFifo].Variance.StdDeviation,
-		"rx_frame_1":                statsCollector[ival][rxFrame].Avg1Min.Value,
-		"rx_frame_5":                statsCollector[ival][rxFrame].Avg5Min.Value,
-		"rx_frame_15":               statsCollector[ival][rxFrame].Avg15Min.Value,
-		"rx_frame_variance":         statsCollector[ival][rxFrame].Variance.StdDeviation,
-		"rx_compressed_1":           statsCollector[ival][rxCompressed].Avg1Min.Value,
-		"rx_compressed_5":           statsCollector[ival][rxCompressed].Avg5Min.Value,
-		"rx_compressed_15":          statsCollector[ival][rxCompressed].Avg15Min.Value,
-		"rx_compressed_variance":    statsCollector[ival][rxCompressed].Variance.StdDeviation,
-		"rx_multicast_1":            statsCollector[ival][rxMulticast].Avg1Min.Value,
-		"rx_multicast_5":            statsCollector[ival][rxMulticast].Avg5Min.Value,
-		"rx_multicast_15":           statsCollector[ival][rxMulticast].Avg15Min.Value,
-		"rx_multicast_variance":     statsCollector[ival][rxMulticast].Variance.StdDeviation,
-		"tx_bytes_1":                statsCollector[ival][txBytes].Avg1Min.Value,
-		"tx_bytes_5":                statsCollector[ival][txBytes].Avg5Min.Value,
-		"tx_bytes_15":               statsCollector[ival][txBytes].Avg15Min.Value,
-		"tx_bytes_variance":         statsCollector[ival][txBytes].Variance.StdDeviation,
-		"tx_packets_1":              statsCollector[ival][txPackets].Avg1Min.Value,
-		"tx_packets_5":              statsCollector[ival][txPackets].Avg5Min.Value,
-		"tx_packets_15":             statsCollector[ival][txPackets].Avg15Min.Value,
-		"tx_packets_variance":       statsCollector[ival][txPackets].Variance.StdDeviation,
-		"tx_errors_1":               statsCollector[ival][txErrors].Avg1Min.Value,
-		"tx_errors_5":               statsCollector[ival][txErrors].Avg5Min.Value,
-		"tx_errors_15":              statsCollector[ival][txErrors].Avg15Min.Value,
-		"tx_errors_variance":        statsCollector[ival][txErrors].Variance.StdDeviation,
-		"tx_drop_1":                 statsCollector[ival][txDrop].Avg1Min.Value,
-		"tx_drop_5":                 statsCollector[ival][txDrop].Avg5Min.Value,
-		"tx_drop_15":                statsCollector[ival][txDrop].Avg15Min.Value,
-		"tx_drop_variance":          statsCollector[ival][txDrop].Variance.StdDeviation,
-		"tx_fifo_1":                 statsCollector[ival][txFifo].Avg1Min.Value,
-		"tx_fifo_5":                 statsCollector[ival][txFifo].Avg5Min.Value,
-		"tx_fifo_15":                statsCollector[ival][txFifo].Avg15Min.Value,
-		"tx_fifo_variance":          statsCollector[ival][txFifo].Variance.StdDeviation,
-		"tx_collision_1":            statsCollector[ival][txCollision].Avg1Min.Value,
-		"tx_collision_5":            statsCollector[ival][txCollision].Avg5Min.Value,
-		"tx_collision_15":           statsCollector[ival][txCollision].Avg15Min.Value,
-		"tx_collision_variance":     statsCollector[ival][txCollision].Variance.StdDeviation,
-		"tx_carrier_1":              statsCollector[ival][txCarrier].Avg1Min.Value,
-		"tx_carrier_5":              statsCollector[ival][txCarrier].Avg5Min.Value,
-		"tx_carrier_15":             statsCollector[ival][txCarrier].Avg15Min.Value,
-		"tx_carrier_variance":       statsCollector[ival][txCarrier].Variance.StdDeviation,
-		"tx_compressed_1":           statsCollector[ival][txCompressed].Avg1Min.Value,
-		"tx_compressed_5":           statsCollector[ival][txCompressed].Avg5Min.Value,
-		"tx_compressed_15":          statsCollector[ival][txCompressed].Avg15Min.Value,
-		"tx_compressed_variance":    statsCollector[ival][txCompressed].Variance.StdDeviation,
-	}
-
-	reports.LogEvent(reports.CreateEvent("interface_stats", "interface_stats", 1, columns, nil))
-}
-
-// writeLatencyStatsFile writes the interface latency stats to a special JSON file
-func writeLatencyStatsFile() {
-	var istats []InterfaceStatsJSON
-
-	for iface := 0; iface < 256; iface++ {
-		// ignore interface if we haven't captured any activity
-		if statsCollector[iface][combinedLatency].GetActivityCount() == 0 {
-			continue
-		}
-
-		statsLocker[iface].Lock()
-		combo := statsCollector[iface][combinedLatency].MakeCopy()
-		statsLocker[iface].Unlock()
-
-		istat := MakeInterfaceStatsJSON(iface, combo.Avg1Min.Value, combo.Avg5Min.Value, combo.Avg15Min.Value)
-		istats = append(istats, istat)
 	}
 
 	allstats := MakeStatsJSON(istats)
 	WriteStatsJSON(allstats)
+}
+
+func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive Collector, active Collector, diffInfo *linux.NetworkStat, diffMetric *interfaceMetric) {
+	columns := map[string]interface{}{
+		"time_stamp":               time.Now(),
+		"interface_id":             interfaceID,
+		"device_name":              diffInfo.Iface,
+		"latency_1":                combo.Latency1Min.Value,
+		"latency_5":                combo.Latency5Min.Value,
+		"latency_15":               combo.Latency15Min.Value,
+		"latency_variance":         combo.LatencyVariance.StdDeviation,
+		"passive_latency_1":        passive.Latency1Min.Value,
+		"passive_latency_5":        passive.Latency5Min.Value,
+		"passive_latency_15":       passive.Latency15Min.Value,
+		"passive_latency_variance": passive.LatencyVariance.StdDeviation,
+		"active_latency_1":         active.Latency1Min.Value,
+		"active_latency_5":         active.Latency5Min.Value,
+		"active_latency_15":        active.Latency15Min.Value,
+		"active_latency_variance":  active.LatencyVariance.StdDeviation,
+		"ping_timeout":             diffMetric.PingTimeout,
+		"ping_timeout_rate":        diffMetric.PingTimeout / seconds,
+		"rx_bytes":                 diffInfo.RxBytes,
+		"rx_bytes_rate":            diffInfo.RxBytes / seconds,
+		"rx_packets":               diffInfo.RxPackets,
+		"rx_packets_rate":          diffInfo.RxPackets / seconds,
+		"rx_errs":                  diffInfo.RxErrs,
+		"rx_errs_rate":             diffInfo.RxErrs / seconds,
+		"rx_drop":                  diffInfo.RxDrop,
+		"rx_drop_rate":             diffInfo.RxDrop / seconds,
+		"rx_fifo":                  diffInfo.RxFifo,
+		"rx_fifo_rate":             diffInfo.RxFifo / seconds,
+		"rx_frame":                 diffInfo.RxFrame,
+		"rx_frame_rate":            diffInfo.RxFrame / seconds,
+		"rx_compressed":            diffInfo.RxCompressed,
+		"rx_compressed_rate":       diffInfo.RxCompressed / seconds,
+		"rx_multicast":             diffInfo.RxMulticast,
+		"rx_multicast_rate":        diffInfo.RxMulticast / seconds,
+		"tx_bytes":                 diffInfo.TxBytes,
+		"tx_bytes_rate":            diffInfo.TxBytes / seconds,
+		"tx_packets":               diffInfo.TxPackets,
+		"tx_packets_rate":          diffInfo.TxPackets / seconds,
+		"tx_errs":                  diffInfo.TxErrs,
+		"tx_errs_rate":             diffInfo.TxErrs / seconds,
+		"tx_drop":                  diffInfo.TxDrop,
+		"tx_drop_rate":             diffInfo.TxDrop / seconds,
+		"tx_fifo":                  diffInfo.TxFifo,
+		"tx_fifo_rate":             diffInfo.TxFifo / seconds,
+		"tx_colls":                 diffInfo.TxColls,
+		"tx_colls_rate":            diffInfo.TxColls / seconds,
+		"tx_carrier":               diffInfo.TxCarrier,
+		"tx_carrier_rate":          diffInfo.TxCarrier / seconds,
+		"tx_compressed":            diffInfo.TxCompressed,
+		"tx_compressed_rate":       diffInfo.TxCompressed / seconds,
+	}
+
+	reports.LogEvent(reports.CreateEvent("interface_stats", "interface_stats", 1, columns, nil))
 }
 
 // calculateDifference determines the difference between the two argumented values
@@ -583,19 +526,17 @@ func pingTask() {
 				if value.pingMode == protoIGNORE {
 					continue
 				}
-				for x := 0; x < len(pingCheckTargets); x++ {
-					collectPingSample(value, pingCheckTargets[x])
-				}
+				collectPingSample(value)
 			}
 			interfaceInfoLocker.RUnlock()
 		}
 	}
 }
 
-func collectPingSample(detail *interfaceDetail, target string) {
-	logger.Debug("Pinging %s with interfaceDetail[%v]\n", target, *detail)
+func collectPingSample(detail *interfaceDetail) {
+	logger.Debug("Pinging %s with interfaceDetail[%v]\n", pingCheckTarget, *detail)
 
-	duration, err := pingNetworkAddress(detail.pingMode, detail.netAddress, target)
+	duration, err := pingNetworkAddress(detail.pingMode, detail.netAddress, pingCheckTarget)
 
 	if err != nil {
 		if strings.Contains(err.Error(), "i/o timeout") {
@@ -613,9 +554,11 @@ func collectPingSample(detail *interfaceDetail, target string) {
 	logger.Debug("Logging active latency: %d, %v, %v ms\n", detail.interfaceID, detail.netAddress, (duration.Nanoseconds() / 1000000))
 
 	statsLocker[detail.interfaceID].Lock()
-	statsCollector[detail.interfaceID][combinedLatency].AddDataPoint(float64(duration.Nanoseconds()) / 1000000.0)
-	statsCollector[detail.interfaceID][activeLatency].AddDataPoint(float64(duration.Nanoseconds()) / 1000000.0)
+	activeLocker[detail.interfaceID].Lock()
+	statsCollector[detail.interfaceID].AddDataPoint(float64(duration.Nanoseconds()) / 1000000.0)
+	activeCollector[detail.interfaceID].AddDataPoint(float64(duration.Nanoseconds()) / 1000000.0)
 	statsLocker[detail.interfaceID].Unlock()
+	activeLocker[detail.interfaceID].Unlock()
 }
 
 // We guesstimate the hop count based on the most common TTL values
