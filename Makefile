@@ -5,6 +5,8 @@ GOFLAGS ?= "-mod=vendor"
 all: build-packetd build-settingsd
 
 build-%:
-	cd cmd/$* ; go build $(GOFLAGS) -ldflags "-X main.Version=$(shell git describe --tags --always --long --dirty)"
+	cd cmd/$* ; \
+	export GO111MODULE=on ; \
+	go build $(GOFLAGS) -ldflags "-X main.Version=$(shell git describe --tags --always --long --dirty)"
 
 .PHONY: build
