@@ -115,11 +115,11 @@ func parseValue(arg string) interface{} {
 		}
 		return slices[1]
 	} else if strings.Contains(arg, "int: ") {
-		var temp uint32
+		var temp int32
 		fmt.Sscanf(arg, "int: %d", &temp)
 		value = temp
 	} else if strings.Contains(arg, "int64: ") {
-		var temp uint64
+		var temp int64
 		fmt.Sscanf(arg, "int64: %d", &temp)
 		value = temp
 	} else if strings.Contains(arg, "mac: ") {
@@ -212,10 +212,10 @@ func formatValue(value interface{}) string {
 	switch value.(type) {
 	case string:
 		return fmt.Sprintf("Value: %s", value.(string))
-	case uint32:
-		return fmt.Sprintf("Value: %d", value.(uint32))
-	case uint64:
-		return fmt.Sprintf("Value: %d", value.(uint64))
+	case int32:
+		return fmt.Sprintf("Value: %d", value.(int32))
+	case int64:
+		return fmt.Sprintf("Value: %d", value.(int64))
 	case net.HardwareAddr:
 		return fmt.Sprintf("Value: %s", value.(net.HardwareAddr).String())
 	case net.IP:
@@ -258,11 +258,11 @@ func (p Entry) GetString() (string, error) {
 // Given a dictionary Entry, return the entry's value field
 // as a 32bit integer.  If the entry's value is not a 32bit integer,
 // return an error
-func (p Entry) GetInt() (uint32, error) {
+func (p Entry) GetInt() (int32, error) {
 
 	switch p.Value.(type) {
-	case uint32:
-		return p.Value.(uint32), nil
+	case int32:
+		return p.Value.(int32), nil
 	default:
 		return 0, fmt.Errorf("GetInt: Requested value is not an integer")
 	}
@@ -272,11 +272,11 @@ func (p Entry) GetInt() (uint32, error) {
 // Given a dictionary Entry, return the entry's value field
 // as a 64bit integer.  If the entry's value is not a 64bit integer,
 // return an error
-func (p Entry) GetInt64() (uint64, error) {
+func (p Entry) GetInt64() (int64, error) {
 
 	switch p.Value.(type) {
-	case uint64:
-		return p.Value.(uint64), nil
+	case int64:
+		return p.Value.(int64), nil
 	default:
 		return 0, fmt.Errorf("GetInt64: Requested value is not a 64 bit integer")
 	}
@@ -395,12 +395,12 @@ func generateMac(value net.HardwareAddr) string {
 }
 
 // generateInt generates the int token for the dict proc write string
-func generateInt(value uint32) string {
+func generateInt(value int32) string {
 	return fmt.Sprintf("int=%d", value)
 }
 
 // generateInt64 generates the int token for the dict proc write string
-func generateInt64(value uint64) string {
+func generateInt64(value int64) string {
 	return fmt.Sprintf("int64=%d", value)
 }
 
@@ -434,10 +434,20 @@ func generateValue(value interface{}) string {
 		return generateIP6(value.(net.IP))
 	case bool:
 		return generateBool(value.(bool))
+	case int8:
+		return generateInt(int32((value.(int8))))
+	case uint8:
+		return generateInt(int32((value.(uint8))))
+	case int16:
+		return generateInt(int32((value.(int16))))
+	case uint16:
+		return generateInt(int32((value.(uint16))))
+	case int32:
+		return generateInt((value.(int32)))
 	case uint32:
-		return generateInt(value.(uint32))
-	case uint64:
-		return generateInt64(value.(uint64))
+		return generateInt64(int64(value.(uint32)))
+	case int64:
+		return generateInt64(value.(int64))
 	default:
 		return ""
 	}
@@ -491,29 +501,6 @@ func generateKey(key interface{}) string {
 // AddEntry adds a field/value entry for the supplied key in the supplied table
 func AddEntry(table string, key interface{}, field string, value interface{}) error {
 	var setstr string
-
-	// FIXME
-	// there is a bug with ints currently
-	// We don't handle <32-bit ints...
-	// kern.log spews "top_write: Insuffient input"
-	// Checking in this awful code for now
-	// XXX do we handled signed vs unsigned?
-	ui8, ok := value.(uint8)
-	if ok {
-		value = uint32(ui8)
-	}
-	ui16, ok := value.(uint16)
-	if ok {
-		value = uint32(ui16)
-	}
-	i8, ok := value.(int8)
-	if ok {
-		value = uint32(i8)
-	}
-	i16, ok := value.(int16)
-	if ok {
-		value = uint32(i16)
-	}
 
 	switch value.(type) {
 	case string:
