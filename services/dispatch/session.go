@@ -32,7 +32,7 @@ type Session struct {
 	*/
 
 	// sessionID is the globally unique ID for this session (created in packetd)
-	sessionID uint64
+	sessionID int64
 
 	// used to keep track of the session packet, byte, and event counts
 	packetCount uint64
@@ -91,7 +91,7 @@ var sessionTable map[uint32]*Session
 var sessionMutex sync.Mutex
 
 // sessionIndex stores the next available unique SessionID
-var sessionIndex uint64
+var sessionIndex int64
 
 // PutAttachment is used to safely add an attachment to a session object
 func (sess *Session) PutAttachment(name string, value interface{}) {
@@ -134,13 +134,13 @@ func (sess *Session) UnlockAttachments() {
 }
 
 // GetSessionID gets the session ID
-func (sess *Session) GetSessionID() uint64 {
-	return atomic.LoadUint64(&sess.sessionID)
+func (sess *Session) GetSessionID() int64 {
+	return atomic.LoadInt64(&sess.sessionID)
 }
 
 // SetSessionID sets the seession ID
-func (sess *Session) SetSessionID(value uint64) uint64 {
-	atomic.StoreUint64(&sess.sessionID, value)
+func (sess *Session) SetSessionID(value int64) int64 {
+	atomic.StoreInt64(&sess.sessionID, value)
 	return value
 }
 
@@ -364,14 +364,14 @@ func (sess *Session) flushDict() {
 }
 
 // nextSessionID returns the next sequential session ID value
-func nextSessionID() uint64 {
-	var value uint64
+func nextSessionID() int64 {
+	var value int64
 	sessionMutex.Lock()
 	value = sessionIndex
 	sessionIndex++
 
-	if sessionIndex == 0 {
-		sessionIndex++
+	if sessionIndex < 0 {
+		sessionIndex=1
 	}
 
 	sessionMutex.Unlock()

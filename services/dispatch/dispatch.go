@@ -108,7 +108,7 @@ func Startup(ctInterval int) {
 	// lowest  16 bits are zero
 	// this means that sessionIndex should be ever increasing despite restarts
 	// (unless there are more than 16 bits or 65k sessions per sec on average)
-	sessionIndex = ((uint64(time.Now().Unix()) & 0xFFFFFFFF) << 16)
+	sessionIndex = ((int64(time.Now().Unix()) & 0xFFFFFFFF) << 16)
 
 	kernel.RegisterConntrackCallback(conntrackCallback)
 	kernel.RegisterNfqueueCallback(nfqueueCallback)

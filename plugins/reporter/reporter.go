@@ -142,7 +142,7 @@ func PluginNetloggerHandler(netlogger *dispatch.NetloggerMessage) {
 }
 
 // doAccounting does the session_minutes accounting
-func doAccounting(entry *dispatch.Conntrack, sessionID uint64, ctid uint32) {
+func doAccounting(entry *dispatch.Conntrack, sessionID int64, ctid uint32) {
 	dict.AddSessionEntry(ctid, "byte_rate", uint32(entry.TotalByteRate))
 	dict.AddSessionEntry(ctid, "client_byte_rate", uint32(entry.ClientByteRate))
 	dict.AddSessionEntry(ctid, "server_byte_rate", uint32(entry.ServerByteRate))

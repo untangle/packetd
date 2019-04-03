@@ -17,7 +17,7 @@ type Conntrack struct {
 	ConntrackID       uint32
 	ConnMark          uint32
 	Session           *Session
-	SessionID         uint64
+	SessionID         int64
 	Family            uint8
 	CreationTime      time.Time
 	LastUpdateTime    time.Time
