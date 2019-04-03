@@ -321,13 +321,30 @@ func stopPlugins() {
 	wg.Wait()
 }
 
+// signalPlugins signals all plugins with a handler (in parallel)
+func signalPlugins(message syscall.Signal) {
+	var wg sync.WaitGroup
+
+	targets := []func(syscall.Signal){
+		stats.PluginSignal}
+	for _, f := range targets {
+		wg.Add(1)
+		go func(f func(syscall.Signal)) {
+			f(message)
+			wg.Done()
+		}(f)
+	}
+
+	wg.Wait()
+}
+
 // Add signal handlers
 func handleSignals() {
 	// Add SIGINT & SIGTERM handler (exit)
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+	termch := make(chan os.Signal, 1)
+	signal.Notify(termch, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		sig := <-ch
+		sig := <-termch
 		go func() {
 			logger.Warn("Received signal [%v]. Setting shutdown flag\n", sig)
 			kernel.SetShutdownFlag()
@@ -339,8 +356,20 @@ func handleSignals() {
 	signal.Notify(quitch, syscall.SIGQUIT)
 	go func() {
 		for {
-			<-quitch
+			sig := <-quitch
+			logger.Info("Received signal [%v]. Calling dumpStack()\n", sig)
 			go dumpStack()
+		}
+	}()
+
+	// Add SIGHUP handler (call handlers)
+	hupch := make(chan os.Signal, 1)
+	signal.Notify(hupch, syscall.SIGHUP)
+	go func() {
+		for {
+			sig := <-hupch
+			logger.Info("Recived signal [%v]. Calling handlers\n", sig)
+			signalPlugins(syscall.SIGHUP)
 		}
 	}()
 }

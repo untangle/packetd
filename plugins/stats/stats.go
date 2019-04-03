@@ -5,6 +5,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/c9s/goprocinfo/linux"
@@ -68,9 +69,7 @@ func PluginStartup() {
 	}
 
 	interfaceStatsMap = make(map[string]*linux.NetworkStat)
-	interfaceDetailMap = make(map[string]*interfaceDetail)
 
-	// FIXME - this is currently only loaded once during startup
 	loadInterfaceDetailMap()
 	refreshActivePingInfo()
 
@@ -100,6 +99,17 @@ func PluginShutdown() {
 		logger.Info("Successful shutdown of pingerTask\n")
 	case <-time.After(10 * time.Second):
 		logger.Warn("Failed to properly shutdown pingerTask\n")
+	}
+}
+
+// PluginSignal is called to handle system signals
+func PluginSignal(message syscall.Signal) {
+	switch message {
+	case syscall.SIGHUP:
+		// reload the interface map and ping info and signal the pinger task to refresh the ICMP sockets
+		loadInterfaceDetailMap()
+		refreshActivePingInfo()
+		pingerChannel <- false
 	}
 }
 
@@ -373,7 +383,7 @@ func getInterfaceIDValue(name string) int {
 
 // loadInterfaceDetailMap creates a map of interface name to MFW interface ID values
 func loadInterfaceDetailMap() {
-	networkJSON, err := settings.GetSettings([]string{"network", "interfaces"})
+	networkJSON, err := settings.GetCurrentSettings([]string{"network", "interfaces"})
 	if networkJSON == nil || err != nil {
 		logger.Warn("Unable to read network settings\n")
 	}

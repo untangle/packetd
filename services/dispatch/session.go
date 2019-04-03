@@ -371,7 +371,7 @@ func nextSessionID() int64 {
 	sessionIndex++
 
 	if sessionIndex < 0 {
-		sessionIndex=1
+		sessionIndex = 1
 	}
 
 	sessionMutex.Unlock()
