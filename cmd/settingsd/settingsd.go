@@ -68,6 +68,10 @@ func main() {
 	stopServices()
 }
 
+func printVersion() {
+	logger.Info("Untangle Settings Daemon Version %s\n", Version)
+}
+
 // Startup is called to start the rest daemon
 func startupRestDaemon() {
 	gin.DisableConsoleColor()
@@ -103,6 +107,7 @@ func startupRestDaemon() {
 	// listen and serve on 0.0.0.0:80
 	go engine.Run(":80")
 
+	printVersion()
 	logger.Info("The RestD engine has been started\n")
 }
 
