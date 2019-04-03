@@ -17,8 +17,6 @@ import (
 
 const pluginName = "stats"
 const interfaceStatLogIntervalSec = 10
-const pingCheckIntervalSec = 5
-const pingCheckTarget = "www.google.com"
 
 var statsCollector [256]*Collector
 var passiveCollector [256]*Collector
@@ -28,15 +26,15 @@ var statsLocker [256]sync.Mutex
 var passiveLocker [256]sync.Mutex
 var activeLocker [256]sync.Mutex
 
-var interfaceInfoMap map[string]*interfaceDetail
-var interfaceInfoLocker sync.RWMutex
+var interfaceDetailMap map[string]*interfaceDetail
+var interfaceDetailLocker sync.RWMutex
 
 var interfaceMetricList [256]*interfaceMetric
 var interfaceMetricLocker sync.Mutex
 
 var interfaceStatsMap map[string]*linux.NetworkStat
 var interfaceChannel = make(chan bool)
-var pingChannel = make(chan bool)
+var pingerChannel = make(chan bool)
 
 var randSrc rand.Source
 var randGen *rand.Rand
@@ -70,13 +68,14 @@ func PluginStartup() {
 	}
 
 	interfaceStatsMap = make(map[string]*linux.NetworkStat)
-	interfaceInfoMap = make(map[string]*interfaceDetail)
+	interfaceDetailMap = make(map[string]*interfaceDetail)
 
 	// FIXME - this is currently only loaded once during startup
-	loadInterfaceInfoMap()
+	loadInterfaceDetailMap()
+	refreshActivePingInfo()
 
 	go interfaceTask()
-	go pingTask()
+	go pingerTask()
 
 	dispatch.InsertNfqueueSubscription(pluginName, dispatch.StatsPriority, PluginNfqueueHandler)
 }
@@ -94,15 +93,14 @@ func PluginShutdown() {
 		logger.Warn("Failed to properly shutdown interfaceTask\n")
 	}
 
-	pingChannel <- true
+	pingerChannel <- true
 
 	select {
-	case <-pingChannel:
-		logger.Info("Successful shutdown of pingTask\n")
+	case <-pingerChannel:
+		logger.Info("Successful shutdown of pingerTask\n")
 	case <-time.After(10 * time.Second):
-		logger.Warn("Failed to properly shutdown pingTask\n")
+		logger.Warn("Failed to properly shutdown pingerTask\n")
 	}
-
 }
 
 // PluginNfqueueHandler is called to handle nfqueue packet data.
@@ -362,9 +360,9 @@ func calculateMetrics(metric *interfaceMetric) interfaceMetric {
 func getInterfaceIDValue(name string) int {
 	var val *interfaceDetail
 
-	interfaceInfoLocker.RLock()
-	val = interfaceInfoMap[name]
-	interfaceInfoLocker.RUnlock()
+	interfaceDetailLocker.RLock()
+	val = interfaceDetailMap[name]
+	interfaceDetailLocker.RUnlock()
 
 	if val != nil {
 		return val.interfaceID
@@ -373,8 +371,8 @@ func getInterfaceIDValue(name string) int {
 	return -1
 }
 
-// loadInterfaceInfoMap creates a map of interface name to MFW interface ID values
-func loadInterfaceInfoMap() {
+// loadInterfaceDetailMap creates a map of interface name to MFW interface ID values
+func loadInterfaceDetailMap() {
 	networkJSON, err := settings.GetSettings([]string{"network", "interfaces"})
 	if networkJSON == nil || err != nil {
 		logger.Warn("Unable to read network settings\n")
@@ -386,11 +384,11 @@ func loadInterfaceInfoMap() {
 		return
 	}
 
-	interfaceInfoLocker.Lock()
-	defer interfaceInfoLocker.Unlock()
+	interfaceDetailLocker.Lock()
+	defer interfaceDetailLocker.Unlock()
 
 	// start with an empty map
-	interfaceInfoMap = make(map[string]*interfaceDetail)
+	interfaceDetailMap = make(map[string]*interfaceDetail)
 
 	// walk the list of interfaces and store each name and ID in the map
 	for _, value := range networkSlice {
@@ -425,7 +423,7 @@ func loadInterfaceInfoMap() {
 		}
 
 		// put the interface details in the map
-		interfaceInfoMap[holder.deviceName] = holder
+		interfaceDetailMap[holder.deviceName] = holder
 	}
 }
 
@@ -437,21 +435,21 @@ func refreshActivePingInfo() {
 		return
 	}
 
-	interfaceInfoLocker.Lock()
-	defer interfaceInfoLocker.Unlock()
+	interfaceDetailLocker.Lock()
+	defer interfaceDetailLocker.Unlock()
 
 	for _, item := range facelist {
 		// ignore interfaces not in our map
-		if interfaceInfoMap[item.Name] == nil {
+		if interfaceDetailMap[item.Name] == nil {
 			continue
 		}
 
 		// found in the map so clear existing values
-		interfaceInfoMap[item.Name].netAddress = ""
-		interfaceInfoMap[item.Name].pingMode = protoIGNORE
+		interfaceDetailMap[item.Name].netAddress = ""
+		interfaceDetailMap[item.Name].pingMode = protoIGNORE
 
 		// ignore interfaces not flagged as WAN in our map
-		if interfaceInfoMap[item.Name].wanFlag == false {
+		if interfaceDetailMap[item.Name].wanFlag == false {
 			continue
 		}
 
@@ -477,14 +475,14 @@ func refreshActivePingInfo() {
 			if ip.To4() == nil {
 				continue
 			}
-			interfaceInfoMap[item.Name].netAddress = ip.String()
-			interfaceInfoMap[item.Name].pingMode = protoICMP4
+			interfaceDetailMap[item.Name].netAddress = ip.String()
+			interfaceDetailMap[item.Name].pingMode = protoICMP4
 			logger.Trace("Adding IPv4 active ping interface: %v\n", ip)
 			break
 		}
 
 		// if we found an IPv4 address for the interface we are finished
-		if interfaceInfoMap[item.Name].pingMode != protoIGNORE {
+		if interfaceDetailMap[item.Name].pingMode != protoIGNORE {
 			continue
 		}
 
@@ -504,61 +502,12 @@ func refreshActivePingInfo() {
 			if ip.To4() != nil {
 				continue
 			}
-			interfaceInfoMap[item.Name].netAddress = ip.String()
-			interfaceInfoMap[item.Name].pingMode = protoICMP6
+			interfaceDetailMap[item.Name].netAddress = ip.String()
+			interfaceDetailMap[item.Name].pingMode = protoICMP6
 			logger.Trace("Adding IPv6 active ping interface: %v\n", ip)
 			break
 		}
 	}
-}
-
-func pingTask() {
-
-	for {
-		select {
-		case <-pingChannel:
-			pingChannel <- true
-			return
-		case <-time.After(time.Second * time.Duration(pingCheckIntervalSec)):
-			refreshActivePingInfo()
-			interfaceInfoLocker.RLock()
-			for _, value := range interfaceInfoMap {
-				if value.pingMode == protoIGNORE {
-					continue
-				}
-				collectPingSample(value)
-			}
-			interfaceInfoLocker.RUnlock()
-		}
-	}
-}
-
-func collectPingSample(detail *interfaceDetail) {
-	logger.Debug("Pinging %s with interfaceDetail[%v]\n", pingCheckTarget, *detail)
-
-	duration, err := pingNetworkAddress(detail.pingMode, detail.netAddress, pingCheckTarget)
-
-	if err != nil {
-		if strings.Contains(err.Error(), "i/o timeout") {
-			// if no ping response we count as a timeout
-			interfaceMetricLocker.Lock()
-			interfaceMetricList[detail.interfaceID].PingTimeout++
-			interfaceMetricLocker.Unlock()
-		} else {
-			// otherwise log the error
-			logger.Warn("Error returned from pingIPv4Address: %v\n", err)
-		}
-		return
-	}
-
-	logger.Debug("Logging active latency: %d, %v, %v ms\n", detail.interfaceID, detail.netAddress, (duration.Nanoseconds() / 1000000))
-
-	statsLocker[detail.interfaceID].Lock()
-	activeLocker[detail.interfaceID].Lock()
-	statsCollector[detail.interfaceID].AddDataPoint(float64(duration.Nanoseconds()) / 1000000.0)
-	activeCollector[detail.interfaceID].AddDataPoint(float64(duration.Nanoseconds()) / 1000000.0)
-	statsLocker[detail.interfaceID].Unlock()
-	activeLocker[detail.interfaceID].Unlock()
 }
 
 // We guesstimate the hop count based on the most common TTL values
