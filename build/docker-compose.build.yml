@@ -3,12 +3,12 @@ services:
     musl:
       image: untangleinc/packetd:build-musl
       volumes:
-        - ../../../../../:/go
+        - ..:/go/packetd
 
     glibc:
       image: untangleinc/packetd:build-glibc
       volumes:
-        - ../../../../../:/go
+        - ..:/go/packetd
 
     # the next 2 services allow for local changes and tests to the
     # docker images, before pushing new official ones to GitHub: the
