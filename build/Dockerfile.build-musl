@@ -21,6 +21,7 @@ RUN apk add libnetfilter_conntrack-dev
 RUN apk add libnetfilter_queue-dev
 
 # build packetd
-VOLUME /go
-WORKDIR /go/src/github.com/untangle/packetd
+RUN mkdir -p /go/packetd
+VOLUME /go/packetd
+WORKDIR /go/packetd
 CMD make
