@@ -193,12 +193,12 @@ func classifyTraffic(mess *dispatch.NfqueueMessage) string {
 }
 
 // processReply processes a reply from the classd daemon
-func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int, uint64) {
+func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int, int32) {
 	var appid string
 	var name string
 	var protochain string
 	var detail string
-	var confidence uint64
+	var confidence int32
 	var category string
 	var state int
 	var attachments map[string]interface{}
@@ -226,7 +226,7 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 
 	checkdata := attachments["application_confidence"]
 	if checkdata != nil {
-		checkval := checkdata.(uint64)
+		checkval := checkdata.(int32)
 		if confidence < checkval {
 			logger.Debug("Ignoring update with confidence %d < %d STATE:%d\n", confidence, checkval, state)
 			return state, confidence
@@ -271,13 +271,14 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 
 // parseReply parses a reply from classd and returns
 // (appid, name, protochain, detail, confidence, category, state)
-func parseReply(replyString string) (string, string, string, string, uint64, string, int) {
+func parseReply(replyString string) (string, string, string, string, int32, string, int) {
 	var err error
 	var appid string
 	var name string
 	var protochain string
 	var detail string
-	var confidence uint64
+	var confidence int32
+	var c uint64
 	var category string
 	var state int
 
@@ -300,9 +301,11 @@ func parseReply(replyString string) (string, string, string, string, uint64, str
 		case "DETAIL: ":
 			detail = rawpair[1]
 		case "CONFIDENCE: ":
-			confidence, err = strconv.ParseUint(rawpair[1], 10, 64)
+			c, err = strconv.ParseUint(rawpair[1], 10, 32)
 			if err != nil {
 				confidence = 0
+			} else {
+				confidence = int32(c)
 			}
 		case "STATE: ":
 			state, err = strconv.Atoi(rawpair[1])
