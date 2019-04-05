@@ -115,7 +115,7 @@ func getBuildInfo() (map[string]interface{}, error) {
 			continue
 		}
 
-		jsonO[strings.ToLower(parts[0])] = parts[1]
+		jsonO[strings.ToLower(parts[0])] = strings.Trim(parts[1], "\"")
 	}
 
 	return jsonO, nil
