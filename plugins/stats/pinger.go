@@ -77,7 +77,14 @@ func pingerTask() {
 	for {
 		select {
 		case finish := <-pingerChannel:
+			// always close any open sockets
 			closeNetworkSockets()
+
+			// always create an empty map for active pings
+			pingLocker.Lock()
+			pingMap = make(map[uint16]*pingTarget)
+			pingLocker.Unlock()
+
 			// true on the channel means time to shutdown
 			if finish == true {
 				pingerChannel <- true
@@ -92,6 +99,14 @@ func pingerTask() {
 }
 
 func pingerWorker() {
+	// if we detect interface changes signal our control channel to do a refresh
+	// and skip this round of pings since the interfaces are in flux
+	if checkForInterfaceChanges() {
+		logger.Info("Interface changes detected. Recycling ICMP sockets\n")
+		pingerChannel <- false
+		return
+	}
+
 	// before starting a batch of pings we log a timeout and do cleanup of any previous outstanding
 	pingLocker.Lock()
 	for index, entry := range pingMap {

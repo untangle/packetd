@@ -1,7 +1,9 @@
 package stats
 
 import (
-	"math/rand"
+	"crypto/md5"
+	"encoding/json"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -33,12 +35,12 @@ var interfaceDetailLocker sync.RWMutex
 var interfaceMetricList [256]*interfaceMetric
 var interfaceMetricLocker sync.Mutex
 
-var interfaceStatsMap map[string]*linux.NetworkStat
-var interfaceChannel = make(chan bool)
-var pingerChannel = make(chan bool)
+var interfaceHashString string
+var interfaceHashLocker sync.Mutex
 
-var randSrc rand.Source
-var randGen *rand.Rand
+var interfaceStatsMap map[string]*linux.NetworkStat
+var interfaceChannel = make(chan bool, 1)
+var pingerChannel = make(chan bool, 1)
 
 type interfaceDetail struct {
 	interfaceID int
@@ -57,10 +59,6 @@ type interfaceMetric struct {
 func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
 
-	// we use random numbers in our active ping packets to help detect valid replies
-	randSrc = rand.NewSource(time.Now().UnixNano())
-	randGen = rand.New(randSrc)
-
 	for x := 0; x < 256; x++ {
 		statsCollector[x] = CreateCollector()
 		passiveCollector[x] = CreateCollector()
@@ -72,6 +70,9 @@ func PluginStartup() {
 
 	loadInterfaceDetailMap()
 	refreshActivePingInfo()
+
+	// the first check will record current status used to check for changes in subsequent calls
+	checkForInterfaceChanges()
 
 	go interfaceTask()
 	go pingerTask()
@@ -362,6 +363,37 @@ func calculateMetrics(metric *interfaceMetric) interfaceMetric {
 	result.PingTimeout = metric.PingTimeout - metric.lastPingTimeout
 	metric.lastPingTimeout = metric.PingTimeout
 	return result
+}
+
+// checkForInterfaceChanges returns true if network interfaces have
+// changed since the last time it was called, false if they have not
+func checkForInterfaceChanges() bool {
+	master := []byte{}
+
+	facelist, err := net.Interfaces()
+	if err != nil {
+		return false
+	}
+
+	for key, item := range facelist {
+		summary, err := json.Marshal(item)
+		if err != nil {
+			logger.Warn("Could not generate hash for item:%v value:%v\n", key, item)
+			continue
+		}
+		master = append(master, summary...)
+	}
+
+	hash := fmt.Sprintf("%x", md5.Sum(master))
+
+	// if nothing has changed return false
+	if strings.Compare(hash, interfaceHashString) == 0 {
+		return false
+	}
+
+	// changes detected so save just calculated hash for next check and return true
+	interfaceHashString = hash
+	return true
 }
 
 // getInterfaceIDValue is called to get the interface ID value that corresponds
