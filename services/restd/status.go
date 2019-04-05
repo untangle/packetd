@@ -1,7 +1,10 @@
 package restd
 
 import (
+	"bufio"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/c9s/goprocinfo/linux"
 	"github.com/gin-gonic/gin"
@@ -72,5 +75,64 @@ func statusHardware(c *gin.Context) {
 		stats["cpuinfo"] = cpuinfo
 	}
 
+	boardName, err := getBoardName()
+	if err != nil {
+		logger.Warn("Error reading board name: %s\n", err.Error())
+	} else {
+		stats["boardName"] = boardName
+	}
+
 	c.JSON(http.StatusOK, stats)
+}
+
+// statusBuild is the RESTD /api/status/build handler
+func statusBuild(c *gin.Context) {
+	logger.Debug("statusBuild()\n")
+
+	jsonO, err := getBuildInfo()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	c.JSON(http.StatusOK, jsonO)
+}
+
+// getBuildInfo returns the build info as a json map
+func getBuildInfo() (map[string]interface{}, error) {
+	jsonO := make(map[string]interface{})
+
+	file, err := os.Open("/etc/os-release")
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		parts := strings.SplitN(scanner.Text(), "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		jsonO[strings.ToLower(parts[0])] = parts[1]
+	}
+
+	return jsonO, nil
+}
+
+// getBoardName returns the board name of the SOC system
+func getBoardName() (string, error) {
+	file, err := os.Open("/tmp/sysinfo/board_name")
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		return scanner.Text(), nil
+	}
+
+	return "unknown", nil
 }

@@ -93,6 +93,7 @@ func Startup() {
 	api.GET("/status/sessions", statusSessions)
 	api.GET("/status/system", statusSystem)
 	api.GET("/status/hardware", statusHardware)
+	api.GET("/status/build", statusBuild)
 
 	api.POST("/sysupgrade", sysupgradeHandler)
 
