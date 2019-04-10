@@ -21,15 +21,9 @@ Then build the regular way:
 make
 ```
 
-If you want to use the golint tool, you can install it with this command:
+There is also a target for running golint:
 ```
-go get -u golang.org/x/lint/golint
-```
-
-You can run golint with the following command: (assumes GOPATH=~/golang)
-
-```
-~/golang/bin/golint github.com/untangle/packetd/...
+make golint
 ```
 
 Building in docker

@@ -10,4 +10,8 @@ build-%:
 	export GO111MODULE=$(GO111MODULE) ; \
 	go build $(GOFLAGS) -ldflags "-X main.Version=$(shell git describe --tags --always --long --dirty)"
 
-.PHONY: build
+lint:
+	GO111MODULE=off go get -u golang.org/x/lint/golint
+	$(shell go env GOPATH)/bin/golint -set_exit_status ./...
+
+.PHONY: build lint
