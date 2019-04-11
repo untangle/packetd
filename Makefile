@@ -12,6 +12,6 @@ build-%:
 
 lint:
 	GO111MODULE=off go get -u golang.org/x/lint/golint
-	$(shell go env GOPATH)/bin/golint -set_exit_status ./...
+	$(shell go env GOPATH)/bin/golint -set_exit_status github.com/untangle/packetd/...
 
 .PHONY: build lint
