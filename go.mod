@@ -3,8 +3,7 @@ module github.com/untangle/packetd
 require (
 	github.com/GehirnInc/crypt v0.0.0-20190301055215-6c0105aabd46
 	github.com/c9s/goprocinfo v0.0.0-20190309065803-0b2ad9ac246b
-	github.com/gbrlsnchs/jwt v1.1.0
-	github.com/gbrlsnchs/jwt/v3 v3.0.0-beta.0 // indirect
+	github.com/gbrlsnchs/jwt/v3 v3.0.0-beta.0
 	github.com/gin-contrib/location v0.0.0-20190301062650-0462caccbb9c
 	github.com/gin-contrib/sessions v0.0.0-20190226023029-1532893d996f
 	github.com/gin-gonic/contrib v0.0.0-20190302003538-54ff787f7c73
