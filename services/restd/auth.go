@@ -49,6 +49,7 @@ func authRequired(engine *gin.Engine) gin.HandlerFunc {
 		}
 
 		// Check if JWT token was specified
+		// DISABLED
 		// if checkJWTToken(c) {
 		// 	c.Next()
 		// 	return
@@ -69,11 +70,18 @@ func authRequired(engine *gin.Engine) gin.HandlerFunc {
 // if found, it will verify the token and authenticate the user if the JWT is valid
 func checkJWTToken(c *gin.Context) bool {
 	now := time.Now()
-	hs256 := jwt.NewHMAC(jwt.SHA256, []byte("secret")) // FIXME - use random but persistent string
-	token := []byte("eyJhbGciOiJIUzI1NiIsImtpZCI6ImtpZCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJNRlciLCJzdWIiOiJ1c2VybmFtZSIsImV4cCI6MTU4Njc0MTAyMywibmJmIjoxNTU1NjM4ODIzLCJpYXQiOjE1NTU2MzcwMjMsImp0aSI6Ik1GVyJ9.ZdfVEqn2TFnkBIr_eIawL-kZ9G3EyE2sekPJ5b0EO_Q")
-	//token := []byte("foo" + "bar" + "baz")
+	hs256 := jwt.NewHMAC(jwt.SHA256, []byte("secret"))
+	// FIXME - use RSA
+	token := findJWTToken(c)
+	// valid hs256 "secret" token
+	//token := []byte("eyJhbGciOiJIUzI1NiIsImtpZCI6ImtpZCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJNRlciLCJzdWIiOiJ1c2VybmFtZSIsImV4cCI6MTU4Njc0MTAyMywibmJmIjoxNTU1NjM4ODIzLCJpYXQiOjE1NTU2MzcwMjMsImp0aSI6Ik1GVyJ9.ZdfVEqn2TFnkBIr_eIawL-kZ9G3EyE2sekPJ5b0EO_Q")
+	// invalid token
+	//token := []byte("invalid.jwt.token")
+	if token == nil {
+		return false
+	}
 
-	logger.Info("Token  : %v\n", string(token))
+	logger.Info("JWT Token: %v\n", string(token))
 	// t, err := createJWT("admin")
 	// logger.Info("Wanted : %v\n", string(t))
 
@@ -127,7 +135,21 @@ func checkJWTToken(c *gin.Context) bool {
 	return false
 }
 
-func createJWT(username string) ([]byte, error) {
+// findJWTToken search the arguments and cookie for a JWT
+func findJWTToken(c *gin.Context) []byte {
+	token := c.Query("jwt")
+	if token != "" {
+		return []byte(token)
+	}
+	cookie, _ := c.Cookie("jwt")
+	if cookie != "" {
+		return []byte(cookie)
+	}
+	return nil
+}
+
+// createJWTToken creates a valid JWT token - used for testing
+func createJWTToken(username string) ([]byte, error) {
 	now := time.Now()
 	hs256 := jwt.NewHMAC(jwt.SHA256, []byte("secret"))
 	h := jwt.Header{KeyID: "kid"}
