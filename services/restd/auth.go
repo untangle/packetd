@@ -49,10 +49,10 @@ func authRequired(engine *gin.Engine) gin.HandlerFunc {
 		}
 
 		// Check if JWT token was specified
-		if checkJWTToken(c) {
-			c.Next()
-			return
-		}
+		// if checkJWTToken(c) {
+		// 	c.Next()
+		// 	return
+		// }
 
 		// if the setup wizard is not completed, auth is not required
 		if !isSetupWizardCompleted() {
@@ -70,7 +70,12 @@ func authRequired(engine *gin.Engine) gin.HandlerFunc {
 func checkJWTToken(c *gin.Context) bool {
 	now := time.Now()
 	hs256 := jwt.NewHMAC(jwt.SHA256, []byte("secret")) // FIXME - use random but persistent string
-	token := []byte("foo" + "bar" + "baz")
+	token := []byte("eyJhbGciOiJIUzI1NiIsImtpZCI6ImtpZCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJNRlciLCJzdWIiOiJ1c2VybmFtZSIsImV4cCI6MTU4Njc0MTAyMywibmJmIjoxNTU1NjM4ODIzLCJpYXQiOjE1NTU2MzcwMjMsImp0aSI6Ik1GVyJ9.ZdfVEqn2TFnkBIr_eIawL-kZ9G3EyE2sekPJ5b0EO_Q")
+	//token := []byte("foo" + "bar" + "baz")
+
+	logger.Info("Token  : %v\n", string(token))
+	// t, err := createJWT("admin")
+	// logger.Info("Wanted : %v\n", string(t))
 
 	raw, err := jwt.Parse(token)
 	if err != nil {
@@ -92,7 +97,11 @@ func checkJWTToken(c *gin.Context) bool {
 	iatValidator := jwt.IssuedAtValidator(now)
 	expValidator := jwt.ExpirationTimeValidator(now, true)
 	//audValidator := jwt.AudienceValidator(jwt.Audience{"https://example.com"})
-	if err := payload.Validate(iatValidator, expValidator, nil /*audValidator*/); err != nil {
+	audValidator := func(p *jwt.Payload) error {
+		return nil
+	}
+
+	if err := payload.Validate(iatValidator, expValidator, audValidator); err != nil {
 		switch err {
 		case jwt.ErrIatValidation:
 			logger.Warn("Failed IssuedAt validation: %s\n", err.Error())
@@ -110,12 +119,33 @@ func checkJWTToken(c *gin.Context) bool {
 	session.Set("username", payload.Payload.Subject)
 	err = session.Save()
 	if err == nil {
+		logger.Info("JWT accepted: %s\n", payload.Payload.Subject)
 		return true
 	}
 
 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
 	return false
+}
 
+func createJWT(username string) ([]byte, error) {
+	now := time.Now()
+	hs256 := jwt.NewHMAC(jwt.SHA256, []byte("secret"))
+	h := jwt.Header{KeyID: "kid"}
+	p := jwt.Payload{
+		Issuer:         "MFW",
+		Subject:        "username",
+		Audience:       nil,
+		ExpirationTime: now.Add(24 * 30 * 12 * time.Hour).Unix(),
+		NotBefore:      now.Add(30 * time.Minute).Unix(),
+		IssuedAt:       now.Unix(),
+		JWTID:          "MFW",
+	}
+	token, err := jwt.Sign(h, p, hs256)
+	if err != nil {
+		logger.Warn("Failed to sign JWT: %s\n", err.Error())
+		return nil, err
+	}
+	return token, nil
 }
 
 // checkHTTPAuth checks the basic http auth & bearer http auth
@@ -242,7 +272,7 @@ func authStatus(c *gin.Context) {
 	session := sessions.Default(c)
 	user := session.Get("username")
 	if user == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Not logged in"})
+		c.JSON(http.StatusOK, gin.H{"error": "Not logged in"})
 	} else {
 		username := user.(string)
 		credentialsJSON := getCredentials(username)
