@@ -5,6 +5,8 @@ github.com/GehirnInc/crypt/common
 github.com/GehirnInc/crypt/internal
 # github.com/c9s/goprocinfo v0.0.0-20190309065803-0b2ad9ac246b
 github.com/c9s/goprocinfo/linux
+# github.com/gbrlsnchs/jwt v1.1.0
+github.com/gbrlsnchs/jwt
 # github.com/gin-contrib/location v0.0.0-20190301062650-0462caccbb9c
 github.com/gin-contrib/location
 # github.com/gin-contrib/sessions v0.0.0-20190226023029-1532893d996f
@@ -53,7 +55,7 @@ golang.org/x/net/ipv6
 golang.org/x/net/internal/iana
 golang.org/x/net/internal/socket
 golang.org/x/net/bpf
-# golang.org/x/sys v0.0.0-20190222072716-a9d3bda3a223
+# golang.org/x/sys v0.0.0-20190403152447-81d4e9dc473e
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # gopkg.in/go-playground/validator.v8 v8.18.2

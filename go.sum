@@ -12,6 +12,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/gbrlsnchs/jwt v1.1.0 h1:Gh2CoXcIfk8/LxV8ks0GDOmUDCpVIrw8Oa34Ozmw/10=
 github.com/gbrlsnchs/jwt v1.1.0/go.mod h1:p5fttBhRV34dmDL7zpqJ2ctL8yaWm5DJTtBm/evgQ/c=
+github.com/gbrlsnchs/jwt/v3 v3.0.0-beta.0 h1:aNKrhvte4XtVvQelq6y0RNxw03rerU5GZ6rDuJGZyV0=
+github.com/gbrlsnchs/jwt/v3 v3.0.0-beta.0/go.mod h1:TVblxrqSCH+1E5/cCnEt7sCDb1brRErn25lltKJBQAw=
 github.com/gin-contrib/location v0.0.0-20190301062650-0462caccbb9c h1:wIH31ULjzSWT6AAb1yxeEbpQYrhgO2U8OOHdUMqeDHY=
 github.com/gin-contrib/location v0.0.0-20190301062650-0462caccbb9c/go.mod h1:Y9jJgyrzeIqCnTAIlB0Hi36xeXH1BukBJLPf0JsTDjo=
 github.com/gin-contrib/sessions v0.0.0-20190226023029-1532893d996f h1:f8TGHcU6cxOhMwW6YQhpRe+zlr05qNjVmdcK1qigr5I=
@@ -77,6 +79,7 @@ github.com/ugorji/go/codec v0.0.0-20181209151446-772ced7fd4c2 h1:EICbibRW4JNKMcY
 github.com/ugorji/go/codec v0.0.0-20181209151446-772ced7fd4c2/go.mod h1:VFNgLljTbGfSG7qAOspJ7OScBnGdDN/yBr0sguwnwf0=
 github.com/ugorji/go/codec v0.0.0-20190204201341-e444a5086c43 h1:BasDe+IErOQKrMVXab7UayvSlIpiyGwRvuX3EKYY7UA=
 github.com/ugorji/go/codec v0.0.0-20190204201341-e444a5086c43/go.mod h1:iT03XoTwV7xq/+UGwKO3UbC1nNNlopQiY61beSdrtOA=
+golang.org/x/crypto v0.0.0-20190211182817-74369b46fc67/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20190418165655-df01cb2cc480 h1:O5YqonU5IWby+w98jVUG9h7zlCWCcH4RHyPVReBmhzk=
 golang.org/x/crypto v0.0.0-20190418165655-df01cb2cc480/go.mod h1:WFFai1msRO1wXaEeE5yQxYXgSfI8pQAWXbQop6sCtWE=
