@@ -21,7 +21,8 @@ import (
 	"github.com/untangle/packetd/services/settings"
 )
 
-type MyPayload struct {
+// CustomJWTPayload stores the custom part of the JWT payload
+type CustomJWTPayload struct {
 	jwt.Payload
 	//IsLoggedIn  bool   `json:"isLoggedIn"`
 }
@@ -95,7 +96,7 @@ func checkJWTToken(c *gin.Context) bool {
 		return false
 	}
 	var head jwt.Header
-	var payload MyPayload
+	var payload CustomJWTPayload
 	if head, err = raw.Decode(&payload); err != nil {
 		logger.Warn("Failed to decode token %s\n", err.Error())
 		return false
