@@ -3,6 +3,7 @@ package restd
 import (
 	"encoding/base64"
 	"fmt"
+	"time"
 
 	"io/ioutil"
 	"net"
@@ -13,11 +14,17 @@ import (
 
 	"github.com/GehirnInc/crypt"
 	_ "github.com/GehirnInc/crypt/md5_crypt" // MD5 used to verify password
+	"github.com/gbrlsnchs/jwt"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/settings"
 )
+
+type MyPayload struct {
+	jwt.Payload
+	//IsLoggedIn  bool   `json:"isLoggedIn"`
+}
 
 func authRequired(engine *gin.Engine) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -35,8 +42,14 @@ func authRequired(engine *gin.Engine) gin.HandlerFunc {
 			return
 		}
 
-		// If the connection is from the local host, check if its authorized
-		if checkBasicHTTPAuth(c) {
+		// Check if the connection has valid basic http auth credentials
+		if checkHTTPAuth(c) {
+			c.Next()
+			return
+		}
+
+		// Check if JWT token was specified
+		if checkJWTToken(c) {
 			c.Next()
 			return
 		}
@@ -52,10 +65,63 @@ func authRequired(engine *gin.Engine) gin.HandlerFunc {
 	}
 }
 
-// checkBasicHTTPAuth checks the basic http auth
+// checkJWTToken checks for a token specified in the argument
+// if found, it will verify the token and authenticate the user if the JWT is valid
+func checkJWTToken(c *gin.Context) bool {
+	now := time.Now()
+	hs256 := jwt.NewHMAC(jwt.SHA256, []byte("secret")) // FIXME - use random but persistent string
+	token := []byte("foo" + "bar" + "baz")
+
+	raw, err := jwt.Parse(token)
+	if err != nil {
+		logger.Warn("Invalid token %s\n", err.Error())
+		return false
+	}
+	if err = raw.Verify(hs256); err != nil {
+		logger.Warn("Error validating token %s\n", err.Error())
+		return false
+	}
+	var head jwt.Header
+	var payload MyPayload
+	if head, err = raw.Decode(&payload); err != nil {
+		logger.Warn("Failed to decode token %s\n", err.Error())
+		return false
+	}
+	logger.Info("JWT received: %v %v\n", head.KeyID, head.Algorithm)
+
+	iatValidator := jwt.IssuedAtValidator(now)
+	expValidator := jwt.ExpirationTimeValidator(now, true)
+	//audValidator := jwt.AudienceValidator(jwt.Audience{"https://example.com"})
+	if err := payload.Validate(iatValidator, expValidator, nil /*audValidator*/); err != nil {
+		switch err {
+		case jwt.ErrIatValidation:
+			logger.Warn("Failed IssuedAt validation: %s\n", err.Error())
+			return false
+		case jwt.ErrExpValidation:
+			logger.Warn("Failed Expiration validation: %s\n", err.Error())
+			return false
+		case jwt.ErrAudValidation:
+			logger.Warn("Failed Audience validation: %s\n", err.Error())
+			return false
+		}
+	}
+
+	session := sessions.Default(c)
+	session.Set("username", payload.Payload.Subject)
+	err = session.Save()
+	if err == nil {
+		return true
+	}
+
+	c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
+	return false
+
+}
+
+// checkHTTPAuth checks the basic http auth & bearer http auth
 // returns false if request should continue to next auth technique
 // returns true if the auth is valid and the request should be allowed
-func checkBasicHTTPAuth(c *gin.Context) bool {
+func checkHTTPAuth(c *gin.Context) bool {
 	authHeader := c.Request.Header.Get("Authorization")
 	if authHeader == "" {
 		// continue, not an error though so don't set an error
@@ -63,8 +129,12 @@ func checkBasicHTTPAuth(c *gin.Context) bool {
 	}
 
 	auth := strings.SplitN(c.Request.Header.Get("Authorization"), " ", 2)
-	if len(auth) != 2 || auth[0] != "Basic" {
+	if len(auth) != 2 {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Invalid Authorization Header"})
+		return false
+	}
+	if auth[0] != "Basic" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Invalid Authorization Type"})
 		return false
 	}
 

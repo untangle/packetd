@@ -3,6 +3,7 @@ module github.com/untangle/packetd
 require (
 	github.com/GehirnInc/crypt v0.0.0-20190301055215-6c0105aabd46
 	github.com/c9s/goprocinfo v0.0.0-20190309065803-0b2ad9ac246b
+	github.com/gbrlsnchs/jwt v1.1.0
 	github.com/gin-contrib/location v0.0.0-20190301062650-0462caccbb9c
 	github.com/gin-contrib/sessions v0.0.0-20190226023029-1532893d996f
 	github.com/gin-gonic/contrib v0.0.0-20190302003538-54ff787f7c73
@@ -11,5 +12,6 @@ require (
 	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/oschwald/geoip2-golang v1.2.1
 	github.com/oschwald/maxminddb-golang v1.3.0 // indirect
+	golang.org/x/crypto v0.0.0-20190418165655-df01cb2cc480 // indirect
 	golang.org/x/net v0.0.0-20190320064053-1272bf9dcd53
 )
