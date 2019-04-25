@@ -295,7 +295,7 @@ func authStatus(c *gin.Context) {
 	session := sessions.Default(c)
 	user := session.Get("username")
 	if user == nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Not logged in"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Not logged in"})
 	} else {
 		username := user.(string)
 		credentialsJSON := getCredentials(username)
