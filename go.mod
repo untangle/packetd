@@ -14,4 +14,5 @@ require (
 	github.com/oschwald/maxminddb-golang v1.3.0 // indirect
 	golang.org/x/net v0.0.0-20190320064053-1272bf9dcd53
 	golang.org/x/sys v0.0.0-20190403152447-81d4e9dc473e // indirect
+	golang.org/x/tools v0.0.0-20190425001055-9e44c1c40307 // indirect
 )
