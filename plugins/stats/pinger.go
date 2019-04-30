@@ -99,10 +99,22 @@ func pingerTask() {
 }
 
 func pingerWorker() {
-	// if we detect interface changes signal our control channel to do a refresh
-	// and skip this round of pings since the interfaces are in flux
+	// if we detect interface changes refresh the interface detail and active
+	// ping maps and signal our control channel to do a socket refresh
 	if checkForInterfaceChanges() {
 		logger.Info("Interface changes detected. Recycling ICMP sockets\n")
+		loadInterfaceDetailMap()
+		refreshActivePingInfo()
+		pingerChannel <- false
+		return
+	}
+
+	// if there are no active ping sockets we can't do active latency checks
+	// so refresh the interface and ping maps and do a socket refresh
+	if len(socketList) == 0 {
+		logger.Info("No active ping interfaces. Recycling ICMP sockets\n")
+		loadInterfaceDetailMap()
+		refreshActivePingInfo()
 		pingerChannel <- false
 		return
 	}
