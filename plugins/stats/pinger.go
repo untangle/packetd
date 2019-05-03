@@ -32,7 +32,10 @@ import (
 	IPv6 address can reach the internet.
 */
 
-var pingCheckTargets = [...]string{"www.google.com", "google-public-dns-a.google.com", "1dot1dot1dot1.cloudflare-dns.com"}
+const pingCheckTotal = 3
+
+var pingCheckTargets = [pingCheckTotal]string{"www.google.com", "google-public-dns-a.google.com", "1dot1dot1dot1.cloudflare-dns.com"}
+var pingCheckJitter [pingCheckTotal][256]int64
 
 const pingCheckIntervalSec = 5
 
@@ -49,6 +52,7 @@ type pingTarget struct {
 	srcAddress  string
 	dstAddress  string
 	xmitTime    time.Time
+	index       int
 }
 
 // pingSocket holds the details of a packet connection that is open and active for sending and receiving pings
@@ -71,6 +75,14 @@ var sequenceLocker sync.Mutex
 func pingerTask() {
 	masterPid = os.Getpid() & 0xFFFF
 	pingMap = make(map[uint16]*pingTarget)
+
+	// jitter will always be a positive value so we initialize the last value array
+	// with minus one so we don't use the first latency we calculate as the jitter
+	for x := 0; x < pingCheckTotal; x++ {
+		for y := 0; y < 256; y++ {
+			pingCheckJitter[x][y] = -1
+		}
+	}
 
 	openNetworkSockets()
 
@@ -133,6 +145,7 @@ func pingerWorker() {
 	for srcaddr, socket := range socketList {
 		for x := 0; x < len(pingCheckTargets); x++ {
 			var target pingTarget
+			target.index = x
 			target.interfaceID = socket.interfaceID
 			target.protocol = socket.protocol
 			target.srcAddress = srcaddr
@@ -253,6 +266,27 @@ func watchNetworkSocket(socket *pingSocket) {
 		activeLocker[target.interfaceID].Lock()
 		activeCollector[target.interfaceID].AddDataPoint(float64(duration.Nanoseconds()) / 1000000.0)
 		activeLocker[target.interfaceID].Unlock()
+
+		// if we don't have the previous latency for this [target][interface] store and continue
+		if pingCheckJitter[target.index][target.interfaceID] < 0 {
+			pingCheckJitter[target.index][target.interfaceID] = duration.Nanoseconds()
+			continue
+		}
+
+		// we have the previous latency so we can calculate the jitter
+		var jitter int64
+
+		if duration.Nanoseconds() > pingCheckJitter[target.index][target.interfaceID] {
+			jitter = (duration.Nanoseconds() - pingCheckJitter[target.index][target.interfaceID])
+		} else {
+			jitter = (pingCheckJitter[target.index][target.interfaceID] - duration.Nanoseconds())
+		}
+
+		pingCheckJitter[target.index][target.interfaceID] = duration.Nanoseconds()
+
+		jitterLocker[target.interfaceID].Lock()
+		jitterCollector[target.interfaceID].AddDataPoint(float64(jitter) / 1000000.0)
+		jitterLocker[target.interfaceID].Unlock()
 	}
 }
 

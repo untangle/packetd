@@ -24,10 +24,12 @@ const interfaceStatLogIntervalSec = 10
 var statsCollector [256]*Collector
 var passiveCollector [256]*Collector
 var activeCollector [256]*Collector
+var jitterCollector [256]*Collector
 
 var statsLocker [256]sync.Mutex
 var passiveLocker [256]sync.Mutex
 var activeLocker [256]sync.Mutex
+var jitterLocker [256]sync.Mutex
 
 var interfaceDetailMap map[string]*interfaceDetail
 var interfaceDetailLocker sync.RWMutex
@@ -63,6 +65,7 @@ func PluginStartup() {
 		statsCollector[x] = CreateCollector()
 		passiveCollector[x] = CreateCollector()
 		activeCollector[x] = CreateCollector()
+		jitterCollector[x] = CreateCollector()
 		interfaceMetricList[x] = new(interfaceMetric)
 	}
 
@@ -281,10 +284,14 @@ func collectInterfaceStats(seconds uint64) {
 				active := activeCollector[interfaceID].MakeCopy()
 				activeLocker[interfaceID].Unlock()
 
+				jitterLocker[interfaceID].Lock()
+				jitter := jitterCollector[interfaceID].MakeCopy()
+				jitterLocker[interfaceID].Unlock()
+
 				istat := MakeInterfaceStatsJSON(interfaceID, combo.Latency1Min.Value, combo.Latency5Min.Value, combo.Latency15Min.Value)
 				istats = append(istats, istat)
 
-				logInterfaceStats(seconds, interfaceID, combo, passive, active, &diffInfo, &metric)
+				logInterfaceStats(seconds, interfaceID, combo, passive, active, jitter, &diffInfo, &metric)
 			}
 		}
 	}
@@ -293,7 +300,7 @@ func collectInterfaceStats(seconds uint64) {
 	WriteStatsJSON(allstats)
 }
 
-func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive Collector, active Collector, diffInfo *linux.NetworkStat, diffMetric *interfaceMetric) {
+func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive Collector, active Collector, jitter Collector, diffInfo *linux.NetworkStat, diffMetric *interfaceMetric) {
 	columns := map[string]interface{}{
 		"time_stamp":               time.Now(),
 		"interface_id":             interfaceID,
@@ -310,6 +317,10 @@ func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive
 		"active_latency_5":         active.Latency5Min.Value,
 		"active_latency_15":        active.Latency15Min.Value,
 		"active_latency_variance":  active.LatencyVariance.StdDeviation,
+		"jitter_1":                 jitter.Latency1Min.Value,
+		"jitter_5":                 jitter.Latency5Min.Value,
+		"jitter_15":                jitter.Latency15Min.Value,
+		"jitter_variance":          jitter.LatencyVariance.StdDeviation,
 		"ping_timeout":             diffMetric.PingTimeout,
 		"ping_timeout_rate":        diffMetric.PingTimeout / seconds,
 		"rx_bytes":                 diffInfo.RxBytes,
