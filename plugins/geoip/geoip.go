@@ -20,6 +20,7 @@ const pluginName = "geoip"
 
 var geoDatabase *geoip2.Reader
 var geoMutex sync.Mutex
+var privateIPBlocks []*net.IPNet
 
 // PluginStartup is called to allow plugin specific initialization.
 // We initialize an instance of the GeoIP engine using any existing
@@ -42,6 +43,18 @@ func PluginStartup() {
 		geoDatabase = db
 	}
 
+	for _, cidr := range []string{
+		"127.0.0.0/8",    // IPv4 loopback
+		"10.0.0.0/8",     // RFC1918
+		"172.16.0.0/12",  // RFC1918
+		"192.168.0.0/16", // RFC1918
+		"::1/128",        // IPv6 loopback
+		"fe80::/10",      // IPv6 link-local
+		"fc00::/7",       // IPv6 unique local addr
+	} {
+		_, block, _ := net.ParseCIDR(cidr)
+		privateIPBlocks = append(privateIPBlocks, block)
+	}
 	dispatch.InsertNfqueueSubscription(pluginName, dispatch.GeoipPriority, PluginNfqueueHandler)
 }
 
@@ -55,6 +68,7 @@ func PluginShutdown() {
 
 	if geoDatabase != nil {
 		geoDatabase.Close()
+		geoDatabase = nil
 	}
 }
 
@@ -75,14 +89,11 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	geoMutex.Lock()
 	defer geoMutex.Unlock()
 
-	if geoDatabase == nil {
-		return result
-	}
-
+	// we start by setting both the client and server country to XU for unknown
+	var clientCountry = "XU"
+	var serverCountry = "XU"
 	var srcAddr net.IP
 	var dstAddr net.IP
-	var clientCountry = "XX"
-	var serverCountry = "XX"
 
 	if mess.IP6Layer != nil {
 		srcAddr = mess.IP6Layer.SrcIP
@@ -94,18 +105,32 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		dstAddr = mess.IP4Layer.DstIP
 	}
 
-	if srcAddr == nil || dstAddr == nil {
-		return result
+	// first we check to see if the source or destination addresses are
+	// in private address blocks and if so assign the XL local country code
+
+	if srcAddr != nil && isPrivateIP(srcAddr) {
+		clientCountry = "XL"
 	}
 
-	SrcRecord, err := geoDatabase.City(srcAddr)
-	if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
-		clientCountry = SrcRecord.Country.IsoCode
+	if dstAddr != nil && isPrivateIP(dstAddr) {
+		serverCountry = "XL"
 	}
 
-	DstRecord, err := geoDatabase.City(dstAddr)
-	if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
-		serverCountry = DstRecord.Country.IsoCode
+	// if we have a good database and good addresses and the country
+	// is still unknown we do the database lookup
+
+	if geoDatabase != nil && srcAddr != nil && clientCountry == "XU" {
+		SrcRecord, err := geoDatabase.City(srcAddr)
+		if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
+			clientCountry = SrcRecord.Country.IsoCode
+		}
+	}
+
+	if geoDatabase != nil && dstAddr != nil && serverCountry == "XU" {
+		DstRecord, err := geoDatabase.City(dstAddr)
+		if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
+			serverCountry = DstRecord.Country.IsoCode
+		}
 	}
 
 	logger.Debug("SRC: %v = %s ctid:%d\n", srcAddr, clientCountry, ctid)
@@ -119,6 +144,15 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	logEvent(mess.Session, clientCountry, serverCountry)
 
 	return result
+}
+
+func isPrivateIP(ip net.IP) bool {
+	for _, block := range privateIPBlocks {
+		if block.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 func databaseDownload(filename string) {
@@ -161,7 +195,7 @@ func databaseDownload(filename string) {
 
 	// Write the uncompressed database to the file
 	io.Copy(writer, reader)
-	logger.Info("Downloaded  GeoIP Database.\n")
+	logger.Info("Downloaded GeoIP Database.\n")
 }
 
 // findGeoFile finds the location of the GeoLite2-City.mmdb file
