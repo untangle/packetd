@@ -46,7 +46,7 @@ func Shutdown() {
 }
 
 // AttachCertificateToSession is called to attach a certificate to a session entry and
-// to populate the dictionary  with details about the certificate
+// to populate the dictionary with details about the certificate
 func AttachCertificateToSession(session *dispatch.Session, certificate x509.Certificate) {
 	ctid := session.GetConntrackID()
 
@@ -72,6 +72,20 @@ func AttachCertificateToSession(session *dispatch.Session, certificate x509.Cert
 	setSessionList(session, "certificate_issuer_p", certificate.Issuer.Province, ctid)
 	setSessionList(session, "certificate_issuer_sa", certificate.Issuer.StreetAddress, ctid)
 	setSessionList(session, "certificate_issuer_pc", certificate.Issuer.PostalCode, ctid)
+
+	// create a list of all DNS names in the certificate
+	var namelist string
+
+	// start with the Common Name
+	namelist += certificate.Subject.CommonName
+
+	// add all of the subject alternative names
+	for _, value := range certificate.DNSNames {
+		namelist += "|"
+		namelist += value
+	}
+
+	setSessionEntry(session, "cert_dns_names", namelist, ctid)
 
 	logEvent(session)
 }
