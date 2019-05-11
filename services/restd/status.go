@@ -2,8 +2,10 @@ package restd
 
 import (
 	"bufio"
+	"errors"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/c9s/goprocinfo/linux"
@@ -98,6 +100,37 @@ func statusBuild(c *gin.Context) {
 	c.JSON(http.StatusOK, jsonO)
 }
 
+// statusUID returns the UID of the system
+func statusUID(c *gin.Context) {
+	logger.Debug("statusUID()\n")
+
+	uid, err := getUID()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	c.String(http.StatusOK, uid)
+}
+
+// statusWANTest runs the WAN performance test and returns the result
+func statusWANTest(c *gin.Context) {
+	logger.Debug("statusWANTest()\n")
+	device := c.Param("device")
+
+	if device == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "device not found"})
+		return
+	}
+
+	output, err := exec.Command("/usr/bin/speedtest.sh", device).CombinedOutput()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+	}
+	c.String(http.StatusOK, string(output))
+	return
+}
+
 // getBuildInfo returns the build info as a json map
 func getBuildInfo() (map[string]interface{}, error) {
 	jsonO := make(map[string]interface{})
@@ -119,6 +152,21 @@ func getBuildInfo() (map[string]interface{}, error) {
 	}
 
 	return jsonO, nil
+}
+
+// getUID returns the UID of the system
+func getUID() (string, error) {
+	file, err := os.Open("/etc/config/uid")
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		return scanner.Text(), nil
+	}
+	return "", errors.New("UID file missing contents")
 }
 
 // getBoardName returns the board name of the SOC system

@@ -94,6 +94,8 @@ func Startup() {
 	api.GET("/status/system", statusSystem)
 	api.GET("/status/hardware", statusHardware)
 	api.GET("/status/build", statusBuild)
+	api.GET("/status/wantest/:device", statusWANTest)
+	api.GET("/status/uid", statusUID)
 
 	api.POST("/sysupgrade", sysupgradeHandler)
 
