@@ -98,11 +98,12 @@ func daemonProcessStartup() {
 
 	// start the classd daemon with the mfw flag to enable our mode of operation
 	// include the local flag so we can capture the log output
+	// include the memory watchdog flag to set the size limit
 	// include the debug flag when our own debug mode is enabled
 	if logger.IsDebugEnabled() {
-		daemonProcess = exec.Command(daemonBinary, "-mfw", "-l", "-d")
+		daemonProcess = exec.Command(daemonBinary, "-mfw", "-l", "-w32768", "-d")
 	} else {
-		daemonProcess = exec.Command(daemonBinary, "-mfw", "-l")
+		daemonProcess = exec.Command(daemonBinary, "-mfw", "-l", "-w32768")
 	}
 
 	// set a different process group so it doesn't get packetd signals

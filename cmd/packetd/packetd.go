@@ -159,7 +159,6 @@ func parseArguments() {
 	disableConndictPtr := flag.Bool("disable-dict", false, "disable dict")
 	versionPtr := flag.Bool("version", false, "version")
 	localPtr := flag.Bool("local", false, "run on console")
-	debugPtr := flag.Bool("debug", false, "enable debug")
 	bypassPtr := flag.Bool("bypass", false, "ignore live traffic")
 	timestampPtr := flag.Bool("no-timestamp", false, "disable timestamp in logging")
 	playbackFilePtr := flag.String("playback", "", "playback traffic from specified file")
@@ -183,10 +182,6 @@ func parseArguments() {
 
 	if *localPtr {
 		localFlag = true
-	}
-
-	if *debugPtr {
-		kernel.SetDebugFlag()
 	}
 
 	if *bypassPtr {

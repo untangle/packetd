@@ -34,7 +34,6 @@ var shutdownConntrackTask = make(chan bool)
 var conntrackCallback ConntrackCallback
 var nfqueueCallback NfqueueCallback
 var netloggerCallback NetloggerCallback
-var debugFlag = false
 var shutdownFlag uint32
 var shutdownChannel = make(chan bool)
 var shutdownChannelCloseOnce sync.Once
@@ -133,16 +132,6 @@ func SetShutdownFlag() {
 // GetShutdownChannel returns a channel
 func GetShutdownChannel() chan bool {
 	return shutdownChannel
-}
-
-// GetDebugFlag gets the shared debug flag
-func GetDebugFlag() bool {
-	return debugFlag
-}
-
-// SetDebugFlag sets the shared debug flag
-func SetDebugFlag() {
-	debugFlag = true
 }
 
 // GetBypassFlag gets the live traffic bypass flag
