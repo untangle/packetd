@@ -63,6 +63,7 @@ var processChannel = make(chan daemonSignal, 1)
 var socketChannel = make(chan daemonSignal, 1)
 var shutdownChannel = make(chan bool)
 var classdHostPort = "127.0.0.1:8123"
+var daemonAvailable = false
 
 // PluginStartup is called to allow plugin specific initialization
 func PluginStartup() {
@@ -84,6 +85,9 @@ func PluginStartup() {
 		return
 	}
 
+	// we found the daemon so set our flag
+	daemonAvailable = true
+
 	// load the application details
 	loadApplicationTable()
 
@@ -100,6 +104,11 @@ func PluginStartup() {
 // PluginShutdown is called when the daemon is shutting down
 func PluginShutdown() {
 	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
+
+	// make sure we created the process and socket manager before trying to stop them
+	if !daemonAvailable {
+		return
+	}
 
 	// signal the socket manager that the system is shutting down
 	signalSocketManager(systemShutdown)
