@@ -58,7 +58,8 @@ func authRequired(engine *gin.Engine) gin.HandlerFunc {
 
 		// Check if JWT token was specified
 		// DISABLED
-		// if checkJWTToken(c) {
+		// jwtauth, _ := checkJWTToken(c)
+		// if jwtauth {
 		// 	c.Next()
 		// 	return
 		// }
@@ -76,7 +77,7 @@ func authRequired(engine *gin.Engine) gin.HandlerFunc {
 
 // checkJWTToken checks for a token specified in the argument
 // if found, it will verify the token and authenticate the user if the JWT is valid
-func checkJWTToken(c *gin.Context) bool {
+func checkJWTToken(c *gin.Context) (bool, string) {
 	now := time.Now()
 	hs256 := jwt.NewHMAC(jwt.SHA256, []byte("secret"))
 	// FIXME - use RSA
@@ -86,7 +87,7 @@ func checkJWTToken(c *gin.Context) bool {
 	// invalid token
 	//token := []byte("invalid.jwt.token")
 	if token == nil {
-		return false
+		return false, ""
 	}
 
 	logger.Info("JWT Token: %v\n", string(token))
@@ -96,17 +97,17 @@ func checkJWTToken(c *gin.Context) bool {
 	raw, err := jwt.Parse(token)
 	if err != nil {
 		logger.Warn("Invalid token %s\n", err.Error())
-		return false
+		return false, ""
 	}
 	if err = raw.Verify(hs256); err != nil {
 		logger.Warn("Error validating token %s\n", err.Error())
-		return false
+		return false, ""
 	}
 	var head jwt.Header
 	var payload CustomJWTPayload
 	if head, err = raw.Decode(&payload); err != nil {
 		logger.Warn("Failed to decode token %s\n", err.Error())
-		return false
+		return false, ""
 	}
 	logger.Info("JWT received: %v %v\n", head.KeyID, head.Algorithm)
 
@@ -121,13 +122,13 @@ func checkJWTToken(c *gin.Context) bool {
 		switch err {
 		case jwt.ErrIatValidation:
 			logger.Warn("Failed IssuedAt validation: %s\n", err.Error())
-			return false
+			return false, ""
 		case jwt.ErrExpValidation:
 			logger.Warn("Failed Expiration validation: %s\n", err.Error())
-			return false
+			return false, ""
 		case jwt.ErrAudValidation:
 			logger.Warn("Failed Audience validation: %s\n", err.Error())
-			return false
+			return false, ""
 		}
 	}
 
@@ -136,11 +137,11 @@ func checkJWTToken(c *gin.Context) bool {
 	err = session.Save()
 	if err == nil {
 		logger.Info("JWT accepted: %s\n", payload.Payload.Subject)
-		return true
+		return true, payload.Payload.Subject
 	}
 
 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
-	return false
+	return false, ""
 }
 
 // findJWTToken search the arguments and cookie for a JWT
@@ -293,8 +294,8 @@ func authLogout(c *gin.Context) {
 	}
 }
 
+// authStatus returns (via a json http reply) the auth status of the current session
 func authStatus(c *gin.Context) {
-
 	// if the setup wizard is not completed, auth is not required - return fake user
 	if !isSetupWizardCompleted() {
 		c.JSON(http.StatusOK, map[string]string{"username": "setup"})
@@ -312,6 +313,13 @@ func authStatus(c *gin.Context) {
 		c.JSON(http.StatusOK, map[string]string{"username": "command-center"})
 		return
 	}
+
+	// check JWT
+	// jwtauth, jwtuser := checkJWTToken(c)
+	// if jwtauth {
+	// 	c.JSON(http.StatusOK, map[string]string{"username": jwtuser})
+	// 	return
+	// }
 
 	session := sessions.Default(c)
 	user := session.Get("username")
