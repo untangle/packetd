@@ -51,6 +51,11 @@ func authRequired(engine *gin.Engine) gin.HandlerFunc {
 			return
 		}
 
+		if checkCommandCenterToken(c) {
+			c.Next()
+			return
+		}
+
 		// Check if JWT token was specified
 		// DISABLED
 		// if checkJWTToken(c) {
@@ -296,9 +301,15 @@ func authStatus(c *gin.Context) {
 		return
 	}
 
-	// if connection is from a local root process, auth is not required
+	// if connection is from a local root process
 	if checkAuthLocal(c) {
 		c.JSON(http.StatusOK, map[string]string{"username": "localroot"})
+		return
+	}
+
+	// if connection is from command center
+	if checkCommandCenterToken(c) {
+		c.JSON(http.StatusOK, map[string]string{"username": "command-center"})
 		return
 	}
 
@@ -440,8 +451,14 @@ func isLocalProcessRoot(ip string, port string) bool {
 	return false
 }
 
-// checks if the untangle auth token is valid
-func isTokenValid(token string) bool {
+// checkCommandCenterToken checks if the untangle auth token is valid
+func checkCommandCenterToken(c *gin.Context) bool {
+	token := c.Query("token")
+	if token == "" {
+		// no token specified
+		return false
+	}
+
 	uid, err := getUID()
 	if err != nil {
 		logger.Warn("Failed to read UID: %s\n", err.Error())
