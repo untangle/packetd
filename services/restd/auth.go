@@ -1,7 +1,9 @@
 package restd
 
 import (
+	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -294,6 +296,12 @@ func authStatus(c *gin.Context) {
 		return
 	}
 
+	// if connection is from a local root process, auth is not required
+	if checkAuthLocal(c) {
+		c.JSON(http.StatusOK, map[string]string{"username": "localroot"})
+		return
+	}
+
 	session := sessions.Default(c)
 	user := session.Get("username")
 	if user == nil {
@@ -425,6 +433,44 @@ func isLocalProcessRoot(ip string, port string) bool {
 		// words[7] is the UID, 0 means uid 0 (root)
 		// words[3] is the state, 01 means ESTABLISHED
 		if parts[0] == ipString && parts[1] == portString && words[7] == "0" && words[3] == "01" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// checks if the untangle auth token is valid
+func isTokenValid(token string) bool {
+	uid, err := getUID()
+	if err != nil {
+		logger.Warn("Failed to read UID: %s\n", err.Error())
+		return false
+	}
+
+	postdata := map[string]interface{}{
+		"token":      token,
+		"resourceId": uid,
+	}
+	bytesdata, err := json.Marshal(postdata)
+	if err != nil {
+		logger.Warn("Failed to serialize JSON: %s\n", err.Error())
+		return false
+	}
+
+	resp, err := http.Post("https://auth.untangle.com/v1/CheckTokenAccess", "application/json", bytes.NewBuffer(bytesdata))
+	if err != nil {
+		logger.Warn("Failed to verify token: %s\n", err.Error())
+		return false
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		b, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			logger.Warn("Failed to parse body: %s\n", err.Error())
+			return false
+		}
+		if string(b) == "true" {
 			return true
 		}
 	}
