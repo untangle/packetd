@@ -224,6 +224,8 @@ func checkHTTPAuth(c *gin.Context) bool {
 func checkAuthLocal(c *gin.Context) bool {
 	// If the connection is from the local host, check if its authorized
 	ip, port, err := net.SplitHostPort(c.Request.RemoteAddr)
+	logger.Info("Connection From : %v %v\n", string(ip), port)
+
 	if err == nil && (ip == "::1" || ip == "127.0.0.1") {
 		if isLocalProcessRoot(ip, port) {
 			session := sessions.Default(c)
