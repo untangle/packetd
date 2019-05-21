@@ -98,6 +98,9 @@ insert_packetd_rules()
     ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct state invalid return
     ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct state untracked return
 
+    # In case we are quickly reusing a conntrack id, flush the sessions dictionary on new connections
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct state new counter dict sessions ct id flush
+
     # Don't catch bypassed traffic
     ${NFT} add rule inet ${TABLE_NAME} packetd-queue dict sessions ct id bypass_packetd bool true counter return
     ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct mark and 0x80000000 == 0x80000000 counter return
@@ -112,9 +115,6 @@ insert_packetd_rules()
 
     # Don't catch deep-sessions
     ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct packets \> 256 counter return
-
-    # In case we are quickly reusing a conntrack id, flush the sessions dictionary on new connections
-    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct state new counter dict sessions ct id flush
 
     # Set the new packet mark
     # We must actually set this mark so that packetd can tell this is a "new" packet
