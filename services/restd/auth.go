@@ -463,8 +463,15 @@ func isLocalProcessRoot(ip string, port string) bool {
 func checkCommandCenterToken(c *gin.Context) bool {
 	token := c.Query("token")
 	if token == "" {
-		// no token specified
-		return false
+		session := sessions.Default(c)
+		tokenO := session.Get("token")
+		if tokenO == nil {
+			return false
+		}
+		token, _ = tokenO.(string)
+		if token == "" {
+			return false
+		}
 	}
 
 	uid, err := getUID()
@@ -483,6 +490,7 @@ func checkCommandCenterToken(c *gin.Context) bool {
 		return false
 	}
 
+	logger.Info("Verify token: %v\n", token)
 	resp, err := http.Post("https://auth.untangle.com/v1/CheckTokenAccess", "application/json", bytes.NewBuffer(bytesdata))
 	if err != nil {
 		logger.Warn("Failed to verify token: %s\n", err.Error())

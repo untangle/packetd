@@ -43,6 +43,7 @@ func Startup() {
 	engine.Use(ginlogger())
 	engine.Use(gin.Recovery())
 	engine.Use(addHeaders)
+	engine.Use(addTokenToSession)
 
 	// Allow cross-site for dev - this should be disabled in production
 	// config := cors.DefaultConfig()
@@ -456,6 +457,22 @@ func addHeaders(c *gin.Context) {
 	// c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE")
 	// c.Header("Access-Control-Allow-Headers", "X-Custom-Header")
 	c.Next()
+}
+
+// addTokenToSession checks for a "token" argument, and adds it to the session
+// this is easier than passing it around among redirects
+func addTokenToSession(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		return
+	}
+	logger.Info("Saving token insession: %v\n", token)
+	session := sessions.Default(c)
+	session.Set("token", token)
+	err := session.Save()
+	if err != nil {
+		logger.Info("Error saving session: %s\n", err.Error())
+	}
 }
 
 // returns true if the setup wizard is completed, or false if not
