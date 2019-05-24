@@ -43,7 +43,6 @@ func Startup() {
 	engine.Use(ginlogger())
 	engine.Use(gin.Recovery())
 	engine.Use(addHeaders)
-	engine.Use(addTokenToSession)
 
 	// Allow cross-site for dev - this should be disabled in production
 	// config := cors.DefaultConfig()
@@ -56,6 +55,7 @@ func Startup() {
 	// store := cookie.NewStore([]byte("secret"))
 
 	engine.Use(sessions.Sessions("auth_session", store))
+	engine.Use(addTokenToSession)
 
 	engine.GET("/", rootHandler)
 
