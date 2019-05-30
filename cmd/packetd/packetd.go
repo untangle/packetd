@@ -215,8 +215,8 @@ func parseArguments() {
 		if err != nil {
 			panic("Failed to write to log file\n")
 		}
-		syscall.Dup2(int(logFile.Fd()), 1)
-		syscall.Dup2(int(logFile.Fd()), 2)
+		syscall.Dup3(int(logFile.Fd()), 1, 0)
+		syscall.Dup3(int(logFile.Fd()), 2, 0)
 	}
 
 }
