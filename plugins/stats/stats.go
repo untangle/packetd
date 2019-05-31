@@ -440,7 +440,7 @@ func loadInterfaceDetailMap() {
 
 	networkSlice, ok := networkJSON.([]interface{})
 	if !ok {
-		logger.Warn("Unable to locate interfaces")
+		logger.Warn("Unable to locate interfaces\n")
 		return
 	}
 
