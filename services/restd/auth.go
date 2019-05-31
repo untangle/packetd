@@ -474,7 +474,7 @@ func checkCommandCenterToken(c *gin.Context) bool {
 		}
 	}
 
-	uid, err := getUID()
+	uid, err := settings.GetUID()
 	if err != nil {
 		logger.Warn("Failed to read UID: %s\n", err.Error())
 		return false

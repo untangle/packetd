@@ -1,10 +1,13 @@
 package reports
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -14,6 +17,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3" // blank import required for runtime binding
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/settings"
 )
 
 // Event stores an arbitrary event
@@ -95,6 +99,8 @@ var queries = make(map[uint64]*Query)
 var queriesLock sync.RWMutex
 var queryID uint64
 var eventQueue = make(chan Event, 10000)
+var cloudQueue = make(chan []byte, 1000)
+var cloudDisabled = false
 
 // EventsLogged records the number of events logged
 var EventsLogged uint64
@@ -118,6 +124,11 @@ func Startup() {
 		createTables()
 		go eventLogger()
 		go dbCleaner()
+		if cloudDisabled {
+			logger.Alert("Cloud event reporting has been disabled\n")
+		} else {
+			go cloudSender()
+		}
 	}()
 }
 
@@ -275,6 +286,72 @@ func eventLogger() {
 		if event.SQLOp == 2 {
 			logUpdateEvent(event)
 		}
+	}
+}
+
+// DisableCloud is called to disable all cloud telemetry
+func DisableCloud() {
+	cloudDisabled = true
+}
+
+// CloudMessage adds a message to the cloudQueue for later sending to the cloud
+func CloudMessage(message []byte) error {
+	if cloudDisabled {
+		return nil
+	}
+	select {
+	case cloudQueue <- message:
+	default:
+		// log the message with the OC verb passing the counter name and the repeat message limit as the first two arguments
+		logger.Warn("%OC|Cloud queue at capacity[%d]. Dropping message: %v\n", "reports_cloud_queue_full", 100, cap(cloudQueue), message)
+		return errors.New("Cloud Queue at Capacity")
+	}
+	return nil
+}
+
+// cloudSender reads from the cloudQueue and logs the events to the cloud
+func cloudSender() {
+	var client http.Client
+	var target string
+	var uid string
+	var err error
+
+	uid, err = settings.GetUID()
+	if err != nil {
+		logger.Warn("Unable to read UID: %s - Exiting cloudSender()\n", err.Error())
+		cloudDisabled = true
+		return
+	}
+
+	target = fmt.Sprintf("https://database.untangle.com/v1/put?source=%s&type=db&queue_name=mfw_events", uid)
+	client.Timeout = time.Duration(5 * time.Second)
+
+	for {
+		message := <-cloudQueue
+
+		request, err := http.NewRequest("POST", target, bytes.NewBuffer(message))
+		if err != nil {
+			logger.Warn("Error calling http.NewRequest: %s\n", err.Error())
+			continue
+		}
+
+		request.Header.Set("AuthRequest", "93BE7735-E9F2-487A-9DD4-9D05B95640F5")
+		request.Header.Set("cache-control", "no-cache")
+
+		response, err := client.Do(request)
+		if err != nil {
+			logger.Warn("Error calling client.Do: %s\n", err.Error())
+			continue
+		}
+
+		body, err := ioutil.ReadAll(response.Body)
+		response.Body.Close()
+
+		if err != nil {
+			logger.Warn("Error calling ioutil.ReadAll: %s\n", err.Error())
+		}
+
+		logger.Trace("Cloud Message: %v\nCloudReply: %v\n", string(message), string(body))
 	}
 }
 

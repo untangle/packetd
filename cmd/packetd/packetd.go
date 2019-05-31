@@ -156,7 +156,8 @@ func printVersion() {
 // parseArguments parses the command line arguments
 func parseArguments() {
 	classdAddressStringPtr := flag.String("classd", "127.0.0.1:8123", "host:port for classd daemon")
-	disableConndictPtr := flag.Bool("disable-dict", false, "disable dict")
+	disableCloudPtr := flag.Bool("disable-cloud", false, "disable cloud events")
+	disableDictPtr := flag.Bool("disable-dict", false, "disable dict")
 	versionPtr := flag.Bool("version", false, "version")
 	localPtr := flag.Bool("local", false, "run on console")
 	bypassPtr := flag.Bool("bypass", false, "ignore live traffic")
@@ -171,7 +172,11 @@ func parseArguments() {
 
 	classify.SetHostPort(*classdAddressStringPtr)
 
-	if *disableConndictPtr {
+	if *disableCloudPtr {
+		reports.DisableCloud()
+	}
+
+	if *disableDictPtr {
 		dict.Disable()
 	}
 

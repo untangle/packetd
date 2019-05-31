@@ -424,3 +424,18 @@ func tempFile(dir, pattern string) (f *os.File, err error) {
 	}
 	return
 }
+
+// GetUID returns the UID of the system
+func GetUID() (string, error) {
+	file, err := os.Open("/etc/config/uid")
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		return scanner.Text(), nil
+	}
+	return "", errors.New("UID file missing contents")
+}

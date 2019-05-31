@@ -358,6 +358,13 @@ func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive
 	}
 
 	reports.LogEvent(reports.CreateEvent("interface_stats", "interface_stats", 1, columns, nil))
+
+	jsonData, err := json.Marshal(columns)
+	if err == nil {
+		reports.CloudMessage(jsonData)
+	} else {
+		logger.Warn("Error %s returned from json.Marshal(%v)\n", err.Error(), columns)
+	}
 }
 
 // calculateDifference determines the difference between the two argumented values

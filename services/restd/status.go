@@ -2,7 +2,6 @@ package restd
 
 import (
 	"bufio"
-	"errors"
 	"net/http"
 	"os"
 	"os/exec"
@@ -11,6 +10,7 @@ import (
 	"github.com/c9s/goprocinfo/linux"
 	"github.com/gin-gonic/gin"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/settings"
 )
 
 // statusSystem is the RESTD /api/status/system handler
@@ -104,7 +104,7 @@ func statusBuild(c *gin.Context) {
 func statusUID(c *gin.Context) {
 	logger.Debug("statusUID()\n")
 
-	uid, err := getUID()
+	uid, err := settings.GetUID()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
@@ -152,21 +152,6 @@ func getBuildInfo() (map[string]interface{}, error) {
 	}
 
 	return jsonO, nil
-}
-
-// getUID returns the UID of the system
-func getUID() (string, error) {
-	file, err := os.Open("/etc/config/uid")
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		return scanner.Text(), nil
-	}
-	return "", errors.New("UID file missing contents")
 }
 
 // getBoardName returns the board name of the SOC system
