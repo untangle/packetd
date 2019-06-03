@@ -357,14 +357,10 @@ func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive
 		"tx_compressed_rate":       diffInfo.TxCompressed / seconds,
 	}
 
-	reports.LogEvent(reports.CreateEvent("interface_stats", "interface_stats", 1, columns, nil))
-
-	jsonData, err := json.Marshal(columns)
-	if err == nil {
-		reports.CloudMessage(jsonData)
-	} else {
-		logger.Warn("Error %s returned from json.Marshal(%v)\n", err.Error(), columns)
-	}
+	// create a stats event and send to the log and the cloud
+	event := reports.CreateEvent("interface_stats", "interface_stats", 1, columns, nil)
+	reports.LogEvent(event)
+	reports.CloudEvent(event)
 }
 
 // calculateDifference determines the difference between the two argumented values

@@ -23,16 +23,16 @@ import (
 // Event stores an arbitrary event
 type Event struct {
 	// Name - A human readable name for this event. (ie "session_new" is a new session event)
-	Name string
+	Name string `json:"eventName"`
 	// Table - the DB table that this event modifies (or nil)
-	Table string
+	Table string `json:"dbTable"`
 	// SQLOp - the SQL operation needed to serialize the event to the DB
 	// 1 - INSERT // 2 - UPDATE
-	SQLOp int
+	SQLOp int `json:"dbOperation"`
 	// The columns in the DB this inserts for INSERTS or qualifies if matches for UPDATES
-	Columns map[string]interface{}
+	Columns map[string]interface{} `json:"dbColumns"`
 	// The columns to modify for UPDATE events
-	ModifiedColumns map[string]interface{}
+	ModifiedColumns map[string]interface{} `json:"dbModified"`
 }
 
 // Query holds the results of a database query operation
@@ -99,7 +99,7 @@ var queries = make(map[uint64]*Query)
 var queriesLock sync.RWMutex
 var queryID uint64
 var eventQueue = make(chan Event, 10000)
-var cloudQueue = make(chan []byte, 1000)
+var cloudQueue = make(chan Event, 1000)
 var cloudDisabled = false
 
 // EventsLogged records the number of events logged
@@ -294,16 +294,16 @@ func DisableCloud() {
 	cloudDisabled = true
 }
 
-// CloudMessage adds a message to the cloudQueue for later sending to the cloud
-func CloudMessage(message []byte) error {
+// CloudEvent adds an Event to the cloudQueue for later sending to the cloud
+func CloudEvent(event Event) error {
 	if cloudDisabled {
 		return nil
 	}
 	select {
-	case cloudQueue <- message:
+	case cloudQueue <- event:
 	default:
-		// log the message with the OC verb passing the counter name and the repeat message limit as the first two arguments
-		logger.Warn("%OC|Cloud queue at capacity[%d]. Dropping message: %v\n", "reports_cloud_queue_full", 100, cap(cloudQueue), message)
+		// log the event with the OC verb passing the counter name and the repeat message limit as the first two arguments
+		logger.Warn("%OC|Cloud queue at capacity[%d]. Dropping message: %v\n", "reports_cloud_queue_full", 100, cap(cloudQueue), event)
 		return errors.New("Cloud Queue at Capacity")
 	}
 	return nil
@@ -327,7 +327,12 @@ func cloudSender() {
 	client.Timeout = time.Duration(5 * time.Second)
 
 	for {
-		message := <-cloudQueue
+		event := <-cloudQueue
+		message, err := json.Marshal(event)
+		if err != nil {
+			logger.Warn("Error calling json.Marshal: %s\n", err.Error())
+			continue
+		}
 
 		request, err := http.NewRequest("POST", target, bytes.NewBuffer(message))
 		if err != nil {
@@ -351,7 +356,9 @@ func cloudSender() {
 			logger.Warn("Error calling ioutil.ReadAll: %s\n", err.Error())
 		}
 
-		logger.Trace("Cloud Message: %v\nCloudReply: %v\n", string(message), string(body))
+		if logger.IsTraceEnabled() {
+			logger.Trace("Cloud Message: %v\nCloudReply: %v\n", string(message), string(body))
+		}
 	}
 }
 
