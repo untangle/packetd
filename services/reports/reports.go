@@ -23,16 +23,16 @@ import (
 // Event stores an arbitrary event
 type Event struct {
 	// Name - A human readable name for this event. (ie "session_new" is a new session event)
-	Name string `json:"eventName"`
+	Name string `json:"name"`
 	// Table - the DB table that this event modifies (or nil)
-	Table string `json:"dbTable"`
+	Table string `json:"table"`
 	// SQLOp - the SQL operation needed to serialize the event to the DB
 	// 1 - INSERT // 2 - UPDATE
-	SQLOp int `json:"dbOperation"`
+	SQLOp int `json:"sqlOp"`
 	// The columns in the DB this inserts for INSERTS or qualifies if matches for UPDATES
-	Columns map[string]interface{} `json:"dbColumns"`
+	Columns map[string]interface{} `json:"columns"`
 	// The columns to modify for UPDATE events
-	ModifiedColumns map[string]interface{} `json:"dbModified"`
+	ModifiedColumns map[string]interface{} `json:"modifiedColumns"`
 }
 
 // Query holds the results of a database query operation
