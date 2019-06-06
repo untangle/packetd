@@ -2,6 +2,7 @@ package reports
 
 import (
 	"bytes"
+	"crypto/tls"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -311,8 +312,6 @@ func CloudEvent(event Event) error {
 
 // cloudSender reads from the cloudQueue and logs the events to the cloud
 func cloudSender() {
-	var client http.Client
-	var target string
 	var uid string
 	var err error
 
@@ -323,8 +322,10 @@ func cloudSender() {
 		return
 	}
 
-	target = fmt.Sprintf("https://database.untangle.com/v1/put?source=%s&type=db&queue_name=mfw_events", uid)
-	client.Timeout = time.Duration(5 * time.Second)
+	// FIXME - We disable cert checking on our http.Client for now
+	transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	client := &http.Client{Transport: transport, Timeout: time.Duration(5 * time.Second)}
+	target := fmt.Sprintf("https://database.untangle.com/v1/put?source=%s&type=db&queue_name=mfw_events", uid)
 
 	for {
 		event := <-cloudQueue
