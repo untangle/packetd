@@ -357,10 +357,14 @@ func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive
 		"tx_compressed_rate":       diffInfo.TxCompressed / seconds,
 	}
 
-	// create a stats event and send to the log and the cloud
+	// create a stats event and send to the logger
 	event := reports.CreateEvent("interface_stats", "interface_stats", 1, columns, nil)
 	reports.LogEvent(event)
-	reports.CloudEvent(event)
+
+	// for WAN interfaces we also send the stats to the cloud
+	if getInterfaceWanFlag(diffInfo.Iface) {
+		reports.CloudEvent(event)
+	}
 }
 
 // calculateDifference determines the difference between the two argumented values
@@ -425,6 +429,21 @@ func getInterfaceIDValue(name string) int {
 	}
 
 	return -1
+}
+
+// getInterfaceWanFlag is called to get the WAN flag for the argumented interface name
+func getInterfaceWanFlag(name string) bool {
+	var val *interfaceDetail
+
+	interfaceDetailLocker.RLock()
+	val = interfaceDetailMap[name]
+	interfaceDetailLocker.RUnlock()
+
+	if val != nil {
+		return val.wanFlag
+	}
+
+	return false
 }
 
 // loadInterfaceDetailMap creates a map of interface name to MFW interface ID values
