@@ -342,7 +342,6 @@ func cloudSender() {
 		}
 
 		request.Header.Set("AuthRequest", "93BE7735-E9F2-487A-9DD4-9D05B95640F5")
-		request.Header.Set("cache-control", "no-cache")
 
 		response, err := client.Do(request)
 		if err != nil {
@@ -350,15 +349,20 @@ func cloudSender() {
 			continue
 		}
 
-		body, err := ioutil.ReadAll(response.Body)
+		_, err = ioutil.ReadAll(response.Body)
 		response.Body.Close()
 
 		if err != nil {
 			logger.Warn("Error calling ioutil.ReadAll: %s\n", err.Error())
 		}
 
+		if logger.IsDebugEnabled() {
+			logger.Info("CloudRequest: %s CloudResponse: [%d] %s %s\n", target, response.StatusCode, response.Proto, response.Status)
+		}
+
 		if logger.IsTraceEnabled() {
-			logger.Trace("Cloud Message: %v\nCloudReply: %v\n", string(message), string(body))
+			logger.Trace("Cloud-XMIT: %v\n", request)
+			logger.Trace("Cloud-RECV: %v\n", response)
 		}
 	}
 }
