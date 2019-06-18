@@ -101,9 +101,9 @@ func daemonProcessStartup() {
 	// include the memory watchdog flag to set the size limit
 	// include the debug flag when our own debug mode is enabled
 	if logger.IsDebugEnabled() {
-		daemonProcess = exec.Command(daemonBinary, "-mfw", "-l", "-w32768", "-d")
+		daemonProcess = exec.Command(daemonBinary, "-mfw", "-l", "-w65536", "-d")
 	} else {
-		daemonProcess = exec.Command(daemonBinary, "-mfw", "-l", "-w32768")
+		daemonProcess = exec.Command(daemonBinary, "-mfw", "-l", "-w65536")
 	}
 
 	// set a different process group so it doesn't get packetd signals
