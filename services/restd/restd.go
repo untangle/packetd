@@ -203,6 +203,7 @@ func reportsGetData(c *gin.Context) {
 		return
 	}
 
+	c.Header("Content-Type", "application/json")
 	c.String(http.StatusOK, str)
 	return
 }
