@@ -325,7 +325,7 @@ func cloudSender() {
 	// FIXME - We disable cert checking on our http.Client for now
 	transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 	client := &http.Client{Transport: transport, Timeout: time.Duration(5 * time.Second)}
-	target := fmt.Sprintf("https://database.untangle.com/v1/put?source=%s&type=db&queue_name=mfw_events", uid)
+	target := fmt.Sprintf("https://database.untangle.com/v1/put?source=%s&type=db&queueName=mfw_events", uid)
 
 	for {
 		event := <-cloudQueue
