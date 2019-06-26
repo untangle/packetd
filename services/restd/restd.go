@@ -86,6 +86,7 @@ func Startup() {
 	api.POST("/reports/close_query/:query_id", reportsCloseQuery)
 
 	api.POST("/warehouse/capture", warehouseCapture)
+	api.POST("/warehouse/close", warehouseClose)
 	api.POST("/warehouse/playback", warehousePlayback)
 	api.POST("/warehouse/cleanup", warehouseCleanup)
 	api.GET("/warehouse/status", warehouseStatus)
@@ -294,14 +295,51 @@ func warehousePlayback(c *gin.Context) {
 	c.JSON(http.StatusOK, "Playback started")
 }
 
-func warehouseCapture(c *gin.Context) {
-	// FIXME - some day
-	c.JSON(http.StatusOK, "THIS FUNCTION IS NOT YET IMPLEMENTED")
-}
-
 func warehouseCleanup(c *gin.Context) {
 	dispatch.HandleWarehouseCleanup()
 	c.JSON(http.StatusOK, "Cleanup success\n")
+}
+
+func warehouseCapture(c *gin.Context) {
+
+	var data map[string]string
+	var body []byte
+	var filename string
+	var found bool
+	var err error
+
+	body, err = ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	filename, found = data["filename"]
+	if found != true {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "filename not specified"})
+		return
+	}
+
+	kernel.SetWarehouseFlag('C')
+	kernel.SetWarehouseFile(filename)
+	kernel.StartWarehouseCapture()
+
+	logger.Info("Beginning capture to file:%s\n", filename)
+
+	c.JSON(http.StatusOK, "Capture started")
+}
+
+func warehouseClose(c *gin.Context) {
+	kernel.CloseWarehouseCapture()
+	kernel.SetWarehouseFlag('I')
+
+	c.JSON(http.StatusOK, "Capture finished\n")
 }
 
 func warehouseStatus(c *gin.Context) {
