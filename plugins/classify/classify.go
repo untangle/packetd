@@ -168,9 +168,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	state, confidence := processReply(reply, mess, ctid)
 
 	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, release the session
-	// FIXME - we're temporarily ignoring state and only releasing when we hit the packet or byte count limits
-	//	if state == navlStateClassified || state == navlStateTerminated || mess.Session.GetPacketCount() > maxPacketCount || mess.Session.GetByteCount() > maxTrafficSize {
-	if mess.Session.GetPacketCount() > maxPacketCount || mess.Session.GetByteCount() > maxTrafficSize {
+	if state == navlStateClassified || state == navlStateTerminated || mess.Session.GetPacketCount() > maxPacketCount || mess.Session.GetByteCount() > maxTrafficSize {
 		if logger.IsLogEnabled(logger.LogLevelDebug) {
 			logger.Debug("RELEASING SESSION:%d STATE:%d CONFIDENCE:%d PACKETS:%d BYTES:%d\n", ctid, state, confidence, mess.Session.GetPacketCount(), mess.Session.GetByteCount())
 		}
