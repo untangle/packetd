@@ -46,6 +46,7 @@ const navlStateClassified = 3 // Indicates the connection is fully classified
 
 const maxPacketCount = 64      // The maximum number of packets to inspect before releasing
 const maxTrafficSize = 0x10000 // The maximum number of bytes to inspect before releasing
+const maxNavlCount = 4         // The number of extra packets to inspect after NAVL is finished
 
 type daemonSignal int
 
@@ -167,10 +168,16 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	// process the reply and get the classification state
 	state, confidence := processReply(reply, mess, ctid)
 
+	// when NAVL is done with the session we use a counter that lets us process
+	// a few extra packets to make sure we get the full classification details
+	if state == navlStateClassified || state == navlStateTerminated || mess.Session.GetNavlCount() != 0 {
+		mess.Session.AddNavlCount(1)
+	}
+
 	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, release the session
-	if state == navlStateClassified || state == navlStateTerminated || mess.Session.GetPacketCount() > maxPacketCount || mess.Session.GetByteCount() > maxTrafficSize {
+	if mess.Session.GetNavlCount() > maxNavlCount || mess.Session.GetPacketCount() > maxPacketCount || mess.Session.GetByteCount() > maxTrafficSize {
 		if logger.IsLogEnabled(logger.LogLevelDebug) {
-			logger.Debug("RELEASING SESSION:%d STATE:%d CONFIDENCE:%d PACKETS:%d BYTES:%d\n", ctid, state, confidence, mess.Session.GetPacketCount(), mess.Session.GetByteCount())
+			logger.Debug("RELEASING SESSION:%d STATE:%d CONFIDENCE:%d PACKETS:%d BYTES:%d COUNT:%d\n", ctid, state, confidence, mess.Session.GetPacketCount(), mess.Session.GetByteCount(), mess.Session.GetNavlCount())
 		}
 
 		return dispatch.NfqueueResult{SessionRelease: true}

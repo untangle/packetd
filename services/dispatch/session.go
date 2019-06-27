@@ -34,10 +34,11 @@ type Session struct {
 	// sessionID is the globally unique ID for this session (created in packetd)
 	sessionID int64
 
-	// used to keep track of the session packet, byte, and event counts
+	// used to keep track of the session packet, byte, event, and navl counts
 	packetCount uint64
 	byteCount   uint64
 	eventCount  uint64
+	navlCount   uint64
 
 	// conntrackID is the conntrack ID. ConntrackIDs (ctid) are unique but reused.
 	conntrackID uint32
@@ -275,6 +276,22 @@ func (sess *Session) SetEventCount(value uint64) uint64 {
 // AddEventCount increases the event count by the argumented value
 func (sess *Session) AddEventCount(value uint64) uint64 {
 	return atomic.AddUint64(&sess.eventCount, value)
+}
+
+// GetNavlCount gets the navl count
+func (sess *Session) GetNavlCount() uint64 {
+	return atomic.LoadUint64(&sess.navlCount)
+}
+
+// SetNavlCount sets the navl count
+func (sess *Session) SetNavlCount(value uint64) uint64 {
+	atomic.StoreUint64(&sess.navlCount, value)
+	return value
+}
+
+// AddNavlCount increases the navl count by the argumented value
+func (sess *Session) AddNavlCount(value uint64) uint64 {
+	return atomic.AddUint64(&sess.navlCount, value)
 }
 
 // GetCreationTime gets the time the entry was created
