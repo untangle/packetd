@@ -8,7 +8,7 @@ import (
 )
 
 const pluginName = "sni"
-const maxPacketCount = 5
+const maxPacketCount = 10
 
 // PluginStartup function is called to allow plugin specific initialization.
 func PluginStartup() {
