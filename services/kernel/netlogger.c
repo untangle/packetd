@@ -14,6 +14,46 @@ static struct nflog_g_handle    *l_grp_handle;
 static int                      l_logsock;
 static char                     *logsrc = "netlogger";
 
+int nflog_get_ct_info(struct nflog_data *nfa, char **data)
+{
+	*data = nfnl_get_pointer_to_data(nfa->nfa,NFULA_CT,char);
+	if (*data)
+		return NFA_PAYLOAD(nfa->nfa[NFULA_CT-1]);
+
+	logmessage(LOG_DEBUG,logsrc,"Error calling nfnl_get_pointer_to_data(NFULA_CT)\n");
+	return(-1);
+}
+
+unsigned int nflog_get_conntrack_id(struct nflog_data *nfa, int l3num)
+{
+	struct nf_conntrack		*ct;
+	char				*ct_data;
+	unsigned int			id;
+	int				ct_len = 0;
+
+	ct_len = nflog_get_ct_info(nfa, &ct_data);
+	if (ct_len <= 0) {
+		return(0);
+	}
+
+	ct = nfct_new();
+
+	if (ct == NULL) {
+		logmessage(LOG_WARNING,logsrc,"Error calling nfct_new()\n");
+		return(0);
+	}
+
+	if (nfct_payload_parse((void *)ct_data,ct_len,l3num,ct ) < 0) {
+		nfct_destroy(ct);
+		logmessage(LOG_WARNING,logsrc,"Error calling nfct_payload_parse()\n" );
+		return(0);
+	}
+
+	id = nfct_get_attr_u32(ct,ATTR_ID);
+	nfct_destroy(ct);
+	return(id);
+}
+
 int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct nflog_data *nfa,void *data)
 {
 	struct netlogger_info   info;
@@ -25,6 +65,7 @@ int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct n
 	char                    *prefix;
 	uint                    packet_size;
     uint32_t                family;
+	uint32_t 		ctid;
     
 	// get the raw packet and check for sanity
 	packet_size = nflog_get_payload(nfa,&packet_data);
@@ -54,6 +95,8 @@ int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct n
 	strcpy(info.src_addr,"UNKNOWN");
 	strcpy(info.dst_addr,"UNKNOWN");
     info.version = 0;
+
+	ctid = nflog_get_conntrack_id(nfa,family);
 
 	// grab the source and destination addresses for IPv4 packets
 	if (family == AF_INET) {
@@ -146,6 +189,13 @@ int netlogger_startup(void)
 	if (ret < 0) {
 		logmessage(LOG_ERR,logsrc,"Error %d returned from nflog_set_mode()\n",errno);
 		return(6);
+	}
+
+	// set flag so we also get the conntrack info for each packet
+	ret = nflog_set_flags(l_grp_handle,NFULNL_CFG_F_CONNTRACK);
+	if (ret < 0) {
+		logmessage(LOG_ERR,logsrc,"Error returned from nflog_set_flags(NFULNL_CFG_F_CONNTRACK)\n");
+		return(7);
 	}
 
 	// get a file descriptor for our log handle

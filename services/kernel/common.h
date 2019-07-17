@@ -25,6 +25,7 @@
 #include <netinet/ip_icmp.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter/nfnetlink_queue.h>
+#include <linux/netfilter/nfnetlink_log.h>
 #include <libnetfilter_conntrack/libnetfilter_conntrack.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
 #include <libnetfilter_log/libnetfilter_log.h>
@@ -86,6 +87,10 @@ struct netlogger_info {
 
 struct nfq_data {
 	struct nfattr	**data;
+};
+
+struct nflog_data {
+	struct nfattr	**nfa;
 };
 
 extern void go_nfqueue_callback(uint32_t mark,unsigned char* data,int len,uint32_t ctid,uint32_t nfid,uint32_t family,char* memory,int playflag,int index);
