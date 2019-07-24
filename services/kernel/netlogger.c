@@ -27,9 +27,9 @@ int nflog_get_ct_info(struct nflog_data *nfa, char **data)
 unsigned int nflog_get_conntrack_id(struct nflog_data *nfa, int l3num)
 {
 	struct nf_conntrack		*ct;
-	char				*ct_data;
+	char					*ct_data;
 	unsigned int			id;
-	int				ct_len = 0;
+	int						ct_len = 0;
 
 	ct_len = nflog_get_ct_info(nfa, &ct_data);
 	if (ct_len <= 0) {
@@ -65,8 +65,8 @@ int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct n
 	char                    *prefix;
 	uint                    packet_size;
     uint32_t                family;
-	uint32_t 		ctid;
-    
+	uint32_t 				ctid;
+
 	// get the raw packet and check for sanity
 	packet_size = nflog_get_payload(nfa,&packet_data);
 	if ((packet_data == NULL) || (packet_size < 20)) return(0);
@@ -90,13 +90,14 @@ int netlogger_callback(struct nflog_g_handle *gh,struct nfgenmsg *nfmsg,struct n
 	// grab the protocol
     family = nfmsg->nfgen_family;
 	info.protocol = iphead->protocol;
-    
+
     // start with unknown in case we don't extract the addresses
 	strcpy(info.src_addr,"UNKNOWN");
 	strcpy(info.dst_addr,"UNKNOWN");
     info.version = 0;
 
-	ctid = nflog_get_conntrack_id(nfa,family);
+	// get the conntrack id
+	info.ctid = nflog_get_conntrack_id(nfa,family);
 
 	// grab the source and destination addresses for IPv4 packets
 	if (family == AF_INET) {

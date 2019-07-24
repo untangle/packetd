@@ -26,7 +26,7 @@ type ConntrackCallback func(uint32, uint32, uint8, uint8, uint8, net.IP, net.IP,
 type NfqueueCallback func(uint32, uint32, gopacket.Packet, int, uint32) int
 
 // NetloggerCallback is a function to handle netlogger events
-type NetloggerCallback func(uint8, uint8, uint16, uint8, uint8, string, string, uint16, uint16, uint32, string)
+type NetloggerCallback func(uint8, uint8, uint16, uint8, uint8, string, string, uint16, uint16, uint32, uint32, string)
 
 // To give C child functions access we export go_child_startup and shutdown functions which
 var childsync sync.WaitGroup
@@ -369,6 +369,7 @@ func go_netlogger_callback(info *C.struct_netlogger_info, playflag C.int) {
 	var srcPort uint16 = uint16(info.src_port)
 	var dstPort uint16 = uint16(info.dst_port)
 	var mark uint32 = uint32(info.mark)
+	var ctid uint32 = uint32(info.ctid)
 	var prefix string = C.GoString(&info.prefix[0])
 
 	if netloggerCallback == nil {
@@ -376,7 +377,7 @@ func go_netlogger_callback(info *C.struct_netlogger_info, playflag C.int) {
 		return
 	}
 
-	netloggerCallback(version, protocol, icmpType, srcInterface, dstInterface, srcAddress, dstAddress, srcPort, dstPort, mark, prefix)
+	netloggerCallback(version, protocol, icmpType, srcInterface, dstInterface, srcAddress, dstAddress, srcPort, dstPort, mark, ctid, prefix)
 }
 
 //export go_child_startup

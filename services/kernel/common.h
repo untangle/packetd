@@ -82,6 +82,7 @@ struct netlogger_info {
 	u_int16_t		src_port;
 	u_int16_t		dst_port;
 	u_int32_t		mark;
+	u_int32_t		ctid;
 	char			prefix[64];
 };
 

@@ -11,6 +11,7 @@ type NetloggerHandlerFunction func(*NetloggerMessage)
 
 // NetloggerMessage is used to pass the details of NFLOG events to interested plugins
 type NetloggerMessage struct {
+	Sessptr      *Session
 	Version      uint8
 	Protocol     uint8
 	IcmpType     uint16
@@ -21,6 +22,7 @@ type NetloggerMessage struct {
 	SrcPort      uint16
 	DstPort      uint16
 	Mark         uint32
+	Ctid         uint32
 	Prefix       string
 }
 
@@ -28,7 +30,8 @@ func netloggerCallback(version uint8,
 	protocol uint8, icmpType uint16,
 	srcInterface uint8, dstInterface uint8,
 	srcAddress string, dstAddress string,
-	srcPort uint16, dstPort uint16, mark uint32, prefix string) {
+	srcPort uint16, dstPort uint16,
+	mark uint32, ctid uint32, prefix string) {
 	var netlogger NetloggerMessage
 
 	netlogger.Version = version
@@ -42,6 +45,7 @@ func netloggerCallback(version uint8,
 	netlogger.DstPort = dstPort
 	netlogger.Mark = mark
 	netlogger.Prefix = prefix
+	netlogger.Sessptr = findSession(ctid)
 
 	logger.Trace("netlogger event: %v \n", netlogger)
 

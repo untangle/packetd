@@ -137,8 +137,23 @@ func PluginConntrackHandler(message int, entry *dispatch.Conntrack) {
 
 // PluginNetloggerHandler receives NFLOG events
 func PluginNetloggerHandler(netlogger *dispatch.NetloggerMessage) {
-	// FIXME
-	// IMPLEMENT ME
+	if netlogger.Sessptr == nil {
+		logger.Warn("Missing session in netlogger event: %v\n", netlogger)
+		return
+	}
+
+	columns := map[string]interface{}{
+		"session_id": netlogger.Sessptr.GetSessionID(),
+	}
+
+	// FIXME - need to parse actual values from the netlogger message
+	modifiedColumns := make(map[string]interface{})
+	modifiedColumns["wan_rule_chain"] = "somechain"
+	modifiedColumns["wan_rule_id"] = 1
+	modifiedColumns["wan_policy_id"] = 2
+
+	reports.LogEvent(reports.CreateEvent("reporter_netlogger", "sessions", 2, columns, modifiedColumns))
+	logger.Debug("NetLogger event for %v: %v\n", columns, modifiedColumns)
 }
 
 // doAccounting does the session_minutes accounting
