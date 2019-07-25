@@ -3,6 +3,7 @@
 package reporter
 
 import (
+	"encoding/json"
 	"net"
 	"time"
 
@@ -135,8 +136,20 @@ func PluginConntrackHandler(message int, entry *dispatch.Conntrack) {
 	}
 }
 
+// TrafficEvent defines the prefix passed in Netlogger events
+type TrafficEvent struct {
+	Type   string
+	Table  string
+	Chain  string
+	RuleId int
+	Action string
+	Policy int
+}
+
 // PluginNetloggerHandler receives NFLOG events
 func PluginNetloggerHandler(netlogger *dispatch.NetloggerMessage) {
+	var traffic TrafficEvent
+
 	if netlogger.Sessptr == nil {
 		logger.Warn("Missing session in netlogger event: %v\n", netlogger)
 		return
@@ -146,11 +159,18 @@ func PluginNetloggerHandler(netlogger *dispatch.NetloggerMessage) {
 		"session_id": netlogger.Sessptr.GetSessionID(),
 	}
 
-	// FIXME - need to parse actual values from the netlogger message
+	// extract the details from the json passed in the prefix
+	json.Unmarshal([]byte(netlogger.Prefix), &traffic)
+
+	// we currently only care about wan routing rules
+	if traffic.Type != "rule" || traffic.Table != "wan-routing" {
+		return
+	}
+
 	modifiedColumns := make(map[string]interface{})
-	modifiedColumns["wan_rule_chain"] = "somechain"
-	modifiedColumns["wan_rule_id"] = 1
-	modifiedColumns["wan_policy_id"] = 2
+	modifiedColumns["wan_rule_chain"] = traffic.Chain
+	modifiedColumns["wan_rule_id"] = traffic.RuleId
+	modifiedColumns["wan_policy_id"] = traffic.Policy
 
 	reports.LogEvent(reports.CreateEvent("reporter_netlogger", "sessions", 2, columns, modifiedColumns))
 	logger.Debug("NetLogger event for %v: %v\n", columns, modifiedColumns)
