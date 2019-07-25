@@ -45,7 +45,7 @@ func netloggerCallback(version uint8,
 	netlogger.SrcPort = srcPort
 	netlogger.DstPort = dstPort
 	netlogger.Mark = mark
-	netlogger.Prefix = strings.ReplaceAll(prefix, "'", "\"")
+	netlogger.Prefix = strings.Replace(prefix, "'", "\"", -1)
 	netlogger.Sessptr = findSession(ctid)
 
 	logger.Trace("netlogger event: %v \n", netlogger)

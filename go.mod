@@ -12,7 +12,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/oschwald/geoip2-golang v1.2.1
 	github.com/oschwald/maxminddb-golang v1.3.0 // indirect
-	golang.org/x/net v0.0.0-20190320064053-1272bf9dcd53
+	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
 	golang.org/x/sys v0.0.0-20190403152447-81d4e9dc473e // indirect
-	golang.org/x/tools v0.0.0-20190425001055-9e44c1c40307 // indirect
+	golang.org/x/tools v0.0.0-20190724185037-8aa4eac1a7c1 // indirect
 )
