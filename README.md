@@ -9,13 +9,7 @@ Userspace packet processing daemon
 Building locally
 ================
 
-You'll need an Untangle mirror to get the patched libnetfilter-queue-dev:
-
-```
-apt-get install libnetfilter-log-dev libnetfilter-queue-dev libnetfilter-conntrack-dev
-```
-
-Then build the regular way:
+Then build the regular way (go 1.11+ is required):
 
 ```
 make
