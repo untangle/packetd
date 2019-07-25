@@ -83,7 +83,7 @@ struct netlogger_info {
 	u_int16_t		dst_port;
 	u_int32_t		mark;
 	u_int32_t		ctid;
-	char			prefix[64];
+	char			prefix[256];
 };
 
 struct nfq_data {

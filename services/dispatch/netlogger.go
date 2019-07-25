@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/untangle/packetd/services/logger"
@@ -44,7 +45,7 @@ func netloggerCallback(version uint8,
 	netlogger.SrcPort = srcPort
 	netlogger.DstPort = dstPort
 	netlogger.Mark = mark
-	netlogger.Prefix = prefix
+	netlogger.Prefix = strings.ReplaceAll(prefix, "'", "\"")
 	netlogger.Sessptr = findSession(ctid)
 
 	logger.Trace("netlogger event: %v \n", netlogger)
