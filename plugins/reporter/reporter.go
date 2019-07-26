@@ -141,7 +141,7 @@ type TrafficEvent struct {
 	Type   string
 	Table  string
 	Chain  string
-	RuleId int
+	RuleID int
 	Action string
 	Policy int
 }
@@ -151,7 +151,7 @@ func PluginNetloggerHandler(netlogger *dispatch.NetloggerMessage) {
 	var traffic TrafficEvent
 
 	if netlogger.Sessptr == nil {
-		logger.Warn("Missing session in netlogger event: %v\n", netlogger)
+		logger.Debug("Missing session in netlogger event: %v\n", netlogger)
 		return
 	}
 
@@ -169,7 +169,7 @@ func PluginNetloggerHandler(netlogger *dispatch.NetloggerMessage) {
 
 	modifiedColumns := make(map[string]interface{})
 	modifiedColumns["wan_rule_chain"] = traffic.Chain
-	modifiedColumns["wan_rule_id"] = traffic.RuleId
+	modifiedColumns["wan_rule_id"] = traffic.RuleID
 	modifiedColumns["wan_policy_id"] = traffic.Policy
 
 	reports.LogEvent(reports.CreateEvent("reporter_netlogger", "sessions", 2, columns, modifiedColumns))
