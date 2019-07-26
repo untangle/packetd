@@ -7,58 +7,58 @@ github.com/GehirnInc/crypt/internal
 github.com/c9s/goprocinfo/linux
 # github.com/gbrlsnchs/jwt/v3 v3.0.0-beta.0
 github.com/gbrlsnchs/jwt/v3
-# github.com/gin-contrib/location v0.0.0-20190301062650-0462caccbb9c
+# github.com/gin-contrib/location v0.0.0-20190528141421-4d994432eb13
 github.com/gin-contrib/location
-# github.com/gin-contrib/sessions v0.0.0-20190226023029-1532893d996f
+# github.com/gin-contrib/sessions v0.0.0-20190512062852-3cb4c4f2d615
 github.com/gin-contrib/sessions
 github.com/gin-contrib/sessions/cookie
-# github.com/gin-contrib/sse v0.0.0-20190301062529-5545eab6dad3
+# github.com/gin-contrib/sse v0.1.0
 github.com/gin-contrib/sse
-# github.com/gin-gonic/contrib v0.0.0-20190302003538-54ff787f7c73
+# github.com/gin-gonic/contrib v0.0.0-20190526021735-7fb7810ed2a0
 github.com/gin-gonic/contrib/static
-# github.com/gin-gonic/gin v1.3.1-0.20190321071206-1d462bbe3713
+# github.com/gin-gonic/gin v1.4.0
 github.com/gin-gonic/gin
 github.com/gin-gonic/gin/binding
 github.com/gin-gonic/gin/internal/json
 github.com/gin-gonic/gin/render
-# github.com/golang/protobuf v1.3.0
+# github.com/golang/protobuf v1.3.2
 github.com/golang/protobuf/proto
-# github.com/google/gopacket v1.1.16
+# github.com/google/gopacket v1.1.17
 github.com/google/gopacket/layers
 github.com/google/gopacket
 # github.com/gorilla/context v1.1.1
 github.com/gorilla/context
 # github.com/gorilla/securecookie v1.1.1
 github.com/gorilla/securecookie
-# github.com/gorilla/sessions v1.1.3
+# github.com/gorilla/sessions v1.2.0
 github.com/gorilla/sessions
-# github.com/json-iterator/go v1.1.5
+# github.com/json-iterator/go v1.1.7
 github.com/json-iterator/go
-# github.com/mattn/go-isatty v0.0.6
+# github.com/mattn/go-isatty v0.0.8
 github.com/mattn/go-isatty
-# github.com/mattn/go-sqlite3 v1.10.0
+# github.com/mattn/go-sqlite3 v1.11.0
 github.com/mattn/go-sqlite3
 # github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v1.0.1
 github.com/modern-go/reflect2
-# github.com/oschwald/geoip2-golang v1.2.1
+# github.com/oschwald/geoip2-golang v1.3.0
 github.com/oschwald/geoip2-golang
-# github.com/oschwald/maxminddb-golang v1.3.0
+# github.com/oschwald/maxminddb-golang v1.3.1
 github.com/oschwald/maxminddb-golang
-# github.com/ugorji/go/codec v0.0.0-20190204201341-e444a5086c43
+# github.com/ugorji/go/codec v1.1.7
 github.com/ugorji/go/codec
-# golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
+# golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 golang.org/x/crypto/ed25519
 golang.org/x/crypto/ed25519/internal/edwards25519
-# golang.org/x/net v0.0.0-20190320064053-1272bf9dcd53
+# golang.org/x/net v0.0.0-20190724013045-ca1201d0de80
 golang.org/x/net/icmp
 golang.org/x/net/ipv4
 golang.org/x/net/ipv6
 golang.org/x/net/internal/iana
 golang.org/x/net/internal/socket
 golang.org/x/net/bpf
-# golang.org/x/sys v0.0.0-20190403152447-81d4e9dc473e
+# golang.org/x/sys v0.0.0-20190726091711-fc99dfbffb4e
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # gopkg.in/go-playground/validator.v8 v8.18.2
