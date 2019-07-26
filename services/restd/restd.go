@@ -95,11 +95,13 @@ func Startup() {
 	api.GET("/status/sessions", statusSessions)
 	api.GET("/status/system", statusSystem)
 	api.GET("/status/hardware", statusHardware)
+	api.GET("/status/upgrade", statusUpgradeAvailable)
 	api.GET("/status/build", statusBuild)
 	api.GET("/status/wantest/:device", statusWANTest)
 	api.GET("/status/uid", statusUID)
 
 	api.POST("/sysupgrade", sysupgradeHandler)
+	api.POST("/upgrade", upgradeHandler)
 
 	// files
 	engine.Static("/admin", "/www/admin")
@@ -576,6 +578,19 @@ func sysupgradeHandler(c *gin.Context) {
 		return
 	}
 	logger.Info("Launching sysupgrade... done\n")
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+	return
+}
+
+func upgradeHandler(c *gin.Context) {
+	err := exec.Command("/bin/upgrade.sh").Run()
+	if err != nil {
+		logger.Warn("upgrade failed: %s\n", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	logger.Info("Launching upgrade... done\n")
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 	return

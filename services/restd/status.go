@@ -131,6 +131,26 @@ func statusWANTest(c *gin.Context) {
 	return
 }
 
+// statusUpgradeAvailable checks to see if an upgrade is available
+func statusUpgradeAvailable(c *gin.Context) {
+	logger.Debug("statusUpgradeAvailable()\n")
+
+	cmd := exec.Command("/usr/bin/upgrade.sh", "-s")
+	if err := cmd.Start(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+	}
+	if err := cmd.Wait(); err != nil {
+		if _, ok := err.(*exec.ExitError); ok {
+			// child exited with non-zero
+			c.JSON(http.StatusOK, gin.H{"available": false})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"available": true})
+	return
+}
+
 // getBuildInfo returns the build info as a json map
 func getBuildInfo() (map[string]interface{}, error) {
 	jsonO := make(map[string]interface{})
