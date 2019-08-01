@@ -7,24 +7,40 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/untangle/packetd/services/logger"
 )
 
-// The ClassifiedTraffic struct contains the API response and cache data
+const cloudAPIEndpoint = "https://labs.untangle.com"
+
+const authRequestKey = ""
+
+const cacheTTL = 8400
+
+// The ClassifiedTraffic struct contains the API response data
 type ClassifiedTraffic struct {
 	Application   string
 	Confidence    float32
 	ProtocolChain string
 }
 
+// The CachedTrafficItem struct contains the cached item and last access time (in Unix time)
+type CachedTrafficItem struct {
+	TrafficData *ClassifiedTraffic
+	lastAccess  int64
+}
+
 // The classifiedTrafficCache is a map of ClassifiedTraffic structs
-var classifiedTrafficCache map[string]*ClassifiedTraffic
+var classifiedTrafficCache map[string]*CachedTrafficItem
+
+var trafficMutex sync.Mutex
 
 // Startup is called during service startup
 func Startup() {
 	logger.Info("Starting up the traffic classification service")
-	classifiedTrafficCache = make(map[string]*ClassifiedTraffic)
+	classifiedTrafficCache = make(map[string]*CachedTrafficItem)
 
 }
 
@@ -47,13 +63,13 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) {
 		logger.Debug("URL for Get: %s\n", requestURL)
 		classifiedTraffic = sendClassifyRequest(requestURL)
 
-		logger.Debug("Adding this into the map... (popping a record if length is > n)\n")
+		logger.Debug("Adding this into the map...\n")
 		storeCachedTraffic(mapKey, classifiedTraffic)
 
 	} else {
 		logger.Debug("Found a cache item!\n")
+		logger.Debug("Current cache size: %d\n", len(classifiedTrafficCache))
 	}
-	logger.Debug("Current cache size: %d, current cache map: %v\n", len(classifiedTrafficCache), classifiedTrafficCache)
 
 	logger.Debug("Pass result to dict?\n")
 
@@ -75,6 +91,7 @@ func sendClassifyRequest(requestURL string) *ClassifiedTraffic {
 
 	req, err := http.NewRequest("GET", requestURL, nil)
 	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("AuthRequest", authRequestKey)
 
 	resp, err := client.Do(req)
 
@@ -101,18 +118,30 @@ func sendClassifyRequest(requestURL string) *ClassifiedTraffic {
 }
 
 func findCachedTraffic(mapKey string) *ClassifiedTraffic {
-	trafficItem := classifiedTrafficCache[mapKey]
-	if trafficItem != nil {
-		return trafficItem
+	trafficMutex.Lock()
+	trafficCacheItem := classifiedTrafficCache[mapKey]
+	if trafficCacheItem != nil {
+		classifiedTrafficCache[mapKey].lastAccess = time.Now().Unix()
+		trafficMutex.Unlock()
+
+		return trafficCacheItem.TrafficData
 	}
+
+	trafficMutex.Unlock()
 	return nil
 }
 
 func storeCachedTraffic(mapKey string, classTraff *ClassifiedTraffic) {
-	classifiedTrafficCache[mapKey] = classTraff
+
+	trafficMutex.Lock()
+	var newTrafficItem = new(CachedTrafficItem)
+	newTrafficItem.TrafficData = classTraff
+	newTrafficItem.lastAccess = time.Now().Unix()
+	classifiedTrafficCache[mapKey] = newTrafficItem
+	trafficMutex.Unlock()
 
 	if len(classifiedTrafficCache) > 500 {
-		logger.Debug("lots of stuff in cache, time to clean...\n")
+		logger.Debug("Cleaning up the traffic classification cache...\n")
 		cleanupTraffic()
 	}
 
@@ -120,10 +149,24 @@ func storeCachedTraffic(mapKey string, classTraff *ClassifiedTraffic) {
 
 func cleanupTraffic() {
 	logger.Debug("Cleaning up traffic...\n")
+	var counter int
+	nowtime := time.Now().Unix()
+
+	trafficMutex.Lock()
+	defer trafficMutex.Unlock()
+
+	for key, val := range classifiedTrafficCache {
+		if nowtime-val.lastAccess > cacheTTL {
+			logger.Debug("Removing %s from cache due to lapsed TTL\n", key)
+			counter++
+			delete(classifiedTrafficCache, key)
+		}
+	}
+
+	logger.Debug("Traffic Items Removed:%d Remaining:%d\n", counter, len(classifiedTrafficCache))
 }
 
 func formRequestURL(ipAdd net.IP, port uint16, protoID uint8) string {
-	var cloudAPIEndpoint = "https://labs.untangle.com"
 	var bufferURL bytes.Buffer
 	bufferURL.WriteString(cloudAPIEndpoint)
 	bufferURL.WriteString("/v1/traffic?ip=")
