@@ -36,26 +36,26 @@ func Shutdown() {
 
 // GetTrafficClassification will retrieve the predicted traffic classification, first from memory cache then from cloud API endpoint
 func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) {
-	logger.Info("Checking map for existing data...\n")
+	logger.Debug("Checking map for existing data...\n")
 	var classifiedTraffic *ClassifiedTraffic
 	var mapKey = formMapKey(ipAdd, port, protoID)
 	classifiedTraffic = findCachedTraffic(mapKey)
 	if classifiedTraffic == nil {
-		logger.Info("No cache items found, checking request against service endpoint...\n")
+		logger.Debug("No cache items found, checking request against service endpoint...\n")
 		requestURL := formRequestURL(ipAdd, port, protoID)
 
-		logger.Info("URL for Get: %s\n", requestURL)
+		logger.Debug("URL for Get: %s\n", requestURL)
 		classifiedTraffic = sendClassifyRequest(requestURL)
 
-		logger.Info("Adding this into the map... (popping a record if length is > n)\n")
+		logger.Debug("Adding this into the map... (popping a record if length is > n)\n")
 		storeCachedTraffic(mapKey, classifiedTraffic)
 
 	} else {
-		logger.Info("Found a cache item!\n")
+		logger.Debug("Found a cache item!\n")
 	}
-	logger.Info("Current cache size: %d, current cache map: %v\n", len(classifiedTrafficCache), classifiedTrafficCache)
+	logger.Debug("Current cache size: %d, current cache map: %v\n", len(classifiedTrafficCache), classifiedTrafficCache)
 
-	logger.Info("Pass result to dict?\n")
+	logger.Debug("Pass result to dict?\n")
 
 	var b, err = json.Marshal(classifiedTraffic)
 
@@ -63,7 +63,7 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) {
 		logger.Err("Error marshaling json result: %v", err)
 	}
 
-	logger.Info("The current class result: %s\n", string(b))
+	logger.Debug("The current class result: %s\n", string(b))
 
 }
 
@@ -90,7 +90,7 @@ func sendClassifyRequest(requestURL string) *ClassifiedTraffic {
 			return nil
 		}
 		bodyString := string(bodyBytes)
-		logger.Info("Response body: %s\n", bodyString)
+		logger.Debug("Response body: %s\n", bodyString)
 
 		json.Unmarshal([]byte(bodyString), &trafficResponse)
 
@@ -112,14 +112,14 @@ func storeCachedTraffic(mapKey string, classTraff *ClassifiedTraffic) {
 	classifiedTrafficCache[mapKey] = classTraff
 
 	if len(classifiedTrafficCache) > 500 {
-		logger.Info("lots of stuff in cache, time to clean...\n")
+		logger.Debug("lots of stuff in cache, time to clean...\n")
 		cleanupTraffic()
 	}
 
 }
 
 func cleanupTraffic() {
-	logger.Info("Cleaning up traffic...\n")
+	logger.Debug("Cleaning up traffic...\n")
 }
 
 func formRequestURL(ipAdd net.IP, port uint16, protoID uint8) string {
