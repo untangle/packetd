@@ -11,13 +11,14 @@ import (
 	"github.com/untangle/packetd/services/logger"
 )
 
+// The ClassifiedTraffic struct contains the API response and cache data
 type ClassifiedTraffic struct {
 	Application   string
 	Confidence    float32
 	ProtocolChain string
 }
 
-// I think if we used some kind of hashmap this could be faster
+// The classifiedTrafficCache is a map of ClassifiedTraffic structs
 var classifiedTrafficCache map[string]*ClassifiedTraffic
 
 // Startup is called during service startup
@@ -33,17 +34,18 @@ func Shutdown() {
 
 }
 
-func GetTrafficClassification(ipAdd net.IP, port uint16, protoId uint8) {
+// GetTrafficClassification will retrieve the predicted traffic classification, first from memory cache then from cloud API endpoint
+func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) {
 	logger.Info("Checking map for existing data...\n")
 	var classifiedTraffic *ClassifiedTraffic
-	var mapKey = formMapKey(ipAdd, port, protoId)
+	var mapKey = formMapKey(ipAdd, port, protoID)
 	classifiedTraffic = findCachedTraffic(mapKey)
 	if classifiedTraffic == nil {
 		logger.Info("No cache items found, checking request against service endpoint...\n")
-		requestUrl := formRequestUrl(ipAdd, port, protoId)
+		requestURL := formRequestURL(ipAdd, port, protoID)
 
-		logger.Info("URL for Get: %s\n", requestUrl)
-		classifiedTraffic = sendClassifyRequest(requestUrl)
+		logger.Info("URL for Get: %s\n", requestURL)
+		classifiedTraffic = sendClassifyRequest(requestURL)
 
 		logger.Info("Adding this into the map... (popping a record if length is > n)\n")
 		storeCachedTraffic(mapKey, classifiedTraffic)
@@ -65,13 +67,13 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoId uint8) {
 
 }
 
-func sendClassifyRequest(requestUrl string) *ClassifiedTraffic {
+func sendClassifyRequest(requestURL string) *ClassifiedTraffic {
 
 	var trafficResponse *ClassifiedTraffic
 
 	client := &http.Client{}
 
-	req, err := http.NewRequest("GET", requestUrl, nil)
+	req, err := http.NewRequest("GET", requestURL, nil)
 	req.Header.Add("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
@@ -79,25 +81,23 @@ func sendClassifyRequest(requestUrl string) *ClassifiedTraffic {
 	if err != nil {
 		logger.Err("Found an error: %v\n", err)
 		return nil
+	}
 
-	} else {
-
-		if resp.StatusCode == http.StatusOK {
-			bodyBytes, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				logger.Err("Error reading body: %v", err)
-				return nil
-			}
-			bodyString := string(bodyBytes)
-			logger.Info("Response body: %s\n", bodyString)
-
-			json.Unmarshal([]byte(bodyString), &trafficResponse)
-
-			return trafficResponse
-		} else {
+	if resp.StatusCode == http.StatusOK {
+		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			logger.Err("Error reading body: %v", err)
 			return nil
 		}
+		bodyString := string(bodyBytes)
+		logger.Info("Response body: %s\n", bodyString)
+
+		json.Unmarshal([]byte(bodyString), &trafficResponse)
+
+		return trafficResponse
 	}
+
+	return nil
 }
 
 func findCachedTraffic(mapKey string) *ClassifiedTraffic {
@@ -122,25 +122,25 @@ func cleanupTraffic() {
 	logger.Info("Cleaning up traffic...\n")
 }
 
-func formRequestUrl(ipAdd net.IP, port uint16, protoId uint8) string {
-	var cloudApiEndpoint = "https://labs.untangle.com"
-	var bufferUrl bytes.Buffer
-	bufferUrl.WriteString(cloudApiEndpoint)
-	bufferUrl.WriteString("/v1/traffic?ip=")
-	bufferUrl.WriteString(ipAdd.String())
-	bufferUrl.WriteString("&port=")
-	bufferUrl.WriteString(strconv.Itoa(int(port)))
-	bufferUrl.WriteString("&protocolId=")
-	bufferUrl.WriteString(strconv.Itoa(int(protoId)))
-	return bufferUrl.String()
+func formRequestURL(ipAdd net.IP, port uint16, protoID uint8) string {
+	var cloudAPIEndpoint = "https://labs.untangle.com"
+	var bufferURL bytes.Buffer
+	bufferURL.WriteString(cloudAPIEndpoint)
+	bufferURL.WriteString("/v1/traffic?ip=")
+	bufferURL.WriteString(ipAdd.String())
+	bufferURL.WriteString("&port=")
+	bufferURL.WriteString(strconv.Itoa(int(port)))
+	bufferURL.WriteString("&protocolId=")
+	bufferURL.WriteString(strconv.Itoa(int(protoID)))
+	return bufferURL.String()
 }
 
-func formMapKey(ipAdd net.IP, port uint16, protoId uint8) string {
+func formMapKey(ipAdd net.IP, port uint16, protoID uint8) string {
 	var mapKey bytes.Buffer
 	mapKey.WriteString(ipAdd.String())
 	mapKey.WriteString("-")
 	mapKey.WriteString(strconv.Itoa(int(port)))
 	mapKey.WriteString("-")
-	mapKey.WriteString(strconv.Itoa(int(protoId)))
+	mapKey.WriteString(strconv.Itoa(int(protoID)))
 	return mapKey.String()
 }
