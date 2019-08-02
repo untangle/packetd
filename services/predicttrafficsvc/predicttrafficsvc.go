@@ -18,7 +18,8 @@ const cloudAPIEndpoint = "https://labs.untangle.com"
 
 const authRequestKey = ""
 
-const cacheTTL = 8400
+// The cacheTTL determines how long the cache items should persist (86400 is 24 hours)
+const cacheTTL = 86400
 
 // The ClassifiedTraffic struct contains the API response data
 type ClassifiedTraffic struct {
@@ -38,21 +39,38 @@ var classifiedTrafficCache map[string]*CachedTrafficItem
 
 var trafficMutex sync.Mutex
 
+var shutdownChannel = make(chan bool)
+
 // Startup is called during service startup
 func Startup() {
-	logger.Info("Starting up the traffic classification service")
+	logger.Info("Starting up the traffic classification service\n")
 	classifiedTrafficCache = make(map[string]*CachedTrafficItem)
+	go cleanStaleTrafficItems()
 
 }
 
 // Shutdown is called to handle service shutdown
 func Shutdown() {
-	logger.Info("Stopping up the traffic classification service")
+	logger.Info("Stopping up the traffic classification service\n")
 
+	shutdownChannel <- true
+
+	select {
+	case <-shutdownChannel:
+		logger.Info("Successful shutdown of traffic prediction cleanup\n")
+	case <-time.After(10 * time.Second):
+		logger.Warn("Failed to properly shutdown traffic prediction cleanup\n")
+	}
 }
 
 // GetTrafficClassification will retrieve the predicted traffic classification, first from memory cache then from cloud API endpoint
 func GetTrafficClassification(ctid uint32, ipAdd net.IP, port uint16, protoID uint8) {
+
+	if len(authRequestKey) == 0 {
+		logger.Err("AuthRequestKey is not configured for traffic prediction service\n")
+		return
+	}
+
 	logger.Debug("Checking map for existing data...\n")
 	var classifiedTraffic *ClassifiedTraffic
 	var mapKey = formMapKey(ipAdd, port, protoID)
@@ -92,11 +110,6 @@ func GetTrafficClassification(ctid uint32, ipAdd net.IP, port uint16, protoID ui
 }
 
 func sendClassifyRequest(requestURL string) *ClassifiedTraffic {
-
-	if len(authRequestKey) == 0 {
-		logger.Err("AuthRequestKey is not configured for traffic prediction service")
-		return nil
-	}
 
 	var trafficResponse *ClassifiedTraffic
 
@@ -151,15 +164,22 @@ func storeCachedTraffic(mapKey string, classTraff *ClassifiedTraffic) {
 	newTrafficItem.lastAccess = time.Now().Unix()
 	classifiedTrafficCache[mapKey] = newTrafficItem
 	trafficMutex.Unlock()
-
-	if len(classifiedTrafficCache) > 500 {
-		logger.Debug("Cleaning up the traffic classification cache...\n")
-		cleanupTraffic()
-	}
-
 }
 
-func cleanupTraffic() {
+// periodic task to clean the stale traffic items
+func cleanStaleTrafficItems() {
+	for {
+		select {
+		case <-shutdownChannel:
+			shutdownChannel <- true
+			return
+		case <-time.After(30 * time.Minute):
+			cleanupTrafficCache()
+		}
+	}
+}
+
+func cleanupTrafficCache() {
 	logger.Debug("Cleaning up traffic...\n")
 	var counter int
 	nowtime := time.Now().Unix()
