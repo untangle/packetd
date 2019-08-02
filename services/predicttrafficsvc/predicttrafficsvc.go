@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/logger"
 )
 
@@ -51,7 +52,7 @@ func Shutdown() {
 }
 
 // GetTrafficClassification will retrieve the predicted traffic classification, first from memory cache then from cloud API endpoint
-func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) {
+func GetTrafficClassification(ctid uint32, ipAdd net.IP, port uint16, protoID uint8) {
 	logger.Debug("Checking map for existing data...\n")
 	var classifiedTraffic *ClassifiedTraffic
 	var mapKey = formMapKey(ipAdd, port, protoID)
@@ -66,24 +67,36 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) {
 		logger.Debug("Adding this into the map...\n")
 		storeCachedTraffic(mapKey, classifiedTraffic)
 
-	} else {
-		logger.Debug("Found a cache item!\n")
+	}
+
+	// If this is still nil then API isn't responding or we are unable to access the data
+	if classifiedTraffic == nil {
+		logger.Warn("Unable to predict traffic information for requested IP: %v Port: %d Protocol: %d\n", ipAdd, port, protoID)
+		return
+	}
+
+	addPredictionToDict(ctid, classifiedTraffic)
+
+	if logger.IsDebugEnabled() {
+
 		logger.Debug("Current cache size: %d\n", len(classifiedTrafficCache))
+
+		var b, err = json.Marshal(classifiedTraffic)
+
+		if err != nil {
+			logger.Err("Error marshaling json result: %v", err)
+		}
+
+		logger.Debug("The current class result: %s\n", string(b))
 	}
-
-	logger.Debug("Pass result to dict?\n")
-
-	var b, err = json.Marshal(classifiedTraffic)
-
-	if err != nil {
-		logger.Err("Error marshaling json result: %v", err)
-	}
-
-	logger.Debug("The current class result: %s\n", string(b))
-
 }
 
 func sendClassifyRequest(requestURL string) *ClassifiedTraffic {
+
+	if len(authRequestKey) == 0 {
+		logger.Err("AuthRequestKey is not configured for traffic prediction service")
+		return nil
+	}
 
 	var trafficResponse *ClassifiedTraffic
 
@@ -118,16 +131,15 @@ func sendClassifyRequest(requestURL string) *ClassifiedTraffic {
 }
 
 func findCachedTraffic(mapKey string) *ClassifiedTraffic {
-	trafficMutex.Lock()
 	trafficCacheItem := classifiedTrafficCache[mapKey]
 	if trafficCacheItem != nil {
+		trafficMutex.Lock()
+		logger.Debug("Found a cache item: %v last access time %d\n", trafficCacheItem.TrafficData, trafficCacheItem.lastAccess)
 		classifiedTrafficCache[mapKey].lastAccess = time.Now().Unix()
 		trafficMutex.Unlock()
-
 		return trafficCacheItem.TrafficData
 	}
 
-	trafficMutex.Unlock()
 	return nil
 }
 
@@ -186,4 +198,11 @@ func formMapKey(ipAdd net.IP, port uint16, protoID uint8) string {
 	mapKey.WriteString("-")
 	mapKey.WriteString(strconv.Itoa(int(protoID)))
 	return mapKey.String()
+}
+
+func addPredictionToDict(ctid uint32, currentTraffic *ClassifiedTraffic) {
+	logger.Debug("Sending prediction info to dict with ctid: %d\n", ctid)
+	dict.AddSessionEntry(ctid, "predicted_application", currentTraffic.Application)
+	dict.AddSessionEntry(ctid, "predicted_confidence", uint8(currentTraffic.Confidence))
+	dict.AddSessionEntry(ctid, "predicted_protocolchain", currentTraffic.ProtocolChain)
 }

@@ -36,7 +36,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	//Tell service to cache and categorize this ip request
 	logger.Debug("Running traffic classification on request: Client address: %s, client port: %d, Server address: %s, Server port: %d, Protocol: %d,  \n", mess.MsgTuple.ClientAddress, mess.MsgTuple.ClientPort, mess.MsgTuple.ServerAddress, mess.MsgTuple.ServerPort, mess.MsgTuple.Protocol)
 
-	predicttrafficsvc.GetTrafficClassification(mess.MsgTuple.ServerAddress, mess.MsgTuple.ServerPort, mess.MsgTuple.Protocol)
+	predicttrafficsvc.GetTrafficClassification(ctid, mess.MsgTuple.ServerAddress, mess.MsgTuple.ServerPort, mess.MsgTuple.Protocol)
 
 	return result
 }
