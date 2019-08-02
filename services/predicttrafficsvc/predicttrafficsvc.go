@@ -14,31 +14,35 @@ import (
 	"github.com/untangle/packetd/services/logger"
 )
 
+// cloudAPIEndpoint is the URL of the cloud endpoint
 const cloudAPIEndpoint = "https://labs.untangle.com"
 
+// authRequestKey contains the authrequestkey for authenticating against the cloud API endpoint
 const authRequestKey = ""
 
-// The cacheTTL determines how long the cache items should persist (86400 is 24 hours)
+// cacheTTL determines how long the cache items should persist (86400 is 24 hours)
 const cacheTTL = 86400
 
-// The ClassifiedTraffic struct contains the API response data
+// ClassifiedTraffic struct contains the API response data
 type ClassifiedTraffic struct {
 	Application   string
 	Confidence    float32
 	ProtocolChain string
 }
 
-// The CachedTrafficItem struct contains the cached item and last access time (in Unix time)
+// CachedTrafficItem struct contains the cached traffic data and last access time (in Unix time)
 type CachedTrafficItem struct {
 	TrafficData *ClassifiedTraffic
 	lastAccess  int64
 }
 
-// The classifiedTrafficCache is a map of ClassifiedTraffic structs
+// classifiedTrafficCache is a map of ClassifiedTraffic pointer structs
 var classifiedTrafficCache map[string]*CachedTrafficItem
 
+// trafficMutex is used to prevent multiple writes into the cache map
 var trafficMutex sync.Mutex
 
+// shutdownChannel is used when destroying the service to shutdown the cache cleaning utility safely
 var shutdownChannel = make(chan bool)
 
 // Startup is called during service startup
@@ -77,10 +81,8 @@ func GetTrafficClassification(ctid uint32, ipAdd net.IP, port uint16, protoID ui
 	classifiedTraffic = findCachedTraffic(mapKey)
 	if classifiedTraffic == nil {
 		logger.Debug("No cache items found, checking request against service endpoint...\n")
-		requestURL := formRequestURL(ipAdd, port, protoID)
 
-		logger.Debug("URL for Get: %s\n", requestURL)
-		classifiedTraffic = sendClassifyRequest(requestURL)
+		classifiedTraffic = sendClassifyRequest(ipAdd, port, protoID)
 
 		logger.Debug("Adding this into the map...\n")
 		storeCachedTraffic(mapKey, classifiedTraffic)
@@ -109,11 +111,15 @@ func GetTrafficClassification(ctid uint32, ipAdd net.IP, port uint16, protoID ui
 	}
 }
 
-func sendClassifyRequest(requestURL string) *ClassifiedTraffic {
+// sendClassifyRequest will send the classification request to the API endpoint using the provided parameters
+func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) *ClassifiedTraffic {
 
 	var trafficResponse *ClassifiedTraffic
-
 	client := &http.Client{}
+
+	requestURL := formRequestURL(ipAdd, port, protoID)
+
+	logger.Debug("URL for Get: %s\n", requestURL)
 
 	req, err := http.NewRequest("GET", requestURL, nil)
 	req.Header.Add("Content-Type", "application/json")
@@ -143,6 +149,7 @@ func sendClassifyRequest(requestURL string) *ClassifiedTraffic {
 	return nil
 }
 
+// findCachedTraffic will search the cache for a key of the traffic item, sets the last access time and returns the data
 func findCachedTraffic(mapKey string) *ClassifiedTraffic {
 	trafficCacheItem := classifiedTrafficCache[mapKey]
 	if trafficCacheItem != nil {
@@ -156,6 +163,7 @@ func findCachedTraffic(mapKey string) *ClassifiedTraffic {
 	return nil
 }
 
+// storeCachedTraffic will store a new cache item into the classified traffic cache
 func storeCachedTraffic(mapKey string, classTraff *ClassifiedTraffic) {
 
 	trafficMutex.Lock()
@@ -166,7 +174,7 @@ func storeCachedTraffic(mapKey string, classTraff *ClassifiedTraffic) {
 	trafficMutex.Unlock()
 }
 
-// periodic task to clean the stale traffic items
+// cleanStaleTrafficItems is a periodic task to clean the stale traffic items
 func cleanStaleTrafficItems() {
 	for {
 		select {
@@ -179,6 +187,7 @@ func cleanStaleTrafficItems() {
 	}
 }
 
+// cleanupTrafficCache iterates the entire map and cleans stale entries that have not been accessed within the TTL time
 func cleanupTrafficCache() {
 	logger.Debug("Cleaning up traffic...\n")
 	var counter int
@@ -198,6 +207,7 @@ func cleanupTrafficCache() {
 	logger.Debug("Traffic Items Removed:%d Remaining:%d\n", counter, len(classifiedTrafficCache))
 }
 
+// formRequestURL will build the request URL
 func formRequestURL(ipAdd net.IP, port uint16, protoID uint8) string {
 	var bufferURL bytes.Buffer
 	bufferURL.WriteString(cloudAPIEndpoint)
@@ -210,6 +220,7 @@ func formRequestURL(ipAdd net.IP, port uint16, protoID uint8) string {
 	return bufferURL.String()
 }
 
+// formMapKey will build the mapkey used in the cache stores and lookups
 func formMapKey(ipAdd net.IP, port uint16, protoID uint8) string {
 	var mapKey bytes.Buffer
 	mapKey.WriteString(ipAdd.String())
@@ -220,6 +231,7 @@ func formMapKey(ipAdd net.IP, port uint16, protoID uint8) string {
 	return mapKey.String()
 }
 
+// addPredictionToDict will take a ClassifiedTraffic pointer and send the data to dict. Confidence is converted to a uint8 here (basically floors it)
 func addPredictionToDict(ctid uint32, currentTraffic *ClassifiedTraffic) {
 	logger.Debug("Sending prediction info to dict with ctid: %d\n", ctid)
 	dict.AddSessionEntry(ctid, "predicted_application", currentTraffic.Application)
