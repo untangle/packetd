@@ -18,7 +18,7 @@ import (
 const cloudAPIEndpoint = "https://labs.untangle.com"
 
 // authRequestKey contains the authrequestkey for authenticating against the cloud API endpoint
-const authRequestKey = ""
+const authRequestKey = "4E6FAB77-B2DF-4DEA-B6BD-2B434A3AE981"
 
 // cacheTTL determines how long the cache items should persist (86400 is 24 hours)
 const cacheTTL = 86400
