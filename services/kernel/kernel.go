@@ -70,7 +70,7 @@ func StartCallbacks(numNfqueueThreads int, intervalSeconds int) {
 	}()
 	go func() {
 		//runtime.LockOSThread()
-		// C.netlogger_thread()
+		C.netlogger_thread()
 	}()
 
 	// start the conntrack interval-second update task
