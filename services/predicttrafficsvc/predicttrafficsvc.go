@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/logger"
 )
 
@@ -68,11 +67,11 @@ func Shutdown() {
 }
 
 // GetTrafficClassification will retrieve the predicted traffic classification, first from memory cache then from cloud API endpoint
-func GetTrafficClassification(ctid uint32, ipAdd net.IP, port uint16, protoID uint8) {
+func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *ClassifiedTraffic {
 
 	if len(authRequestKey) == 0 {
 		logger.Err("AuthRequestKey is not configured for traffic prediction service\n")
-		return
+		return nil
 	}
 
 	logger.Debug("Checking map for existing data...\n")
@@ -92,10 +91,8 @@ func GetTrafficClassification(ctid uint32, ipAdd net.IP, port uint16, protoID ui
 	// If this is still nil then API isn't responding or we are unable to access the data
 	if classifiedTraffic == nil {
 		logger.Warn("Unable to predict traffic information for requested IP: %v Port: %d Protocol: %d\n", ipAdd, port, protoID)
-		return
+		return nil
 	}
-
-	addPredictionToDict(ctid, classifiedTraffic)
 
 	if logger.IsDebugEnabled() {
 
@@ -109,6 +106,8 @@ func GetTrafficClassification(ctid uint32, ipAdd net.IP, port uint16, protoID ui
 
 		logger.Debug("The current class result: %s\n", string(b))
 	}
+
+	return classifiedTraffic
 }
 
 // sendClassifyRequest will send the classification request to the API endpoint using the provided parameters
@@ -229,12 +228,4 @@ func formMapKey(ipAdd net.IP, port uint16, protoID uint8) string {
 	mapKey.WriteString("-")
 	mapKey.WriteString(strconv.Itoa(int(protoID)))
 	return mapKey.String()
-}
-
-// addPredictionToDict will take a ClassifiedTraffic pointer and send the data to dict. Confidence is converted to a uint8 here (basically floors it)
-func addPredictionToDict(ctid uint32, currentTraffic *ClassifiedTraffic) {
-	logger.Debug("Sending prediction info to dict with ctid: %d\n", ctid)
-	dict.AddSessionEntry(ctid, "predicted_application", currentTraffic.Application)
-	dict.AddSessionEntry(ctid, "predicted_confidence", uint8(currentTraffic.Confidence))
-	dict.AddSessionEntry(ctid, "predicted_protocolchain", currentTraffic.ProtocolChain)
 }
