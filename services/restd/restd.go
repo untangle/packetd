@@ -584,7 +584,7 @@ func sysupgradeHandler(c *gin.Context) {
 }
 
 func upgradeHandler(c *gin.Context) {
-	err := exec.Command("/bin/upgrade.sh").Run()
+	err := exec.Command("/usr/bin/upgrade.sh").Run()
 	if err != nil {
 		logger.Warn("upgrade failed: %s\n", err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
