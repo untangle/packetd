@@ -38,6 +38,15 @@ var shutdownFlag uint32
 var shutdownChannel = make(chan bool)
 var shutdownChannelCloseOnce sync.Once
 
+// FlagNoNfqueue can be set to disable the nfqueue callback
+var FlagNoNfqueue bool
+
+// FlagNoConntrack can be set to disable the conntrack callback
+var FlagNoConntrack bool
+
+// FlagNoNetlogger can be set to disable the netlogger callback
+var FlagNoNetlogger bool
+
 // These maps are used to track ctid's we see during playback. They are set to the
 // maps passed to the playback function and cleared when playback is finished.
 var nfCleanTracker map[uint32]bool
@@ -57,27 +66,42 @@ func StartCallbacks(numNfqueueThreads int, intervalSeconds int) {
 	if numNfqueueThreads > 32 {
 		numNfqueueThreads = 32
 	}
-	for x := 0; x < numNfqueueThreads; x++ {
-		go func(x C.int) {
-			//runtime.LockOSThread()
-			C.nfqueue_thread(x)
-		}(C.int(x))
+
+	if FlagNoNfqueue == false {
+		for x := 0; x < numNfqueueThreads; x++ {
+			go func(x C.int) {
+				//runtime.LockOSThread()
+				C.nfqueue_thread(x)
+			}(C.int(x))
+		}
+	} else {
+		logger.Warn("***** ATTENTION! ***** The no-nfqueue flag is set - Not installing nfqueue callback\n")
 	}
 
-	go func() {
-		//runtime.LockOSThread()
-		C.conntrack_thread()
-	}()
-	go func() {
-		//runtime.LockOSThread()
-		C.netlogger_thread()
-	}()
+	if FlagNoConntrack == false {
+		go func() {
+			//runtime.LockOSThread()
+			C.conntrack_thread()
+		}()
 
-	// start the conntrack interval-second update task
-	go func() {
-		//runtime.LockOSThread()
-		conntrackTask(intervalSeconds)
-	}()
+		// start the conntrack interval-second update task
+		go func() {
+			//runtime.LockOSThread()
+			conntrackTask(intervalSeconds)
+		}()
+
+	} else {
+		logger.Warn("***** ATTENTION! ***** The no-conntrack flag is set - Not installing conntrack callback\n")
+	}
+
+	if FlagNoNetlogger == false {
+		go func() {
+			//runtime.LockOSThread()
+			C.netlogger_thread()
+		}()
+	} else {
+		logger.Warn("***** ATTENTION! ***** The no-netlogger flag is set - Not installing netlogger callback\n")
+	}
 }
 
 // StopCallbacks stops all C services and callbacks
@@ -87,17 +111,19 @@ func StopCallbacks() {
 	// make sure the shutdown flag is set
 	SetShutdownFlag()
 
-	// send shutdown signal to periodicTask and wait for it to return
-	go func() {
-		shutdownConntrackTask <- true
-		c <- true
-	}()
+	if FlagNoConntrack == false {
+		// send shutdown signal to periodicTask and wait for it to return
+		go func() {
+			shutdownConntrackTask <- true
+			c <- true
+		}()
 
-	select {
-	case <-c:
-		logger.Info("Successful shutdown of conntrackTask\n")
-	case <-time.After(10 * time.Second):
-		logger.Err("Failed to properly shutdown conntrackPeriodicTask\n")
+		select {
+		case <-c:
+			logger.Info("Successful shutdown of conntrackTask\n")
+		case <-time.After(10 * time.Second):
+			logger.Err("Failed to properly shutdown conntrackPeriodicTask\n")
+		}
 	}
 
 	// wait for everything else to finish

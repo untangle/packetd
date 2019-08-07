@@ -167,6 +167,9 @@ func parseArguments() {
 	playSpeedPtr := flag.Int("playspeed", 100, "traffic playback speed percentage")
 	logFilePtr := flag.String("logfile", "", "file to redirect stdout/stderr")
 	cpuCountPtr := flag.Int("cpucount", cpuCount, "override the cpucount manually")
+	noNfqueuePtr := flag.Bool("no-nfqueue", false, "disable the nfqueue callback hook")
+	noConntrackPtr := flag.Bool("no-conntrack", false, "disable the conntrack callback hook")
+	noNetloggerPtr := flag.Bool("no-netlogger", false, "disable the netlogger callback hook")
 
 	flag.Parse()
 
@@ -224,6 +227,17 @@ func parseArguments() {
 		syscall.Dup3(int(logFile.Fd()), 2, 0)
 	}
 
+	if *noNfqueuePtr {
+		kernel.FlagNoNfqueue = true
+	}
+
+	if *noConntrackPtr {
+		kernel.FlagNoConntrack = true
+	}
+
+	if *noNetloggerPtr {
+		kernel.FlagNoNetlogger = true
+	}
 }
 
 // startServices starts all the services
@@ -376,6 +390,9 @@ func handleSignals() {
 
 // insert the netfilter queue rules for packetd
 func insertRules() {
+	if kernel.FlagNoNfqueue {
+		return
+	}
 	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
 		logger.Err("Error determining directory: %s\n", err.Error())
@@ -387,7 +404,7 @@ func insertRules() {
 	}
 	output, err := exec.Command(dir+"/"+rulesScript, queueRange).CombinedOutput()
 	if err != nil {
-		logger.Warn("Error running %v: %v\n", rulesScript, err.Error())
+		logger.Warn("Error running %v %v: %v\n", rulesScript, queueRange, err.Error())
 		kernel.SetShutdownFlag()
 	} else {
 		for _, line := range strings.Split(string(output), "\n") {
