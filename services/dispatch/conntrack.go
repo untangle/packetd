@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/logger"
 )
 
@@ -323,12 +324,12 @@ func removeConntrack(ctid uint32) {
 // removeConntrackStale remove an entry from the conntrackTable that is obsolete/dead/invalid
 func removeConntrackStale(ctid uint32, conntrack *Conntrack) {
 	removeConntrack(ctid)
+	dict.DeleteSession(ctid)
 
 	// We only want to remove the specific session
 	// There is a race, we may get this DELETE event after the ctid has been reused by a new session
 	// and we don't want to remove that mapping from the session table
 	if conntrack != nil && conntrack.Session != nil {
-		conntrack.Session.flushDict()
 		conntrack.Session.removeFromSessionTable()
 	}
 }
