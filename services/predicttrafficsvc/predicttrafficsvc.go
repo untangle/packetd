@@ -35,6 +35,9 @@ type CachedTrafficItem struct {
 	lastAccess  int64
 }
 
+// unknownTrafficItem is a pointer for unknown traffic
+var unknownTrafficItem = &ClassifiedTraffic{Application: "Unknown", Confidence: 0, ProtocolChain: "Unknown"}
+
 // classifiedTrafficCache is a map of ClassifiedTraffic pointer structs
 var classifiedTrafficCache map[string]*CachedTrafficItem
 
@@ -90,7 +93,8 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 
 	// If this is still nil then API isn't responding or we are unable to access the data
 	if classifiedTraffic == nil {
-		logger.Warn("Unable to predict traffic information for requested IP: %v Port: %d Protocol: %d\n", ipAdd, port, protoID)
+		logger.Warn("Unable to predict traffic information for requested IP, creating empty cache item: %v Port: %d Protocol: %d\n", ipAdd, port, protoID)
+		storeCachedTraffic(mapKey, unknownTrafficItem)
 		return nil
 	}
 
