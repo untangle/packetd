@@ -7,6 +7,7 @@ import (
 
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/overseer"
 )
 
 // Session stores information about a packetd session
@@ -426,18 +427,27 @@ func cleanSessionTable() {
 	defer sessionMutex.Unlock()
 
 	for ctid, session := range sessionTable {
-		// Having stale sessions is normal if sessions get blocked
-		// Their conntracks never get confirmed and thus there is never a delete conntrack event
-		// These sessions will hang in the table around and get cleaned up here.
+		// Having stale sessions is normal if sessions get blocked. Their conntrack is
+		// never get confirmed and thus there is never a delete conntrack event so we
+		// clean those session up quickly to keep the dict from getting huge.
 		// However, if we find a a stale conntrack-confirmed session that is bad.
-
-		// We use 10000 seconds because 7440 is the established idle tcp timeout default
-		if time.Now().Sub(session.GetLastActivity()) > 10000*time.Second {
-			if session.GetConntrackConfirmed() {
+		if session.GetConntrackConfirmed() {
+			// We use 10000 seconds for confirmed sessions because 7440 is the established idle tcp timeout default
+			if time.Now().Sub(session.GetLastActivity()) > 10000*time.Second {
 				logger.Err("%OC|Removing stale (%v) session [%v] %v\n", "stale_session_removed", 0, time.Now().Sub(session.GetLastActivity()), ctid, session.GetClientSideTuple())
+				dict.DeleteSession(ctid)
+				delete(sessionTable, ctid)
 			}
-			dict.DeleteSession(ctid)
-			delete(sessionTable, ctid)
+		} else {
+			// We remove unconfirmed sessions after 60 seconds to keep things lean and clean
+			if time.Now().Sub(session.GetLastActivity()) > 60*time.Second {
+				if logger.IsTraceEnabled() {
+					logger.Err("Removing unconfirmed (%v) session [%v] %v\n", time.Now().Sub(session.GetLastActivity()), ctid, session.GetClientSideTuple())
+				}
+				overseer.AddCounter("unconfirmed_session_removed", 1)
+				dict.DeleteSession(ctid)
+				delete(sessionTable, ctid)
+			}
 		}
 	}
 }
