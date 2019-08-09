@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"runtime/debug"
 	"strconv"
 	"strings"
 
@@ -60,7 +61,6 @@ func Startup() {
 	engine.GET("/", rootHandler)
 
 	engine.GET("/ping", pingHandler)
-	engine.GET("/debug", debugHandler)
 
 	engine.POST("/account/login", authLogin)
 	//engine.GET("/account/login", authLogin)
@@ -99,6 +99,9 @@ func Startup() {
 	api.GET("/status/build", statusBuild)
 	api.GET("/status/wantest/:device", statusWANTest)
 	api.GET("/status/uid", statusUID)
+
+	api.GET("/debug", debugHandler)
+	api.POST("/gc", gcHandler)
 
 	api.POST("/sysupgrade", sysupgradeHandler)
 	api.POST("/upgrade", upgradeHandler)
@@ -176,6 +179,11 @@ func debugHandler(c *gin.Context) {
 	var buffer bytes.Buffer
 	buffer = overseer.GenerateReport()
 	c.Data(http.StatusOK, "text/html; chareset=utf-8", buffer.Bytes())
+}
+
+func gcHandler(c *gin.Context) {
+	logger.Info("Calling FreeOSMemory()...\n")
+	debug.FreeOSMemory()
 }
 
 func pprofHandler(h http.HandlerFunc) gin.HandlerFunc {
