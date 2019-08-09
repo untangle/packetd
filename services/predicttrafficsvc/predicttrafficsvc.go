@@ -77,38 +77,19 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 		return nil
 	}
 
-	logger.Debug("Checking map for existing data...\n")
 	var classifiedTraffic *ClassifiedTraffic
 	var mapKey = formMapKey(ipAdd, port, protoID)
 	classifiedTraffic = findCachedTraffic(mapKey)
 	if classifiedTraffic == nil {
-		logger.Debug("No cache items found, checking request against service endpoint...\n")
-
 		classifiedTraffic = sendClassifyRequest(ipAdd, port, protoID)
-
-		logger.Debug("Adding this into the map...\n")
 		storeCachedTraffic(mapKey, classifiedTraffic)
-
 	}
 
 	// If this is still nil then API isn't responding or we are unable to access the data
 	if classifiedTraffic == nil {
-		logger.Warn("Unable to predict traffic information for requested IP, creating empty cache item: %v Port: %d Protocol: %d\n", ipAdd, port, protoID)
+		logger.Debug("Unable to predict traffic information for requested IP, creating empty cache item: %v Port: %d Protocol: %d\n", ipAdd, port, protoID)
 		storeCachedTraffic(mapKey, unknownTrafficItem)
 		return nil
-	}
-
-	if logger.IsDebugEnabled() {
-
-		logger.Debug("Current cache size: %d\n", len(classifiedTrafficCache))
-
-		var b, err = json.Marshal(classifiedTraffic)
-
-		if err != nil {
-			logger.Err("Error marshaling json result: %v", err)
-		}
-
-		logger.Debug("The current class result: %s\n", string(b))
 	}
 
 	return classifiedTraffic
@@ -122,8 +103,6 @@ func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) *ClassifiedTr
 
 	requestURL := formRequestURL(ipAdd, port, protoID)
 
-	logger.Debug("URL for Get: %s\n", requestURL)
-
 	req, err := http.NewRequest("GET", requestURL, nil)
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("AuthRequest", authRequestKey)
@@ -131,18 +110,17 @@ func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) *ClassifiedTr
 	resp, err := client.Do(req)
 
 	if err != nil {
-		logger.Err("Found an error: %v\n", err)
+		logger.Err("Error sending prediction request to cloud: %v\n", err)
 		return nil
 	}
 
 	if resp.StatusCode == http.StatusOK {
 		bodyBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			logger.Err("Error reading body: %v", err)
+			logger.Err("Error reading body of prediction request: %v", err)
 			return nil
 		}
 		bodyString := string(bodyBytes)
-		logger.Debug("Response body: %s\n", bodyString)
 
 		json.Unmarshal([]byte(bodyString), &trafficResponse)
 
@@ -156,8 +134,8 @@ func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) *ClassifiedTr
 func findCachedTraffic(mapKey string) *ClassifiedTraffic {
 	trafficCacheItem := classifiedTrafficCache[mapKey]
 	if trafficCacheItem != nil {
-		trafficMutex.Lock()
 		logger.Debug("Found a cache item: %v last access time %d\n", trafficCacheItem.TrafficData, trafficCacheItem.lastAccess)
+		trafficMutex.Lock()
 		classifiedTrafficCache[mapKey].lastAccess = time.Now().Unix()
 		trafficMutex.Unlock()
 		return trafficCacheItem.TrafficData
@@ -168,7 +146,7 @@ func findCachedTraffic(mapKey string) *ClassifiedTraffic {
 
 // storeCachedTraffic will store a new cache item into the classified traffic cache
 func storeCachedTraffic(mapKey string, classTraff *ClassifiedTraffic) {
-
+	logger.Debug("Storing a cache item for key: %s", mapKey)
 	trafficMutex.Lock()
 	var newTrafficItem = new(CachedTrafficItem)
 	newTrafficItem.TrafficData = classTraff
@@ -192,7 +170,7 @@ func cleanStaleTrafficItems() {
 
 // cleanupTrafficCache iterates the entire map and cleans stale entries that have not been accessed within the TTL time
 func cleanupTrafficCache() {
-	logger.Debug("Cleaning up traffic...\n")
+	logger.Debug("Starting traffic cache clean up...\n")
 	var counter int
 	nowtime := time.Now().Unix()
 
