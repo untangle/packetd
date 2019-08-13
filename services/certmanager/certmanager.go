@@ -217,6 +217,7 @@ func pemBlockForKey(priv interface{}) *pem.Block {
 	}
 }
 
+// getSystemSetting will use a setting name as input to retrieve system settings
 func getSystemSetting(settingName string) string {
 	settingValue, err := settings.GetSettings([]string{"system", settingName})
 	if err != nil {
