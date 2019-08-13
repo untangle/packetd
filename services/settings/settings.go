@@ -439,25 +439,3 @@ func GetUID() (string, error) {
 	}
 	return "", errors.New("UID file missing contents")
 }
-
-// GetHostname returns the hostname within settings
-func GetHostname() string {
-	hostname, err := GetSettings([]string{"system", "hostName"})
-	if err != nil {
-		logger.Warn("Failed to read settings: %v\n", err.Error())
-		return ""
-	}
-
-	return hostname.(string)
-}
-
-// GetDomainName returns the domain name within settings
-func GetDomainName() string {
-	domainName, err := GetSettings([]string{"system", "domainName"})
-	if err != nil {
-		logger.Warn("Failed to read settings: %v\n", err.Error())
-		return ""
-	}
-
-	return domainName.(string)
-}

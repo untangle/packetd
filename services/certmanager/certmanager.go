@@ -128,11 +128,11 @@ func createCACert() (ca *x509.Certificate, caPrivKey *ecdsa.PrivateKey) {
 func createCert(ca *x509.Certificate, caPrivKey *ecdsa.PrivateKey) (certBytes []byte, privateKey *ecdsa.PrivateKey) {
 	var hostIps []net.IP
 	var hostnames []string
-	domainName := settings.GetDomainName()
+	domainName := getSystemSetting("domainName")
 
 	hostIps = append(hostIps, net.IPv4(127, 0, 0, 1))
 	hostnames = append(hostnames, "localhost")
-	hostnames = append(hostnames, settings.GetHostname())
+	hostnames = append(hostnames, getSystemSetting("hostName"))
 
 	logger.Debug("Generating new private key...\n")
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -215,4 +215,14 @@ func pemBlockForKey(priv interface{}) *pem.Block {
 	default:
 		return nil
 	}
+}
+
+func getSystemSetting(settingName string) string {
+	settingValue, err := settings.GetSettings([]string{"system", settingName})
+	if err != nil {
+		logger.Warn("Failed to read setting value for setting %s, error: %v\n", settingName, err.Error())
+		return ""
+	}
+
+	return settingValue.(string)
 }
