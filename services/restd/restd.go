@@ -20,6 +20,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"github.com/untangle/packetd/services/certmanager"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
@@ -130,6 +131,9 @@ func Startup() {
 
 	// listen and serve on 0.0.0.0:80
 	go engine.Run(":80")
+
+	cert, key := certmanager.GetConfiguredCert()
+	go engine.RunTLS(":443", cert, key)
 
 	logger.Info("The RestD engine has been started\n")
 }

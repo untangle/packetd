@@ -422,6 +422,7 @@ func initLoggerConfig() {
 
 	// services
 	config["certcache"] = "INFO"
+	config["certmanager"] = "INFO"
 	config["dict"] = "INFO"
 	config["dispatch/conntrack.go"] = "INFO"
 	config["dispatch/netlogger.go"] = "INFO"
