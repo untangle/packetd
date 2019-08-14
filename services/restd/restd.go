@@ -79,6 +79,7 @@ func Startup() {
 	api.DELETE("/settings/*path", trimSettings)
 
 	api.GET("/logging/logread", getLogread)
+	api.GET("/logging/dmesg", getDmesg)
 
 	api.GET("/defaults", getDefaultSettings)
 	api.GET("/defaults/*path", getDefaultSettings)
@@ -455,15 +456,22 @@ func getLogread(c *gin.Context) {
 
 	output, err := exec.Command("/sbin/logread").CombinedOutput()
 	if err != nil {
-
 		logger.Err("/sbin/logread Error: %v\n", err)
-
-		c.JSON(http.StatusInternalServerError, output)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 	}
-	logger.Info("getLogread OK response: %s\n", output)
 
-	c.JSON(http.StatusOK, output)
+	c.JSON(http.StatusOK, gin.H{"logresults": output})
+	return
+}
 
+func getDmesg(c *gin.Context) {
+	output, err := exec.Command("/bin/dmesg").CombinedOutput()
+	if err != nil {
+		logger.Err("/bin/dmesg Error: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"logresults": output})
 	return
 }
 
