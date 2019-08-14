@@ -78,6 +78,8 @@ func Startup() {
 	api.DELETE("/settings", trimSettings)
 	api.DELETE("/settings/*path", trimSettings)
 
+	api.GET("/logging/logread", getLogread)
+
 	api.GET("/defaults", getDefaultSettings)
 	api.GET("/defaults/*path", getDefaultSettings)
 
@@ -446,6 +448,22 @@ func getDefaultSettings(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusOK, jsonResult)
 	}
+	return
+}
+
+func getLogread(c *gin.Context) {
+
+	output, err := exec.Command("/sbin/logread").CombinedOutput()
+	if err != nil {
+
+		logger.Err("/sbin/logread Error: %v\n", err)
+
+		c.JSON(http.StatusInternalServerError, output)
+	}
+	logger.Info("getLogread OK response: %s\n", output)
+
+	c.JSON(http.StatusOK, output)
+
 	return
 }
 
