@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/c9s/goprocinfo/linux"
@@ -147,7 +148,11 @@ func statusUpgradeAvailable(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{"available": true})
+	output, _ := cmd.CombinedOutput()
+	r, _ := regexp.Compile("Newest\\s+Version:\\s+(\\w+)")
+	newVersion := r.FindString(string(output))
+
+	c.JSON(http.StatusOK, gin.H{"available": true, "version": newVersion})
 	return
 }
 
