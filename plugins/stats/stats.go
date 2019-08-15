@@ -14,6 +14,7 @@ import (
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/overseer"
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/settings"
 )
@@ -156,10 +157,10 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	if interfaceID == 255 {
 		return result
 	}
-	// log and ignore traffic to unknown interface
+
+	// count and ignore traffic to unknown interface
 	if interfaceID == 0 {
-		//the server interface is set in the conntrack new event
-		logger.Warn("Unknown interface ID: %v\n", mess.Session.GetClientSideTuple())
+		overseer.AddCounter("stats_unknown_interface", 1)
 		return result
 	}
 
