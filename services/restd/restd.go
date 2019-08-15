@@ -78,8 +78,7 @@ func Startup() {
 	api.DELETE("/settings", trimSettings)
 	api.DELETE("/settings/*path", trimSettings)
 
-	api.GET("/logging/logread", getLogread)
-	api.GET("/logging/dmesg", getDmesg)
+	api.GET("/logging/:logtype", getLogOutput)
 
 	api.GET("/defaults", getDefaultSettings)
 	api.GET("/defaults/*path", getDefaultSettings)
@@ -452,23 +451,25 @@ func getDefaultSettings(c *gin.Context) {
 	return
 }
 
-func getLogread(c *gin.Context) {
+func getLogOutput(c *gin.Context) {
 
-	output, err := exec.Command("/sbin/logread").CombinedOutput()
-	if err != nil {
-		logger.Err("/sbin/logread Error: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+	var logcmd string
+
+	switch logtype := c.Param("logtype"); logtype {
+	case "dmesg":
+		logcmd = "/bin/dmesg"
+	case "syslog":
+		logcmd = "cat /var/log/syslog"
+	default:
+		logcmd = "/sbin/logread"
 	}
 
-	c.JSON(http.StatusOK, gin.H{"logresults": output})
-	return
-}
+	output, err := exec.Command(logcmd).CombinedOutput()
 
-func getDmesg(c *gin.Context) {
-	output, err := exec.Command("/bin/dmesg").CombinedOutput()
 	if err != nil {
-		logger.Err("/bin/dmesg Error: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		logger.Err("Error getting log output from %s: %v\n", logcmd, string(output))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": string(output)})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"logresults": output})
