@@ -451,6 +451,7 @@ func getDefaultSettings(c *gin.Context) {
 	return
 }
 
+// getLogOutput will take a logtype param (ie: dmesg, logread, syslog) and attempt to retrieve the log output for that logtype, or default to logread
 func getLogOutput(c *gin.Context) {
 
 	var logcmd string
