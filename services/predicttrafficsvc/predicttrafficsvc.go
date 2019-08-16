@@ -79,7 +79,10 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 
 	var classifiedTraffic *ClassifiedTraffic
 	var mapKey = formMapKey(ipAdd, port, protoID)
+
+	trafficMutex.Lock()
 	classifiedTraffic = findCachedTraffic(mapKey)
+	trafficMutex.Unlock()
 	if classifiedTraffic == nil {
 		classifiedTraffic = sendClassifyRequest(ipAdd, port, protoID)
 		storeCachedTraffic(mapKey, classifiedTraffic)
@@ -135,9 +138,7 @@ func findCachedTraffic(mapKey string) *ClassifiedTraffic {
 	trafficCacheItem := classifiedTrafficCache[mapKey]
 	if trafficCacheItem != nil {
 		logger.Debug("Found a cache item: %v last access time %d\n", trafficCacheItem.TrafficData, trafficCacheItem.lastAccess)
-		trafficMutex.Lock()
 		classifiedTrafficCache[mapKey].lastAccess = time.Now().Unix()
-		trafficMutex.Unlock()
 		return trafficCacheItem.TrafficData
 	}
 
