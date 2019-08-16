@@ -128,6 +128,9 @@ func statusWANTest(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 	}
+
+	// note here: the output type is already in JSON, setting the content-type before calling c.String will force the header
+	c.Header("Content-Type", "application/json")
 	c.String(http.StatusOK, string(output))
 	return
 }
