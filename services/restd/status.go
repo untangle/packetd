@@ -147,6 +147,7 @@ func statusUpgradeAvailable(c *gin.Context) {
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		}
+		return
 	}
 	output, _ := cmd.CombinedOutput()
 	r, _ := regexp.Compile("Newest\\s+Version:\\s+(\\w+)")
