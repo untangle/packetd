@@ -2,6 +2,8 @@ package restd
 
 import (
 	"bufio"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
@@ -158,6 +160,168 @@ func statusUpgradeAvailable(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"available": true, "version": newVersion})
 	return
+}
+
+// statusInterfaces is the RESTD /api/status/interfaces handler
+func statusInterfaces(c *gin.Context) {
+	// get the device for which status is being requested
+	// string will be empty if caller wants status for all
+	device := c.Param("device")
+	logger.Debug("statusInterfaces(%s)\n", device)
+
+	result, err := getInterfaceInfo(device)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	logger.Info("RESULT = %v\n", string(result)) // TODO - remove this
+
+	// note here: the output type is already in JSON, setting the content-type before calling c.String will force the header
+	c.Header("Content-Type", "application/json")
+	c.String(http.StatusOK, string(result))
+	return
+}
+
+type interfaceInfo struct {
+	Device     string
+	Connected  bool
+	IP4Addr    []string
+	IP4Gateway string
+	IP6Addr    []string
+	IP6Gateway string
+	DNSServers []string
+	ComboRate  uint
+	RxRate     uint
+	TxRate     uint
+}
+
+// getInterfaceInfo returns a json object with details for the requested interface
+func getInterfaceInfo(getface string) ([]byte, error) {
+	var ubuslist map[string]interface{}
+	var result []*interfaceInfo
+	var worker *interfaceInfo
+	var ubusdata []byte
+	var ubuserr error
+	var found bool
+	var err error
+
+	// We first try to call ubus to get the interface dump, but that only works on OpenWRT so on
+	// failure we try to load the data from a known file which makes x86 development easier. If
+	// that fails, we return the error from the original ubus call attempt.
+	ubusdata, ubuserr = exec.Command("/bin/ubus", "call", "network.interface", "dump").CombinedOutput()
+	if ubuserr != nil {
+		logger.Warn("Unable to call /bin/ubus: %v - Trying /etc/config/interfaces.json\n", ubuserr)
+		ubusdata, err = exec.Command("/bin/cat", "/etc/config/interfaces.json").CombinedOutput()
+		if err != nil {
+			return nil, ubuserr
+		}
+	}
+
+	err = json.Unmarshal([]byte(ubusdata), &ubuslist)
+	if err != nil {
+		return nil, err
+	}
+
+	// walk through each interface object in the ubus data
+	for _, raw := range ubuslist["interface"].([]interface{}) {
+		ubusitem, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		// we don't care about the loop-back device
+		if ubusitem["device"].(string) == "lo" {
+			continue
+		}
+
+		// if caller requested a specific device continue when no match
+		if getface != "all" && getface != ubusitem["device"].(string) {
+			continue
+		}
+
+		// start with an empty worker
+		worker = nil
+
+		// The ubus network.interface dump returns a json object that includes multiple
+		// entries for the IPv4 and IPv6 configuration using the same device name. The
+		// logic here is to create a single interfaceInfo object for each physical device
+		// and then add to it as we encouter the different sections in the json dump.
+		// We start by looking for an existing object for the current device iteration.
+		for _, find := range result {
+			if ubusitem["device"].(string) != find.Device {
+				continue
+			}
+			worker = find
+			found = true
+			break
+		}
+
+		// if existing not found create a new interfaceInfo structure for the device and copy the relevant fields
+		if worker == nil {
+			worker = new(interfaceInfo)
+			worker.Device = ubusitem["device"].(string)
+			worker.Connected = ubusitem["up"].(bool)
+			found = false
+		}
+
+		// walk through each ipv4-address object for the interface
+		for _, item := range ubusitem["ipv4-address"].([]interface{}) {
+			ptr, ok := item.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			// put the address and mask in CIDR format and add to the address array
+			str := fmt.Sprintf("%s/%d", ptr["address"].(string), int(ptr["mask"].(float64)))
+			worker.IP4Addr = append(worker.IP4Addr, str)
+		}
+
+		// walk through each ipv6-address object for the interface
+		for _, item := range ubusitem["ipv6-address"].([]interface{}) {
+			ptr, ok := item.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			// put the address and mask in address/prefix format and add to the address array
+			str := fmt.Sprintf("%s/%d", ptr["address"].(string), int(ptr["mask"].(float64)))
+			worker.IP6Addr = append(worker.IP6Addr, str)
+		}
+
+		// walk through the dns-server list object for the interface
+		for _, item := range ubusitem["dns-server"].([]interface{}) {
+			worker.DNSServers = append(worker.DNSServers, item.(string))
+		}
+
+		// walk through each route object for the interface
+		for _, item := range ubusitem["route"].([]interface{}) {
+			ptr, ok := item.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			// look for the IPv4 default gateway
+			if ptr["target"].(string) == "0.0.0.0" && uint(ptr["mask"].(float64)) == 0 {
+				worker.IP4Gateway = ptr["nexthop"].(string)
+				continue
+			}
+			// look for the IPv6 default gateway
+			if ptr["target"].(string) == "::" && uint(ptr["mask"].(float64)) == 0 {
+				worker.IP6Gateway = ptr["nexthop"].(string)
+			}
+		}
+
+		// if we created a new interfaceInfo object append to our device array
+		if !found {
+			result = append(result, worker)
+		}
+	}
+
+	// return the array of interfaceInfo objects as a json object
+	data, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 // getBuildInfo returns the build info as a json map
