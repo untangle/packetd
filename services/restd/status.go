@@ -176,8 +176,6 @@ func statusInterfaces(c *gin.Context) {
 		return
 	}
 
-	logger.Info("RESULT = %v\n", string(result)) // TODO - remove this
-
 	// note here: the output type is already in JSON, setting the content-type before calling c.String will force the header
 	c.Header("Content-Type", "application/json")
 	c.String(http.StatusOK, string(result))
