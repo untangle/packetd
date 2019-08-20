@@ -313,7 +313,7 @@ func getInterfaceInfo(getface string) ([]byte, error) {
 		if nodelist, ok := ubusitem["route"].([]interface{}); ok {
 			for _, item := range nodelist {
 				if ptr, ok := item.(map[string]interface{}); ok {
-					if ptr["address"] != nil && ptr["mask"] != nil {
+					if ptr["target"] != nil && ptr["mask"] != nil && ptr["nexthop"] != nil {
 						// look for the IPv4 default gateway
 						if ptr["target"].(string) == "0.0.0.0" && uint(ptr["mask"].(float64)) == 0 {
 							worker.IP4Gateway = ptr["nexthop"].(string)
