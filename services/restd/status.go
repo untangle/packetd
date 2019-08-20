@@ -13,6 +13,7 @@ import (
 
 	"github.com/c9s/goprocinfo/linux"
 	"github.com/gin-gonic/gin"
+	"github.com/untangle/packetd/plugins/stats"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/settings"
 )
@@ -183,16 +184,29 @@ func statusInterfaces(c *gin.Context) {
 }
 
 type interfaceInfo struct {
-	Device     string
-	Connected  bool
-	IP4Addr    []string
-	IP4Gateway string
-	IP6Addr    []string
-	IP6Gateway string
-	DNSServers []string
-	ComboRate  uint
-	RxRate     uint
-	TxRate     uint
+	Device           string
+	Connected        bool
+	IP4Addr          []string
+	IP4Gateway       string
+	IP6Addr          []string
+	IP6Gateway       string
+	DNSServers       []string
+	RxByteRate       uint64
+	RxPacketRate     uint64
+	RxErrorRate      uint64
+	RxDropRate       uint64
+	RxFifoRate       uint64
+	RxFrameRate      uint64
+	RxCompressedRate uint64
+	RxMulticastRate  uint64
+	TxByteRate       uint64
+	TxPacketRate     uint64
+	TxErrorRate      uint64
+	TxDropRate       uint64
+	TxFifoRate       uint64
+	TxCollisionRate  uint64
+	TxCarrierRate    uint64
+	TxCompressedRate uint64
 }
 
 // getInterfaceInfo returns a json object with details for the requested interface
@@ -326,8 +340,27 @@ func getInterfaceInfo(getface string) ([]byte, error) {
 			}
 		}
 
-		// if we created a new interfaceInfo object append to our device array
+		// if we created a new interfaceInfo object get the interface rate details and append to our device array
 		if !found {
+			facemap := stats.GetInterfaceRateDetails("wan")
+			if facemap != nil {
+				worker.RxByteRate = facemap["rx_bytes_rate"]
+				worker.RxPacketRate = facemap["rx_packets_rate"]
+				worker.RxErrorRate = facemap["rx_errs_rate"]
+				worker.RxDropRate = facemap["rx_drop_rate"]
+				worker.RxFifoRate = facemap["rx_fifo_rate"]
+				worker.RxFrameRate = facemap["rx_frame_rate"]
+				worker.RxCompressedRate = facemap["rx_compressed_rate"]
+				worker.RxMulticastRate = facemap["rx_multicast_rate"]
+				worker.TxByteRate = facemap["tx_bytes_rate"]
+				worker.TxPacketRate = facemap["tx_packets_rate"]
+				worker.TxErrorRate = facemap["tx_errs_rate"]
+				worker.TxDropRate = facemap["tx_drop_rate"]
+				worker.TxFifoRate = facemap["tx_fifo_rate"]
+				worker.TxCollisionRate = facemap["tx_colls_rate"]
+				worker.TxCarrierRate = facemap["tx_carrier_rate"]
+				worker.TxCompressedRate = facemap["tx_compressed_rate"]
+			}
 			result = append(result, worker)
 		}
 	}

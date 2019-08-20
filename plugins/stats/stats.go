@@ -42,6 +42,9 @@ var interfaceHashString string
 var interfaceHashLocker sync.Mutex
 
 var interfaceStatsMap map[string]*linux.NetworkStat
+var interfaceDiffMap map[string]*linux.NetworkStat
+var interfaceDiffLocker sync.Mutex
+
 var interfaceChannel = make(chan bool, 1)
 var pingerChannel = make(chan bool, 1)
 
@@ -71,6 +74,7 @@ func PluginStartup() {
 	}
 
 	interfaceStatsMap = make(map[string]*linux.NetworkStat)
+	interfaceDiffMap = make(map[string]*linux.NetworkStat)
 
 	loadInterfaceDetailMap()
 	refreshActivePingInfo()
@@ -194,8 +198,9 @@ func interfaceTask() {
 // calculates and logs the difference since the last time it was called
 func collectInterfaceStats(seconds uint64) {
 	var statInfo *linux.NetworkStat
-	var diffInfo linux.NetworkStat
+	var diffInfo *linux.NetworkStat
 	var istats []InterfaceStatsJSON
+	var interfaceID int
 
 	procData, err := linux.ReadNetworkStat("/proc/net/dev")
 	if err != nil {
@@ -207,11 +212,21 @@ func collectInterfaceStats(seconds uint64) {
 		item := procData[i]
 
 		// ignore loopback and dummy interfaces
-		if item.Iface == "lo" ||
-			strings.HasPrefix(item.Iface, "dummy") {
+		if item.Iface == "lo" || strings.HasPrefix(item.Iface, "dummy") {
 			continue
 		}
 
+		// convert the interface name to the ID value
+		interfaceID = getInterfaceIDValue(item.Iface)
+
+		// negative return means we don't know the ID so ignore
+		if interfaceID < 0 {
+			logger.Debug("Skipping unknown interface: %s\n", item.Iface)
+			continue
+		}
+
+		// create a new instance for the curr-last rate calculation object and lookup the current value object
+		diffInfo = new(linux.NetworkStat)
 		statInfo = interfaceStatsMap[item.Iface]
 
 		if statInfo == nil {
@@ -258,42 +273,38 @@ func collectInterfaceStats(seconds uint64) {
 			// replace the current stats map object with the one returned from ReadNetworkStat
 			interfaceStatsMap[item.Iface] = &item
 
-			// convert the interface name to the ID value
-			interfaceID := getInterfaceIDValue(diffInfo.Iface)
+			// calculate the difference for other metrics we track for each interface
+			interfaceMetricLocker.Lock()
+			metric := calculateMetrics(interfaceMetricList[interfaceID])
+			interfaceMetricLocker.Unlock()
 
-			// negative return means we don't know the ID so we set latency to zero
-			// otherwise we get the total moving average
-			if interfaceID < 0 {
-				logger.Debug("Skipping unknown interface: %s\n", diffInfo.Iface)
-			} else {
+			// get copies of the three latency collectors
+			statsLocker[interfaceID].Lock()
+			combo := statsCollector[interfaceID].MakeCopy()
+			statsLocker[interfaceID].Unlock()
 
-				// calculate the difference for other metrics we track for each interface
-				interfaceMetricLocker.Lock()
-				metric := calculateMetrics(interfaceMetricList[interfaceID])
-				interfaceMetricLocker.Unlock()
+			passiveLocker[interfaceID].Lock()
+			passive := passiveCollector[interfaceID].MakeCopy()
+			passiveLocker[interfaceID].Unlock()
 
-				// get copies of the three latency collectors
-				statsLocker[interfaceID].Lock()
-				combo := statsCollector[interfaceID].MakeCopy()
-				statsLocker[interfaceID].Unlock()
+			activeLocker[interfaceID].Lock()
+			active := activeCollector[interfaceID].MakeCopy()
+			activeLocker[interfaceID].Unlock()
 
-				passiveLocker[interfaceID].Lock()
-				passive := passiveCollector[interfaceID].MakeCopy()
-				passiveLocker[interfaceID].Unlock()
+			jitterLocker[interfaceID].Lock()
+			jitter := jitterCollector[interfaceID].MakeCopy()
+			jitterLocker[interfaceID].Unlock()
 
-				activeLocker[interfaceID].Lock()
-				active := activeCollector[interfaceID].MakeCopy()
-				activeLocker[interfaceID].Unlock()
+			istat := MakeInterfaceStatsJSON(interfaceID, combo.Latency1Min.Value, combo.Latency5Min.Value, combo.Latency15Min.Value)
+			istats = append(istats, istat)
 
-				jitterLocker[interfaceID].Lock()
-				jitter := jitterCollector[interfaceID].MakeCopy()
-				jitterLocker[interfaceID].Unlock()
+			logInterfaceStats(seconds, interfaceID, combo, passive, active, jitter, diffInfo, &metric)
 
-				istat := MakeInterfaceStatsJSON(interfaceID, combo.Latency1Min.Value, combo.Latency5Min.Value, combo.Latency15Min.Value)
-				istats = append(istats, istat)
-
-				logInterfaceStats(seconds, interfaceID, combo, passive, active, jitter, &diffInfo, &metric)
-			}
+			// update the diff map with the new data
+			interfaceDiffLocker.Lock()
+			delete(interfaceDiffMap, item.Iface)
+			interfaceDiffMap[item.Iface] = diffInfo
+			interfaceDiffLocker.Unlock()
 		}
 	}
 
@@ -625,4 +636,37 @@ func logHopCount(ctid uint32, mess dispatch.NfqueueMessage, name string) {
 	modifiedColumns[name] = hops
 
 	reports.LogEvent(reports.CreateEvent(name, "sessions", 2, columns, modifiedColumns))
+}
+
+// GetInterfaceRateDetails returns the per second rate for available interface metrics
+func GetInterfaceRateDetails(facename string) map[string]uint64 {
+	var retmap map[string]uint64
+
+	interfaceDiffLocker.Lock()
+	defer interfaceDiffLocker.Unlock()
+
+	diffInfo := interfaceDiffMap[facename]
+
+	if diffInfo == nil {
+		return nil
+	}
+
+	retmap = make(map[string]uint64)
+	retmap["rx_bytes_rate"] = diffInfo.RxBytes / interfaceStatLogIntervalSec
+	retmap["rx_packets_rate"] = diffInfo.RxPackets / interfaceStatLogIntervalSec
+	retmap["rx_errs_rate"] = diffInfo.RxErrs / interfaceStatLogIntervalSec
+	retmap["rx_drop_rate"] = diffInfo.RxDrop / interfaceStatLogIntervalSec
+	retmap["rx_fifo_rate"] = diffInfo.RxFifo / interfaceStatLogIntervalSec
+	retmap["rx_frame_rate"] = diffInfo.RxFrame / interfaceStatLogIntervalSec
+	retmap["rx_compressed_rate"] = diffInfo.RxCompressed / interfaceStatLogIntervalSec
+	retmap["rx_multicast_rate"] = diffInfo.RxMulticast / interfaceStatLogIntervalSec
+	retmap["tx_bytes_rate"] = diffInfo.TxBytes / interfaceStatLogIntervalSec
+	retmap["tx_packets_rate"] = diffInfo.TxPackets / interfaceStatLogIntervalSec
+	retmap["tx_errs_rate"] = diffInfo.TxErrs / interfaceStatLogIntervalSec
+	retmap["tx_drop_rate"] = diffInfo.TxDrop / interfaceStatLogIntervalSec
+	retmap["tx_fifo_rate"] = diffInfo.TxFifo / interfaceStatLogIntervalSec
+	retmap["tx_colls_rate"] = diffInfo.TxColls / interfaceStatLogIntervalSec
+	retmap["tx_carrier_rate"] = diffInfo.TxCarrier / interfaceStatLogIntervalSec
+	retmap["tx_compressed_rate"] = diffInfo.TxCompressed / interfaceStatLogIntervalSec
+	return retmap
 }
