@@ -106,13 +106,35 @@ func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) *ClassifiedTr
 
 	requestURL := formRequestURL(ipAdd, port, protoID)
 
+	// build the transport based on the http.DefaultTransport, but with 1 second timeouts
+	tr := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   1 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   1 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
 	req, err := http.NewRequest("GET", requestURL, nil)
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("AuthRequest", authRequestKey)
 
+	client = &http.Client{Transport: tr}
 	resp, err := client.Do(req)
 
 	if err != nil {
+
+		// timeout requests are handled differently
+		if err.(net.Error).Timeout() {
+			logger.Warn("%OC|Cloud API request to %s has timed out, error: %v\n", "traffic_prediction_cloud_api_timeout", 10, cloudAPIEndpoint, err)
+			return nil
+		}
+
 		logger.Err("Error sending prediction request to cloud: %v\n", err)
 		return nil
 	}
@@ -147,7 +169,7 @@ func findCachedTraffic(mapKey string) *ClassifiedTraffic {
 
 // storeCachedTraffic will store a new cache item into the classified traffic cache
 func storeCachedTraffic(mapKey string, classTraff *ClassifiedTraffic) {
-	logger.Debug("Storing a cache item for key: %s", mapKey)
+	logger.Debug("Storing a cache item for key: %s\n", mapKey)
 	trafficMutex.Lock()
 	var newTrafficItem = new(CachedTrafficItem)
 	newTrafficItem.TrafficData = classTraff
