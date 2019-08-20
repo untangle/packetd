@@ -102,6 +102,7 @@ func Startup() {
 	api.GET("/status/build", statusBuild)
 	api.GET("/status/wantest/:device", statusWANTest)
 	api.GET("/status/uid", statusUID)
+	api.GET("/status/interfaces/:device", statusInterfaces)
 
 	api.GET("/debug", debugHandler)
 	api.POST("/gc", gcHandler)
