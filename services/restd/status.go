@@ -3,6 +3,7 @@ package restd
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -176,8 +177,6 @@ func statusInterfaces(c *gin.Context) {
 		return
 	}
 
-	logger.Info("RESULT = %v\n", string(result)) // TODO - remove this
-
 	// note here: the output type is already in JSON, setting the content-type before calling c.String will force the header
 	c.Header("Content-Type", "application/json")
 	c.String(http.StatusOK, string(result))
@@ -245,10 +244,20 @@ func getInterfaceInfo(getface string) ([]byte, error) {
 		return nil, err
 	}
 
+	mainlist, ok := ubuslist["interface"].([]interface{})
+	if !ok {
+		return nil, errors.New("Missing interface object in ubus network.interface dump")
+	}
+
 	// walk through each interface object in the ubus data
-	for _, raw := range ubuslist["interface"].([]interface{}) {
+	for _, raw := range mainlist {
 		ubusitem, ok := raw.(map[string]interface{})
 		if !ok {
+			continue
+		}
+
+		// ignore if there is no device or up entry
+		if ubusitem["device"] == nil || ubusitem["up"] == nil {
 			continue
 		}
 
@@ -288,46 +297,54 @@ func getInterfaceInfo(getface string) ([]byte, error) {
 		}
 
 		// walk through each ipv4-address object for the interface
-		for _, item := range ubusitem["ipv4-address"].([]interface{}) {
-			ptr, ok := item.(map[string]interface{})
-			if !ok {
-				continue
+		if nodelist, ok := ubusitem["ipv4-address"].([]interface{}); ok {
+			for _, item := range nodelist {
+				if ptr, ok := item.(map[string]interface{}); ok {
+					// put the address and mask in CIDR format and add to the address array
+					if ptr["address"] != nil && ptr["mask"] != nil {
+						str := fmt.Sprintf("%s/%d", ptr["address"].(string), int(ptr["mask"].(float64)))
+						worker.IP4Addr = append(worker.IP4Addr, str)
+					}
+				}
 			}
-			// put the address and mask in CIDR format and add to the address array
-			str := fmt.Sprintf("%s/%d", ptr["address"].(string), int(ptr["mask"].(float64)))
-			worker.IP4Addr = append(worker.IP4Addr, str)
 		}
 
 		// walk through each ipv6-address object for the interface
-		for _, item := range ubusitem["ipv6-address"].([]interface{}) {
-			ptr, ok := item.(map[string]interface{})
-			if !ok {
-				continue
+		if nodelist, ok := ubusitem["ipv6-address"].([]interface{}); ok {
+			for _, item := range nodelist {
+				if ptr, ok := item.(map[string]interface{}); ok {
+					// put the address and mask in address/prefix format and add to the address array
+					if ptr["address"] != nil && ptr["mask"] != nil {
+						str := fmt.Sprintf("%s/%d", ptr["address"].(string), int(ptr["mask"].(float64)))
+						worker.IP6Addr = append(worker.IP6Addr, str)
+					}
+				}
 			}
-			// put the address and mask in address/prefix format and add to the address array
-			str := fmt.Sprintf("%s/%d", ptr["address"].(string), int(ptr["mask"].(float64)))
-			worker.IP6Addr = append(worker.IP6Addr, str)
 		}
 
 		// walk through the dns-server list object for the interface
-		for _, item := range ubusitem["dns-server"].([]interface{}) {
-			worker.DNSServers = append(worker.DNSServers, item.(string))
+		if nodelist, ok := ubusitem["dns-server"].([]interface{}); ok {
+			for _, item := range nodelist {
+				worker.DNSServers = append(worker.DNSServers, item.(string))
+			}
 		}
 
 		// walk through each route object for the interface
-		for _, item := range ubusitem["route"].([]interface{}) {
-			ptr, ok := item.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			// look for the IPv4 default gateway
-			if ptr["target"].(string) == "0.0.0.0" && uint(ptr["mask"].(float64)) == 0 {
-				worker.IP4Gateway = ptr["nexthop"].(string)
-				continue
-			}
-			// look for the IPv6 default gateway
-			if ptr["target"].(string) == "::" && uint(ptr["mask"].(float64)) == 0 {
-				worker.IP6Gateway = ptr["nexthop"].(string)
+		if nodelist, ok := ubusitem["route"].([]interface{}); ok {
+			for _, item := range nodelist {
+				if ptr, ok := item.(map[string]interface{}); ok {
+					if ptr["target"] != nil && ptr["mask"] != nil && ptr["nexthop"] != nil {
+						// look for the IPv4 default gateway
+						if ptr["target"].(string) == "0.0.0.0" && uint(ptr["mask"].(float64)) == 0 {
+							worker.IP4Gateway = ptr["nexthop"].(string)
+							continue
+						}
+						// look for the IPv6 default gateway
+						if ptr["target"].(string) == "::" && uint(ptr["mask"].(float64)) == 0 {
+							worker.IP6Gateway = ptr["nexthop"].(string)
+						}
+					}
+				}
 			}
 		}
 
