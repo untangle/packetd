@@ -184,29 +184,29 @@ func statusInterfaces(c *gin.Context) {
 }
 
 type interfaceInfo struct {
-	Device           string
-	Connected        bool
-	IP4Addr          []string
-	IP4Gateway       string
-	IP6Addr          []string
-	IP6Gateway       string
-	DNSServers       []string
-	RxByteRate       uint64
-	RxPacketRate     uint64
-	RxErrorRate      uint64
-	RxDropRate       uint64
-	RxFifoRate       uint64
-	RxFrameRate      uint64
-	RxCompressedRate uint64
-	RxMulticastRate  uint64
-	TxByteRate       uint64
-	TxPacketRate     uint64
-	TxErrorRate      uint64
-	TxDropRate       uint64
-	TxFifoRate       uint64
-	TxCollisionRate  uint64
-	TxCarrierRate    uint64
-	TxCompressedRate uint64
+	Device           string   `json:"device"`
+	Connected        bool     `json:"connected"`
+	IP4Addr          []string `json:"ip4Addr"`
+	IP4Gateway       string   `json:"ip4Gateway"`
+	IP6Addr          []string `json:"ip6Addr"`
+	IP6Gateway       string   `json:"ip6Gateway"`
+	DNSServers       []string `json:"dnsServers"`
+	RxByteRate       uint64   `json:"rxByteRate"`
+	RxPacketRate     uint64   `json:"rxPacketRate"`
+	RxErrorRate      uint64   `json:"rxErrorRate"`
+	RxDropRate       uint64   `json:"rxDropRate"`
+	RxFifoRate       uint64   `json:"rxFifoRate"`
+	RxFrameRate      uint64   `json:"rxFrameRate"`
+	RxCompressedRate uint64   `json:"rxCompressedRate"`
+	RxMulticastRate  uint64   `json:"rxMulticastRate"`
+	TxByteRate       uint64   `json:"txByteRate"`
+	TxPacketRate     uint64   `json:"txPacketRate"`
+	TxErrorRate      uint64   `json:"txErrorRate"`
+	TxDropRate       uint64   `json:"txDropRate"`
+	TxFifoRate       uint64   `json:"txFifoRate"`
+	TxCollisionRate  uint64   `json:"txCollisionRate"`
+	TxCarrierRate    uint64   `json:"txCarrierRate"`
+	TxCompressedRate uint64   `json:"txCompressedRate"`
 }
 
 // getInterfaceInfo returns a json object with details for the requested interface
