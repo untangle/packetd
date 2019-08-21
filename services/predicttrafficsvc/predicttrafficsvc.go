@@ -135,7 +135,7 @@ func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) *ClassifiedTr
 			return nil
 		}
 
-		logger.Err("Error sending prediction request to cloud: %v\n", err)
+		logger.Warn("%OC|Cloud API request to %s has failed, error details: %v\n", "traffic_prediction_cloud_api_failure", 10, cloudAPIEndpoint, err)
 		return nil
 	}
 
