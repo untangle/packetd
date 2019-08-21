@@ -105,6 +105,7 @@ func Startup() {
 	api.GET("/status/interfaces/:device", statusInterfaces)
 	api.GET("/status/arp/", statusArp)
 	api.GET("/status/arp/:device", statusArp)
+	api.GET("/status/dhcp", statusDHCP)
 
 	api.GET("/debug", debugHandler)
 	api.POST("/gc", gcHandler)
