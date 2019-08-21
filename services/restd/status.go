@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/c9s/goprocinfo/linux"
@@ -183,6 +184,19 @@ func statusInterfaces(c *gin.Context) {
 	return
 }
 
+// statusDHCP is the RESTD /api/status/dhcp handler, this will return DHCP records
+func statusDHCP(c *gin.Context) {
+
+	result, err := getDHCPInfo()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+	return
+}
+
 type interfaceInfo struct {
 	Device           string   `json:"device"`
 	Connected        bool     `json:"connected"`
@@ -207,6 +221,14 @@ type interfaceInfo struct {
 	TxCollisionRate  uint64   `json:"txCollisionRate"`
 	TxCarrierRate    uint64   `json:"txCarrierRate"`
 	TxCompressedRate uint64   `json:"txCompressedRate"`
+}
+
+type dhcpInfo struct {
+	LeaseExpiration uint
+	MACAddress      string
+	IP4Addr         string
+	Hostname        string
+	ClientID        string
 }
 
 // getInterfaceInfo returns a json object with details for the requested interface
@@ -372,6 +394,44 @@ func getInterfaceInfo(getface string) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+// getDHCPInfo returns the DHCP info as a slice of dhcpInfos
+func getDHCPInfo() ([]dhcpInfo, error) {
+
+	returnDHCPInfo := []dhcpInfo{}
+
+	file, err := os.Open("/tmp/dhcp.leases")
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		leaseValue, parseErr := strconv.ParseUint(fields[0], 0, 32)
+
+		if parseErr != nil {
+			return nil, parseErr
+		}
+
+		var dhcpEntry = dhcpInfo{
+			uint(leaseValue),
+			fields[1],
+			fields[2],
+			fields[3],
+			fields[4],
+		}
+
+		returnDHCPInfo = append(returnDHCPInfo, dhcpEntry)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return returnDHCPInfo, nil
 }
 
 // getBuildInfo returns the build info as a json map
