@@ -220,7 +220,20 @@ func statusDHCP(c *gin.Context) {
 
 // statusRoute is the RESTD /api/status/route handler, this will return route information
 func statusRoute(c *gin.Context) {
+	table := c.Param("table")
+	query := c.Request.URL.Query()
+
 	cmdArgs := []string{"route"}
+
+	if len(table) > 0 {
+		cmdArgs = []string{"route", "show", "table", table}
+	}
+
+	//if the ip protocol is passed in, prepend it
+	if query["family"] != nil && len(query["family"][0]) > 0 {
+		cmdArgs = append([]string{"-" + query["family"][0]}, cmdArgs...)
+	}
+
 	result, err := runIPCommand(cmdArgs)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
@@ -231,6 +244,33 @@ func statusRoute(c *gin.Context) {
 	c.Header("Content-Type", "application/json")
 	c.String(http.StatusOK, string(result))
 	return
+}
+
+// statusRules is the RESTD /api/status/rules handler, this will return ip rule information
+func statusRules(c *gin.Context) {
+	query := c.Request.URL.Query()
+	cmdArgs := []string{"rule", "ls"}
+
+	//if the ip protocol is passed in, prepend it
+	if query["family"] != nil && len(query["family"][0]) > 0 {
+		cmdArgs = append([]string{"-" + query["family"][0]}, cmdArgs...)
+	}
+
+	result, err := runIPCommand(cmdArgs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	// note here: the output type is already in JSON, setting the content-type before calling c.String will force the header
+	c.Header("Content-Type", "application/json")
+	c.String(http.StatusOK, string(result))
+	return
+}
+
+// statusRouteTables returns routing table names to pass into the statusRoute api
+func statusRouteTables(c *gin.Context) {
+
 }
 
 type interfaceInfo struct {
@@ -514,6 +554,8 @@ func runIPCommand(cmdArgs []string) ([]byte, error) {
 
 	// the -json flag should be prepended to the argument list
 	cmdArgs = append([]string{"-json"}, cmdArgs...)
+
+	logger.Info("Running ip command with these args: %v", cmdArgs)
 
 	result, err := exec.Command("ip", cmdArgs...).CombinedOutput()
 
