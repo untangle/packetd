@@ -280,6 +280,7 @@ func statusRouteTables(c *gin.Context) {
 	}
 
 	//append awk results to rtTables
+	logger.Info("Result parse: %v", result)
 
 	c.JSON(http.StatusOK, rtTables)
 	return
