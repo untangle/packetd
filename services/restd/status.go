@@ -270,7 +270,19 @@ func statusRules(c *gin.Context) {
 
 // statusRouteTables returns routing table names to pass into the statusRoute api
 func statusRouteTables(c *gin.Context) {
+	rtTables := []string{"main", "balance", "default", "local", "220"}
 
+	//read through rt_tables and append
+	result, err := exec.Command("awk", "/wan/ {print $2}", "/etc/iproute2/rt_tables").CombinedOutput()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	//append awk results to rtTables
+
+	c.JSON(http.StatusOK, rtTables)
+	return
 }
 
 type interfaceInfo struct {
