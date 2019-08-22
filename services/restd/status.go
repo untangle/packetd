@@ -238,11 +238,11 @@ type interfaceInfo struct {
 }
 
 type dhcpInfo struct {
-	LeaseExpiration uint
-	MACAddress      string
-	IP4Addr         string
-	Hostname        string
-	ClientID        string
+	LeaseExpiration uint   `json:leaseExpiration`
+	MACAddress      string `json:macAddress`
+	IP4Addr         string `json:ip4Addr`
+	Hostname        string `json:hostName`
+	ClientID        string `json:clientId`
 }
 
 // getInterfaceInfo returns a json object with details for the requested interface
@@ -488,10 +488,10 @@ func getBoardName() (string, error) {
 }
 
 type arpInfo struct {
-	Destination string
-	Device      string
-	MAC         string
-	State       string
+	Destination string `json:destination`
+	Device      string `json:device`
+	MACAddress  string `json:macAddress`
+	State       string `json:state`
 }
 
 // getArpStatus returns the arp status using "ip neigh", if the device is populated then we return only arp info for that device
