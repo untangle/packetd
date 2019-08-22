@@ -2,7 +2,6 @@ package restd
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -188,13 +187,21 @@ func statusInterfaces(c *gin.Context) {
 // statusArp is the RESTD /api/status/arp handler, this will return the arp table
 func statusArp(c *gin.Context) {
 	device := c.Param("device")
-	result, err := getArpStatus(device)
+	cmdArgs := []string{"neigh"}
+
+	if len(device) > 0 {
+		cmdArgs = []string{"neigh", "show", "dev", device}
+	}
+
+	result, err := runIPCommand(cmdArgs)
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	c.Header("Content-Type", "application/json")
+	c.String(http.StatusOK, string(result))
 	return
 }
 
@@ -208,6 +215,21 @@ func statusDHCP(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, result)
+	return
+}
+
+// statusRoute is the RESTD /api/status/route handler, this will return route information
+func statusRoute(c *gin.Context) {
+	cmdArgs := []string{"route"}
+	result, err := runIPCommand(cmdArgs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	// note here: the output type is already in JSON, setting the content-type before calling c.String will force the header
+	c.Header("Content-Type", "application/json")
+	c.String(http.StatusOK, string(result))
 	return
 }
 
@@ -487,54 +509,17 @@ func getBoardName() (string, error) {
 	return "unknown", nil
 }
 
-type arpInfo struct {
-	Destination string `json:destination`
-	Device      string `json:device`
-	MACAddress  string `json:macAddress`
-	State       string `json:state`
-}
+// runIPCommand is used to run various commands using iproute2, the results from the output are json strings
+func runIPCommand(cmdArgs []string) ([]byte, error) {
 
-// getArpStatus returns the arp status using "ip neigh", if the device is populated then we return only arp info for that device
-func getArpStatus(device string) ([]arpInfo, error) {
-
-	cmdArgs := []string{"neigh"}
-	arpTable := []arpInfo{}
-
-	if len(device) > 0 {
-		cmdArgs = []string{"neigh", "show", "dev", device}
-	}
+	// the -json flag should be prepended to the argument list
+	cmdArgs = append([]string{"-json"}, cmdArgs...)
 
 	result, err := exec.Command("ip", cmdArgs...).CombinedOutput()
 
 	if err != nil {
 		return nil, err
 	}
-	scanner := bufio.NewScanner(bytes.NewReader(result))
 
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		var currentArp arpInfo
-
-		// if ipneigh returns 6 columns, then the device name is available
-		if len(fields) == 6 {
-			currentArp = arpInfo{
-				fields[0],
-				fields[2],
-				fields[4],
-				fields[5],
-			}
-		} else {
-			currentArp = arpInfo{
-				fields[0],
-				device,
-				fields[2],
-				fields[3],
-			}
-		}
-
-		arpTable = append(arpTable, currentArp)
-	}
-
-	return arpTable, nil
-
+	return result, nil
 }
