@@ -240,7 +240,7 @@ type interfaceInfo struct {
 type dhcpInfo struct {
 	LeaseExpiration uint   `json:leaseExpiration`
 	MACAddress      string `json:macAddress`
-	IP4Addr         string `json:ip4Addr`
+	IPAddr          string `json:ipAddr`
 	Hostname        string `json:hostName`
 	ClientID        string `json:clientId`
 }
