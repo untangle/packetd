@@ -110,6 +110,7 @@ func Startup() {
 	api.GET("/status/routetables", statusRouteTables)
 	api.GET("/status/route/:table", statusRoute)
 	api.GET("/status/rules", statusRules)
+	api.GET("/status/routerules", statusRouteRules)
 
 	api.GET("/debug", debugHandler)
 	api.POST("/gc", gcHandler)

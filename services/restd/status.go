@@ -268,6 +268,19 @@ func statusRules(c *gin.Context) {
 	return
 }
 
+func statusRouteRules(c *gin.Context) {
+
+	result, err := getRouteRules()
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.String(http.StatusOK, result)
+	return
+}
+
 // statusRouteTables returns routing table names to pass into the statusRoute api
 func statusRouteTables(c *gin.Context) {
 	rtTables := []string{"main", "balance", "default", "local", "220"}
@@ -562,15 +575,41 @@ func getBoardName() (string, error) {
 	return "unknown", nil
 }
 
-// runIPCommand is used to run various commands using iproute2, the results from the output are json strings
+func getRouteRules() (string, error) {
+
+	cmdArgs := []string{"list", "chain", "inet", "wan-routing", "user-wan-rules"}
+
+	result, err := runNFTCommand(cmdArgs)
+
+	if err != nil {
+		return "", err
+	}
+
+	return string(result), nil
+}
+
+// runIPCommand is used to run various commands using iproute2, the results from the output are byte arrays which represent json strings
 func runIPCommand(cmdArgs []string) ([]byte, error) {
 
 	// the -json flag should be prepended to the argument list
 	cmdArgs = append([]string{"-json"}, cmdArgs...)
 
-	logger.Info("Running ip command with these args: %v", cmdArgs)
-
 	result, err := exec.Command("ip", cmdArgs...).CombinedOutput()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// runNFTCommand is used to run various commands using nft, the result is a byte array of string content (until the -json flag is available in NFT 0.9)
+func runNFTCommand(cmdArgs []string) ([]byte, error) {
+
+	//the -json flag is prepended to the arg list (uncomment when NFT is updated to 0.9)
+	// cmdArgs = append([]string{"--json"}, cmdArgs...)
+
+	result, err := exec.Command("nft", cmdArgs...).CombinedOutput()
 
 	if err != nil {
 		return nil, err
