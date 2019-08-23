@@ -313,11 +313,11 @@ type interfaceInfo struct {
 }
 
 type dhcpInfo struct {
-	LeaseExpiration uint   `json:leaseExpiration`
-	MACAddress      string `json:macAddress`
-	IPAddr          string `json:ipAddr`
-	Hostname        string `json:hostName`
-	ClientID        string `json:clientId`
+	LeaseExpiration uint   `json:"leaseExpiration"`
+	MACAddress      string `json:"macAddress"`
+	IPAddr          string `json:"ipAddr"`
+	Hostname        string `json:"hostName"`
+	ClientID        string `json:"clientId"`
 }
 
 // getInterfaceInfo returns a json object with details for the requested interface
