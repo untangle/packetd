@@ -293,7 +293,7 @@ func statusRouteTables(c *gin.Context) {
 	}
 
 	//append awk results to rtTables
-	for i, s := range strings.Fields(string(result)) {
+	for _, s := range strings.Fields(string(result)) {
 		rtTables = append(rtTables, s)
 	}
 
