@@ -79,6 +79,7 @@ func statusHardware(c *gin.Context) {
 	cpuinfo, err := linux.ReadCPUInfo("/proc/cpuinfo")
 	if err != nil {
 		logger.Warn("Error reading cpuinfo: %s\n", err.Error())
+		stats["cpuinfo"] = getMachineType()
 	} else {
 		stats["cpuinfo"] = cpuinfo
 	}
@@ -575,6 +576,17 @@ func getBoardName() (string, error) {
 	}
 
 	return "unknown", nil
+}
+
+// getMachineType returns the machine type and is called when /proc/cpuinfo doesn't list Hardware
+func getMachineType() string {
+	result, err := exec.Command("uname", "-m").CombinedOutput()
+
+	if err != nil {
+		return "unknown"
+	}
+
+	return string(result)
 }
 
 func getRouteRules() (string, error) {
