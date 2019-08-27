@@ -302,6 +302,22 @@ func statusRouteTables(c *gin.Context) {
 	return
 }
 
+// statusWwan is the RESTD /api/status/wwan handler, this will return wwan device info
+func statusWwan(c *gin.Context) {
+	device := c.Param("device")
+
+	result, err := exec.Command("/usr/bin/wwan_status.sh", device).CombinedOutput()
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	c.Header("Content-Type", "application/json")
+	c.String(http.StatusOK, string(result))
+	return
+}
+
 type interfaceInfo struct {
 	Device           string   `json:"device"`
 	Connected        bool     `json:"connected"`
