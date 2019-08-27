@@ -40,7 +40,7 @@ type CachedTrafficItem struct {
 }
 
 // unknownTrafficItem is a pointer for unknown traffic
-var unknownTrafficItem = &ClassifiedTraffic{ID: "Unknown ID", Name: "Unknown Name", Confidence: 0, ProtoChain: "Unknown Protochain", Productivity: "Unknown Productivity", Threat: "Unknown Threat", Category: "Unknown Category"}
+var unknownTrafficItem = &ClassifiedTraffic{ID: "Unknown", Name: "Unknown", Confidence: 0, ProtoChain: "Unknown", Productivity: "Unknown", Threat: "Unknown", Category: "Unknown"}
 
 // classifiedTrafficCache is a map of ClassifiedTraffic pointer structs
 var classifiedTrafficCache map[string]*CachedTrafficItem
