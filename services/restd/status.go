@@ -79,6 +79,7 @@ func statusHardware(c *gin.Context) {
 	cpuinfo, err := linux.ReadCPUInfo("/proc/cpuinfo")
 	if err != nil {
 		logger.Warn("Error reading cpuinfo: %s\n", err.Error())
+		stats["cpuinfo"] = getMachineType()
 	} else {
 		stats["cpuinfo"] = cpuinfo
 	}
@@ -298,6 +299,22 @@ func statusRouteTables(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, rtTables)
+	return
+}
+
+// statusWwan is the RESTD /api/status/wwan handler, this will return wwan device info
+func statusWwan(c *gin.Context) {
+	device := c.Param("device")
+
+	result, err := exec.Command("/usr/bin/wwan_status.sh", device).CombinedOutput()
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	c.Header("Content-Type", "application/json")
+	c.String(http.StatusOK, string(result))
 	return
 }
 
@@ -575,6 +592,17 @@ func getBoardName() (string, error) {
 	}
 
 	return "unknown", nil
+}
+
+// getMachineType returns the machine type and is called when /proc/cpuinfo doesn't list Hardware
+func getMachineType() string {
+	result, err := exec.Command("uname", "-m").CombinedOutput()
+
+	if err != nil {
+		return "unknown"
+	}
+
+	return string(result)
 }
 
 func getRouteRules() (string, error) {
