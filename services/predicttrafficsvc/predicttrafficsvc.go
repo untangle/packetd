@@ -24,13 +24,13 @@ const cacheTTL = 86400
 
 // ClassifiedTraffic struct contains the API response data
 type ClassifiedTraffic struct {
-	ID           string `json:"Application"`
-	Name         string
-	Confidence   float32
-	ProtoChain   string `json:"Protocolchain"`
-	Productivity string
-	Threat       string
-	Category     string
+	ID           string  `json:"Application"`
+	Name         string  `json:"ApplicationName"`
+	Confidence   float32 `json:"Confidence"`
+	ProtoChain   string  `json:"Protocolchain"`
+	Productivity string  `json:"ApplicationProductivity"`
+	Risk         string  `json:"ApplicationRisk"`
+	Category     string  `json:"ApplicationCategory"`
 }
 
 // CachedTrafficItem struct contains the cached traffic data and last access time (in Unix time)
@@ -40,7 +40,7 @@ type CachedTrafficItem struct {
 }
 
 // unknownTrafficItem is a pointer for unknown traffic
-var unknownTrafficItem = &ClassifiedTraffic{ID: "Unknown", Name: "Unknown", Confidence: 0, ProtoChain: "Unknown", Productivity: "Unknown", Threat: "Unknown", Category: "Unknown"}
+var unknownTrafficItem = &ClassifiedTraffic{ID: "Unknown", Name: "Unknown", Confidence: 0, ProtoChain: "Unknown", Productivity: "Unknown", Risk: "Unknown", Category: "Unknown"}
 
 // classifiedTrafficCache is a map of ClassifiedTraffic pointer structs
 var classifiedTrafficCache map[string]*CachedTrafficItem
