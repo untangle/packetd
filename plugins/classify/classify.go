@@ -37,7 +37,7 @@ type applicationInfo struct {
 const pluginName = "classify"
 const guidInfoFile = "/usr/share/untangle-classd/protolist.csv"
 
-var applicationTable map[string]applicationInfo
+var applicationTable map[string]*applicationInfo
 
 const navlStateTerminated = 0 // Indicates the connection has been terminated
 const navlStateInspecting = 1 // Indicates the connection is under inspection
@@ -366,7 +366,7 @@ func loadApplicationTable() {
 	var list []string
 	var err error
 
-	applicationTable = make(map[string]applicationInfo)
+	applicationTable = make(map[string]*applicationInfo)
 
 	// open the guid info file provided by Sandvine
 	file, err = os.Open(guidInfoFile)
@@ -406,7 +406,8 @@ func loadApplicationTable() {
 			continue
 		}
 
-		var info applicationInfo
+		// create a object to store the details
+		info := new(applicationInfo)
 
 		info.guid = list[0]
 		info.index, err = strconv.Atoi(list[1])
@@ -431,7 +432,8 @@ func loadApplicationTable() {
 		info.reference = list[8]
 		info.plugin = list[9]
 
-		applicationTable[list[0]] = info
+		// store the object in the table using the guid as the index
+		applicationTable[info.guid] = info
 		infocount++
 	}
 
