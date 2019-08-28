@@ -239,7 +239,6 @@ func watchNetworkSocket(socket *pingSocket) {
 		// make sure the ID in the reply matches our PID from the request
 		answer := reply.Body.(*icmp.Echo)
 		if answer.ID != masterPid {
-			logger.Warn("Unexpected message ID - received:%d expecting:%d\n", answer.ID, masterPid)
 			continue
 		}
 
