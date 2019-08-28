@@ -56,7 +56,7 @@ func addPredictionToDict(ctid uint32, currentTraffic *predicttrafficsvc.Classifi
 	dict.AddSessionEntry(ctid, "application_confidence_inferred", roundConfidence(currentTraffic.Confidence))
 	dict.AddSessionEntry(ctid, "application_protochain_inferred", currentTraffic.ProtoChain)
 	dict.AddSessionEntry(ctid, "application_productivity_inferred", currentTraffic.Productivity)
-	dict.AddSessionEntry(ctid, "application_risk_inferred", currentTraffic.Threat)
+	dict.AddSessionEntry(ctid, "application_risk_inferred", currentTraffic.Risk)
 	dict.AddSessionEntry(ctid, "application_category_inferred", currentTraffic.Category)
 
 }
@@ -75,7 +75,7 @@ func addPredictionToReport(mess dispatch.NfqueueMessage, currentTraffic *predict
 	modifiedColumns["application_confidence_inferred"] = roundConfidence(currentTraffic.Confidence)
 	modifiedColumns["application_protochain_inferred"] = currentTraffic.ProtoChain
 	modifiedColumns["application_productivity_inferred"] = currentTraffic.Productivity
-	modifiedColumns["application_risk_inferred"] = currentTraffic.Threat
+	modifiedColumns["application_risk_inferred"] = currentTraffic.Risk
 	modifiedColumns["application_category_inferred"] = currentTraffic.Category
 
 	reports.LogEvent(reports.CreateEvent("session_predict_traffic", "sessions", 2, columns, modifiedColumns))
