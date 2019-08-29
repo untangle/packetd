@@ -24,9 +24,13 @@ const cacheTTL = 86400
 
 // ClassifiedTraffic struct contains the API response data
 type ClassifiedTraffic struct {
-	Application   string
-	Confidence    float32
-	ProtocolChain string
+	ID           string  `json:"Application"`
+	Name         string  `json:"ApplicationName"`
+	Confidence   float32 `json:"Confidence"`
+	ProtoChain   string  `json:"Protocolchain"`
+	Productivity uint8   `json:"ApplicationProductivity"`
+	Risk         uint8   `json:"ApplicationRisk"`
+	Category     string  `json:"ApplicationCategory"`
 }
 
 // CachedTrafficItem struct contains the cached traffic data and last access time (in Unix time)
@@ -36,7 +40,7 @@ type CachedTrafficItem struct {
 }
 
 // unknownTrafficItem is a pointer for unknown traffic
-var unknownTrafficItem = &ClassifiedTraffic{Application: "Unknown", Confidence: 0, ProtocolChain: "Unknown"}
+var unknownTrafficItem = &ClassifiedTraffic{ID: "Unknown", Name: "Unknown", Confidence: 0, ProtoChain: "Unknown", Productivity: 0, Risk: 0, Category: "Unknown"}
 
 // classifiedTrafficCache is a map of ClassifiedTraffic pointer structs
 var classifiedTrafficCache map[string]*CachedTrafficItem
@@ -102,7 +106,6 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) *ClassifiedTraffic {
 
 	var trafficResponse *ClassifiedTraffic
-	client := &http.Client{}
 
 	requestURL := formRequestURL(ipAdd, port, protoID)
 
@@ -124,7 +127,7 @@ func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) *ClassifiedTr
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("AuthRequest", authRequestKey)
 
-	client = &http.Client{Transport: tr}
+	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
 
 	if err != nil {

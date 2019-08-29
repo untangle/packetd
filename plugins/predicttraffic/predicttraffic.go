@@ -51,9 +51,14 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 // addPredictionToDict will take a ClassifiedTraffic pointer and send the data to dict
 func addPredictionToDict(ctid uint32, currentTraffic *predicttrafficsvc.ClassifiedTraffic) {
 	logger.Debug("Sending prediction info to dict with ctid: %d\n", ctid)
-	dict.AddSessionEntry(ctid, "application_predicted_name", currentTraffic.Application)
-	dict.AddSessionEntry(ctid, "application_predicted_confidence", roundConfidence(currentTraffic.Confidence))
-	dict.AddSessionEntry(ctid, "application_predicted_protochain", currentTraffic.ProtocolChain)
+	dict.AddSessionEntry(ctid, "application_id_inferred", currentTraffic.ID)
+	dict.AddSessionEntry(ctid, "application_name_inferred", currentTraffic.Name)
+	dict.AddSessionEntry(ctid, "application_confidence_inferred", roundConfidence(currentTraffic.Confidence))
+	dict.AddSessionEntry(ctid, "application_protochain_inferred", currentTraffic.ProtoChain)
+	dict.AddSessionEntry(ctid, "application_productivity_inferred", currentTraffic.Productivity)
+	dict.AddSessionEntry(ctid, "application_risk_inferred", currentTraffic.Risk)
+	dict.AddSessionEntry(ctid, "application_category_inferred", currentTraffic.Category)
+
 }
 
 // addPredictionToReport will take a ClassifiedTraffic pointer and send the data into the reports sqlite database, under the sessions table
@@ -65,9 +70,13 @@ func addPredictionToReport(mess dispatch.NfqueueMessage, currentTraffic *predict
 	}
 
 	modifiedColumns := make(map[string]interface{})
-	modifiedColumns["application_predicted_name"] = currentTraffic.Application
-	modifiedColumns["application_predicted_confidence"] = roundConfidence(currentTraffic.Confidence)
-	modifiedColumns["application_predicted_protochain"] = currentTraffic.ProtocolChain
+	modifiedColumns["application_id_inferred"] = currentTraffic.ID
+	modifiedColumns["application_name_inferred"] = currentTraffic.Name
+	modifiedColumns["application_confidence_inferred"] = roundConfidence(currentTraffic.Confidence)
+	modifiedColumns["application_protochain_inferred"] = currentTraffic.ProtoChain
+	modifiedColumns["application_productivity_inferred"] = currentTraffic.Productivity
+	modifiedColumns["application_risk_inferred"] = currentTraffic.Risk
+	modifiedColumns["application_category_inferred"] = currentTraffic.Category
 
 	reports.LogEvent(reports.CreateEvent("session_predict_traffic", "sessions", 2, columns, modifiedColumns))
 }
