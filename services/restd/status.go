@@ -269,6 +269,7 @@ func statusRules(c *gin.Context) {
 	return
 }
 
+// statusRouteRules gets the route rules to return as a string content type
 func statusRouteRules(c *gin.Context) {
 
 	result, err := getRouteRules()
