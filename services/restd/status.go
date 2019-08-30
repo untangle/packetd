@@ -319,6 +319,21 @@ func statusWwan(c *gin.Context) {
 	return
 }
 
+// statusWifiChannels gets available wifi channels for a given wireless device
+func statusWifiChannels(c *gin.Context) {
+	device := c.Param("device")
+
+	result, err := getWifiChannels(device)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+	return
+}
+
 type interfaceInfo struct {
 	Device           string   `json:"device"`
 	Connected        bool     `json:"connected"`
@@ -617,6 +632,30 @@ func getRouteRules() (string, error) {
 	}
 
 	return string(result), nil
+}
+
+func getWifiChannels(device string) ([]string, error) {
+	cmdArgs := []string{device, "freqlist"}
+
+	cmdResult, err := exec.Command("iwinfo", cmdArgs...).CombinedOutput()
+
+	if err != nil {
+		logger.Err("iwinfo failed during getWifiChannels: %v\n", err)
+		return nil, err
+	}
+
+	availableChannels := []string{}
+
+	// regex should match for channel, use groups to pull the channel #
+	channelRegex := regexp.MustCompile(`\(Channel\s(\d*)\)`)
+
+	groupMatches := channelRegex.FindAllSubmatch(cmdResult, -1)
+
+	for _, channelMatch := range groupMatches {
+		availableChannels = append(availableChannels, string(channelMatch[1]))
+	}
+
+	return availableChannels, nil
 }
 
 // runIPCommand is used to run various commands using iproute2, the results from the output are byte arrays which represent json strings
