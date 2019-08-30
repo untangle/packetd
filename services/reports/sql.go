@@ -308,6 +308,7 @@ func getDistinctValues(reportEntry *ReportEntry) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	rows.Close()
 
 	var values []string
 
