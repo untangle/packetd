@@ -621,6 +621,7 @@ func getMachineType() string {
 	return string(result)
 }
 
+// getRouteRules will retrieve route rules using the NFT command
 func getRouteRules() (string, error) {
 
 	cmdArgs := []string{"list", "chain", "inet", "wan-routing", "user-wan-rules"}
@@ -634,6 +635,7 @@ func getRouteRules() (string, error) {
 	return string(result), nil
 }
 
+// getWifiChannels will retrieve the wifi channels available to a given interface name using "iwinfo"
 func getWifiChannels(device string) ([]string, error) {
 	cmdArgs := []string{device, "freqlist"}
 
