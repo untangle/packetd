@@ -100,6 +100,7 @@ var queries = make(map[uint64]*Query)
 var queriesLock sync.RWMutex
 var queryID uint64
 var eventQueue = make(chan Event, 10000)
+var eventLogCounter = 0
 var cloudQueue = make(chan Event, 1000)
 var cloudDisabled = false
 
@@ -280,6 +281,12 @@ func eventLogger() {
 		}
 		logger.Debug("Log Event: %s %v\n", summary, event.SQLOp)
 		atomic.AddUint64(&EventsLogged, 1)
+
+		eventLogCounter = eventLogCounter + 1
+		if eventLogCounter%10000 == 0 {
+			logger.Info("Cleaning sqlite...\n")
+			runSQL("PRAGMA shrink_memory;")
+		}
 
 		if event.SQLOp == 1 {
 			logInsertEvent(event)
@@ -782,7 +789,7 @@ func trimPercent(table string, percent float32) {
 	runSQL(sqlStr)
 }
 
-// runSql runs the specified SQL
+// runSQL runs the specified SQL
 // results are not read
 // errors are logged
 func runSQL(sqlStr string) {
