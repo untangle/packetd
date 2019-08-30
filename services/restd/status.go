@@ -637,7 +637,7 @@ func getRouteRules() (string, error) {
 func getWifiChannels(device string) ([]string, error) {
 	cmdArgs := []string{device, "freqlist"}
 
-	cmdResult, err := exec.Command("iwinfo", cmdArgs...).CombinedOutput()
+	cmdResult, err := exec.Command("/usr/bin/iwinfo", cmdArgs...).CombinedOutput()
 
 	if err != nil {
 		logger.Err("iwinfo failed during getWifiChannels: %v\n", err)
