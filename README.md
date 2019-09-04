@@ -172,3 +172,13 @@ Use it:
 ```
 ${GOPATH}/bin/golint $(pwd)/...
 ```
+
+Updating vendors
+----------------
+
+To update all upstream libraries:
+
+go list -m all | awk '{print $1}' | while read mod ; do go get $mod ; done
+go mod vendor
+
+compile and make sure it works
