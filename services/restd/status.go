@@ -133,6 +133,7 @@ func statusWANTest(c *gin.Context) {
 	output, err := exec.Command("/usr/bin/speedtest.sh", device).CombinedOutput()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
 	}
 
 	// note here: the output type is already in JSON, setting the content-type before calling c.String will force the header
