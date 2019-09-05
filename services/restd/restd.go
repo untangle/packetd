@@ -112,6 +112,7 @@ func Startup() {
 	api.GET("/status/rules", statusRules)
 	api.GET("/status/routerules", statusRouteRules)
 	api.GET("/status/wwan/:device", statusWwan)
+	api.GET("/status/wifichannels/:device", statusWifiChannels)
 
 	api.GET("/debug", debugHandler)
 	api.POST("/gc", gcHandler)
