@@ -368,6 +368,10 @@ type dhcpInfo struct {
 	Hostname        string `json:"hostName"`
 	ClientID        string `json:"clientId"`
 }
+type wifiChannelInfo struct {
+	Frequency string `json:"frequency"`
+	Channel   uint   `json:"channel"`
+}
 
 // getInterfaceInfo returns a json object with details for the requested interface
 func getInterfaceInfo(getface string) ([]byte, error) {
@@ -637,7 +641,7 @@ func getRouteRules() (string, error) {
 }
 
 // getWifiChannels will retrieve the wifi channels available to a given interface name using "iwinfo"
-func getWifiChannels(device string) ([]string, error) {
+func getWifiChannels(device string) ([]wifiChannelInfo, error) {
 	cmdArgs := []string{device, "freqlist"}
 
 	cmdResult, err := exec.Command("/usr/bin/iwinfo", cmdArgs...).CombinedOutput()
@@ -647,18 +651,29 @@ func getWifiChannels(device string) ([]string, error) {
 		return nil, err
 	}
 
-	availableChannels := []string{}
+	availableFreqs := []wifiChannelInfo{}
 
-	// regex should match for channel, use groups to pull the channel #
-	channelRegex := regexp.MustCompile(`\(Channel\s(\d*)\)`)
+	// regex should match for channel frequency and channel #, split up by groupings
+	channelRegex := regexp.MustCompile(`(\d*\.\d*\s[a-zA-Z]*)\s\(Channel\s(\d*)\)`)
 
 	groupMatches := channelRegex.FindAllSubmatch(cmdResult, -1)
 
 	for _, channelMatch := range groupMatches {
-		availableChannels = append(availableChannels, string(channelMatch[1]))
+		var parsedChannel, err = strconv.ParseUint(string(channelMatch[2]), 10, 32)
+
+		if err != nil {
+			logger.Err("unable to parse channel %s : %v\n", channelMatch[2], err)
+		}
+		var freqMatch = wifiChannelInfo{
+			string(channelMatch[1]),
+			//string(channelMatch[2]),
+			uint(parsedChannel),
+		}
+
+		availableFreqs = append(availableFreqs, freqMatch)
 	}
 
-	return availableChannels, nil
+	return availableFreqs, nil
 }
 
 // runIPCommand is used to run various commands using iproute2, the results from the output are byte arrays which represent json strings
