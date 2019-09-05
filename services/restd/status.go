@@ -666,7 +666,6 @@ func getWifiChannels(device string) ([]wifiChannelInfo, error) {
 		}
 		var freqMatch = wifiChannelInfo{
 			string(channelMatch[1]),
-			//string(channelMatch[2]),
 			uint(parsedChannel),
 		}
 
