@@ -10,12 +10,18 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/untangle/packetd/services/logger"
 )
 
 const pathBase string = "/proc/net/dict"
 
+const cleanCycleSeconds = 900
+const cleanMaxSeconds = 3600
+
+var cleanupTable = make(map[uint64]int64)
+var shutdownChannel = make(chan bool)
 var readMutex = &sync.Mutex{}
 var disabled = false
 
@@ -27,10 +33,17 @@ func Startup() {
 
 	// Load the dict module
 	exec.Command("modprobe", "nft_dict").Run()
+	go cleanupTask()
 }
 
 // Shutdown dict service
 func Shutdown() {
+	shutdownChannel <- true
+	select {
+	case <-shutdownChannel:
+	case <-time.After(10 * time.Second):
+		logger.Warn("Failed to properly shutdown dict cleanupTask\n")
+	}
 }
 
 // Disable disable dict writing
@@ -753,4 +766,83 @@ func GetSessions() (map[uint32]map[string]interface{}, error) {
 	}
 
 	return m, nil
+}
+
+// periodic task to clean the address table
+func cleanupTask() {
+	cleanDictionary()
+	for {
+		select {
+		case <-shutdownChannel:
+			shutdownChannel <- true
+			return
+		case <-time.After(cleanCycleSeconds * time.Second):
+			cleanDictionary()
+		}
+	}
+}
+
+// The goal is to periodically clean up sessions in the dictionary that don't get
+// removed by our normal session processing. This would include sessions that get
+// routed, blocked, or otherwise handled by nft without us ever seeing them.
+func cleanDictionary() {
+	// get the current time
+	currtime := time.Now().Unix()
+
+	// get the list of unique items in the sessions table from the dictionary
+	cmd := "cat /proc/net/dict/all | awk '{ if($2 ==  \"sessions\") print $4 }' | uniq"
+	out, err := exec.Command("sh", "-c", cmd).Output()
+	if err != nil {
+		logger.Warn("Failed to execute command: %s\n", cmd)
+		return
+	}
+
+	// split the output into an array of strings
+	list := strings.Split(string(out), "\n")
+	if len(list) == 1 && list[0] == "\n" {
+		return
+	}
+
+	var dictCount int
+	var dictClean int
+	var tableDel int
+	var tableAdd int
+
+	// First check for all dict sessions in the cleanup table. If found and expired, remove from
+	// dict and table. If found an not expired, leave untouched. If not found create in table.
+	for _, item := range list {
+		if idx, err := strconv.ParseUint(item, 10, 64); err == nil {
+			dictCount++
+			if lasttime, ok := cleanupTable[idx]; ok {
+				if currtime > lasttime+cleanMaxSeconds {
+					logger.Debug("Removing session %d from dictionary\n", idx)
+					DeleteSession(uint32(idx))
+					delete(cleanupTable, idx)
+					dictClean++
+					tableDel++
+				} else {
+					logger.Debug("Ignoring session %d in dictionary\n", idx)
+				}
+			} else {
+				logger.Debug("Adding session %d to the cleanup table\n", idx)
+				cleanupTable[idx] = currtime
+				tableAdd++
+			}
+		}
+	}
+
+	// Now look for and remove anything stale in the cleanup table. Stuff we find here
+	// won't exist in the dictionary since those would have been cleaned in the loop
+	// above. We're just making sure our cleanup table doesn't fill with sessions that
+	// get cleaned during the normal processing of traffic.
+	for item, lasttime := range cleanupTable {
+		if currtime > lasttime+cleanMaxSeconds {
+			delete(cleanupTable, item)
+			tableDel++
+		}
+	}
+
+	logger.Info("----- Dictionary Cleanup -----\n")
+	logger.Info("Removed %d of %d sessions from dict\n", dictClean, dictCount)
+	logger.Info("Cleanup table Add:%d Del:%d Now:%d\n", tableAdd, tableDel, len(cleanupTable))
 }
