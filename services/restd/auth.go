@@ -266,10 +266,11 @@ func authLogin(c *gin.Context) {
 		return
 	}
 
-	// This is a POST, with a username/password. Try to login
+	// This is a POST, with a username/password. Try to login, set an expiration token for 86400 seconds (24 hours)
 	session := sessions.Default(c)
 	if validate(username, password) {
 		session.Set("username", username)
+		session.Options(sessions.Options{Path: "/", MaxAge: 86400})
 		err := session.Save()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
