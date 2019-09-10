@@ -215,11 +215,13 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 	var detail string
 	var confidence int32
 	var category string
+	var productivity int
 	var state int
+	var risk int
 	var attachments map[string]interface{}
 
 	// parse update classd information from reply
-	appid, name, protochain, detail, confidence, category, state = parseReply(reply)
+	appid, name, protochain, detail, confidence, category, state, productivity, risk = parseReply(reply)
 
 	// WARNING - DO NOT USE Session GetAttachment or SetAttachment in this function
 	// Because we make decisions based on existing attachments and update multiple
@@ -275,6 +277,12 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 	if updateClassifyDetail(attachments, ctid, "application_category", category) {
 		changed = append(changed, "application_category")
 	}
+	if updateClassifyDetail(attachments, ctid, "application_productivity", productivity) {
+		changed = append(changed, "application_productivity")
+	}
+	if updateClassifyDetail(attachments, ctid, "application_risk", risk) {
+		changed = append(changed, "application_risk")
+	}
 
 	// if something changed, log a new event
 	if len(changed) > 0 {
@@ -286,16 +294,18 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 
 // parseReply parses a reply from classd and returns
 // (appid, name, protochain, detail, confidence, category, state)
-func parseReply(replyString string) (string, string, string, string, int32, string, int) {
+func parseReply(replyString string) (string, string, string, string, int32, string, int, int, int) {
 	var err error
 	var appid string
 	var name string
 	var protochain string
 	var detail string
 	var confidence int32
-	var c uint64
+	var conparse uint64
 	var category string
+	var productivity int
 	var state int
+	var risk int
 
 	rawinfo := strings.Split(replyString, "\r\n")
 
@@ -316,11 +326,11 @@ func parseReply(replyString string) (string, string, string, string, int32, stri
 		case "DETAIL: ":
 			detail = rawpair[1]
 		case "CONFIDENCE: ":
-			c, err = strconv.ParseUint(rawpair[1], 10, 32)
+			conparse, err = strconv.ParseUint(rawpair[1], 10, 32)
 			if err != nil {
 				confidence = 0
 			} else {
-				confidence = int32(c)
+				confidence = int32(conparse)
 			}
 		case "STATE: ":
 			state, err = strconv.Atoi(rawpair[1])
@@ -335,9 +345,11 @@ func parseReply(replyString string) (string, string, string, string, int32, stri
 	if finder == true {
 		name = appinfo.name
 		category = appinfo.category
+		productivity = appinfo.productivity
+		risk = appinfo.risk
 	}
 
-	return appid, name, protochain, detail, confidence, category, state
+	return appid, name, protochain, detail, confidence, category, state, productivity, risk
 
 }
 

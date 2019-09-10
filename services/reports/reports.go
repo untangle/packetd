@@ -565,6 +565,8 @@ func createTables() {
 			application_blocked boolean,
 			application_flagged boolean,
 			application_confidence integer,
+			application_productivity integer,
+			application_risk integer,
 			application_detail text,
 			application_id_inferred text,
 			application_name_inferred text,
