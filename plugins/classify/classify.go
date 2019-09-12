@@ -27,8 +27,8 @@ type applicationInfo struct {
 	name         string
 	description  string
 	category     string
-	productivity int
-	risk         int
+	productivity uint8
+	risk         uint8
 	flags        uint64
 	reference    string
 	plugin       string
@@ -215,9 +215,9 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 	var detail string
 	var confidence int32
 	var category string
-	var productivity int
+	var productivity uint8
 	var state int
-	var risk int
+	var risk uint8
 	var attachments map[string]interface{}
 
 	// parse update classd information from reply
@@ -294,7 +294,7 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 
 // parseReply parses a reply from classd and returns
 // (appid, name, protochain, detail, confidence, category, state)
-func parseReply(replyString string) (string, string, string, string, int32, string, int, int, int) {
+func parseReply(replyString string) (string, string, string, string, int32, string, int, uint8, uint8) {
 	var err error
 	var appid string
 	var name string
@@ -303,9 +303,9 @@ func parseReply(replyString string) (string, string, string, string, int32, stri
 	var confidence int32
 	var conparse uint64
 	var category string
-	var productivity int
+	var productivity uint8
 	var state int
-	var risk int
+	var risk uint8
 
 	rawinfo := strings.Split(replyString, "\r\n")
 
@@ -429,14 +429,16 @@ func loadApplicationTable() {
 		info.name = list[2]
 		info.description = list[3]
 		info.category = list[4]
-		info.productivity, err = strconv.Atoi(list[5])
+		tempProd, err := strconv.ParseUint(list[5], 10, 8)
 		if err != nil {
 			logger.Warn("Invalid productivity: %s\n", list[5])
 		}
-		info.risk, err = strconv.Atoi(list[6])
+		info.productivity = uint8(tempProd)
+		tempRisk, err := strconv.ParseUint(list[6], 10, 8)
 		if err != nil {
 			logger.Warn("Invalid risk: %s\n", list[6])
 		}
+		info.risk = uint8(tempRisk)
 		info.flags, err = strconv.ParseUint(list[7], 10, 64)
 		if err != nil {
 			logger.Warn("Invalid flags: %s %s\n", list[7], err)
