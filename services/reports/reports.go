@@ -572,7 +572,7 @@ func createTables() {
 			application_name_inferred text,
 			application_confidence_inferred integer,
 			application_protochain_inferred text,
-			application_productivity_inferred text,
+			application_productivity_inferred integer,
 			application_risk_inferred text,
 			application_category_inferred text,
 			certificate_subject_cn text,
