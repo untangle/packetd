@@ -335,6 +335,21 @@ func statusWifiChannels(c *gin.Context) {
 	return
 }
 
+// statusWifiModelist gets available wifi channel modes for a given wireless device
+func statusWifiModelist(c *gin.Context) {
+	device := c.Param("device")
+
+	result, err := getWifiModelist(device)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+	return
+}
+
 type interfaceInfo struct {
 	Device           string   `json:"device"`
 	Connected        bool     `json:"connected"`
@@ -673,6 +688,21 @@ func getWifiChannels(device string) ([]wifiChannelInfo, error) {
 	}
 
 	return availableFreqs, nil
+}
+
+// getWifiChannels will retrieve the wifi channels available to a given interface name using "iwinfo"
+func getWifiModelist(device string) ([]string, error) {
+	cmdArgs := []string{device, "htmodelist"}
+	cmdResult, err := exec.Command("/usr/bin/iwinfo", cmdArgs...).CombinedOutput()
+
+	if err != nil {
+		logger.Err("iwinfo failed during getWifiModelist: %v\n", err)
+		return nil, err
+	}
+
+	availableModes := strings.Fields(string(cmdResult))
+
+	return availableModes, nil
 }
 
 // runIPCommand is used to run various commands using iproute2, the results from the output are byte arrays which represent json strings
