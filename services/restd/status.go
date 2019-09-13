@@ -388,6 +388,11 @@ type wifiChannelInfo struct {
 	Channel   uint   `json:"channel"`
 }
 
+type wifiModeInfo struct {
+	Name string `json:"name"`
+	Mode string `json:"mode"`
+}
+
 // getInterfaceInfo returns a json object with details for the requested interface
 func getInterfaceInfo(getface string) ([]byte, error) {
 	var ubuslist map[string]interface{}
@@ -658,7 +663,6 @@ func getRouteRules() (string, error) {
 // getWifiChannels will retrieve the wifi channels available to a given interface name using "iwinfo"
 func getWifiChannels(device string) ([]wifiChannelInfo, error) {
 	cmdArgs := []string{device, "freqlist"}
-
 	cmdResult, err := exec.Command("/usr/bin/iwinfo", cmdArgs...).CombinedOutput()
 
 	if err != nil {
@@ -691,7 +695,7 @@ func getWifiChannels(device string) ([]wifiChannelInfo, error) {
 }
 
 // getWifiChannels will retrieve the wifi channels available to a given interface name using "iwinfo"
-func getWifiModelist(device string) ([]string, error) {
+func getWifiModelist(device string) ([]wifiModeInfo, error) {
 	cmdArgs := []string{device, "htmodelist"}
 	cmdResult, err := exec.Command("/usr/bin/iwinfo", cmdArgs...).CombinedOutput()
 
@@ -700,7 +704,18 @@ func getWifiModelist(device string) ([]string, error) {
 		return nil, err
 	}
 
-	availableModes := strings.Fields(string(cmdResult))
+	availableModes := []wifiModeInfo{}
+	availableModes = append(availableModes, wifiModeInfo{"AUTO", "AUTO"})
+
+	modeList := strings.Fields(string(cmdResult))
+
+	for _, mode := range modeList {
+		var modeInfo = wifiModeInfo{
+			string(mode),
+			string(mode),
+		}
+		availableModes = append(availableModes, modeInfo)
+	}
 
 	return availableModes, nil
 }
