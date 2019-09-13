@@ -70,10 +70,10 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		"ip_protocol":           clientSideTuple.Protocol,
 		"client_interface_id":   session.GetClientInterfaceID(),
 		"client_interface_type": session.GetClientInterfaceType(),
-		"local_address":         localAddress.String(),
-		"remote_address":        remoteAddress.String(),
-		"client_address":        clientSideTuple.ClientAddress.String(),
-		"server_address":        clientSideTuple.ServerAddress.String(),
+		"local_address":         localAddress,
+		"remote_address":        remoteAddress,
+		"client_address":        clientSideTuple.ClientAddress,
+		"server_address":        clientSideTuple.ServerAddress,
 		"client_port":           clientSideTuple.ClientPort,
 		"server_port":           clientSideTuple.ServerPort,
 	}
@@ -106,8 +106,8 @@ func PluginConntrackHandler(message int, entry *dispatch.Conntrack) {
 			}
 			serverSideTuple := session.GetServerSideTuple()
 			modifiedColumns := map[string]interface{}{
-				"client_address_new":    serverSideTuple.ClientAddress.String(),
-				"server_address_new":    serverSideTuple.ServerAddress.String(),
+				"client_address_new":    serverSideTuple.ClientAddress,
+				"server_address_new":    serverSideTuple.ServerAddress,
 				"client_port_new":       serverSideTuple.ClientPort,
 				"server_port_new":       serverSideTuple.ServerPort,
 				"server_interface_id":   session.GetServerInterfaceID(),

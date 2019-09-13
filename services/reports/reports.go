@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -374,6 +375,22 @@ func cloudSender() {
 	}
 }
 
+// prepareEventValues prepares data that should be modified when being inserted into SQLite
+func prepareEventValues(data interface{}) interface{} {
+	switch data.(type) {
+	//IP Addresses should be converted to string types before stored in database
+	case net.IP:
+		return data.(net.IP).String()
+
+	// Special handle time.Time
+	// We want to log these as milliseconds since epoch
+	case time.Time:
+		return data.(time.Time).UnixNano() / 1e6
+	default:
+		return data
+	}
+}
+
 func logInsertEvent(event Event) {
 	var sqlStr = "INSERT INTO " + event.Table + "("
 	var valueStr = "("
@@ -388,14 +405,7 @@ func logInsertEvent(event Event) {
 		sqlStr += k
 		valueStr += "?"
 		first = false
-		timestamp, ok := v.(time.Time)
-		if ok {
-			// Special handle time.Time
-			// We want to log these as milliseconds since epoch
-			values = append(values, timestamp.UnixNano()/1e6)
-		} else {
-			values = append(values, v)
-		}
+		values = append(values, prepareEventValues(v))
 	}
 	sqlStr += ")"
 	valueStr += ")"
@@ -433,7 +443,7 @@ func logUpdateEvent(event Event) {
 		}
 
 		sqlStr += " " + k + " = ?"
-		values = append(values, v)
+		values = append(values, prepareEventValues(v))
 		first = false
 	}
 
@@ -445,7 +455,7 @@ func logUpdateEvent(event Event) {
 		}
 
 		sqlStr += " " + k + " = ?"
-		values = append(values, v)
+		values = append(values, prepareEventValues(v))
 		first = false
 	}
 
@@ -542,14 +552,14 @@ func createTables() {
 			server_interface_id int default 0,
 			client_interface_type int1 default 0,
 			server_interface_type int1 default 0,
-			local_address  inet,
-			remote_address inet,
-			client_address inet,
-			server_address inet,
+			local_address  text,
+			remote_address text,
+			client_address text,
+			server_address text,
 			client_port int2,
 			server_port int2,
-			client_address_new inet,
-			server_address_new inet,
+			client_address_new text,
+			server_address_new text,
 			server_port_new int2,
 			client_port_new int2,
 			client_country text,
