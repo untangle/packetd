@@ -354,6 +354,7 @@ func createSession(mess NfqueueMessage, ctid uint32) *Session {
 	session.SetEventCount(1)
 	session.SetLastActivity(time.Now())
 	session.SetClientSideTuple(mess.MsgTuple)
+	session.SetFamily(uint8(mess.Family))
 	session.SetConntrackConfirmed(false)
 	session.attachments = make(map[string]interface{})
 	AttachNfqueueSubscriptions(session)
