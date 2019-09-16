@@ -76,6 +76,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		"server_address":        clientSideTuple.ServerAddress,
 		"client_port":           clientSideTuple.ClientPort,
 		"server_port":           clientSideTuple.ServerPort,
+		"family":                session.GetFamily(),
 	}
 	reports.LogEvent(reports.CreateEvent("session_new", "sessions", 1, columns, nil))
 	for k, v := range columns {
