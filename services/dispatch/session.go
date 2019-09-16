@@ -63,6 +63,9 @@ type Session struct {
 	serverInterfaceID   uint32
 	serverInterfaceType uint32
 
+	// family stores the family indicator of the session
+	family uint32
+
 	// conntrackConfirmed is true if this session has been confirmed by conntrack. false otherwise
 	// A session becomes confirmed by conntrack once its packet reaches the final CONNTRACK_CONFIRM
 	// priority in netfilter, and we get an conntrack "NEW" event for it.
@@ -355,6 +358,17 @@ func (sess *Session) SetConntrackPointer(pointer *Conntrack) {
 	sess.conntrackLock.Lock()
 	defer sess.conntrackLock.Unlock()
 	sess.conntrackPointer = pointer
+}
+
+// GetFamily gets the session family type
+func (sess *Session) GetFamily() uint8 {
+	return uint8(atomic.LoadUint32(&sess.family))
+}
+
+// SetFamily sets the session family type
+func (sess *Session) SetFamily(value uint8) uint8 {
+	atomic.StoreUint32(&sess.family, uint32(value))
+	return value
 }
 
 // removeFromSessionTable removes the session from the session table
