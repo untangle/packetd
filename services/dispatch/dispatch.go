@@ -35,23 +35,29 @@ type SubscriptionHolder struct {
 //
 // 2 - The general purpose plugins are called next
 //
-// 3 - We want the stats plugin to be called last so our network latency calculations
+// 3 - The classify plugin goes here so it gets called after the prediction plugin
+//     so it can compare the predicted/actual and report differences to the cloud.
+//
+// 4 - We want the stats plugin to be called last so our network latency calculations
 //     aren't influenced by time spent waiting for other plugins.
 
 // ReporterPriority ... We want this to be called FIRST
 const ReporterPriority = 1
 
 // StatsPriority ... We want this to be called LAST
-const StatsPriority = 3
+const StatsPriority = 4
+
+// PredictPriority ...
+const PredictPriority = 2
+
+// ClassifyPriority ... We want this to be called after prediction
+const ClassifyPriority = 3
 
 // CertfetchPriority ...
 const CertfetchPriority = 2
 
 // CertsniffPriority ...
 const CertsniffPriority = 2
-
-// ClassifyPriority ...
-const ClassifyPriority = 2
 
 // DNSPriority ...
 const DNSPriority = 2
