@@ -15,7 +15,7 @@ const pluginName = "predicttraffic"
 // our shutdown function to return during shutdown.
 func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
-	dispatch.InsertNfqueueSubscription(pluginName, dispatch.ExamplePriority, PluginNfqueueHandler)
+	dispatch.InsertNfqueueSubscription(pluginName, dispatch.PredictPriority, PluginNfqueueHandler)
 }
 
 // PluginShutdown function called when the daemon is shutting down. We call Done
@@ -43,6 +43,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	if trafficInfo != nil {
 		addPredictionToDict(ctid, trafficInfo)
 		addPredictionToReport(mess, trafficInfo)
+		addPredictionToSession(mess.Session, trafficInfo)
 	}
 
 	return result
@@ -79,6 +80,18 @@ func addPredictionToReport(mess dispatch.NfqueueMessage, currentTraffic *predict
 	modifiedColumns["application_category_inferred"] = currentTraffic.Category
 
 	reports.LogEvent(reports.CreateEvent("session_predict_traffic", "sessions", 2, columns, modifiedColumns))
+}
+
+// addPredictionToDict will take a ClassifiedTraffic pointer and send the data to dict
+func addPredictionToSession(session *dispatch.Session, currentTraffic *predicttrafficsvc.ClassifiedTraffic) {
+	logger.Debug("Sending prediction info to session attachments: %d\n", session.GetSessionID())
+	session.PutAttachment("application_id_inferred", currentTraffic.ID)
+	session.PutAttachment("application_name_inferred", currentTraffic.Name)
+	session.PutAttachment("application_confidence_inferred", roundConfidence(currentTraffic.Confidence))
+	session.PutAttachment("application_protochain_inferred", currentTraffic.ProtoChain)
+	session.PutAttachment("application_productivity_inferred", currentTraffic.Productivity)
+	session.PutAttachment("application_risk_inferred", currentTraffic.Risk)
+	session.PutAttachment("application_category_inferred", currentTraffic.Category)
 }
 
 // round confidence converts the confidence from a float32 into a uint8, with very basic logic to round up or down
