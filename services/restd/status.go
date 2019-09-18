@@ -526,7 +526,7 @@ func getInterfaceInfo(getface string) ([]byte, error) {
 
 		// if we created a new interfaceInfo object get the interface rate details and append to our device array
 		if !found {
-			facemap := stats.GetInterfaceRateDetails("wan")
+			facemap := stats.GetInterfaceRateDetails(ubusitem["device"].(string))
 			if facemap != nil {
 				worker.RxByteRate = facemap["rx_bytes_rate"]
 				worker.RxPacketRate = facemap["rx_packets_rate"]
