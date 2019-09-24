@@ -25,6 +25,7 @@ var shutdownFlag int32
 
 // daemonProcessManager is a goroutine to start and monitor the untnagle-classd daemon
 func daemonProcessManager() {
+	logger.Info("The daemonProcessManager is starting\n")
 
 	// send the initial signal to launch the daemon
 	signalProcessManager(daemonStartup)

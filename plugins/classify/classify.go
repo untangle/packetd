@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
@@ -62,6 +64,7 @@ const (
 
 var processChannel = make(chan daemonSignal, 1)
 var socketChannel = make(chan daemonSignal, 1)
+var cloudChannel = make(chan daemonSignal, 1)
 var shutdownChannel = make(chan bool)
 var classdHostPort = "127.0.0.1:8123"
 var daemonAvailable = false
@@ -98,6 +101,9 @@ func PluginStartup() {
 	// start the socket manager to handle the daemon socket connection
 	go daemonSocketManager()
 
+	// start the cloud manager to handle sending guess/match updates
+	go pluginCloudManager()
+
 	// insert our nfqueue subscription
 	dispatch.InsertNfqueueSubscription(pluginName, dispatch.ClassifyPriority, PluginNfqueueHandler)
 }
@@ -131,6 +137,15 @@ func PluginShutdown() {
 		logger.Warn("Failed to properly shutdown daemonProcessManager\n")
 	}
 
+	// signal the cloud manager that the system is shutting down
+	signalCloudManager(systemShutdown)
+
+	select {
+	case <-shutdownChannel:
+		logger.Info("Successful shutdown of pluginCloudManager\n")
+	case <-time.After(10 * time.Second):
+		logger.Warn("Failed to properly shutdown pluginCloudManager\n")
+	}
 }
 
 // PluginNfqueueHandler is called for raw nfqueue packets. We pass the
@@ -179,7 +194,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		if logger.IsLogEnabled(logger.LogLevelDebug) {
 			logger.Debug("RELEASING SESSION:%d STATE:%d CONFIDENCE:%d PACKETS:%d BYTES:%d COUNT:%d\n", ctid, state, confidence, mess.Session.GetPacketCount(), mess.Session.GetByteCount(), mess.Session.GetNavlCount())
 		}
-
+		analyzePrediction(mess.Session)
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 
@@ -188,22 +203,79 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 // classifyTraffic sends the packet to the daemon manager for classification and returns the result
 func classifyTraffic(mess *dispatch.NfqueueMessage) string {
+	var fixer gopacket.Packet
+	var IP4Layer *layers.IPv4
+	var IP6Layer *layers.IPv6
+	var srcport uint16
+	var dstport uint16
 	var command string
 	var proto string
 	var reply string
 
+	// For IPv4 and IPv6 we modify the packet before classify because our nftables rules give us
+	// one side of traffic pre-nat and the other side post-nat. This causes classify to see two
+	// different sessions, each with traffic going in a single direction, rather than a single session
+	// with traffic going in both directions. This caused confusing classification results that could
+	// flip-flop between two different categorizations, and it deprived NAVL of the full context it needs
+	// to generate accurate results (e.g.: the server side didn't know the SNI passed by the client).
+	// The approach here is to always replace the src and dst in the packet with values from the client
+	// side tuple, using the ClientToServer flag to determine which info goes on which side.
 	if mess.IP4Layer != nil {
+		fixer = gopacket.NewPacket(mess.Packet.Data(), layers.LayerTypeIPv4, gopacket.Lazy)
+		IP4Layer = fixer.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
 		proto = "IP4"
+		if mess.ClientToServer {
+			copy(IP4Layer.SrcIP, mess.Session.GetClientSideTuple().ClientAddress)
+			copy(IP4Layer.DstIP, mess.Session.GetClientSideTuple().ServerAddress)
+			srcport = mess.Session.GetClientSideTuple().ClientPort
+			dstport = mess.Session.GetClientSideTuple().ServerPort
+		} else {
+			copy(IP4Layer.SrcIP, mess.Session.GetClientSideTuple().ServerAddress)
+			copy(IP4Layer.DstIP, mess.Session.GetClientSideTuple().ClientAddress)
+			srcport = mess.Session.GetClientSideTuple().ServerPort
+			dstport = mess.Session.GetClientSideTuple().ClientPort
+		}
 	} else if mess.IP6Layer != nil {
+		fixer = gopacket.NewPacket(mess.Packet.Data(), layers.LayerTypeIPv6, gopacket.Lazy)
+		IP6Layer = fixer.Layer(layers.LayerTypeIPv6).(*layers.IPv6)
 		proto = "IP6"
+		if mess.ClientToServer {
+			copy(IP6Layer.SrcIP, mess.Session.GetClientSideTuple().ClientAddress)
+			copy(IP6Layer.DstIP, mess.Session.GetClientSideTuple().ServerAddress)
+			srcport = mess.Session.GetClientSideTuple().ClientPort
+			dstport = mess.Session.GetClientSideTuple().ServerPort
+		} else {
+			copy(IP6Layer.SrcIP, mess.Session.GetClientSideTuple().ServerAddress)
+			copy(IP6Layer.DstIP, mess.Session.GetClientSideTuple().ClientAddress)
+			srcport = mess.Session.GetClientSideTuple().ServerPort
+			dstport = mess.Session.GetClientSideTuple().ClientPort
+		}
 	} else {
 		logger.Err("Unsupported protocol for %d\n", mess.Session.GetConntrackID())
 		return ""
 	}
 
+	// if we have a TCP layer update with the ports we saved above
+	tcpPtr := fixer.Layer(layers.LayerTypeTCP)
+	if tcpPtr != nil {
+		TCPlayer := tcpPtr.(*layers.TCP)
+		TCPlayer.SrcPort = layers.TCPPort(srcport)
+		TCPlayer.DstPort = layers.TCPPort(dstport)
+	} else {
+		logger.Warn("NO TCP LAYER\n")
+	}
+
+	// if we have a UDP layer update with the ports we saved above
+	udpPtr := mess.Packet.Layer(layers.LayerTypeUDP)
+	if udpPtr != nil {
+		UDPlayer := udpPtr.(*layers.UDP)
+		UDPlayer.SrcPort = layers.UDPPort(srcport)
+		UDPlayer.DstPort = layers.UDPPort(dstport)
+	}
+
 	// send the packet to the daemon for classification
-	command = fmt.Sprintf("PACKET|%d|%s|%d\r\n", mess.Session.GetSessionID(), proto, len(mess.Packet.Data()))
-	reply = daemonClassifyPacket(command, mess.Packet.Data())
+	command = fmt.Sprintf("PACKET|%d|%s|%d\r\n", mess.Session.GetSessionID(), proto, len(fixer.Data()))
+	reply = daemonClassifyPacket(command, fixer.Data())
 	return reply
 }
 
@@ -246,14 +318,6 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 		checkval := checkdata.(int32)
 		if confidence < checkval {
 			logger.Debug("Ignoring update with confidence %d < %d STATE:%d\n", confidence, checkval, state)
-			return state, confidence
-		}
-	}
-	checkprotochain := attachments["application_protochain"]
-	if checkprotochain != nil {
-		current := checkprotochain.(string)
-		if strings.Count(protochain, "/") < strings.Count(current, "/") {
-			logger.Debug("Ignoring update with protochain %s < %s STATE:%d\n", protochain, current, state)
 			return state, confidence
 		}
 	}
@@ -351,6 +415,31 @@ func parseReply(replyString string) (string, string, string, string, int32, stri
 
 	return appid, name, protochain, detail, confidence, category, state, productivity, risk
 
+}
+
+// analyzePrection compares the actual classification details with those
+// determined by the prediction plugin. If different the actual details
+// are added to a list that will be pushed to the cloud.
+func analyzePrediction(session *dispatch.Session) {
+	guessAppid := session.GetAttachment("application_id_inferred")
+	// if guess not found just return
+	if guessAppid == nil {
+		return
+	}
+
+	matchAppid := session.GetAttachment("application_id")
+	// if match not found just return
+	if matchAppid == nil {
+		return
+	}
+
+	// see if match and guess are the same just return
+	if strings.Compare(matchAppid.(string), guessAppid.(string)) == 0 {
+		return
+	}
+
+	// the match and guess are different so queue the details for cloud submission
+	logger.Debug("%OC|SESSION:%v guessAppid(%v) != matchAppid(%v) - adding to cloud report\n", "classify_match_guess_mismatch", 0, session.GetSessionID(), guessAppid, matchAppid)
 }
 
 // logEvent logs a session_classify event that updates the application_* columns
@@ -515,6 +604,13 @@ func signalProcessManager(signal daemonSignal) {
 func signalSocketManager(signal daemonSignal) {
 	select {
 	case socketChannel <- signal:
+	default:
+	}
+}
+
+func signalCloudManager(signal daemonSignal) {
+	select {
+	case cloudChannel <- signal:
 	default:
 	}
 }

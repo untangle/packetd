@@ -18,6 +18,8 @@ var socketMutex sync.Mutex
 
 // daemonSocketManager is a goroutine to handle the daemon socket connection
 func daemonSocketManager() {
+	logger.Info("The daemonSocketManager is starting\n")
+
 	for {
 		message := <-socketChannel
 
@@ -149,7 +151,7 @@ func daemonClassifyPacket(command string, buffer []byte) string {
 	}
 
 	// convert the buffer to a string and return the classification result
-	reply = string(daemonBuffer)
+	reply = string(daemonBuffer[:tot])
 	logger.Trace("DAEMON REPLY: %s\n", reply)
 	return reply
 }
