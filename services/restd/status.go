@@ -621,7 +621,13 @@ func getBuildInfo() (map[string]interface{}, error) {
 
 // getBoardName returns the board name of the SOC system
 func getBoardName() (string, error) {
-	file, err := os.Open("/tmp/sysinfo/board_name")
+	var file *os.File
+	_, err := os.Stat("/tmp/sysinfo/untangle_board_name")
+	if os.IsNotExist(err) {
+		file, err = os.Open("/tmp/sysinfo/board_name")
+	} else {
+		file, err = os.Open("/tmp/sysinfo/untangle_board_name")
+	}
 	if err != nil {
 		return "", err
 	}
