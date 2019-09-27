@@ -79,8 +79,10 @@ func statusHardware(c *gin.Context) {
 	cpuinfo, err := linux.ReadCPUInfo("/proc/cpuinfo")
 	if err != nil {
 		logger.Warn("Error reading cpuinfo: %s\n", err.Error())
-		stats["cpuinfo"] = getMachineType()
 	} else {
+		if cpuinfo.Processors[0].ModelName == "" {
+			cpuinfo.Processors[0].ModelName = getMachineType()
+		}
 		stats["cpuinfo"] = cpuinfo
 	}
 
