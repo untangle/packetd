@@ -47,6 +47,9 @@ var FlagNoConntrack bool
 // FlagNoNetlogger can be set to disable the netlogger callback
 var FlagNoNetlogger bool
 
+// FlagNoCloud can be set to disable all cloud services
+var FlagNoCloud bool
+
 // These maps are used to track ctid's we see during playback. They are set to the
 // maps passed to the playback function and cleared when playback is finished.
 var nfCleanTracker map[uint32]bool

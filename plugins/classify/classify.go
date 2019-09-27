@@ -18,6 +18,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
+	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
 )
@@ -113,13 +114,15 @@ func PluginStartup() {
 		logger.Warn("Failed to properly startup daemonSocketManager\n")
 	}
 
-	// start the cloud manager to handle sending match/infer updates
-	go pluginCloudManager(controlChannel)
-	select {
-	case <-controlChannel:
-		logger.Info("Successful startup of pluginCloudManager\n")
-	case <-time.After(10 * time.Second):
-		logger.Warn("Failed to properly startup pluginCloudManager\n")
+	if !kernel.FlagNoCloud {
+		// start the cloud manager to handle sending match/infer updates
+		go pluginCloudManager(controlChannel)
+		select {
+		case <-controlChannel:
+			logger.Info("Successful startup of pluginCloudManager\n")
+		case <-time.After(10 * time.Second):
+			logger.Warn("Failed to properly startup pluginCloudManager\n")
+		}
 	}
 
 	// insert our nfqueue subscription
@@ -137,7 +140,6 @@ func PluginShutdown() {
 
 	// signal the socket manager that the system is shutting down
 	signalSocketManager(systemShutdown)
-
 	select {
 	case <-controlChannel:
 		logger.Info("Successful shutdown of daemonSocketManager\n")
@@ -147,7 +149,6 @@ func PluginShutdown() {
 
 	// signal the process manager that the system is shutting down
 	signalProcessManager(systemShutdown)
-
 	select {
 	case <-controlChannel:
 		logger.Info("Successful shutdown of daemonProcessManager\n")
@@ -155,14 +156,15 @@ func PluginShutdown() {
 		logger.Warn("Failed to properly shutdown daemonProcessManager\n")
 	}
 
-	// signal the cloud manager that the system is shutting down
-	signalCloudManager(systemShutdown)
-
-	select {
-	case <-controlChannel:
-		logger.Info("Successful shutdown of pluginCloudManager\n")
-	case <-time.After(10 * time.Second):
-		logger.Warn("Failed to properly shutdown pluginCloudManager\n")
+	if !kernel.FlagNoCloud {
+		// signal the cloud manager that the system is shutting down
+		signalCloudManager(systemShutdown)
+		select {
+		case <-controlChannel:
+			logger.Info("Successful shutdown of pluginCloudManager\n")
+		case <-time.After(10 * time.Second):
+			logger.Warn("Failed to properly shutdown pluginCloudManager\n")
+		}
 	}
 }
 
@@ -212,7 +214,9 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		if logger.IsLogEnabled(logger.LogLevelDebug) {
 			logger.Debug("RELEASING SESSION:%d STATE:%d CONFIDENCE:%d PACKETS:%d BYTES:%d COUNT:%d\n", ctid, state, confidence, mess.Session.GetPacketCount(), mess.Session.GetByteCount(), mess.Session.GetNavlCount())
 		}
-		analyzePrediction(mess.Session)
+		if !kernel.FlagNoCloud {
+			analyzePrediction(mess.Session)
+		}
 		return dispatch.NfqueueResult{SessionRelease: true}
 	}
 

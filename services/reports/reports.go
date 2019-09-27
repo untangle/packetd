@@ -18,6 +18,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3" // blank import required for runtime binding
+	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/settings"
 )
@@ -103,7 +104,6 @@ var queryID uint64
 var eventQueue = make(chan Event, 10000)
 var eventLogCounter = 0
 var cloudQueue = make(chan Event, 1000)
-var cloudDisabled = false
 
 // EventsLogged records the number of events logged
 var EventsLogged uint64
@@ -127,9 +127,7 @@ func Startup() {
 		createTables()
 		go eventLogger()
 		go dbCleaner()
-		if cloudDisabled {
-			logger.Alert("Cloud event reporting has been disabled\n")
-		} else {
+		if !kernel.FlagNoCloud {
 			go cloudSender()
 		}
 	}()
@@ -298,14 +296,9 @@ func eventLogger() {
 	}
 }
 
-// DisableCloud is called to disable all cloud telemetry
-func DisableCloud() {
-	cloudDisabled = true
-}
-
 // CloudEvent adds an Event to the cloudQueue for later sending to the cloud
 func CloudEvent(event Event) error {
-	if cloudDisabled {
+	if kernel.FlagNoCloud {
 		return nil
 	}
 	select {
@@ -325,9 +318,8 @@ func cloudSender() {
 
 	uid, err = settings.GetUID()
 	if err != nil {
-		logger.Warn("Unable to read UID: %s - Exiting cloudSender()\n", err.Error())
-		cloudDisabled = true
-		return
+		uid = "00000000-0000-0000-0000-000000000000"
+		logger.Warn("Unable to read UID: %s - Using all zeros\n", err.Error())
 	}
 
 	// FIXME - We disable cert checking on our http.Client for now
@@ -365,12 +357,7 @@ func cloudSender() {
 		}
 
 		if logger.IsDebugEnabled() {
-			logger.Info("CloudRequest: %s CloudResponse: [%d] %s %s\n", target, response.StatusCode, response.Proto, response.Status)
-		}
-
-		if logger.IsTraceEnabled() {
-			logger.Trace("Cloud-XMIT: %v\n", request)
-			logger.Trace("Cloud-RECV: %v\n", response)
+			logger.Debug("CloudURL:%s CloudRequest:%s CloudResponse: [%d] %s %s\n", target, string(message), response.StatusCode, response.Proto, response.Status)
 		}
 	}
 }

@@ -159,7 +159,6 @@ func printVersion() {
 // parseArguments parses the command line arguments
 func parseArguments() {
 	classdAddressStringPtr := flag.String("classd", "127.0.0.1:8123", "host:port for classd daemon")
-	disableCloudPtr := flag.Bool("disable-cloud", false, "disable cloud events")
 	disableDictPtr := flag.Bool("disable-dict", false, "disable dict")
 	versionPtr := flag.Bool("version", false, "version")
 	localPtr := flag.Bool("local", false, "run on console")
@@ -173,14 +172,11 @@ func parseArguments() {
 	noNfqueuePtr := flag.Bool("no-nfqueue", false, "disable the nfqueue callback hook")
 	noConntrackPtr := flag.Bool("no-conntrack", false, "disable the conntrack callback hook")
 	noNetloggerPtr := flag.Bool("no-netlogger", false, "disable the netlogger callback hook")
+	noCloudPtr := flag.Bool("no-cloud", false, "disable all cloud services")
 
 	flag.Parse()
 
 	classify.SetHostPort(*classdAddressStringPtr)
-
-	if *disableCloudPtr {
-		reports.DisableCloud()
-	}
 
 	if *disableDictPtr {
 		dict.Disable()
@@ -232,14 +228,22 @@ func parseArguments() {
 
 	if *noNfqueuePtr {
 		kernel.FlagNoNfqueue = true
+		logger.Alert("!!!!! The no-nfqueue flag was passed on the command line !!!!!\n")
 	}
 
 	if *noConntrackPtr {
 		kernel.FlagNoConntrack = true
+		logger.Alert("!!!!! The no-conntrack flag was passed on the command line !!!!!\n")
 	}
 
 	if *noNetloggerPtr {
 		kernel.FlagNoNetlogger = true
+		logger.Alert("!!!!! The no-netlogger flag was passed on the command line !!!!!\n")
+	}
+
+	if *noCloudPtr {
+		kernel.FlagNoCloud = true
+		logger.Alert("!!!!! The no-cloud flag was passed on the command line !!!!!\n")
 	}
 }
 
@@ -258,16 +262,21 @@ func startServices() {
 	restd.Startup()
 	certcache.Startup()
 	overseer.Startup()
-	predicttrafficsvc.Startup()
 	certmanager.Startup()
+
+	if !kernel.FlagNoCloud {
+		predicttrafficsvc.Startup()
+	}
 }
 
 // stopServices stops all the services
 func stopServices() {
 	c := make(chan bool)
 	go func() {
+		if !kernel.FlagNoCloud {
+			predicttrafficsvc.Shutdown()
+		}
 		overseer.Shutdown()
-		predicttrafficsvc.Shutdown()
 		certmanager.Shutdown()
 		certcache.Shutdown()
 		restd.Shutdown()
@@ -304,8 +313,10 @@ func startPlugins() {
 		revdns.PluginStartup,
 		sni.PluginStartup,
 		stats.PluginStartup,
-		reporter.PluginStartup,
-		predicttraffic.PluginStartup}
+		reporter.PluginStartup}
+	if !kernel.FlagNoCloud {
+		startups = append(startups, predicttraffic.PluginStartup)
+	}
 	for _, f := range startups {
 		wg.Add(1)
 		go func(f func()) {
@@ -331,8 +342,10 @@ func stopPlugins() {
 		revdns.PluginShutdown,
 		sni.PluginShutdown,
 		stats.PluginShutdown,
-		reporter.PluginShutdown,
-		predicttraffic.PluginShutdown}
+		reporter.PluginShutdown}
+	if !kernel.FlagNoCloud {
+		shutdowns = append(shutdowns, predicttraffic.PluginShutdown)
+	}
 	for _, f := range shutdowns {
 		wg.Add(1)
 		go func(f func()) {
