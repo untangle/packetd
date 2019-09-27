@@ -17,8 +17,9 @@ var daemonBuffer = make([]byte, 1024)
 var socketMutex sync.Mutex
 
 // daemonSocketManager is a goroutine to handle the daemon socket connection
-func daemonSocketManager() {
+func daemonSocketManager(control chan bool) {
 	logger.Info("The daemonSocketManager is starting\n")
+	control <- true
 
 	for {
 		message := <-socketChannel
@@ -32,7 +33,7 @@ func daemonSocketManager() {
 		if message == systemShutdown {
 			logger.Info("The daemonSocketManager is finished\n")
 			daemonSocketClose()
-			shutdownChannel <- true
+			control <- true
 			return
 		}
 	}

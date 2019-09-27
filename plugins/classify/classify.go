@@ -65,7 +65,7 @@ const (
 var processChannel = make(chan daemonSignal, 1)
 var socketChannel = make(chan daemonSignal, 1)
 var cloudChannel = make(chan daemonSignal, 1)
-var shutdownChannel = make(chan bool)
+var controlChannel = make(chan bool)
 var classdHostPort = "127.0.0.1:8123"
 var daemonAvailable = false
 
@@ -96,13 +96,31 @@ func PluginStartup() {
 	loadApplicationTable()
 
 	// start the daemon manager to handle running the daemon process
-	go daemonProcessManager()
+	go daemonProcessManager(controlChannel)
+	select {
+	case <-controlChannel:
+		logger.Info("Successful startup of daemonProcessManager\n")
+	case <-time.After(10 * time.Second):
+		logger.Warn("Failed to properly startup daemonProcessManager\n")
+	}
 
 	// start the socket manager to handle the daemon socket connection
-	go daemonSocketManager()
+	go daemonSocketManager(controlChannel)
+	select {
+	case <-controlChannel:
+		logger.Info("Successful startup of daemonSocketManager\n")
+	case <-time.After(10 * time.Second):
+		logger.Warn("Failed to properly startup daemonSocketManager\n")
+	}
 
-	// start the cloud manager to handle sending guess/match updates
-	go pluginCloudManager()
+	// start the cloud manager to handle sending match/infer updates
+	go pluginCloudManager(controlChannel)
+	select {
+	case <-controlChannel:
+		logger.Info("Successful startup of pluginCloudManager\n")
+	case <-time.After(10 * time.Second):
+		logger.Warn("Failed to properly startup pluginCloudManager\n")
+	}
 
 	// insert our nfqueue subscription
 	dispatch.InsertNfqueueSubscription(pluginName, dispatch.ClassifyPriority, PluginNfqueueHandler)
@@ -121,7 +139,7 @@ func PluginShutdown() {
 	signalSocketManager(systemShutdown)
 
 	select {
-	case <-shutdownChannel:
+	case <-controlChannel:
 		logger.Info("Successful shutdown of daemonSocketManager\n")
 	case <-time.After(10 * time.Second):
 		logger.Warn("Failed to properly shutdown daemonSocketManager\n")
@@ -131,7 +149,7 @@ func PluginShutdown() {
 	signalProcessManager(systemShutdown)
 
 	select {
-	case <-shutdownChannel:
+	case <-controlChannel:
 		logger.Info("Successful shutdown of daemonProcessManager\n")
 	case <-time.After(10 * time.Second):
 		logger.Warn("Failed to properly shutdown daemonProcessManager\n")
@@ -141,7 +159,7 @@ func PluginShutdown() {
 	signalCloudManager(systemShutdown)
 
 	select {
-	case <-shutdownChannel:
+	case <-controlChannel:
 		logger.Info("Successful shutdown of pluginCloudManager\n")
 	case <-time.After(10 * time.Second):
 		logger.Warn("Failed to properly shutdown pluginCloudManager\n")
@@ -220,6 +238,9 @@ func classifyTraffic(mess *dispatch.NfqueueMessage) string {
 	// to generate accurate results (e.g.: the server side didn't know the SNI passed by the client).
 	// The approach here is to always replace the src and dst in the packet with values from the client
 	// side tuple, using the ClientToServer flag to determine which info goes on which side.
+	// TODO - We currently create a copy of the packet and make our changes there. It would be more
+	// efficient to modify the shared packet, but deeper analysis of all potentially affected consumers
+	// would have happen before making that change. For now this is probably fine.
 	if mess.IP4Layer != nil {
 		fixer = gopacket.NewPacket(mess.Packet.Data(), layers.LayerTypeIPv4, gopacket.Lazy)
 		IP4Layer = fixer.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
@@ -261,8 +282,6 @@ func classifyTraffic(mess *dispatch.NfqueueMessage) string {
 		TCPlayer := tcpPtr.(*layers.TCP)
 		TCPlayer.SrcPort = layers.TCPPort(srcport)
 		TCPlayer.DstPort = layers.TCPPort(dstport)
-	} else {
-		logger.Warn("NO TCP LAYER\n")
 	}
 
 	// if we have a UDP layer update with the ports we saved above
@@ -317,7 +336,7 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 	if checkdata != nil {
 		checkval := checkdata.(int32)
 		if confidence < checkval {
-			logger.Debug("Ignoring update with confidence %d < %d STATE:%d\n", confidence, checkval, state)
+			logger.Debug("%OC|Ignoring update with confidence %d < %d STATE:%d\n", "classify_confidence_regression", 0, confidence, checkval, state)
 			return state, confidence
 		}
 	}
@@ -421,9 +440,9 @@ func parseReply(replyString string) (string, string, string, string, int32, stri
 // determined by the prediction plugin. If different the actual details
 // are added to a list that will be pushed to the cloud.
 func analyzePrediction(session *dispatch.Session) {
-	guessAppid := session.GetAttachment("application_id_inferred")
-	// if guess not found just return
-	if guessAppid == nil {
+	inferAppid := session.GetAttachment("application_id_inferred")
+	// if infer not found or unknown just return
+	if inferAppid == nil || inferAppid == "Unknown" {
 		return
 	}
 
@@ -433,13 +452,32 @@ func analyzePrediction(session *dispatch.Session) {
 		return
 	}
 
-	// see if match and guess are the same just return
-	if strings.Compare(matchAppid.(string), guessAppid.(string)) == 0 {
+	// if match and infer are the same just return
+	if strings.Compare(matchAppid.(string), inferAppid.(string)) == 0 {
 		return
 	}
 
-	// the match and guess are different so queue the details for cloud submission
-	logger.Debug("%OC|SESSION:%v guessAppid(%v) != matchAppid(%v) - adding to cloud report\n", "classify_match_guess_mismatch", 0, session.GetSessionID(), guessAppid, matchAppid)
+	// match and infer are different so queue the details for cloud submission
+	logger.Debug("%OC|SESSION:%v inferAppid(%v) != matchAppid(%v) - adding to cloud report\n", "classify_match_infer_mismatch", 0, session.GetSessionID(), inferAppid, matchAppid)
+
+	report := new(cloudReport)
+	report.Protocol = session.GetClientSideTuple().Protocol
+	report.ServerAddr = fmt.Sprintf("%v", session.GetClientSideTuple().ServerAddress)
+	report.ServerPort = session.GetClientSideTuple().ServerPort
+
+	if ptr := session.GetAttachment("application_id"); ptr != nil {
+		report.Application = ptr.(string)
+	}
+
+	if ptr := session.GetAttachment("application_protochain"); ptr != nil {
+		report.Protochain = ptr.(string)
+	}
+
+	if ptr := session.GetAttachment("application_detail"); ptr != nil {
+		report.Detail = ptr.(string)
+	}
+
+	storeCloudReport(report)
 }
 
 // logEvent logs a session_classify event that updates the application_* columns
