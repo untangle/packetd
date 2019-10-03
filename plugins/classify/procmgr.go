@@ -13,7 +13,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 
+	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 )
 
@@ -59,6 +61,10 @@ func daemonProcessManager(control chan bool) {
 				err := proc.Wait()
 				if err != nil {
 					logger.Info("The classd daemon has failed. Error:%v\n", err)
+					time.Sleep(1 * time.Second)
+					if kernel.GetShutdownFlag() {
+						atomic.StoreInt32(&shutdownFlag, 1)
+					}
 				} else {
 					logger.Info("The classd daemon has exited.\n")
 				}
