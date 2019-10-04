@@ -5,48 +5,6 @@ QUEUE_PRIORITY="-145"
 MANGLE_PRIORITY="-145"
 TABLE_NAME="packetd"
 
-is_queue_open()
-{
-    local l_queue_stat
-    local l_queue_mode
-    local l_queue_size
-
-    FIRST_QUEUE="`echo $PACKETD_QUEUE | sed 's/-.*//'`"
-
-    # make sure the nfnetlink_queue file is available
-    if [ ! -f /proc/net/netfilter/nfnetlink_queue ]; then
-        echo "The netfilter nfnetlink_queue does not exist - not inserting rules for packetd"
-        return 1
-    fi
-
-    # see if our queue is active
-    l_queue_stat=`awk -v queue=${FIRST_QUEUE} '{ if ( $1 == queue ) print $2 }' /proc/net/netfilter/nfnetlink_queue`
-
-    if [ -z "${l_queue_stat}" ]; then
-        echo "The packetd netfilter queue ${FIRST_QUEUE} is not open - not inserting rules for packetd"
-        return 1
-    fi
-
-    # see if the queue copy mode is what we expect
-    l_queue_mode=`awk -v queue=${FIRST_QUEUE} '{ if ( $1 == queue )print $4 }' /proc/net/netfilter/nfnetlink_queue`
-
-    if [ $((l_queue_mode)) -ne 2 ]; then
-        echo "Unexpected queue copy mode ${FIRST_QUEUE} - not inserting rules for packetd"
-        return 1
-    fi
-
-    # see if the queue copy size is what we expect
-    l_queue_mode=`awk -v queue=${FIRST_QUEUE} '{ if ( $1 == queue ) print $5 }' /proc/net/netfilter/nfnetlink_queue`
-
-    if [ $((l_queue_mode)) -ne 32768 ]; then
-        echo "Unexpected queue copy size ${FIRST_QUEUE} - not inserting rules for packetd"
-        return 1
-    fi
-
-    # the queue is open and seems to be owned by packetd so return success
-    return 0
-}
-
 remove_packetd_rules()
 {
     ${NFT} flush chain inet ${TABLE_NAME} packetd-prerouting 2>/dev/null
@@ -96,6 +54,12 @@ insert_packetd_rules()
     ${NFT} add rule inet ${TABLE_NAME} packetd-queue ip6 saddr ::1 return
     ${NFT} add rule inet ${TABLE_NAME} packetd-queue ip6 daddr ::1 return
 
+    # Don't catch development network if defined
+    if [ "${PACKETD_DEVNET}" != "" ] ; then
+        ${NFT} add rule inet ${TABLE_NAME} packetd-queue ip saddr ${PACKETD_DEVNET} return
+        ${NFT} add rule inet ${TABLE_NAME} packetd-queue ip daddr ${PACKETD_DEVNET} return
+    fi
+
     # Do not queue invalid or untracked packets
     # These will not have a valid conntrack ID so there is nothing for packetd to attach metadata to
     ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct state invalid return
@@ -125,67 +89,65 @@ insert_packetd_rules()
     # The only reliable way to let packetd know this is a new packet is by setting the mark before queueing
     ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct state new mark set "mark|0x10000000"
 
-    # Queue the traffic
-    ${NFT} add rule inet ${TABLE_NAME} packetd-queue counter queue num ${PACKETD_QUEUE} fanout,bypass
-}
-
-usage() {
-    echo "$0 [options] queue-number/queue-range"
-    echo "optional options: "
-    echo " -r              (force removal only)"
-    echo " -i              (force insert only)"
-    echo " -h              (help)"
-    echo
-    echo "example:"
-    echo "$0 2000-2003"
-    echo
+    # Queue the traffic using fanout only if the start and end values are different
+    # Note the positional arguments are those passed to this function
+    if [ "$1" = "$2" ] ; then
+        ${NFT} add rule inet ${TABLE_NAME} packetd-queue counter queue num "$1" bypass
+    else
+        ${NFT} add rule inet ${TABLE_NAME} packetd-queue counter queue num "$1"-"$2" fanout,bypass
+    fi
 }
 
 ##### Start of script
 
-OP=""
-while getopts "rih" opt; do
-  case $opt in
-    r) OP="remove";;
-    i) OP="insert";;
-    h) usage;exit 1;;
-    *) usage;exit 1;;
-  esac
-done
-shift $(($OPTIND-1))
-
-if [ -z "$1" ] ; then
-    usage
+## make sure we are called as root
+USERVAL=`id -u`
+if [ ${USERVAL} -ne 0 ] ; then
+    printf "\n  ERROR: You must be root to run this script\n\n"
     exit 1
 fi
 
-PACKETD_QUEUE="$1"
-
-## make sure we are called as root
-USERVAL=`id -u`
-if test ${USERVAL} -ne 0
-then
-  printf "\n  ERROR: You must be root to run this script\n\n"
-  exit
-fi
-
-## Source the configuration file if available
+## source the configuration file if available
 if [ -f /etc/default/untangle-packetd ]; then
     . /etc/default/untangle-packetd
 fi
 
-if [ "$OP" = "remove" ] ; then
-    remove_packetd_rules
-    echo "packetd netfilter rules removed."
-    exit 0
-elif [ "$OP" = "insert" ] ; then
-    insert_packetd_rules
-    echo "packetd netfilter rules inserted."
-    exit 0
-else
-    remove_packetd_rules
-    is_queue_open && {
-        insert_packetd_rules
-        echo "packetd netfilter rules inserted."
-    }
+## make sure the first argument is something
+if [ -z $1 ] ; then
+    echo "Missing INSERT or REMOVE directive"
+    exit 2
 fi
+
+## check for and handle remove
+if [ "$1" = "REMOVE" ] ; then
+    remove_packetd_rules
+    echo "The packetd netfilter rules have been removed"
+    exit 0
+fi
+
+## not remove so only insert is valid
+if [ "$1" != "INSERT" ] ; then
+    echo "The first argument must be INSERT or REMOVE"
+    exit 3
+fi
+
+## check for the queue range start
+if [ "$2" = "" ] ; then
+    echo "The queue range start value is missing"
+    exit 4
+fi
+
+## check for the queue range end
+if [ "$3" = "" ] ; then
+    echo "The queue range end value is missing"
+    exit 5
+fi
+
+## allow passing test as the final argument to see the rules
+if [ "$4" = "test" ] ; then
+    NFT=echo
+fi
+
+## everything looks good so handle the insert
+insert_packetd_rules $2 $3
+echo "The packetd netfilter rules have been inserted"

@@ -48,7 +48,7 @@ const rulesScript = "packetd_rules"
 
 var localFlag bool
 var cpuCount = getConcurrencyFactor()
-var queueRange = getQueueRange()
+var queueStart = 2000
 var conntrackIntervalSeconds = 10
 
 func main() {
@@ -135,12 +135,13 @@ func main() {
 		kernel.CloseWarehouseCapture()
 	}
 
+	// Remove netfilter rules
+	logger.Info("Removing netfilter rules...\n")
+	removeRules()
+
 	// Stop kernel callbacks
 	logger.Info("Removing kernel callbacks...\n")
 	kernel.StopCallbacks()
-
-	// Remove netfilter rules
-	removeRules()
 
 	// Stop all plugins
 	logger.Info("Stopping plugins...\n")
@@ -424,9 +425,11 @@ func insertRules() {
 	if ok && home != "" {
 		dir = home
 	}
-	output, err := exec.Command(dir+"/"+rulesScript, queueRange).CombinedOutput()
+	qmin := strconv.Itoa(queueStart)
+	qmax := strconv.Itoa(queueStart + cpuCount - 1)
+	output, err := exec.Command(dir+"/"+rulesScript, "INSERT", qmin, qmax).CombinedOutput()
 	if err != nil {
-		logger.Warn("Error running %v %v: %v\n", rulesScript, queueRange, err.Error())
+		logger.Warn("Error running %v INSERT %v %v: %v\n", rulesScript, qmin, qmax, err.Error())
 		kernel.SetShutdownFlag()
 	} else {
 		for _, line := range strings.Split(string(output), "\n") {
@@ -448,12 +451,16 @@ func removeRules() {
 	if ok && home != "" {
 		dir = home
 	}
-	logger.Info("Removing netfilter rules...\n")
-	err = exec.Command(dir+"/"+rulesScript, "-r", queueRange).Run()
+	output, err := exec.Command(dir+"/"+rulesScript, "REMOVE").CombinedOutput()
 	if err != nil {
-		logger.Err("Failed to remove rules: %s\n", err.Error())
+		logger.Err("Error running %v REMOVE: %v\n", err.Error())
+	} else {
+		for _, line := range strings.Split(string(output), "\n") {
+			if line != "" {
+				logger.Info("%s\n", line)
+			}
+		}
 	}
-	logger.Info("Removing netfilter rules...done\n")
 }
 
 // prints some basic stats about packetd
@@ -505,13 +512,6 @@ func getProcStats() (string, error) {
 		}
 	}
 	return interesting, nil
-}
-
-// getQueueRange gets the nfqueue specification
-func getQueueRange() string {
-	str := "2000"
-	str = str + "-" + strconv.Itoa(2000+cpuCount)
-	return str
 }
 
 // load all packetd requirements
