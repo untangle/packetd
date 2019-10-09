@@ -123,6 +123,8 @@ func Startup() {
 	api.POST("/sysupgrade", sysupgradeHandler)
 	api.POST("/upgrade", upgradeHandler)
 
+	api.POST("/releasedhcp/:device", releaseDhcp)
+	api.POST("/renewdhcp/:device", renewDhcp)
 	// files
 	engine.Static("/admin", "/www/admin")
 	engine.Static("/settings", "/www/settings")
@@ -697,6 +699,72 @@ func upgradeHandler(c *gin.Context) {
 		return
 	}
 	logger.Notice("Launching upgrade... done\n")
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+	return
+}
+
+func releaseDhcp(c *gin.Context) {
+	deviceName := c.Param("device")
+
+	logger.Info("Releasing DHCP for device %s...\n", deviceName)
+
+	// var/run/udhcpc-deviceName stores the PID of the DHCP client process with udhcpc on openwrt
+	udhdpcFile, err := ioutil.ReadFile(fmt.Sprintf("/var/run/udhcpc-%s.pid", deviceName))
+
+	if err != nil {
+		// if we cannot find the udhcpc, then this probably isn't an openwrt device
+		logger.Warn("Unable to get udhcpc pid: %v - Trying dhclient \n", err)
+		err = exec.Command("dhclient", "-r", deviceName).Run()
+		if err != nil {
+			logger.Warn("Release DHCP with dhclient has failed: %s\n", err.Error())
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	} else {
+		// Some parsing errors fail due to markup in the udhcpc file, so split it on new lines and take the first line
+		udhcpcPid := strings.Split(string(udhdpcFile), "\n")[0]
+		err = exec.Command("/bin/kill", "-SIGUSR2", udhcpcPid).Run()
+		if err != nil {
+			logger.Warn("Release DHCP by kill -sigusr2 %s has failed: %s\n", udhcpcPid, err.Error())
+
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+	return
+}
+
+func renewDhcp(c *gin.Context) {
+	deviceName := c.Param("device")
+
+	logger.Info("Renewing DHCP for device %s...\n", deviceName)
+
+	// var/run/udhcpc-deviceName stores the PID of the DHCP client process with udhcpc on openwrt
+	udhdpcFile, err := ioutil.ReadFile(fmt.Sprintf("/var/run/udhcpc-%s.pid", deviceName))
+
+	if err != nil {
+		// if we cannot find the udhcpc, then this probably isn't an openwrt device
+		logger.Warn("Unable to get udhcpc pid: %v - Trying dhclient \n", err)
+		err = exec.Command("dhclient", deviceName).Run()
+		if err != nil {
+			logger.Warn("Renew DHCP with dhclient has failed: %s\n", err.Error())
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	} else {
+		// Some parsing errors fail due to markup in the udhcpc file, so split it on new lines and take the first line
+		udhcpcPid := strings.Split(string(udhdpcFile), "\n")[0]
+		// if we have the PID and no error then try to kill the SIGUSR1 PID (renews IP)
+		err := exec.Command("/bin/kill", "-SIGUSR1", string(udhcpcPid)).Run()
+		if err != nil {
+			logger.Warn("Renew DHCP by killing PID sigusr1 has failed: %s\n", err.Error())
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 	return
