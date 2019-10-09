@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/untangle/packetd/services/overseer"
@@ -15,36 +16,36 @@ import (
 const logConfigFile = "/tmp/logconfig.js"
 
 var logLevelName = [...]string{"EMERG", "ALERT", "CRIT", "ERROR", "WARN", "NOTIC", "INFO", "DEBUG", "TRACE"}
-var appLogLevel map[string]int
+var appLogLevel map[string]*int32
 var launchTime time.Time
 var timestampEnabled = true
 
 //LogLevelEmerg = stdlog.h/LOG_EMERG
-const LogLevelEmerg = 0
+const LogLevelEmerg int32 = 0
 
 //LogLevelAlert = stdlog.h/LOG_ALERT
-const LogLevelAlert = 1
+const LogLevelAlert int32 = 1
 
 //LogLevelCrit = stdlog.h/LOG_CRIT
-const LogLevelCrit = 2
+const LogLevelCrit int32 = 2
 
 //LogLevelErr = stdlog.h/LOG_ERR
-const LogLevelErr = 3
+const LogLevelErr int32 = 3
 
 //LogLevelWarn = stdlog.h/LOG_WARNING
-const LogLevelWarn = 4
+const LogLevelWarn int32 = 4
 
 //LogLevelNotice = stdlog.h/LOG_NOTICE
-const LogLevelNotice = 5
+const LogLevelNotice int32 = 5
 
 //LogLevelInfo = stdlog.h/LOG_INFO
-const LogLevelInfo = 6
+const LogLevelInfo int32 = 6
 
 //LogLevelDebug = stdlog.h/LOG_DEBUG
-const LogLevelDebug = 7
+const LogLevelDebug int32 = 7
 
 //LogLevelTrace = custom value
-const LogLevelTrace = 8
+const LogLevelTrace int32 = 8
 
 // Startup starts the logging service
 func Startup() {
@@ -52,7 +53,7 @@ func Startup() {
 	launchTime = time.Now()
 
 	// create the map and load the Log configuration
-	appLogLevel = make(map[string]int)
+	appLogLevel = make(map[string]*int32)
 	loadLoggerConfig()
 
 	// Set system logger to use our logger
@@ -66,26 +67,24 @@ func Shutdown() {
 
 // GetLogLevel returns the log level for the specified source(s)
 // it uses altsource only if a specification for source is not found
-func GetLogLevel(source string, altsource string) int {
-	lvl, stat := appLogLevel[source]
-	if stat == true {
-		return lvl
+func GetLogLevel(source string, altsource string) int32 {
+	if ptr, stat := appLogLevel[source]; stat == true {
+		return atomic.LoadInt32(ptr)
 	}
 
 	if len(altsource) == 0 {
 		return LogLevelInfo //default
 	}
 
-	altlvl, stat := appLogLevel[altsource]
-	if stat == true {
-		return altlvl
+	if ptr, stat := appLogLevel[altsource]; stat == true {
+		return atomic.LoadInt32(ptr)
 	}
 
 	return LogLevelInfo //default
 }
 
 // LogMessage is called to write messages to the system log
-func LogMessage(level int, format string, args ...interface{}) {
+func LogMessage(level int32, format string, args ...interface{}) {
 	caller, packagename, comboname, _, _ := findCaller()
 
 	if level > GetLogLevel(comboname, packagename) {
@@ -106,13 +105,12 @@ func LogMessage(level int, format string, args ...interface{}) {
 // LogMessageSource is similar to LogMessage
 // except instead of using runtime to determine the caller/source
 // the source is specified manually
-func LogMessageSource(level int, source string, format string, args ...interface{}) {
+func LogMessageSource(level int32, source string, format string, args ...interface{}) {
 	// if no log level defined, assume Info
 	var loglvl = LogLevelInfo
 
-	item, stat := appLogLevel[source]
-	if stat == true {
-		loglvl = item
+	if ptr, stat := appLogLevel[source]; stat == true {
+		loglvl = atomic.LoadInt32(ptr)
 	}
 	if level > loglvl {
 		return
@@ -182,7 +180,7 @@ func LogFormatter(format string, args ...interface{}) string {
 }
 
 // IsLogEnabled returns true if logging is enabled for the caller at the specified level, false otherwise
-func IsLogEnabled(level int) bool {
+func IsLogEnabled(level int32) bool {
 	_, packagename, comboname, _, _ := findCaller()
 	if IsLogEnabledSource(level, comboname) {
 		return true
@@ -194,7 +192,7 @@ func IsLogEnabled(level int) bool {
 }
 
 // IsLogEnabledSource is the same as IsLogEnabled but for the manually specified source
-func IsLogEnabledSource(level int, source string) bool {
+func IsLogEnabledSource(level int32, source string) bool {
 	lvl := GetLogLevel(source, "")
 	return (lvl >= level)
 }
@@ -379,8 +377,10 @@ func loadLoggerConfig() {
 		// find the index of the logLevelName that matches the configured level
 		found := false
 		for levelvalue, levelname := range logLevelName {
+			// if the string matches the level will be the index of the matched name
 			if strings.Compare(levelname, strings.ToUpper(cfglevel)) == 0 {
-				appLogLevel[cfgname] = levelvalue
+				appLogLevel[cfgname] = new(int32)
+				atomic.StoreInt32(appLogLevel[cfgname], int32(levelvalue))
 				found = true
 			}
 		}
@@ -502,4 +502,40 @@ func getPrefix() string {
 	nowtime := time.Now()
 	var elapsed = nowtime.Sub(launchTime)
 	return fmt.Sprintf("[%11.5f] ", elapsed.Seconds())
+}
+
+// SearchSourceLogLevel returns the log level for the specified source
+// or a negative value if the source does not exist
+func SearchSourceLogLevel(source string) int32 {
+	ptr, stat := appLogLevel[source]
+	if stat == false {
+		return -1
+	}
+
+	return atomic.LoadInt32(ptr)
+}
+
+// AdjustSourceLogLevel sets the log level for the specified source and returns
+// the previous level or a negative value if the source does not exist
+func AdjustSourceLogLevel(source string, level int32) int32 {
+	ptr, stat := appLogLevel[source]
+	if stat == false {
+		return -1
+	}
+
+	prelvl := atomic.LoadInt32(ptr)
+	atomic.StoreInt32(ptr, level)
+	return prelvl
+}
+
+// FindLogLevelName returns the numeric log level for the arugmented name
+// or a negative value if the level is not valid
+func FindLogLevelName(source string) int32 {
+	for levelvalue, levelname := range logLevelName {
+		if strings.Compare(strings.ToUpper(levelname), strings.ToUpper(source)) == 0 {
+			return (int32(levelvalue))
+		}
+	}
+
+	return -1
 }
