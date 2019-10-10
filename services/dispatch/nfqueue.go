@@ -8,6 +8,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/overseer"
 )
 
 // maxAllowedTime is the maximum time a plugin is allowed to process a packet.
@@ -287,7 +288,9 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 				t1 := getMicroseconds()
 
 				go func() {
+					overseer.IncCounter(val.CounterName)
 					result := val.NfqueueFunc(mess, ctid, newSession)
+					overseer.DecCounter(val.CounterName)
 					c <- subscriberResult{owner: key, sessionRelease: result.SessionRelease}
 				}()
 
@@ -304,7 +307,6 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 				timeMapLock.Lock()
 				timeMap[val.Owner] = timediff
 				timeMapLock.Unlock()
-
 				if logger.IsTraceEnabled() {
 					logger.Trace("Finished nfqueue PLUGIN:%s PRI:%d CTID:%d ms:%.1f\n", key, pri, ctid, timediff)
 				}

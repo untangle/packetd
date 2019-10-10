@@ -138,7 +138,7 @@ func LogFormatter(format string, args ...interface{}) string {
 	// the second is the log repeat limit value and the rest go to the formatter
 	if strings.HasPrefix(format, "%OC|") {
 		var ocname string
-		var limit uint64
+		var limit int64
 
 		// make sure we have at least two arguments
 		if len(args) < 2 {
@@ -156,7 +156,7 @@ func LogFormatter(format string, args ...interface{}) string {
 		// make sure the second argument is int
 		switch args[1].(type) {
 		case int:
-			limit = uint64(args[1].(int))
+			limit = int64(args[1].(int))
 		default:
 			return fmt.Sprintf("ERROR: LogFormatter OC verb args[1] not int:%s", format)
 		}

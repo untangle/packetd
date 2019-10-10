@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/overseer"
 )
 
 //NetloggerHandlerFunction defines a pointer to a netlogger callback function
@@ -67,7 +68,9 @@ func netloggerCallback(version uint8,
 			logger.Debug("Calling netlogger APP:%s PRIORITY:%d\n", key, priority)
 			wg.Add(1)
 			go func(val SubscriptionHolder) {
+				overseer.IncCounter(val.CounterName)
 				val.NetloggerFunc(&netlogger)
+				overseer.DecCounter(val.CounterName)
 				wg.Done()
 				logger.Debug("Finished netlogger APP:%s PRIORITY:%d\n", key, priority)
 			}(val)
