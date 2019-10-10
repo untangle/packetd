@@ -218,7 +218,7 @@ func loggerHandler(c *gin.Context) {
 		} else {
 			c.JSON(http.StatusOK, gin.H{
 				"source": info[0],
-				"level":  level,
+				"level":  logger.FindLogLevelName(level),
 			})
 		}
 		return
@@ -226,22 +226,20 @@ func loggerHandler(c *gin.Context) {
 
 	// two arguments is a request to adjust the level of a source so
 	// start by finding the numeric level for the level name
-	setlevel := logger.FindLogLevelName(info[1])
+	setlevel := logger.FindLogLevelValue(info[1])
 	if setlevel < 0 {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid log level specified"})
 		return
 	}
 
+	// set the level for the source
 	nowlevel := logger.AdjustSourceLogLevel(info[0], setlevel)
-	if nowlevel < 0 {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid log source specified"})
-		return
-	}
 
+	// return old and new values
 	c.JSON(http.StatusOK, gin.H{
 		"source":   info[0],
-		"oldlevel": nowlevel,
-		"newlevel": setlevel,
+		"oldlevel": logger.FindLogLevelName(nowlevel),
+		"newlevel": logger.FindLogLevelName(setlevel),
 	})
 }
 
