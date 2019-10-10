@@ -115,6 +115,7 @@ func Startup() {
 	api.GET("/status/wifichannels/:device", statusWifiChannels)
 	api.GET("/status/wifimodelist/:device", statusWifiModelist)
 
+	api.GET("/logger/:source", loggerHandler)
 	api.GET("/debug", debugHandler)
 	api.POST("/gc", gcHandler)
 
@@ -190,6 +191,55 @@ func rootHandler(c *gin.Context) {
 func pingHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "pong",
+	})
+}
+
+// loggerHandler handles getting and setting the log level for the different logger sources
+func loggerHandler(c *gin.Context) {
+	queryStr := c.Param("source")
+	if queryStr == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "missing logger source"})
+		return
+	}
+
+	// split passed query on equal character to get the function arguments
+	info := strings.Split(queryStr, "=")
+
+	// we expect either one or two arguments
+	if len(info) < 1 || len(info) > 2 {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid logger syntax"})
+	}
+
+	// single argument is a level query
+	if len(info) == 1 {
+		level := logger.SearchSourceLogLevel(info[0])
+		if level < 0 {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid log source specified"})
+		} else {
+			c.JSON(http.StatusOK, gin.H{
+				"source": info[0],
+				"level":  logger.FindLogLevelName(level),
+			})
+		}
+		return
+	}
+
+	// two arguments is a request to adjust the level of a source so
+	// start by finding the numeric level for the level name
+	setlevel := logger.FindLogLevelValue(info[1])
+	if setlevel < 0 {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid log level specified"})
+		return
+	}
+
+	// set the level for the source
+	nowlevel := logger.AdjustSourceLogLevel(info[0], setlevel)
+
+	// return old and new values
+	c.JSON(http.StatusOK, gin.H{
+		"source":   info[0],
+		"oldlevel": logger.FindLogLevelName(nowlevel),
+		"newlevel": logger.FindLogLevelName(setlevel),
 	})
 }
 

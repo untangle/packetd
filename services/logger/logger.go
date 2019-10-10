@@ -7,6 +7,8 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/untangle/packetd/services/overseer"
@@ -14,37 +16,38 @@ import (
 
 const logConfigFile = "/tmp/logconfig.js"
 
-var logLevelName = [...]string{"EMERG", "ALERT", "CRIT", "ERROR", "WARN", "NOTIC", "INFO", "DEBUG", "TRACE"}
-var appLogLevel map[string]int
+var logLevelName = [...]string{"EMERG", "ALERT", "CRIT", "ERROR", "WARN", "NOTICE", "INFO", "DEBUG", "TRACE"}
+var logLevelMap map[string]*int32
+var logLevelLocker sync.RWMutex
 var launchTime time.Time
 var timestampEnabled = true
 
-//LogLevelEmerg = stdlog.h/LOG_EMERG
-const LogLevelEmerg = 0
+//LogLevelEmerg = syslog.h/LOG_EMERG
+const LogLevelEmerg int32 = 0
 
-//LogLevelAlert = stdlog.h/LOG_ALERT
-const LogLevelAlert = 1
+//LogLevelAlert = syslog.h/LOG_ALERT
+const LogLevelAlert int32 = 1
 
-//LogLevelCrit = stdlog.h/LOG_CRIT
-const LogLevelCrit = 2
+//LogLevelCrit = syslog.h/LOG_CRIT
+const LogLevelCrit int32 = 2
 
-//LogLevelErr = stdlog.h/LOG_ERR
-const LogLevelErr = 3
+//LogLevelErr = syslog.h/LOG_ERR
+const LogLevelErr int32 = 3
 
-//LogLevelWarn = stdlog.h/LOG_WARNING
-const LogLevelWarn = 4
+//LogLevelWarn = syslog.h/LOG_WARNING
+const LogLevelWarn int32 = 4
 
-//LogLevelNotice = stdlog.h/LOG_NOTICE
-const LogLevelNotice = 5
+//LogLevelNotice = syslog.h/LOG_NOTICE
+const LogLevelNotice int32 = 5
 
-//LogLevelInfo = stdlog.h/LOG_INFO
-const LogLevelInfo = 6
+//LogLevelInfo = syslog.h/LOG_INFO
+const LogLevelInfo int32 = 6
 
-//LogLevelDebug = stdlog.h/LOG_DEBUG
-const LogLevelDebug = 7
+//LogLevelDebug = syslog.h/LOG_DEBUG
+const LogLevelDebug int32 = 7
 
 //LogLevelTrace = custom value
-const LogLevelTrace = 8
+const LogLevelTrace int32 = 8
 
 // Startup starts the logging service
 func Startup() {
@@ -52,7 +55,7 @@ func Startup() {
 	launchTime = time.Now()
 
 	// create the map and load the Log configuration
-	appLogLevel = make(map[string]int)
+	logLevelMap = make(map[string]*int32)
 	loadLoggerConfig()
 
 	// Set system logger to use our logger
@@ -64,68 +67,66 @@ func Shutdown() {
 
 }
 
-// GetLogLevel returns the log level for the specified source(s)
-// it uses altsource only if a specification for source is not found
-func GetLogLevel(source string, altsource string) int {
-	lvl, stat := appLogLevel[source]
-	if stat == true {
-		return lvl
+// GetLogLevel returns the log level for the specified package or function
+// It checks function first allowing individual functions to be configured
+// for a higher level of logging than the package that owns them.
+func GetLogLevel(packageName string, functionName string) int32 {
+	if len(functionName) != 0 {
+		logLevelLocker.RLock()
+		ptr, stat := logLevelMap[functionName]
+		logLevelLocker.RUnlock()
+		if stat == true {
+			return atomic.LoadInt32(ptr)
+		}
 	}
 
-	if len(altsource) == 0 {
-		return LogLevelInfo //default
+	if len(packageName) != 0 {
+		logLevelLocker.RLock()
+		ptr, stat := logLevelMap[packageName]
+		logLevelLocker.RUnlock()
+		if stat == true {
+			return atomic.LoadInt32(ptr)
+		}
 	}
 
-	altlvl, stat := appLogLevel[altsource]
-	if stat == true {
-		return altlvl
-	}
-
-	return LogLevelInfo //default
+	// nothing found so return default level
+	return LogLevelInfo
 }
 
 // LogMessage is called to write messages to the system log
-func LogMessage(level int, format string, args ...interface{}) {
-	caller, packagename, comboname, _, _ := findCaller()
+func LogMessage(level int32, format string, args ...interface{}) {
+	_, _, packageName, functionName := findCallingFunction()
 
-	if level > GetLogLevel(comboname, packagename) {
+	if level > GetLogLevel(packageName, functionName) {
 		return
 	}
 
 	if len(args) == 0 {
-		fmt.Printf("%s%-5s %26s: %s", getPrefix(), logLevelName[level], caller, format)
+		fmt.Printf("%s%-6s %18s: %s", getPrefix(), logLevelName[level], packageName, format)
 	} else {
 		buffer := LogFormatter(format, args...)
 		if len(buffer) == 0 {
 			return
 		}
-		fmt.Printf("%s%-5s %26s: %s", getPrefix(), logLevelName[level], caller, buffer)
+		fmt.Printf("%s%-6s %18s: %s", getPrefix(), logLevelName[level], packageName, buffer)
 	}
 }
 
-// LogMessageSource is similar to LogMessage
-// except instead of using runtime to determine the caller/source
-// the source is specified manually
-func LogMessageSource(level int, source string, format string, args ...interface{}) {
-	// if no log level defined, assume Info
-	var loglvl = LogLevelInfo
-
-	item, stat := appLogLevel[source]
-	if stat == true {
-		loglvl = item
-	}
-	if level > loglvl {
+// LogMessageSource is similar to LogMessage except instead of using
+// runtime to determine the caller/source the source is specified manually
+func LogMessageSource(level int32, source string, format string, args ...interface{}) {
+	if level > GetLogLevel(source, "") {
 		return
 	}
 
 	if len(args) == 0 {
-		fmt.Printf("%s%-5s %26s: %s", getPrefix(), logLevelName[level], source, format)
+		fmt.Printf("%s%-6s %18s: %s", getPrefix(), logLevelName[level], source, format)
 	} else {
 		buffer := LogFormatter(format, args...)
 		if len(buffer) == 0 {
 			return
 		}
-		fmt.Printf("%s%-5s %26s: %s", getPrefix(), logLevelName[level], source, buffer)
+		fmt.Printf("%s%-6s %18s: %s", getPrefix(), logLevelName[level], source, buffer)
 	}
 }
 
@@ -182,19 +183,19 @@ func LogFormatter(format string, args ...interface{}) string {
 }
 
 // IsLogEnabled returns true if logging is enabled for the caller at the specified level, false otherwise
-func IsLogEnabled(level int) bool {
-	_, packagename, comboname, _, _ := findCaller()
-	if IsLogEnabledSource(level, comboname) {
+func IsLogEnabled(level int32) bool {
+	_, _, packageName, functionName := findCallingFunction()
+	if IsLogEnabledSource(level, packageName) {
 		return true
 	}
-	if IsLogEnabledSource(level, packagename) {
+	if IsLogEnabledSource(level, functionName) {
 		return true
 	}
 	return false
 }
 
 // IsLogEnabledSource is the same as IsLogEnabled but for the manually specified source
-func IsLogEnabledSource(level int, source string) bool {
+func IsLogEnabledSource(level int32, source string) bool {
 	lvl := GetLogLevel(source, "")
 	return (lvl >= level)
 }
@@ -239,12 +240,12 @@ func IsErrEnabled() bool {
 	return IsLogEnabled(LogLevelErr)
 }
 
-// Warn is called for log level WARN messages
+// Warn is called for log level WARNING messages
 func Warn(format string, args ...interface{}) {
 	LogMessage(LogLevelWarn, format, args...)
 }
 
-// IsWarnEnabled returns true if WARN logging is enable for the caller
+// IsWarnEnabled returns true if WARNING logging is enable for the caller
 func IsWarnEnabled() bool {
 	return IsLogEnabled(LogLevelWarn)
 }
@@ -322,6 +323,7 @@ func (w *LogWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// loadLoggerConfig loads the logger configuration file
 func loadLoggerConfig() {
 	var file *os.File
 	var info os.FileInfo
@@ -379,8 +381,10 @@ func loadLoggerConfig() {
 		// find the index of the logLevelName that matches the configured level
 		found := false
 		for levelvalue, levelname := range logLevelName {
+			// if the string matches the level will be the index of the matched name
 			if strings.Compare(levelname, strings.ToUpper(cfglevel)) == 0 {
-				appLogLevel[cfgname] = levelvalue
+				logLevelMap[cfgname] = new(int32)
+				atomic.StoreInt32(logLevelMap[cfgname], int32(levelvalue))
 				found = true
 			}
 		}
@@ -402,43 +406,46 @@ func initLoggerConfig() {
 		comment += element
 	}
 
-	// make a map and fill it with a default log level for every application
+	// make a map and fill it with a default log level for every package
 	config := make(map[string]string)
+	config["_FileVersion_"] = "200"
 	config["_ValidLevels_"] = comment
 
 	// plugins
 	config["certfetch"] = "INFO"
 	config["certsniff"] = "INFO"
 	config["classify"] = "INFO"
-	config["predicttraffic"] = "INFO"
 	config["dns"] = "INFO"
-	config["geoip"] = "INFO"
 	config["example"] = "INFO"
+	config["geoip"] = "INFO"
+	config["predicttraffic"] = "INFO"
 	config["reporter"] = "INFO"
 	config["revdns"] = "INFO"
 	config["sni"] = "INFO"
 	config["stats"] = "INFO"
-	config["tls"] = "INFO"
 
 	// services
 	config["certcache"] = "INFO"
 	config["certmanager"] = "INFO"
 	config["dict"] = "INFO"
-	config["dispatch/conntrack.go"] = "INFO"
-	config["dispatch/netlogger.go"] = "INFO"
-	config["dispatch/nfqueue.go"] = "INFO"
-	config["dispatch/session.go"] = "INFO"
-	config["dispatch_timer"] = "INFO"
 	config["dispatch"] = "INFO"
-	config["predicttrafficsvc"] = "INFO"
-	config["exec"] = "INFO"
 	config["kernel"] = "INFO"
 	config["logger"] = "INFO"
-	config["packetd"] = "INFO"
+	config["overseer"] = "INFO"
+	config["predicttrafficsvc"] = "INFO"
 	config["reports"] = "INFO"
 	config["restd"] = "INFO"
 	config["settings"] = "INFO"
+
+	// static source names used in the low level c handlers
+	config["common"] = "INFO"
+	config["conntrack"] = "INFO"
+	config["netlogger"] = "INFO"
+	config["nfqueue"] = "INFO"
 	config["warehouse"] = "INFO"
+
+	// other static names used for special logging
+	config["dispatchTimer"] = "INFO"
 
 	// convert the config map to a json object
 	jstr, err := json.MarshalIndent(config, "", "")
@@ -458,39 +465,44 @@ func initLoggerConfig() {
 	file.Close()
 }
 
-func findCaller() (string, string, string, string, int) {
-	// start with 1 because this is not public
-	for depth := 1; depth < 15; depth++ {
-		_, filename, line, ok := runtime.Caller(depth)
-		if ok &&
-			!strings.HasSuffix(filename, "print.go") &&
-			!strings.HasSuffix(filename, "logger.go") &&
-			!strings.HasSuffix(filename, "log.go") {
-			var split = strings.Split(filename, "/")
-			var shortname string
-			if len(split) > 1 {
-				shortname = split[len(split)-1]
-			} else {
-				shortname = filename
-			}
+func findCallingFunction() (string, int, string, string) {
+	// we use runtime.Callers to get the call stack so we can determine the calling function
+	// skipping over the first 4 in the frame since they are internal to getting here
+	// 0 = runtime.Callers
+	// 1 = findCallingFunction
+	// 2 = LogMessage
+	// 3 = Warn, Info, Debug, etc.
+	// 4 = the function that actually called logger.Warn, logger.Info, logger.Debug, etc.
+	stack := make([]uintptr, 5)
+	runtime.Callers(4, stack)
+	frames := runtime.CallersFrames(stack)
+	caller, _ := frames.Next()
 
-			var packagename string
-			if len(split) > 2 {
-				packagename = split[len(split)-2]
-			} else {
-				packagename = shortname
-			}
+	// Here is an example of what we expect to see for the caller frame
+	// FILE: /home/mahotz/golang/src/github.com/untangle/packetd/services/dict/dict.go
+	// FUNC: github.com/untangle/packetd/services/dict.cleanDictionary
+	// LINE: 827
 
-			var summary = fmt.Sprintf("%s/%s:%04d", packagename, shortname, line)
-			if len(summary) > 26 {
-				summary = summary[len(summary)-26:]
-			}
-			comboname := packagename + "/" + shortname
-			return summary, packagename, comboname, shortname, line
-		}
+	var functionName string
+	var packageName string
+
+	// Find the index of the last slash to isolate the package.FunctionName
+	end := strings.LastIndex(caller.Function, "/")
+	if end < 0 {
+		functionName = caller.Function
+	} else {
+		functionName = caller.Function[end+1:]
 	}
 
-	return "unknown|unknown:0", "unknown:0", "unknown", "unknown", 0
+	// Find the index of the dot after the package name
+	dot := strings.Index(functionName, ".")
+	if dot < 0 {
+		packageName = "unknown"
+	} else {
+		packageName = functionName[0:dot]
+	}
+
+	return caller.File, caller.Line, packageName, functionName
 }
 
 // getPrefix returns a log message prefix
@@ -502,4 +514,60 @@ func getPrefix() string {
 	nowtime := time.Now()
 	var elapsed = nowtime.Sub(launchTime)
 	return fmt.Sprintf("[%11.5f] ", elapsed.Seconds())
+}
+
+// SearchSourceLogLevel returns the log level for the specified source
+// or a negative value if the source does not exist
+func SearchSourceLogLevel(source string) int32 {
+	logLevelLocker.RLock()
+	ptr, stat := logLevelMap[source]
+	logLevelLocker.RUnlock()
+	if stat == false {
+		return -1
+	}
+
+	return atomic.LoadInt32(ptr)
+}
+
+// AdjustSourceLogLevel sets the log level for the specified source and returns
+// the previous level or a negative value if the source does not exist
+func AdjustSourceLogLevel(source string, level int32) int32 {
+	logLevelLocker.RLock()
+	ptr, stat := logLevelMap[source]
+	logLevelLocker.RUnlock()
+	if stat == false {
+		Notice("Adding log level source NAME:%s LEVEL:%d\n", source, level)
+		ptr = new(int32)
+		atomic.StoreInt32(ptr, -1)
+		logLevelLocker.Lock()
+		logLevelMap[source] = ptr
+		logLevelLocker.Unlock()
+	}
+
+	prelvl := atomic.LoadInt32(ptr)
+	atomic.StoreInt32(ptr, level)
+	return prelvl
+}
+
+// FindLogLevelValue returns the numeric log level for the arugmented name
+// or a negative value if the level is not valid
+func FindLogLevelValue(source string) int32 {
+	for levelvalue, levelname := range logLevelName {
+		if strings.Compare(strings.ToUpper(levelname), strings.ToUpper(source)) == 0 {
+			return (int32(levelvalue))
+		}
+	}
+
+	return -1
+}
+
+// FindLogLevelName returns the log level name for the argumented value
+func FindLogLevelName(level int32) string {
+	if level < 0 {
+		return "UNDEFINED"
+	}
+	if int(level) > len(logLevelName) {
+		return fmt.Sprintf("%d", level)
+	}
+	return logLevelName[level]
 }

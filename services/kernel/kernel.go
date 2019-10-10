@@ -423,7 +423,7 @@ func go_child_shutdown() {
 func go_child_message(level C.int, source *C.char, message *C.char) {
 	lsrc := C.GoString(source)
 	lmsg := C.GoString(message)
-	logger.LogMessageSource(int(level), lsrc, lmsg)
+	logger.LogMessageSource(int32(level), lsrc, lmsg)
 }
 
 //conntrack periodic task

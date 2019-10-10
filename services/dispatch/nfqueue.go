@@ -332,9 +332,9 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 		}
 	}
 
-	if logger.IsLogEnabledSource(logger.LogLevelTrace, "dispatch_timer") {
+	if logger.IsLogEnabledSource(logger.LogLevelTrace, "dispatchTimer") {
 		timeMapLock.RLock()
-		logger.LogMessageSource(logger.LogLevelTrace, "dispatch_timer", "Timer Map: %v\n", timeMap)
+		logger.LogMessageSource(logger.LogLevelTrace, "dispatchTimer", "Timer Map: %v\n", timeMap)
 		timeMapLock.RUnlock()
 	}
 
