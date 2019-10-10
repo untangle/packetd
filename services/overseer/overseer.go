@@ -46,13 +46,12 @@ func GetCounter(name string) uint64 {
 }
 
 // GenerateReport is called to create a dynamic HTTP page that shows all named counters
-func GenerateReport() bytes.Buffer {
-	var buffer bytes.Buffer
-
+func GenerateReport(buffer *bytes.Buffer) {
 	counterMutex.Lock()
 	defer counterMutex.Unlock()
 
 	buffer.WriteString("<TABLE BORDER=2 CELLPADDING=4 BGCOLOR=#EEEEEE>\r\n")
+	buffer.WriteString("<TR><TH COLSPAN=2>Overseer Debug Counters</TH></TR>\r\n")
 	buffer.WriteString("<TR><TD><B>Counter Name</B></TD><TD><B>Value</B></TD></TR>\r\n")
 
 	for name, value := range counterTable {
@@ -64,6 +63,4 @@ func GenerateReport() bytes.Buffer {
 	}
 
 	buffer.WriteString("</TABLE>\r\n")
-
-	return buffer
 }

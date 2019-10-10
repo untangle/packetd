@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -570,4 +571,24 @@ func FindLogLevelName(level int32) string {
 		return fmt.Sprintf("%d", level)
 	}
 	return logLevelName[level]
+}
+
+// GenerateReport is called to create a dynamic HTTP page that shows all debug sources
+func GenerateReport(buffer *bytes.Buffer) {
+	logLevelLocker.RLock()
+	defer logLevelLocker.RUnlock()
+
+	buffer.WriteString("<TABLE BORDER=2 CELLPADDING=4 BGCOLOR=#EEEEEE>\r\n")
+	buffer.WriteString("<TR><TH COLSPAN=2>Logger Source Levels</TH></TR>\r\n")
+	buffer.WriteString("<TR><TD><B>Logger Source</B></TD><TD><B>Log Level</B></TD></TR>\r\n")
+
+	for name, ptr := range logLevelMap {
+		buffer.WriteString("<TR><TD><TT>")
+		buffer.WriteString(name)
+		buffer.WriteString("</TT></TD><TD><TT>")
+		buffer.WriteString(FindLogLevelName(atomic.LoadInt32(ptr)))
+		buffer.WriteString("</TT></TD></TR>\n\n")
+	}
+
+	buffer.WriteString("</TABLE>\r\n")
 }
