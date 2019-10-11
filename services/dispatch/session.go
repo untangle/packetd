@@ -163,31 +163,31 @@ func (sess *Session) SetConntrackID(value uint32) uint32 {
 // GetClientSideTuple gets the client side Tuple
 func (sess *Session) GetClientSideTuple() Tuple {
 	sess.clientSideLock.Lock()
-	defer sess.clientSideLock.Unlock()
 	value := sess.clientSideTuple
+	sess.clientSideLock.Unlock()
 	return value
 }
 
 // SetClientSideTuple sets the client side Tuple
 func (sess *Session) SetClientSideTuple(tuple Tuple) {
 	sess.clientSideLock.Lock()
-	defer sess.clientSideLock.Unlock()
 	sess.clientSideTuple = tuple
+	sess.clientSideLock.Unlock()
 }
 
 // GetServerSideTuple gets the server side Tuple
 func (sess *Session) GetServerSideTuple() Tuple {
 	sess.serverSideLock.Lock()
-	defer sess.serverSideLock.Unlock()
 	value := sess.serverSideTuple
+	sess.serverSideLock.Unlock()
 	return value
 }
 
 // SetServerSideTuple sets the server side Tuple
 func (sess *Session) SetServerSideTuple(tuple Tuple) {
 	sess.serverSideLock.Lock()
-	defer sess.serverSideLock.Unlock()
 	sess.serverSideTuple = tuple
+	sess.serverSideLock.Unlock()
 }
 
 // GetServerInterfaceID gets the server interface ID
@@ -301,31 +301,31 @@ func (sess *Session) AddNavlCount(value uint64) uint64 {
 // GetCreationTime gets the time the entry was created
 func (sess *Session) GetCreationTime() time.Time {
 	sess.creationLock.Lock()
-	defer sess.creationLock.Unlock()
 	value := sess.creationTime
+	sess.creationLock.Unlock()
 	return value
 }
 
 // SetCreationTime sets the time the entry was created
 func (sess *Session) SetCreationTime(value time.Time) {
 	sess.creationLock.Lock()
-	defer sess.creationLock.Unlock()
 	sess.creationTime = value
+	sess.creationLock.Unlock()
 }
 
 // GetLastActivity gets the time of the last session activity
 func (sess *Session) GetLastActivity() time.Time {
 	sess.lastActivityLock.Lock()
-	defer sess.lastActivityLock.Unlock()
 	value := sess.lastActivityTime
+	sess.lastActivityLock.Unlock()
 	return value
 }
 
 // SetLastActivity sets the time of the last session activity
 func (sess *Session) SetLastActivity(value time.Time) {
 	sess.lastActivityLock.Lock()
-	defer sess.lastActivityLock.Unlock()
 	sess.lastActivityTime = value
+	sess.lastActivityLock.Unlock()
 }
 
 // GetConntrackConfirmed gets the conntrack confirmed flag
@@ -348,16 +348,16 @@ func (sess *Session) SetConntrackConfirmed(argument bool) {
 // GetConntrackPointer gets the conntrack pointer
 func (sess *Session) GetConntrackPointer() *Conntrack {
 	sess.conntrackLock.Lock()
-	defer sess.conntrackLock.Unlock()
 	value := sess.conntrackPointer
+	sess.conntrackLock.Unlock()
 	return value
 }
 
 // SetConntrackPointer sets the conntrack pointer
 func (sess *Session) SetConntrackPointer(pointer *Conntrack) {
 	sess.conntrackLock.Lock()
-	defer sess.conntrackLock.Unlock()
 	sess.conntrackPointer = pointer
+	sess.conntrackLock.Unlock()
 }
 
 // GetFamily gets the session family type
@@ -426,12 +426,12 @@ func findSession(ctid uint32) *Session {
 func insertSessionTable(ctid uint32, sess *Session) {
 	logger.Trace("Insert session index %v -> %v\n", ctid, sess.GetClientSideTuple())
 	sessionMutex.Lock()
-	defer sessionMutex.Unlock()
 	if sessionTable[ctid] != nil {
 		logger.Warn("Overriding previous session: %v\n", ctid)
 		delete(sessionTable, ctid)
 	}
 	sessionTable[ctid] = sess
+	sessionMutex.Unlock()
 	dict.AddSessionEntry(sess.GetConntrackID(), "session_id", sess.GetSessionID())
 }
 

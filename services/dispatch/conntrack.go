@@ -300,8 +300,8 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 // findConntrack finds an entry in the conntrack table
 func findConntrack(ctid uint32) (*Conntrack, bool) {
 	conntrackTableMutex.Lock()
-	defer conntrackTableMutex.Unlock()
 	entry, status := conntrackTable[ctid]
+	conntrackTableMutex.Unlock()
 	return entry, status
 }
 
@@ -309,19 +309,19 @@ func findConntrack(ctid uint32) (*Conntrack, bool) {
 func insertConntrack(ctid uint32, entry *Conntrack) {
 	logger.Trace("Insert conntrack entry %d\n", ctid)
 	conntrackTableMutex.Lock()
-	defer conntrackTableMutex.Unlock()
 	if conntrackTable[ctid] != nil {
 		delete(conntrackTable, ctid)
 	}
 	conntrackTable[ctid] = entry
+	conntrackTableMutex.Unlock()
 }
 
 // removeConntrack removes an entry from the conntrack table
 func removeConntrack(ctid uint32) {
 	logger.Trace("Remove conntrack entry %d\n", ctid)
 	conntrackTableMutex.Lock()
-	defer conntrackTableMutex.Unlock()
 	delete(conntrackTable, ctid)
+	conntrackTableMutex.Unlock()
 }
 
 // removeConntrackStale remove an entry from the conntrackTable that is obsolete/dead/invalid
