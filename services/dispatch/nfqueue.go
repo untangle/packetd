@@ -56,9 +56,9 @@ type subscriberResult struct {
 // ReleaseSession is called by a subscriber to stop receiving traffic for a session
 func ReleaseSession(session *Session, owner string) {
 	session.subLocker.Lock()
-	defer session.subLocker.Unlock()
 	origLen := len(session.subscriptions)
 	if origLen == 0 {
+		session.subLocker.Unlock()
 		return
 	}
 	delete(session.subscriptions, owner)
@@ -70,6 +70,7 @@ func ReleaseSession(session *Session, owner string) {
 		logger.Debug("Zero subscribers reached - settings bypass_packetd=true for session %d\n", session.GetConntrackID())
 		dict.AddSessionEntry(session.GetConntrackID(), "bypass_packetd", true)
 	}
+	session.subLocker.Unlock()
 }
 
 // nfqueueCallback is the callback for the packet
@@ -237,14 +238,7 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 	session.AddByteCount(uint64(mess.Length))
 	session.AddEventCount(1)
 
-	// If we've processed this many packets without all the plugins releasing
-	// there is likely an issue. Only warn at "== X" packet count
-	// to avoid flooding logs with a "> X" condition
-	packetcount := session.GetPacketCount()
-	if packetcount == 100 || packetcount == 200 {
-		logger.Warn("Deep session scan. %v ctid:%v Packets:%v Bytes:%v Subscribers:%v Age:%v\n", session.GetClientSideTuple(), ctid, session.GetPacketCount(), session.GetByteCount(), session.subscriptions, time.Since(session.GetCreationTime()))
-	}
-
+	// call the subscribers
 	return callSubscribers(ctid, session, mess, pmark, newSession)
 }
 
@@ -278,6 +272,7 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 			if val.Priority != priority {
 				continue
 			}
+			// handle each subscriber on a goroutine
 			go func(key string, val SubscriptionHolder, pri int) {
 				if logger.IsTraceEnabled() {
 					logger.Trace("Calling nfqueue PLUGIN:%s PRI:%d CTID:%d\n", key, pri, ctid)
@@ -287,20 +282,28 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 				c := make(chan subscriberResult, 1)
 				t1 := getMicroseconds()
 
+				// call the subscriber hook on another goroutine so we can timeout while waiting for the result
 				go func() {
 					overseer.IncCounter(val.CounterName)
 					result := val.NfqueueFunc(mess, ctid, newSession)
+					stat := timeoutTimer.Stop()
 					overseer.DecCounter(val.CounterName)
-					c <- subscriberResult{owner: key, sessionRelease: result.SessionRelease}
+					// if we stopped the timer then stat will be true and we need to write the subscriber result
+					// to the channel, otherwise don't bother since a release was written by the timeout handler
+					if stat == true {
+						c <- subscriberResult{owner: key, sessionRelease: result.SessionRelease}
+					}
 				}()
 
+				// wait for the subscriber to finish or the timeout to trigger
 				select {
 				case result := <-c:
+					// put what the subscriber returned in the result channel
 					resultsChannel <- result
-					timeoutTimer.Stop()
 				case <-timeoutTimer.C:
-					logger.Err("%OC|Timeout reached while processing nfqueue. plugin:%s\n", "nfqueue_plugin_timeout", 0, key)
-					c <- subscriberResult{owner: key, sessionRelease: true}
+					// the subscriber took too long so put a release in the result channel on behalf of the subscriber
+					logger.Err("%OC|Timeout while processing nfqueue - subscriber:%s\n", "timeout_nfqueue_"+key, 0, key)
+					resultsChannel <- subscriberResult{owner: key, sessionRelease: true}
 				}
 
 				timediff := (float64(getMicroseconds()-t1) / 1000.0)
@@ -315,7 +318,7 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 			subcount++
 		}
 
-		// Add the mark bits returned from each handler and remove the session
+		// get the results for each called subscriber and remove the session
 		// subscription for any that set the SessionRelease flag
 		for i := 0; i < hitcount; i++ {
 			select {
@@ -336,7 +339,7 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 
 	if logger.IsLogEnabledSource(logger.LogLevelTrace, "dispatchTimer") {
 		timeMapLock.RLock()
-		logger.LogMessageSource(logger.LogLevelTrace, "dispatchTimer", "Timer Map: %v\n", timeMap)
+		logger.LogMessageSource(logger.LogLevelTrace, "dispatchTimer", "ctid:%v Timer Map: %v\n", ctid, timeMap)
 		timeMapLock.RUnlock()
 	}
 
