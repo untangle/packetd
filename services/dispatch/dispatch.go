@@ -19,6 +19,7 @@ import (
 // SubscriptionHolder stores the details of a data callback subscription
 type SubscriptionHolder struct {
 	Owner         string
+	CounterName   string
 	Priority      int
 	NfqueueFunc   NfqueueHandlerFunction
 	ConntrackFunc ConntrackHandlerFunction
@@ -166,6 +167,7 @@ func InsertNfqueueSubscription(owner string, priority int, function NfqueueHandl
 	logger.Info("Adding NFQueue Event Subscription (%s, %d)\n", owner, priority)
 
 	holder.Owner = owner
+	holder.CounterName = "disparity_nfqueue_" + owner
 	holder.Priority = priority
 	holder.NfqueueFunc = function
 	nfqueueSubMutex.Lock()
@@ -209,6 +211,7 @@ func InsertConntrackSubscription(owner string, priority int, function ConntrackH
 
 	holder.Owner = owner
 	holder.Priority = priority
+	holder.CounterName = "disparity_conntrack_" + owner
 	holder.ConntrackFunc = function
 	conntrackSubMutex.Lock()
 	conntrackSubList[owner] = holder
@@ -222,6 +225,7 @@ func InsertNetloggerSubscription(owner string, priority int, function NetloggerH
 
 	holder.Owner = owner
 	holder.Priority = priority
+	holder.CounterName = "disparity_netlogger_" + owner
 	holder.NetloggerFunc = function
 	netloggerSubMutex.Lock()
 	netloggerSubList[owner] = holder

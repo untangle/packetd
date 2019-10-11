@@ -244,8 +244,11 @@ func loggerHandler(c *gin.Context) {
 }
 
 func debugHandler(c *gin.Context) {
-	var buffer bytes.Buffer
-	buffer = overseer.GenerateReport()
+	var buffer *bytes.Buffer = new(bytes.Buffer)
+
+	overseer.GenerateReport(buffer)
+	buffer.WriteString("<BR><BR>\r\n")
+	logger.GenerateReport(buffer)
 	c.Data(http.StatusOK, "text/html; chareset=utf-8", buffer.Bytes())
 }
 

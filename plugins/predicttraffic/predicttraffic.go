@@ -52,14 +52,21 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 // addPredictionToDict will take a ClassifiedTraffic pointer and send the data to dict
 func addPredictionToDict(ctid uint32, currentTraffic *predicttrafficsvc.ClassifiedTraffic) {
 	logger.Debug("Sending prediction info to dict with ctid: %d\n", ctid)
-	dict.AddSessionEntry(ctid, "application_id_inferred", currentTraffic.ID)
-	dict.AddSessionEntry(ctid, "application_name_inferred", currentTraffic.Name)
+	if len(currentTraffic.ID) > 0 {
+		dict.AddSessionEntry(ctid, "application_id_inferred", currentTraffic.ID)
+	}
+	if len(currentTraffic.Name) > 0 {
+		dict.AddSessionEntry(ctid, "application_name_inferred", currentTraffic.Name)
+	}
 	dict.AddSessionEntry(ctid, "application_confidence_inferred", roundConfidence(currentTraffic.Confidence))
-	dict.AddSessionEntry(ctid, "application_protochain_inferred", currentTraffic.ProtoChain)
+	if len(currentTraffic.ProtoChain) > 0 {
+		dict.AddSessionEntry(ctid, "application_protochain_inferred", currentTraffic.ProtoChain)
+	}
 	dict.AddSessionEntry(ctid, "application_productivity_inferred", currentTraffic.Productivity)
 	dict.AddSessionEntry(ctid, "application_risk_inferred", currentTraffic.Risk)
-	dict.AddSessionEntry(ctid, "application_category_inferred", currentTraffic.Category)
-
+	if len(currentTraffic.Category) > 0 {
+		dict.AddSessionEntry(ctid, "application_category_inferred", currentTraffic.Category)
+	}
 }
 
 // addPredictionToReport will take a ClassifiedTraffic pointer and send the data into the reports sqlite database, under the sessions table

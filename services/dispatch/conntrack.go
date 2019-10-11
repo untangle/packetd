@@ -8,6 +8,7 @@ import (
 
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/overseer"
 )
 
 // ConntrackHandlerFunction defines a pointer to a conntrack callback function
@@ -275,7 +276,9 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			logger.Debug("Calling conntrack APP:%s PRIORITY:%d\n", key, priority)
 			wg.Add(1)
 			go func(val SubscriptionHolder) {
+				overseer.IncCounter(val.CounterName)
 				val.ConntrackFunc(int(eventType), conntrack)
+				overseer.DecCounter(val.CounterName)
 				wg.Done()
 				logger.Debug("Finished conntrack APP:%s PRIORITY:%d\n", val.Owner, val.Priority)
 			}(val)
