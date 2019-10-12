@@ -45,7 +45,7 @@ type interfaceInfo struct {
 
 // getInterfaceStatus is called to get
 func getInterfaceStatus(getface string) ([]byte, error) {
-	var result []*interfaceInfo
+	resultMap := make(map[int]*interfaceInfo)
 
 	// load the current network settings
 	networkRaw, err := settings.GetCurrentSettings([]string{"network", "interfaces"})
@@ -75,12 +75,13 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 		}
 	}
 
-	// convert the ubus data to a map of items we can work with
+	// convert the ubus data to a map of items
 	err = json.Unmarshal([]byte(ubusOutput), &ubusMap)
 	if err != nil {
 		return nil, err
 	}
 
+	// convert the ubusMap to a list of interfaces we can work with
 	ubusList, ok := ubusMap["interface"].([]interface{})
 	if !ok {
 		return nil, errors.New("Missing interface object in ubus network.interface dump")
@@ -123,7 +124,7 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 		worker := new(interfaceInfo)
 		worker.Device = item["device"].(string)
 		worker.InterfaceID = int(item["interfaceId"].(float64))
-		worker.ConfigType = item["device"].(string)
+		worker.ConfigType = item["configType"].(string)
 
 		if val, found := item["bridgedTo"]; found {
 			worker.BridgedTo = int(val.(float64))
@@ -145,11 +146,22 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 		attachTrafficDetails(worker)
 
 		// put the completed info object in the results array
-		result = append(result, worker)
+		resultMap[worker.InterfaceID] = worker
+	}
+
+	// Now walk through the resultMap and look for configType BRIDGED
+	// so we can set the connected state from the bridgedTo interface
+	for _, child := range resultMap {
+		if child.ConfigType != "BRIDGED" {
+			continue
+		}
+		if parent, ok := resultMap[child.BridgedTo]; ok {
+			child.Connected = parent.Connected
+		}
 	}
 
 	// return the array of interfaceInfo objects as a json object
-	data, err := json.Marshal(result)
+	data, err := json.Marshal(resultMap)
 	if err != nil {
 		return nil, err
 	}
