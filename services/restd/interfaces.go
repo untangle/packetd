@@ -14,7 +14,6 @@ import (
 type interfaceInfo struct {
 	Device           string   `json:"device"`
 	ConfigType       string   `json:"configType"`
-	BridgedTo        int      `json:"bridgedTo"`
 	InterfaceID      int      `json:"interfaceId"`
 	InterfaceName    string   `json:"name"`
 	InterfaceType    string   `json:"type"`
@@ -59,32 +58,54 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 		return nil, errors.New("Unable to identify network interfaces")
 	}
 
-	var ubusMap map[string]interface{}
-	var ubusOutput []byte
+	var ubusNetworkMap map[string]interface{}
+	var ubusDeviceMap map[string]interface{}
+	var ubusNetworkRaw []byte
+	var ubusDeviceRaw []byte
 	var ubusErr error
 
 	// Now get the network details. We first try to call ubus to get the interface dump, but that
 	// only works on OpenWRT so on failure we try to load the data from a known file which makes
 	// x86 development easier. If that fails, we return the error from the original ubus call attempt.
-	ubusOutput, ubusErr = exec.Command("/bin/ubus", "call", "network.interface", "dump").CombinedOutput()
+	ubusNetworkRaw, ubusErr = exec.Command("/bin/ubus", "call", "network.interface", "dump").CombinedOutput()
 	if ubusErr != nil {
-		logger.Warn("Unable to call /bin/ubus: %v - Trying /etc/config/interfaces.json\n", ubusErr)
-		ubusOutput, err = exec.Command("/bin/cat", "/etc/config/interfaces.json").CombinedOutput()
+		logger.Warn("Unable to call /bin/ubus: %v - Trying /etc/config/networks.json\n", ubusErr)
+		ubusNetworkRaw, err = exec.Command("/bin/cat", "/etc/config/networks.json").CombinedOutput()
 		if err != nil {
 			return nil, ubusErr
 		}
 	}
 
 	// convert the ubus data to a map of items
-	err = json.Unmarshal([]byte(ubusOutput), &ubusMap)
+	err = json.Unmarshal([]byte(ubusNetworkRaw), &ubusNetworkMap)
 	if err != nil {
+		logger.Warn("Error calling json.Unmarshal(networks): %v\n", ubusNetworkRaw)
 		return nil, err
 	}
 
-	// convert the ubusMap to a list of interfaces we can work with
-	ubusList, ok := ubusMap["interface"].([]interface{})
+	// convert the ubusNetworkMap to a list of interfaces we can work with
+	ubusNetworkList, ok := ubusNetworkMap["interface"].([]interface{})
 	if !ok {
 		return nil, errors.New("Missing interface object in ubus network.interface dump")
+	}
+
+	// Now get the device details. We first try to call ubus to get the device dump, but that
+	// only works on OpenWRT so on failure we try to load the data from a known file which makes
+	// x86 development easier. If that fails, we return the error from the original ubus call attempt.
+	ubusDeviceRaw, ubusErr = exec.Command("/bin/ubus", "call", "network.device", "status").CombinedOutput()
+	if ubusErr != nil {
+		logger.Warn("Unable to call /bin/ubus: %v - Trying /etc/config/devices.json\n", ubusErr)
+		ubusDeviceRaw, err = exec.Command("/bin/cat", "/etc/config/devices.json").CombinedOutput()
+		if err != nil {
+			return nil, ubusErr
+		}
+	}
+
+	// convert the ubus data to a map of items
+	err = json.Unmarshal([]byte(ubusDeviceRaw), &ubusDeviceMap)
+	if err != nil {
+		logger.Warn("Error calling jsonUnmarshal(devices): %v\n", ubusDeviceRaw)
+		return nil, err
 	}
 
 	// walk through all of the interfaces we find in settings
@@ -126,10 +147,6 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 		worker.InterfaceID = int(item["interfaceId"].(float64))
 		worker.ConfigType = item["configType"].(string)
 
-		if val, found := item["bridgedTo"]; found {
-			worker.BridgedTo = int(val.(float64))
-		}
-
 		if val, found := item["name"]; found {
 			worker.InterfaceName = val.(string)
 		}
@@ -142,21 +159,12 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 			worker.Wan = val.(bool)
 		}
 
-		attachNetworkDetails(worker, ubusList)
+		attachNetworkDetails(worker, ubusNetworkList)
+		attachDeviceDetails(worker, ubusDeviceMap)
 		attachTrafficDetails(worker)
 
 		// put the completed info object in the results array
 		resultMap[worker.InterfaceID] = worker
-	}
-
-	// Now walk through the resultMap and look for configType BRIDGED
-	// so we can set the connected state from the bridgedTo interface
-	for _, child := range resultMap {
-		if child.ConfigType == "BRIDGED" {
-			if parent, ok := resultMap[child.BridgedTo]; ok {
-				child.Connected = parent.Connected
-			}
-		}
 	}
 
 	// return the array of interfaceInfo objects as a json object
@@ -170,20 +178,20 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 
 // attachNetworkDetails gets the IP, DNS, and other details for a target
 // device and adds them to the interfaceInfo object
-func attachNetworkDetails(worker *interfaceInfo, ubusList []interface{}) {
+func attachNetworkDetails(worker *interfaceInfo, ubusNetworkList []interface{}) {
 	// The ubus network.interface dump returns a json object that includes multiple
 	// entries for the IPv4 and IPv6 configurations using the same device name. The
 	// logic here is to walk through each interface object in the ubus dump looking
 	// for our target device. When found, we extract the available sections and
 	// add the details to the interfaceInfo object we were passed.
-	for _, value := range ubusList {
+	for _, value := range ubusNetworkList {
 		item, ok := value.(map[string]interface{})
 		if !ok {
 			continue
 		}
 
-		// we only look at interfaces that have device, l3_device, and up values
-		if item["device"] == nil || item["l3_device"] == nil || item["up"] == nil {
+		// we only look at interfaces that have a device value
+		if item["device"] == nil {
 			continue
 		}
 
@@ -191,15 +199,6 @@ func attachNetworkDetails(worker *interfaceInfo, ubusList []interface{}) {
 		if worker.Device != item["device"].(string) {
 			continue
 		}
-
-		// l3_device must match as well otherwise we may have an IPv4 or IPv6 config
-		// that is disabled which will show as down and clobber our connected flag
-		if worker.Device != item["l3_device"].(string) {
-			continue
-		}
-
-		// get the up status flag
-		worker.Connected = item["up"].(bool)
 
 		// walk through each ipv4-address object for the interface
 		if nodelist, ok := item["ipv4-address"].([]interface{}); ok {
@@ -250,6 +249,29 @@ func attachNetworkDetails(worker *interfaceInfo, ubusList []interface{}) {
 						}
 					}
 				}
+			}
+		}
+	}
+}
+
+// attachDeviceDetails gets the connected state for each interface and adds to the interfaceInfo object
+func attachDeviceDetails(worker *interfaceInfo, ubusDeviceMap map[string]interface{}) {
+	// The ubus network.device status returns a json object that includes details
+	// for every configured device. It includes any defined bridges and the list
+	// of members, but fortunately it also has a valid up boolean for each member
+	// so we don't have to mess with parsing the bridge-members array.
+	for device, item := range ubusDeviceMap {
+		// see if the device matches the one we are looking for
+		if device != worker.Device {
+			continue
+		}
+
+		// make a map of the values for the interface
+		if list, ok := item.(map[string]interface{}); ok {
+
+			// look for and extract the up boolan
+			if ptr, ok := list["up"]; ok {
+				worker.Connected = ptr.(bool)
 			}
 		}
 	}
