@@ -152,11 +152,10 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 	// Now walk through the resultMap and look for configType BRIDGED
 	// so we can set the connected state from the bridgedTo interface
 	for _, child := range resultMap {
-		if child.ConfigType != "BRIDGED" {
-			continue
-		}
-		if parent, ok := resultMap[child.BridgedTo]; ok {
-			child.Connected = parent.Connected
+		if child.ConfigType == "BRIDGED" {
+			if parent, ok := resultMap[child.BridgedTo]; ok {
+				child.Connected = parent.Connected
+			}
 		}
 	}
 
@@ -193,9 +192,7 @@ func attachNetworkDetails(worker *interfaceInfo, ubusList []interface{}) {
 		}
 
 		// get the up status flag
-		if val, found := item["up"]; found {
-			worker.Connected = val.(bool)
-		}
+		worker.Connected = item["up"].(bool)
 
 		// walk through each ipv4-address object for the interface
 		if nodelist, ok := item["ipv4-address"].([]interface{}); ok {
