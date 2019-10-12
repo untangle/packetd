@@ -182,12 +182,19 @@ func attachNetworkDetails(worker *interfaceInfo, ubusList []interface{}) {
 			continue
 		}
 
-		if item["device"] == nil || item["up"] == nil {
+		// we only look at interfaces that have device, l3_device, and up values
+		if item["device"] == nil || item["l3_device"] == nil || item["up"] == nil {
 			continue
 		}
 
 		// continue if this isn't the device we are looking for
 		if worker.Device != item["device"].(string) {
+			continue
+		}
+
+		// l3_device must match as well otherwise we may have an IPv4 or IPv6 config
+		// that is disabled which will show as down and clobber our connected flag
+		if worker.Device != item["l3_device"].(string) {
 			continue
 		}
 
