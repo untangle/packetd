@@ -45,6 +45,7 @@ type interfaceInfo struct {
 // getInterfaceStatus is called to get
 func getInterfaceStatus(getface string) ([]byte, error) {
 	var resultList []*interfaceInfo
+	var bridgeList map[string]string
 
 	// load the current network settings
 	networkRaw, err := settings.GetCurrentSettings([]string{"network", "interfaces"})
@@ -108,6 +109,26 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 		return nil, err
 	}
 
+	bridgeList = make(map[string]string)
+
+	// look for all of the bridge devices and create a map of member to bridge mappings
+	// so we can find the correct IP, DNS, and gateway info for bridged interfaces
+	for device, config := range ubusDeviceMap {
+		// make a map of the values for the device
+		if entry, ok := config.(map[string]interface{}); ok {
+			// make sure type is brige
+			if entry["type"] == nil || entry["type"].(string) != "bridge" {
+				continue
+			}
+			// look for and extract the bridge-members
+			if list, ok := entry["bridge-members"].([]interface{}); ok {
+				for _, item := range list {
+					bridgeList[item.(string)] = device
+				}
+			}
+		}
+	}
+
 	// walk through all of the interfaces we find in settings
 	for _, value := range networkMap {
 		item, ok := value.(map[string]interface{})
@@ -159,8 +180,8 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 			worker.Wan = val.(bool)
 		}
 
-		attachNetworkDetails(worker, ubusNetworkList)
 		attachDeviceDetails(worker, ubusDeviceMap)
+		attachNetworkDetails(worker, ubusNetworkList, bridgeList)
 		attachTrafficDetails(worker)
 
 		// append the completed interfaceInfo to the results list
@@ -178,7 +199,7 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 
 // attachNetworkDetails gets the IP, DNS, and other details for a target
 // device and adds them to the interfaceInfo object
-func attachNetworkDetails(worker *interfaceInfo, ubusNetworkList []interface{}) {
+func attachNetworkDetails(worker *interfaceInfo, ubusNetworkList []interface{}, bridgeList map[string]string) {
 	// The ubus network.interface dump returns a json object that includes multiple
 	// entries for the IPv4 and IPv6 configurations using the same device name. The
 	// logic here is to walk through each interface object in the ubus dump looking
@@ -195,8 +216,15 @@ func attachNetworkDetails(worker *interfaceInfo, ubusNetworkList []interface{}) 
 			continue
 		}
 
+		// For bridged devices we look for the bridged-to device name. If there is no mapping
+		// for the interface in the bridgeList then we just use the actual device name.
+		search, ok := bridgeList[worker.Device]
+		if !ok {
+			search = worker.Device
+		}
+
 		// continue if this isn't the device we are looking for
-		if worker.Device != item["device"].(string) {
+		if search != item["device"].(string) {
 			continue
 		}
 
