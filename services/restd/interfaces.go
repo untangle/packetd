@@ -44,7 +44,7 @@ type interfaceInfo struct {
 
 // getInterfaceStatus is called to get
 func getInterfaceStatus(getface string) ([]byte, error) {
-	resultMap := make(map[int]*interfaceInfo)
+	var resultList []*interfaceInfo
 
 	// load the current network settings
 	networkRaw, err := settings.GetCurrentSettings([]string{"network", "interfaces"})
@@ -163,12 +163,12 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 		attachDeviceDetails(worker, ubusDeviceMap)
 		attachTrafficDetails(worker)
 
-		// put the completed info object in the results array
-		resultMap[worker.InterfaceID] = worker
+		// append the completed interfaceInfo to the results list
+		resultList = append(resultList, worker)
 	}
 
 	// return the array of interfaceInfo objects as a json object
-	data, err := json.Marshal(resultMap)
+	data, err := json.Marshal(resultList)
 	if err != nil {
 		return nil, err
 	}
