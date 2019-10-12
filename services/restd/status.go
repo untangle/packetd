@@ -2,9 +2,6 @@ package restd
 
 import (
 	"bufio"
-	"encoding/json"
-	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
@@ -14,7 +11,6 @@ import (
 
 	"github.com/c9s/goprocinfo/linux"
 	"github.com/gin-gonic/gin"
-	"github.com/untangle/packetd/plugins/stats"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/settings"
 )
@@ -176,7 +172,7 @@ func statusInterfaces(c *gin.Context) {
 	device := c.Param("device")
 	logger.Debug("statusInterfaces(%s)\n", device)
 
-	result, err := getInterfaceInfo(device)
+	result, err := getInterfaceStatus(device)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
@@ -352,32 +348,6 @@ func statusWifiModelist(c *gin.Context) {
 	return
 }
 
-type interfaceInfo struct {
-	Device           string   `json:"device"`
-	Connected        bool     `json:"connected"`
-	IP4Addr          []string `json:"ip4Addr"`
-	IP4Gateway       string   `json:"ip4Gateway"`
-	IP6Addr          []string `json:"ip6Addr"`
-	IP6Gateway       string   `json:"ip6Gateway"`
-	DNSServers       []string `json:"dnsServers"`
-	RxByteRate       uint64   `json:"rxByteRate"`
-	RxPacketRate     uint64   `json:"rxPacketRate"`
-	RxErrorRate      uint64   `json:"rxErrorRate"`
-	RxDropRate       uint64   `json:"rxDropRate"`
-	RxFifoRate       uint64   `json:"rxFifoRate"`
-	RxFrameRate      uint64   `json:"rxFrameRate"`
-	RxCompressedRate uint64   `json:"rxCompressedRate"`
-	RxMulticastRate  uint64   `json:"rxMulticastRate"`
-	TxByteRate       uint64   `json:"txByteRate"`
-	TxPacketRate     uint64   `json:"txPacketRate"`
-	TxErrorRate      uint64   `json:"txErrorRate"`
-	TxDropRate       uint64   `json:"txDropRate"`
-	TxFifoRate       uint64   `json:"txFifoRate"`
-	TxCollisionRate  uint64   `json:"txCollisionRate"`
-	TxCarrierRate    uint64   `json:"txCarrierRate"`
-	TxCompressedRate uint64   `json:"txCompressedRate"`
-}
-
 type dhcpInfo struct {
 	LeaseExpiration uint   `json:"leaseExpiration"`
 	MACAddress      string `json:"macAddress"`
@@ -393,171 +363,6 @@ type wifiChannelInfo struct {
 type wifiModeInfo struct {
 	Name string `json:"name"`
 	Mode string `json:"mode"`
-}
-
-// getInterfaceInfo returns a json object with details for the requested interface
-func getInterfaceInfo(getface string) ([]byte, error) {
-	var ubuslist map[string]interface{}
-	var result []*interfaceInfo
-	var worker *interfaceInfo
-	var ubusdata []byte
-	var ubuserr error
-	var found bool
-	var err error
-
-	// We first try to call ubus to get the interface dump, but that only works on OpenWRT so on
-	// failure we try to load the data from a known file which makes x86 development easier. If
-	// that fails, we return the error from the original ubus call attempt.
-	ubusdata, ubuserr = exec.Command("/bin/ubus", "call", "network.interface", "dump").CombinedOutput()
-	if ubuserr != nil {
-		logger.Warn("Unable to call /bin/ubus: %v - Trying /etc/config/interfaces.json\n", ubuserr)
-		ubusdata, err = exec.Command("/bin/cat", "/etc/config/interfaces.json").CombinedOutput()
-		if err != nil {
-			return nil, ubuserr
-		}
-	}
-
-	err = json.Unmarshal([]byte(ubusdata), &ubuslist)
-	if err != nil {
-		return nil, err
-	}
-
-	mainlist, ok := ubuslist["interface"].([]interface{})
-	if !ok {
-		return nil, errors.New("Missing interface object in ubus network.interface dump")
-	}
-
-	// walk through each interface object in the ubus data
-	for _, raw := range mainlist {
-		ubusitem, ok := raw.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		// ignore if there is no device or up entry
-		if ubusitem["device"] == nil || ubusitem["up"] == nil {
-			continue
-		}
-
-		// we don't care about the loop-back device
-		if ubusitem["device"].(string) == "lo" {
-			continue
-		}
-
-		// if caller requested a specific device continue when no match
-		if getface != "all" && getface != ubusitem["device"].(string) {
-			continue
-		}
-
-		// start with an empty worker
-		worker = nil
-
-		// The ubus network.interface dump returns a json object that includes multiple
-		// entries for the IPv4 and IPv6 configuration using the same device name. The
-		// logic here is to create a single interfaceInfo object for each physical device
-		// and then add to it as we encouter the different sections in the json dump.
-		// We start by looking for an existing object for the current device iteration.
-		for _, find := range result {
-			if ubusitem["device"].(string) != find.Device {
-				continue
-			}
-			worker = find
-			found = true
-			break
-		}
-
-		// if existing not found create a new interfaceInfo structure for the device and copy the relevant fields
-		if worker == nil {
-			worker = new(interfaceInfo)
-			worker.Device = ubusitem["device"].(string)
-			worker.Connected = ubusitem["up"].(bool)
-			found = false
-		}
-
-		// walk through each ipv4-address object for the interface
-		if nodelist, ok := ubusitem["ipv4-address"].([]interface{}); ok {
-			for _, item := range nodelist {
-				if ptr, ok := item.(map[string]interface{}); ok {
-					// put the address and mask in CIDR format and add to the address array
-					if ptr["address"] != nil && ptr["mask"] != nil {
-						str := fmt.Sprintf("%s/%d", ptr["address"].(string), int(ptr["mask"].(float64)))
-						worker.IP4Addr = append(worker.IP4Addr, str)
-					}
-				}
-			}
-		}
-
-		// walk through each ipv6-address object for the interface
-		if nodelist, ok := ubusitem["ipv6-address"].([]interface{}); ok {
-			for _, item := range nodelist {
-				if ptr, ok := item.(map[string]interface{}); ok {
-					// put the address and mask in address/prefix format and add to the address array
-					if ptr["address"] != nil && ptr["mask"] != nil {
-						str := fmt.Sprintf("%s/%d", ptr["address"].(string), int(ptr["mask"].(float64)))
-						worker.IP6Addr = append(worker.IP6Addr, str)
-					}
-				}
-			}
-		}
-
-		// walk through the dns-server list object for the interface
-		if nodelist, ok := ubusitem["dns-server"].([]interface{}); ok {
-			for _, item := range nodelist {
-				worker.DNSServers = append(worker.DNSServers, item.(string))
-			}
-		}
-
-		// walk through each route object for the interface
-		if nodelist, ok := ubusitem["route"].([]interface{}); ok {
-			for _, item := range nodelist {
-				if ptr, ok := item.(map[string]interface{}); ok {
-					if ptr["target"] != nil && ptr["mask"] != nil && ptr["nexthop"] != nil {
-						// look for the IPv4 default gateway
-						if ptr["target"].(string) == "0.0.0.0" && uint(ptr["mask"].(float64)) == 0 {
-							worker.IP4Gateway = ptr["nexthop"].(string)
-							continue
-						}
-						// look for the IPv6 default gateway
-						if ptr["target"].(string) == "::" && uint(ptr["mask"].(float64)) == 0 {
-							worker.IP6Gateway = ptr["nexthop"].(string)
-						}
-					}
-				}
-			}
-		}
-
-		// if we created a new interfaceInfo object get the interface rate details and append to our device array
-		if !found {
-			facemap := stats.GetInterfaceRateDetails(ubusitem["device"].(string))
-			if facemap != nil {
-				worker.RxByteRate = facemap["rx_bytes_rate"]
-				worker.RxPacketRate = facemap["rx_packets_rate"]
-				worker.RxErrorRate = facemap["rx_errs_rate"]
-				worker.RxDropRate = facemap["rx_drop_rate"]
-				worker.RxFifoRate = facemap["rx_fifo_rate"]
-				worker.RxFrameRate = facemap["rx_frame_rate"]
-				worker.RxCompressedRate = facemap["rx_compressed_rate"]
-				worker.RxMulticastRate = facemap["rx_multicast_rate"]
-				worker.TxByteRate = facemap["tx_bytes_rate"]
-				worker.TxPacketRate = facemap["tx_packets_rate"]
-				worker.TxErrorRate = facemap["tx_errs_rate"]
-				worker.TxDropRate = facemap["tx_drop_rate"]
-				worker.TxFifoRate = facemap["tx_fifo_rate"]
-				worker.TxCollisionRate = facemap["tx_colls_rate"]
-				worker.TxCarrierRate = facemap["tx_carrier_rate"]
-				worker.TxCompressedRate = facemap["tx_compressed_rate"]
-			}
-			result = append(result, worker)
-		}
-	}
-
-	// return the array of interfaceInfo objects as a json object
-	data, err := json.Marshal(result)
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
 }
 
 // getDHCPInfo returns the DHCP info as a slice of dhcpInfos
