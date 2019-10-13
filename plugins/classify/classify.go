@@ -211,7 +211,7 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 	// if the daemon says the session is fully classified or terminated, or after we have seen maximum packets or data, release the session
 	if mess.Session.GetNavlCount() > maxNavlCount || mess.Session.GetPacketCount() > maxPacketCount || mess.Session.GetByteCount() > maxTrafficSize {
-		if logger.IsLogEnabled(logger.LogLevelDebug) {
+		if logger.IsDebugEnabled() {
 			logger.Debug("RELEASING SESSION:%d STATE:%d CONFIDENCE:%d PACKETS:%d BYTES:%d COUNT:%d\n", ctid, state, confidence, mess.Session.GetPacketCount(), mess.Session.GetByteCount(), mess.Session.GetNavlCount())
 		}
 		if !kernel.FlagNoCloud {

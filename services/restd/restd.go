@@ -30,15 +30,16 @@ import (
 )
 
 var engine *gin.Engine
+var logsrc = "gin"
 
 // Startup is called to start the rest daemon
 func Startup() {
 
 	gin.SetMode(gin.ReleaseMode)
 	gin.DisableConsoleColor()
-	gin.DefaultWriter = logger.NewLogWriter()
+	gin.DefaultWriter = logger.NewLogWriter(logsrc)
 	gin.DebugPrintRouteFunc = func(httpMethod, absolutePath, handlerName string, nuHandlers int) {
-		logger.Info("GIN: %v %v %v %v\n", httpMethod, absolutePath, handlerName, nuHandlers)
+		logger.LogMessageSource(logger.LogLevelDebug, logsrc, "%v %v %v %v\n", httpMethod, absolutePath, handlerName, nuHandlers)
 	}
 
 	engine = gin.New()
@@ -644,7 +645,7 @@ func isSetupWizardCompleted() bool {
 
 func ginlogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		logger.Info("GIN: %v %v\n", c.Request.Method, c.Request.RequestURI)
+		logger.LogMessageSource(logger.LogLevelInfo, logsrc, "%v %v\n", c.Request.Method, c.Request.RequestURI)
 		c.Next()
 	}
 }

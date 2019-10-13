@@ -60,7 +60,7 @@ func Startup() {
 	loadLoggerConfig()
 
 	// Set system logger to use our logger
-	log.SetOutput(NewLogWriter())
+	log.SetOutput(NewLogWriter("system"))
 }
 
 // Shutdown stops the logging service
@@ -68,10 +68,163 @@ func Shutdown() {
 
 }
 
-// GetLogLevel returns the log level for the specified package or function
+// Emerg is called for log level EMERG messages
+func Emerg(format string, args ...interface{}) {
+	logMessage(LogLevelEmerg, format, args...)
+}
+
+// IsEmergEnabled returns true if EMERG logging is enable for the caller
+func IsEmergEnabled() bool {
+	return isLogEnabled(LogLevelEmerg)
+}
+
+// Alert is called for log level ALERT messages
+func Alert(format string, args ...interface{}) {
+	logMessage(LogLevelAlert, format, args...)
+}
+
+// IsAlertEnabled returns true if ALERT logging is enable for the caller
+func IsAlertEnabled() bool {
+	return isLogEnabled(LogLevelAlert)
+}
+
+// Crit is called for log level CRIT messages
+func Crit(format string, args ...interface{}) {
+	logMessage(LogLevelCrit, format, args...)
+}
+
+// IsCritEnabled returns true if CRIT logging is enable for the caller
+func IsCritEnabled() bool {
+	return isLogEnabled(LogLevelCrit)
+}
+
+// Err is called for log level ERR messages
+func Err(format string, args ...interface{}) {
+	logMessage(LogLevelErr, format, args...)
+}
+
+// IsErrEnabled returns true if ERR logging is enable for the caller
+func IsErrEnabled() bool {
+	return isLogEnabled(LogLevelErr)
+}
+
+// Warn is called for log level WARNING messages
+func Warn(format string, args ...interface{}) {
+	logMessage(LogLevelWarn, format, args...)
+}
+
+// IsWarnEnabled returns true if WARNING logging is enable for the caller
+func IsWarnEnabled() bool {
+	return isLogEnabled(LogLevelWarn)
+}
+
+// Notice is called for log level NOTICE messages
+func Notice(format string, args ...interface{}) {
+	logMessage(LogLevelNotice, format, args...)
+}
+
+// IsNoticeEnabled returns true if NOTICE logging is enable for the caller
+func IsNoticeEnabled() bool {
+	return isLogEnabled(LogLevelNotice)
+}
+
+// Info is called for log level INFO messages
+func Info(format string, args ...interface{}) {
+	logMessage(LogLevelInfo, format, args...)
+}
+
+// IsInfoEnabled returns true if INFO logging is enable for the caller
+func IsInfoEnabled() bool {
+	return isLogEnabled(LogLevelInfo)
+}
+
+// Debug is called for log level DEBUG messages
+func Debug(format string, args ...interface{}) {
+	logMessage(LogLevelDebug, format, args...)
+}
+
+// IsDebugEnabled returns true if DEBUG logging is enable for the caller
+func IsDebugEnabled() bool {
+	return isLogEnabled(LogLevelDebug)
+}
+
+// Trace is called for log level TRACE messages
+func Trace(format string, args ...interface{}) {
+	logMessage(LogLevelTrace, format, args...)
+}
+
+// IsTraceEnabled returns true if TRACE logging is enable for the caller
+func IsTraceEnabled() bool {
+	return isLogEnabled(LogLevelTrace)
+}
+
+// LogMessageSource is for the netfilter interface functions written in C
+// and our LogWriter type that can be created and passed to anything that
+// expects an object with output stream support. The logging source is passed
+// directly rather than determined from the call stack.
+func LogMessageSource(level int32, source string, format string, args ...interface{}) {
+	if level > getLogLevel(source, "") {
+		return
+	}
+
+	if len(args) == 0 {
+		fmt.Printf("%s%-6s %18s: %s", getPrefix(), logLevelName[level], source, format)
+	} else {
+		buffer := logFormatter(format, args...)
+		if len(buffer) == 0 {
+			return
+		}
+		fmt.Printf("%s%-6s %18s: %s", getPrefix(), logLevelName[level], source, buffer)
+	}
+}
+
+// IsLogEnabledSource returns true if logging is enabled at the argumented level for the argumented source
+func IsLogEnabledSource(level int32, source string) bool {
+	lvl := getLogLevel(source, "")
+	return (lvl >= level)
+}
+
+// LogWriter is used to send an output stream to the Log facility
+type LogWriter struct {
+	buffer []byte
+	source string
+}
+
+// NewLogWriter creates an io Writer to steam output to the Log facility
+func NewLogWriter(name string) *LogWriter {
+	writer := new(LogWriter)
+	writer.buffer = make([]byte, 0)
+	writer.source = name
+	return writer
+}
+
+// Write takes written data and stores it in a buffer and writes to the log when a line feed is detected
+func (writer *LogWriter) Write(p []byte) (int, error) {
+	for _, b := range p {
+		writer.buffer = append(writer.buffer, b)
+		if b == '\n' {
+			LogMessageSource(LogLevelInfo, writer.source, string(writer.buffer))
+			writer.buffer = make([]byte, 0)
+		}
+	}
+
+	return len(p), nil
+}
+
+// EnableTimestamp enables the elapsed time in output
+func EnableTimestamp() {
+	timestampEnabled = true
+}
+
+// DisableTimestamp disable the elapsed time in output
+func DisableTimestamp() {
+	timestampEnabled = false
+}
+
+// getLogLevel returns the log level for the specified package or function
 // It checks function first allowing individual functions to be configured
 // for a higher level of logging than the package that owns them.
-func GetLogLevel(packageName string, functionName string) int32 {
+func getLogLevel(packageName string, functionName string) int32 {
 	if len(functionName) != 0 {
 		logLevelLocker.RLock()
 		ptr, stat := logLevelMap[functionName]
@@ -94,46 +247,9 @@ func GetLogLevel(packageName string, functionName string) int32 {
 	return LogLevelInfo
 }
 
-// LogMessage is called to write messages to the system log
-func LogMessage(level int32, format string, args ...interface{}) {
-	_, _, packageName, functionName := findCallingFunction()
-
-	if level > GetLogLevel(packageName, functionName) {
-		return
-	}
-
-	if len(args) == 0 {
-		fmt.Printf("%s%-6s %18s: %s", getPrefix(), logLevelName[level], packageName, format)
-	} else {
-		buffer := LogFormatter(format, args...)
-		if len(buffer) == 0 {
-			return
-		}
-		fmt.Printf("%s%-6s %18s: %s", getPrefix(), logLevelName[level], packageName, buffer)
-	}
-}
-
-// LogMessageSource is similar to LogMessage except instead of using
-// runtime to determine the caller/source the source is specified manually
-func LogMessageSource(level int32, source string, format string, args ...interface{}) {
-	if level > GetLogLevel(source, "") {
-		return
-	}
-
-	if len(args) == 0 {
-		fmt.Printf("%s%-6s %18s: %s", getPrefix(), logLevelName[level], source, format)
-	} else {
-		buffer := LogFormatter(format, args...)
-		if len(buffer) == 0 {
-			return
-		}
-		fmt.Printf("%s%-6s %18s: %s", getPrefix(), logLevelName[level], source, buffer)
-	}
-}
-
-// LogFormatter creats a log message using the format and arguments provided
+// logFormatter creats a log message using the format and arguments provided
 // We look for and handle special format verbs that trigger additional processing
-func LogFormatter(format string, args ...interface{}) string {
+func logFormatter(format string, args ...interface{}) string {
 	// if we find the overseer counter verb the first argument is the counter name
 	// the second is the log repeat limit value and the rest go to the formatter
 	if strings.HasPrefix(format, "%OC|") {
@@ -142,7 +258,7 @@ func LogFormatter(format string, args ...interface{}) string {
 
 		// make sure we have at least two arguments
 		if len(args) < 2 {
-			return fmt.Sprintf("ERROR: LogFormatter OC verb missing arguments:%s", format)
+			return fmt.Sprintf("ERROR: logFormatter OC verb missing arguments:%s", format)
 		}
 
 		// make sure the first argument is string
@@ -150,7 +266,7 @@ func LogFormatter(format string, args ...interface{}) string {
 		case string:
 			ocname = args[0].(string)
 		default:
-			return fmt.Sprintf("ERROR: LogFormatter OC verb args[0] not string:%s", format)
+			return fmt.Sprintf("ERROR: logFormatter OC verb args[0] not string:%s", format)
 		}
 
 		// make sure the second argument is int
@@ -158,7 +274,7 @@ func LogFormatter(format string, args ...interface{}) string {
 		case int:
 			limit = int64(args[1].(int))
 		default:
-			return fmt.Sprintf("ERROR: LogFormatter OC verb args[1] not int:%s", format)
+			return fmt.Sprintf("ERROR: logFormatter OC verb args[1] not int:%s", format)
 		}
 
 		total := overseer.AddCounter(ocname, 1)
@@ -183,8 +299,8 @@ func LogFormatter(format string, args ...interface{}) string {
 	return buffer
 }
 
-// IsLogEnabled returns true if logging is enabled for the caller at the specified level, false otherwise
-func IsLogEnabled(level int32) bool {
+// isLogEnabled returns true if logging is enabled for the caller at the specified level, false otherwise
+func isLogEnabled(level int32) bool {
 	_, _, packageName, functionName := findCallingFunction()
 	if IsLogEnabledSource(level, packageName) {
 		return true
@@ -195,133 +311,23 @@ func IsLogEnabled(level int32) bool {
 	return false
 }
 
-// IsLogEnabledSource is the same as IsLogEnabled but for the manually specified source
-func IsLogEnabledSource(level int32, source string) bool {
-	lvl := GetLogLevel(source, "")
-	return (lvl >= level)
-}
+// logMessage is called to write messages to the system log
+func logMessage(level int32, format string, args ...interface{}) {
+	_, _, packageName, functionName := findCallingFunction()
 
-// Emerg is called for log level EMERG messages
-func Emerg(format string, args ...interface{}) {
-	LogMessage(LogLevelEmerg, format, args...)
-}
-
-// IsEmergEnabled returns true if EMERG logging is enable for the caller
-func IsEmergEnabled() bool {
-	return IsLogEnabled(LogLevelEmerg)
-}
-
-// Alert is called for log level ALERT messages
-func Alert(format string, args ...interface{}) {
-	LogMessage(LogLevelAlert, format, args...)
-}
-
-// IsAlertEnabled returns true if ALERT logging is enable for the caller
-func IsAlertEnabled() bool {
-	return IsLogEnabled(LogLevelAlert)
-}
-
-// Crit is called for log level CRIT messages
-func Crit(format string, args ...interface{}) {
-	LogMessage(LogLevelCrit, format, args...)
-}
-
-// IsCritEnabled returns true if CRIT logging is enable for the caller
-func IsCritEnabled() bool {
-	return IsLogEnabled(LogLevelCrit)
-}
-
-// Err is called for log level ERR messages
-func Err(format string, args ...interface{}) {
-	LogMessage(LogLevelErr, format, args...)
-}
-
-// IsErrEnabled returns true if ERR logging is enable for the caller
-func IsErrEnabled() bool {
-	return IsLogEnabled(LogLevelErr)
-}
-
-// Warn is called for log level WARNING messages
-func Warn(format string, args ...interface{}) {
-	LogMessage(LogLevelWarn, format, args...)
-}
-
-// IsWarnEnabled returns true if WARNING logging is enable for the caller
-func IsWarnEnabled() bool {
-	return IsLogEnabled(LogLevelWarn)
-}
-
-// Notice is called for log level NOTICE messages
-func Notice(format string, args ...interface{}) {
-	LogMessage(LogLevelNotice, format, args...)
-}
-
-// IsNoticeEnabled returns true if NOTICE logging is enable for the caller
-func IsNoticeEnabled() bool {
-	return IsLogEnabled(LogLevelNotice)
-}
-
-// Info is called for log level INFO messages
-func Info(format string, args ...interface{}) {
-	LogMessage(LogLevelInfo, format, args...)
-}
-
-// IsInfoEnabled returns true if INFO logging is enable for the caller
-func IsInfoEnabled() bool {
-	return IsLogEnabled(LogLevelInfo)
-}
-
-// Debug is called for log level DEBUG messages
-func Debug(format string, args ...interface{}) {
-	LogMessage(LogLevelDebug, format, args...)
-}
-
-// IsDebugEnabled returns true if DEBUG logging is enable for the caller
-func IsDebugEnabled() bool {
-	return IsLogEnabled(LogLevelDebug)
-}
-
-// Trace is called for log level TRACE messages
-func Trace(format string, args ...interface{}) {
-	LogMessage(LogLevelTrace, format, args...)
-}
-
-// IsTraceEnabled returns true if TRACE logging is enable for the caller
-func IsTraceEnabled() bool {
-	return IsLogEnabled(LogLevelTrace)
-}
-
-// LogWriter is used to send an output stream to the Log facility
-type LogWriter struct {
-	buffer []byte
-}
-
-// NewLogWriter creates an io Writer to steam output to the Log facility
-func NewLogWriter() *LogWriter {
-	return (&LogWriter{make([]byte, 0)})
-}
-
-// EnableTimestamp enables the elapsed time in output
-func EnableTimestamp() {
-	timestampEnabled = true
-}
-
-// DisableTimestamp disable the elapsed time in output
-func DisableTimestamp() {
-	timestampEnabled = false
-}
-
-// Write takes written data and stores it in a buffer and writes to the log when a line feed is detected
-func (w *LogWriter) Write(p []byte) (int, error) {
-	for _, b := range p {
-		w.buffer = append(w.buffer, b)
-		if b == '\n' {
-			Info(string(w.buffer))
-			w.buffer = make([]byte, 0)
-		}
+	if level > getLogLevel(packageName, functionName) {
+		return
 	}
 
-	return len(p), nil
+	if len(args) == 0 {
+		fmt.Printf("%s%-6s %18s: %s", getPrefix(), logLevelName[level], packageName, format)
+	} else {
+		buffer := logFormatter(format, args...)
+		if len(buffer) == 0 {
+			return
+		}
+		fmt.Printf("%s%-6s %18s: %s", getPrefix(), logLevelName[level], packageName, buffer)
+	}
 }
 
 // loadLoggerConfig loads the logger configuration file
@@ -444,9 +450,8 @@ func initLoggerConfig() {
 	config["netlogger"] = "INFO"
 	config["nfqueue"] = "INFO"
 	config["warehouse"] = "INFO"
-
-	// other static names used for special logging
-	config["dispatchTimer"] = "INFO"
+	config["system"] = "INFO"
+	config["gin"] = "INFO"
 
 	// convert the config map to a json object
 	jstr, err := json.MarshalIndent(config, "", "")
@@ -466,23 +471,32 @@ func initLoggerConfig() {
 	file.Close()
 }
 
+// This function uses runtime.Callers to get the call stack to determine the calling function
+// Our public function heirarchy is implemented so the caller is always at the 5th frame
+// Frame 0 = runtime.Callers
+// Frame 1 = findCallingFunction
+// Frame 2 = logMessage / isLogEnabled
+// Frame 3 = Warn, Info / IsWarnEnabled, IsInfoEnabled (etc...)
+// Frame 4 = the function that actually called logger.Warn, logger.Info, logger.IsWarnEnabled, logger.IsInfoEnabled, etc...
+
+// Here is an example of what we expect to see in the calling function frame:
+// FILE: /home/username/golang/src/github.com/untangle/packetd/services/dict/dict.go
+// FUNC: github.com/untangle/packetd/services/dict.cleanDictionary
+// LINE: 827
+// We find the last / in caller.Function and use the entire string as the function name (dict.cleanDictionary)
+// We find the dot in the function name and use the left side as the package name (dict)
 func findCallingFunction() (string, int, string, string) {
-	// we use runtime.Callers to get the call stack so we can determine the calling function
-	// skipping over the first 4 in the frame since they are internal to getting here
-	// 0 = runtime.Callers
-	// 1 = findCallingFunction
-	// 2 = LogMessage
-	// 3 = Warn, Info, Debug, etc.
-	// 4 = the function that actually called logger.Warn, logger.Info, logger.Debug, etc.
-	stack := make([]uintptr, 5)
-	runtime.Callers(4, stack)
+	// create a single entry array to hold the 5th stack frame and pass 4 as the
+	// number of frames to skip over so we get the single stack frame we need
+	stack := make([]uintptr, 1)
+	count := runtime.Callers(4, stack)
+	if count != 1 {
+		return "unknown", 0, "unknown", "unknown"
+	}
+
+	// get the frame object for the caller
 	frames := runtime.CallersFrames(stack)
 	caller, _ := frames.Next()
-
-	// Here is an example of what we expect to see for the caller frame
-	// FILE: /home/mahotz/golang/src/github.com/untangle/packetd/services/dict/dict.go
-	// FUNC: github.com/untangle/packetd/services/dict.cleanDictionary
-	// LINE: 827
 
 	var functionName string
 	var packageName string

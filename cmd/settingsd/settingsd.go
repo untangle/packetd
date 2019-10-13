@@ -75,7 +75,7 @@ func printVersion() {
 // Startup is called to start the rest daemon
 func startupRestDaemon() {
 	gin.DisableConsoleColor()
-	gin.DefaultWriter = logger.NewLogWriter()
+	gin.DefaultWriter = logger.NewLogWriter("gin")
 	engine = gin.Default()
 	store := cookie.NewStore([]byte(restd.GenerateRandomString(32)))
 	engine.Use(sessions.Sessions("auth_session", store))
