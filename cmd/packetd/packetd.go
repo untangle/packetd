@@ -405,7 +405,7 @@ func handleSignals() {
 	go func() {
 		for {
 			sig := <-hupch
-			logger.Info("Recived signal [%v]. Calling handlers\n", sig)
+			logger.Info("Received signal [%v]. Calling handlers\n", sig)
 			signalPlugins(syscall.SIGHUP)
 		}
 	}()

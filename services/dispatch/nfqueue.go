@@ -1,7 +1,6 @@
 package dispatch
 
 import (
-	"sync"
 	"time"
 
 	"github.com/google/gopacket"
@@ -259,8 +258,6 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 
 	subcount := 0
 	priority := 0
-	var timeMap = make(map[string]float64)
-	var timeMapLock = sync.RWMutex{}
 
 	for subcount != subtotal {
 		// Counts the total number of calls made for each priority so we know
@@ -280,7 +277,6 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 
 				timeoutTimer := time.NewTimer(maxAllowedTime)
 				c := make(chan subscriberResult, 1)
-				t1 := getMicroseconds()
 
 				// call the subscriber hook on another goroutine so we can timeout while waiting for the result
 				go func() {
@@ -305,14 +301,6 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 					logger.Err("%OC|Timeout while processing nfqueue - subscriber:%s\n", "timeout_nfqueue_"+key, 0, key)
 					resultsChannel <- subscriberResult{owner: key, sessionRelease: true}
 				}
-
-				timediff := (float64(getMicroseconds()-t1) / 1000.0)
-				timeMapLock.Lock()
-				timeMap[val.Owner] = timediff
-				timeMapLock.Unlock()
-				if logger.IsTraceEnabled() {
-					logger.Trace("Finished nfqueue PLUGIN:%s PRI:%d CTID:%d ms:%.1f\n", key, pri, ctid, timediff)
-				}
 			}(key, val, priority)
 			hitcount++
 			subcount++
@@ -335,12 +323,6 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 			logger.Err("%OC|Priority > 100 Constraint failed! %d %d %d %v", "nfqueue_priority_constraint", 0, subcount, subtotal, priority, sublist)
 			panic("Constraint failed - infinite loop detected")
 		}
-	}
-
-	if logger.IsLogEnabledSource(logger.LogLevelTrace, "dispatchTimer") {
-		timeMapLock.RLock()
-		logger.LogMessageSource(logger.LogLevelTrace, "dispatchTimer", "ctid:%v Timer Map: %v\n", ctid, timeMap)
-		timeMapLock.RUnlock()
 	}
 
 	// return the updated mark to be set on the packet
