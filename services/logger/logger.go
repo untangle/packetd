@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -592,11 +593,19 @@ func GenerateReport(buffer *bytes.Buffer) {
 	logLevelLocker.RLock()
 	defer logLevelLocker.RUnlock()
 
+	// create a sorted list of the log level names
+	namelist := make([]string, 0, len(logLevelMap))
+	for name := range logLevelMap {
+		namelist = append(namelist, name)
+	}
+	sort.Strings(namelist)
+
 	buffer.WriteString("<TABLE BORDER=2 CELLPADDING=4 BGCOLOR=#EEEEEE>\r\n")
 	buffer.WriteString("<TR><TH COLSPAN=2>Logger Source Levels</TH></TR>\r\n")
 	buffer.WriteString("<TR><TD><B>Logger Source</B></TD><TD><B>Log Level</B></TD></TR>\r\n")
 
-	for name, ptr := range logLevelMap {
+	for _, name := range namelist {
+		ptr := logLevelMap[name]
 		buffer.WriteString("<TR><TD><TT>")
 		buffer.WriteString(name)
 		buffer.WriteString("</TT></TD><TD><TT>")
