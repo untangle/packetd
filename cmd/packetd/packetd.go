@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"sync"
@@ -47,6 +48,7 @@ import (
 const rulesScript = "packetd_rules"
 
 var localFlag bool
+var cpuProfileFilename = ""
 var cpuCount = getConcurrencyFactor()
 var queueStart = 2000
 var conntrackIntervalSeconds = 10
@@ -118,6 +120,17 @@ func main() {
 		kernel.StartWarehouseCapture()
 	}
 
+	if len(cpuProfileFilename) != 0 {
+		cpu, err := os.Create(cpuProfileFilename)
+		if err == nil {
+			logger.Alert("+++++ CPU profiling is active. Output file:%s +++++\n", cpuProfileFilename)
+			pprof.StartCPUProfile(cpu)
+		} else {
+			logger.Alert("+++++ Error creating file for CPU profile:%v ++++++\n", err)
+			cpuProfileFilename = ""
+		}
+	}
+
 	// Wait until the shutdown flag is set
 	for !kernel.GetShutdownFlag() {
 		select {
@@ -129,6 +142,12 @@ func main() {
 			printStats()
 		}
 	}
+
+	if len(cpuProfileFilename) != 0 {
+		pprof.StopCPUProfile()
+		logger.Alert("+++++ CPU profiling is finished. Output file:%s  +++++\n", cpuProfileFilename)
+	}
+
 	logger.Info("Shutdown initiated...\n")
 
 	if kernel.GetWarehouseFlag() == 'C' {
@@ -161,6 +180,7 @@ func printVersion() {
 func parseArguments() {
 	classdAddressStringPtr := flag.String("classd", "127.0.0.1:8123", "host:port for classd daemon")
 	disableDictPtr := flag.Bool("disable-dict", false, "disable dict")
+	cpuProfilePtr := flag.String("cpuprofile", "", "filename for CPU pprof output")
 	versionPtr := flag.Bool("version", false, "version")
 	localPtr := flag.Bool("local", false, "run on console")
 	bypassPtr := flag.Bool("bypass", false, "ignore live traffic")
@@ -181,6 +201,10 @@ func parseArguments() {
 
 	if *disableDictPtr {
 		dict.Disable()
+	}
+
+	if len(*cpuProfilePtr) > 0 {
+		cpuProfileFilename = *cpuProfilePtr
 	}
 
 	if *versionPtr {
