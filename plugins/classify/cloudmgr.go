@@ -21,7 +21,7 @@ import (
 )
 
 const cloudUploadInterval = 60 * time.Minute
-const cloudTableLimit = 100
+const cloudTableLimit = 1000
 
 type cloudReport struct {
 	Protocol    uint8  `json:"protocol"`
@@ -69,6 +69,7 @@ func storeCloudReport(item *cloudReport) {
 	if cloudTable[index] != nil {
 		found := cloudTable[index]
 		found.Count++
+		overseer.AddCounter("classify_cloud_report_found", 1)
 		return
 	}
 
