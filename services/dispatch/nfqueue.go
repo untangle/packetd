@@ -7,7 +7,6 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/overseer"
 )
 
 // NfDrop is NF_DROP constant
@@ -275,10 +274,8 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 
 				// call the subscriber hook on another goroutine so we can timeout while waiting for the result
 				go func() {
-					overseer.IncCounter(val.CounterName)
 					result := val.NfqueueFunc(mess, ctid, newSession)
 					stat := timeoutTimer.Stop()
-					overseer.DecCounter(val.CounterName)
 					// if we stopped the timer then stat will be true and we need to write the subscriber result
 					// to the channel, otherwise don't bother since a release was written by the timeout handler
 					if stat == true {
