@@ -3,6 +3,7 @@ package dispatch
 import (
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/overseer"
@@ -58,6 +59,7 @@ func netloggerCallback(version uint8,
 	priority := 0
 
 	for subcount != subtotal {
+		timeoutTimer := time.NewTimer(maxSubscriberTime)
 		var wg sync.WaitGroup
 
 		// Call all of the subscribed handlers for the current priority
@@ -78,8 +80,19 @@ func netloggerCallback(version uint8,
 
 		}
 
-		// Wait on all of this priority to finish
-		wg.Wait()
+		// Wait for all of this priority to finish. Calling the wait on a goroutine that closes a
+		// channel allows us to wait for either the channel to close or the subscriber timeout
+		c := make(chan bool)
+		go func() {
+			defer close(c)
+			wg.Wait()
+		}()
+		select {
+		case <-timeoutTimer.C:
+			logger.Crit("%OC|Timeout while waiting for netlogger subcriber:%s\n", "timeout_netlogger", 0)
+		case <-c:
+			break
+		}
 
 		// Increment the priority and keep looping until we've called all subscribers
 		priority++

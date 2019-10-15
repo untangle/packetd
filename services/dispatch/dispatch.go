@@ -26,6 +26,9 @@ type SubscriptionHolder struct {
 	NetloggerFunc NetloggerHandlerFunction
 }
 
+// maxSubscriberTime sets the maximum amount time a subscriber is allowed to process a packet
+const maxSubscriberTime = 30 * time.Second
+
 // The Priority determines the calling order for nfqueue subscribers. When packets
 // are received the handlers are called in order starting with the lowest priority
 // and working to the highest. The order will be random among multiple subscribers

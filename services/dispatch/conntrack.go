@@ -242,7 +242,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 
 		conntrack.EventCount++
 		if (connmark & 0x0fffffff) != (conntrack.ConnMark & 0x0fffffff) {
-			logger.Info("Connmark change [%v] 0x%08x != 0x%08x\n", conntrack.ClientSideTuple, connmark, conntrack.ConnMark)
+			logger.Debug("Connmark change [%v] 0x%08x != 0x%08x\n", conntrack.ClientSideTuple, connmark, conntrack.ConnMark)
 			conntrack.ConnMark = connmark
 		}
 		if conntrack.Session != nil {
@@ -266,6 +266,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 	priority := 0
 
 	for subcount != subtotal {
+		timeoutTimer := time.NewTimer(maxSubscriberTime)
 		var wg sync.WaitGroup
 
 		// Call all of the subscribed handlers for the current priority
@@ -285,8 +286,19 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 			subcount++
 		}
 
-		// Wait on all of this priority to finish
-		wg.Wait()
+		// Wait for all of this priority to finish. Calling the wait on a goroutine that closes a
+		// channel allows us to wait for either the channel to close or the subscriber timeout
+		c := make(chan bool)
+		go func() {
+			defer close(c)
+			wg.Wait()
+		}()
+		select {
+		case <-timeoutTimer.C:
+			logger.Crit("%OC|Timeout while waiting for conntrack subcriber:%s\n", "timeout_conntrack", 0)
+		case <-c:
+			break
+		}
 
 		// Increment the priority and keep looping until we've called all subscribers
 		priority++
