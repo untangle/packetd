@@ -164,7 +164,7 @@ func GenerateRandomString(n int) string {
 	b := make([]byte, n)
 	_, err := rand.Read(b)
 	if err != nil {
-		logger.Info("Failed to generated secure key: %v\n", err)
+		logger.Warn("Failed to generated secure key: %v\n", err)
 		return "secret"
 	}
 	return base64.URLEncoding.EncodeToString(b)
@@ -613,12 +613,12 @@ func addTokenToSession(c *gin.Context) {
 	if token == "" {
 		return
 	}
-	logger.Info("Saving token insession: %v\n", token)
+	logger.Info("Saving token in session: %v\n", token)
 	session := sessions.Default(c)
 	session.Set("token", token)
 	err := session.Save()
 	if err != nil {
-		logger.Info("Error saving session: %s\n", err.Error())
+		logger.Warn("Error saving session: %s\n", err.Error())
 	}
 }
 
@@ -645,7 +645,7 @@ func isSetupWizardCompleted() bool {
 
 func ginlogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		logger.LogMessageSource(logger.LogLevelInfo, logsrc, "%v %v\n", c.Request.Method, c.Request.RequestURI)
+		logger.LogMessageSource(logger.LogLevelDebug, logsrc, "%v %v\n", c.Request.Method, c.Request.RequestURI)
 		c.Next()
 	}
 }
@@ -675,7 +675,7 @@ func sysupgradeHandler(c *gin.Context) {
 		return
 	}
 
-	logger.Info("Launching sysupgrade...\n")
+	logger.Notice("Launching sysupgrade...\n")
 
 	err = exec.Command("/sbin/sysupgrade", filename).Run()
 	if err != nil {
@@ -683,7 +683,7 @@ func sysupgradeHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	logger.Info("Launching sysupgrade... done\n")
+	logger.Notice("Launching sysupgrade... done\n")
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 	return
@@ -696,7 +696,7 @@ func upgradeHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	logger.Info("Launching upgrade... done\n")
+	logger.Notice("Launching upgrade... done\n")
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 	return

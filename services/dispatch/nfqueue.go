@@ -10,11 +10,6 @@ import (
 	"github.com/untangle/packetd/services/overseer"
 )
 
-// maxAllowedTime is the maximum time a plugin is allowed to process a packet.
-// If this time is exceeded. The warning is logged and the packet is passed
-// and the session released on behalf of the offending plugin
-const maxAllowedTime = 30 * time.Second
-
 // NfDrop is NF_DROP constant
 const NfDrop = 0
 
@@ -275,7 +270,7 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 					logger.Trace("Calling nfqueue PLUGIN:%s PRI:%d CTID:%d\n", key, pri, ctid)
 				}
 
-				timeoutTimer := time.NewTimer(maxAllowedTime)
+				timeoutTimer := time.NewTimer(maxSubscriberTime)
 				c := make(chan subscriberResult, 1)
 
 				// call the subscriber hook on another goroutine so we can timeout while waiting for the result
@@ -298,7 +293,7 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 					resultsChannel <- result
 				case <-timeoutTimer.C:
 					// the subscriber took too long so put a release in the result channel on behalf of the subscriber
-					logger.Err("%OC|Timeout while processing nfqueue - subscriber:%s\n", "timeout_nfqueue_"+key, 0, key)
+					logger.Crit("%OC|Timeout while processing nfqueue - subscriber:%s\n", "timeout_nfqueue_"+key, 0, key)
 					resultsChannel <- subscriberResult{owner: key, sessionRelease: true}
 				}
 			}(key, val, priority)

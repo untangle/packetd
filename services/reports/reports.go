@@ -182,7 +182,7 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	}
 	values := conditionValues(reportEntry.Conditions)
 
-	logger.Info("SQL: %v %v\n", sqlStr, values)
+	logger.Debug("SQL: %v %v\n", sqlStr, values)
 	rows, err = db.Query(sqlStr, values...)
 	if err != nil {
 		logger.Err("db.Query error: %s\n", err)

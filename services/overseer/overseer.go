@@ -3,6 +3,7 @@ package overseer
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 )
@@ -108,11 +109,19 @@ func GenerateReport(buffer *bytes.Buffer) {
 	counterMutex.RLock()
 	defer counterMutex.RUnlock()
 
+	// create a sorted list of the counter names
+	namelist := make([]string, 0, len(counterTable))
+	for name := range counterTable {
+		namelist = append(namelist, name)
+	}
+	sort.Strings(namelist)
+
 	buffer.WriteString("<TABLE BORDER=2 CELLPADDING=4 BGCOLOR=#EEEEEE>\r\n")
 	buffer.WriteString("<TR><TH COLSPAN=2>Overseer Debug Counters</TH></TR>\r\n")
 	buffer.WriteString("<TR><TD><B>Counter Name</B></TD><TD><B>Value</B></TD></TR>\r\n")
 
-	for name, ptr := range counterTable {
+	for _, name := range namelist {
+		ptr := counterTable[name]
 		value := atomic.LoadInt64(ptr)
 		buffer.WriteString("<TR><TD><TT>")
 		buffer.WriteString(name)
