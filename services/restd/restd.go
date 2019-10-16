@@ -101,6 +101,7 @@ func Startup() {
 	api.GET("/status/hardware", statusHardware)
 	api.GET("/status/upgrade", statusUpgradeAvailable)
 	api.GET("/status/build", statusBuild)
+	api.GET("/status/license", statusLicense)
 	api.GET("/status/wantest/:device", statusWANTest)
 	api.GET("/status/uid", statusUID)
 	api.GET("/status/interfaces/:device", statusInterfaces)
