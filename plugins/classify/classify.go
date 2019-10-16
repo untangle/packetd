@@ -444,20 +444,15 @@ func parseReply(replyString string) (string, string, string, string, int32, stri
 // determined by the prediction plugin. If different the actual details
 // are added to a list that will be pushed to the cloud.
 func analyzePrediction(session *dispatch.Session) {
-	inferAppid := session.GetAttachment("application_id_inferred")
-	// if infer not found or unknown just return
-	if inferAppid == nil || inferAppid == "Unknown" {
-		return
-	}
-
 	matchAppid := session.GetAttachment("application_id")
 	// if match not found just return
 	if matchAppid == nil {
 		return
 	}
 
-	// if match and infer are the same just return
-	if strings.Compare(matchAppid.(string), inferAppid.(string)) == 0 {
+	inferAppid := session.GetAttachment("application_id_inferred")
+	// if we have infer and match and infer are the same just return
+	if inferAppid != nil && strings.Compare(matchAppid.(string), inferAppid.(string)) == 0 {
 		return
 	}
 
