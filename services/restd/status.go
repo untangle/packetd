@@ -2,6 +2,10 @@ package restd
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/json"
+	"errors"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -97,6 +101,19 @@ func statusBuild(c *gin.Context) {
 	logger.Debug("statusBuild()\n")
 
 	jsonO, err := getBuildInfo()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	c.JSON(http.StatusOK, jsonO)
+}
+
+// statusLicense is the RESTD /api/status/license handler
+func statusLicense(c *gin.Context) {
+	logger.Debug("statusLicense()\n")
+
+	jsonO, err := getLicenseInfo()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
@@ -421,6 +438,34 @@ func getBuildInfo() (map[string]interface{}, error) {
 		}
 
 		jsonO[strings.ToLower(parts[0])] = strings.Trim(parts[1], "\"")
+	}
+
+	return jsonO, nil
+}
+
+// getLicenseInfo returns the license info as a json map
+func getLicenseInfo() (map[string]interface{}, error) {
+	file, err := os.Open("/etc/config/licenses.json")
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	rawdata, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	head := bytes.Index(rawdata, []byte("{"))
+	tail := bytes.LastIndex(rawdata, []byte("}"))
+	if head < 0 || tail < 0 {
+		return nil, errors.New("Invalid license file format")
+	}
+
+	jsonO := make(map[string]interface{})
+	err = json.Unmarshal([]byte(rawdata[head:tail+1]), &jsonO)
+	if err != nil {
+		return nil, err
 	}
 
 	return jsonO, nil
