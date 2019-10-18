@@ -669,18 +669,19 @@ func fetchLicensesHandler(c *gin.Context) {
 
 func sysupgradeHandler(c *gin.Context) {
 	filename := "/tmp/sysupgrade.img"
+	var output []byte
 
 	file, _, err := c.Request.FormFile("file")
 	if err != nil {
 		logger.Warn("Failed to upload file: %s\n", err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image"})
 		return
 	}
 
 	out, err := os.Create(filename)
 	if err != nil {
 		logger.Warn("Failed to create %s: %s\n", filename, err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image"})
 		return
 	}
 
@@ -688,8 +689,21 @@ func sysupgradeHandler(c *gin.Context) {
 	out.Close()
 	if err != nil {
 		logger.Warn("Failed to upload image: %s\n", err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image"})
 		return
+	}
+
+	logger.Notice("Checking sysupgrade file...\n")
+
+	output, err = exec.Command("/sbin/sysupgrade", "-T", filename).Output()
+	if err != nil {
+		if strings.Contains(string(output), "not supported by this image") ||
+			strings.Contains(string(output), "Use sysupgrade -F") {
+
+			logger.Err("sysupgrade -T failed: %s\n", output)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Incompatible upgrade image"})
+			return
+		}
 	}
 
 	logger.Notice("Launching sysupgrade...\n")
@@ -697,7 +711,7 @@ func sysupgradeHandler(c *gin.Context) {
 	err = exec.Command("/sbin/sysupgrade", filename).Run()
 	if err != nil {
 		logger.Warn("sysupgrade failed: %s\n", err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Upgrade failed"})
 		return
 	}
 	logger.Notice("Launching sysupgrade... done\n")
