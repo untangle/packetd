@@ -121,6 +121,7 @@ func Startup() {
 	api.GET("/debug", debugHandler)
 	api.POST("/gc", gcHandler)
 
+	api.POST("/fetch-licenses", fetchLicensesHandler)
 	api.POST("/sysupgrade", sysupgradeHandler)
 	api.POST("/upgrade", upgradeHandler)
 
@@ -651,6 +652,19 @@ func ginlogger() gin.HandlerFunc {
 		logger.LogMessageSource(logger.LogLevelDebug, logsrc, "%v %v\n", c.Request.Method, c.Request.RequestURI)
 		c.Next()
 	}
+}
+
+func fetchLicensesHandler(c *gin.Context) {
+	err := exec.Command("/usr/bin/fetch-licenses.sh").Run()
+	if err != nil {
+		logger.Warn("license fetch failed: %s\n", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	logger.Notice("Fetch licenses... done\n")
+	c.JSON(http.StatusOK, gin.H{"success": true})
+	return
 }
 
 func sysupgradeHandler(c *gin.Context) {
