@@ -88,7 +88,7 @@ func netloggerCallback(version uint8,
 		case <-timeoutTimer.C:
 			logger.Crit("%OC|Timeout while waiting for netlogger subcriber:%s\n", "timeout_netlogger", 0)
 		case <-c:
-			break
+			timeoutTimer.Stop()
 		}
 
 		// Increment the priority and keep looping until we've called all subscribers

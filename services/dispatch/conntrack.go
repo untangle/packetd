@@ -294,7 +294,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		case <-timeoutTimer.C:
 			logger.Crit("%OC|Timeout while waiting for conntrack subcriber:%s\n", "timeout_conntrack", 0)
 		case <-c:
-			break
+			timeoutTimer.Stop()
 		}
 
 		// Increment the priority and keep looping until we've called all subscribers
