@@ -17,7 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3" // blank import required for runtime binding
+	"github.com/mattn/go-sqlite3"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/settings"
@@ -116,21 +116,29 @@ const dbLimit = 1048576 * 96
 
 // Startup starts the reports service
 func Startup() {
+	var dsn string
 	var err error
-	dbMain, err = sql.Open("sqlite3", dbFilename)
+
+	dbVersion, _, _ := sqlite3.Version()
+	dsn = fmt.Sprintf("file:%s?cache=shared&mode=rwc", dbFilename)
+	dbMain, err = sql.Open("sqlite3", dsn)
 
 	if err != nil {
 		logger.Err("Failed to open database: %s\n", err.Error())
+	} else {
+		logger.Info("SQLite3 Database Version: %s File:%s\n", dbVersion, dbFilename)
 	}
 
-	go func() {
-		createTables()
-		go eventLogger()
-		go dbCleaner()
-		if !kernel.FlagNoCloud {
-			go cloudSender()
-		}
-	}()
+	dbMain.SetMaxOpenConns(1)
+
+	createTables()
+
+	go eventLogger()
+	go dbCleaner()
+
+	if !kernel.FlagNoCloud {
+		go cloudSender()
+	}
 }
 
 // Shutdown stops the reports service
@@ -283,8 +291,9 @@ func eventLogger() {
 
 		eventLogCounter = eventLogCounter + 1
 		if eventLogCounter%10000 == 0 {
-			logger.Info("Cleaning sqlite...\n")
-			runSQL("PRAGMA shrink_memory;")
+			logger.Info("Database starting shrink_memory operation\n")
+			runSQL("PRAGMA shrink_memory")
+			logger.Info("Database finished shrink_memory operation\n")
 		}
 
 		if event.SQLOp == 1 {
@@ -763,15 +772,17 @@ func dbCleaner() {
 		}
 		// get the size
 		size := dbFile.Size()
-		logger.Debug("Current DB Size: %.1fM\n", (float32(size) / float32(1024*1024)))
+		logger.Info("Database current size: %.1fM\n", (float32(size) / float32(1024*1024)))
 		if size > dbLimit {
+			logger.Info("Database starting trim operation\n")
 			dbLock.Lock()
 			trimPercent("sessions", .1)
 			trimPercent("session_stats", .1)
 			trimPercent("interface_stats", .1)
+			logger.Info("Database starting vacuum operation\n")
 			runSQL("VACUUM")
 			dbLock.Unlock()
-			logger.Info("Trimmed DB.\n")
+			logger.Info("Database cleanup completed\n")
 			// re-run and check size with no delay
 			ch <- true
 		}
@@ -781,10 +792,8 @@ func dbCleaner() {
 // trimPercent trims the specified table by the specified percent (by time)
 // example: trimPercent("sessions",.1) will drop the oldest 10% of events in sessions by time
 func trimPercent(table string, percent float32) {
-	logger.Debug("Trimming %s by %.1f%% percent...\n", table, percent*100.0)
-
+	logger.Info("Trimming %s by %.1f%% percent...\n", table, percent*100.0)
 	sqlStr := fmt.Sprintf("DELETE FROM %s WHERE time_stamp < (SELECT min(time_stamp)+cast((max(time_stamp)-min(time_stamp))*%f as int) from %s)", table, percent, table)
-
 	runSQL(sqlStr)
 }
 
