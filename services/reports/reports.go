@@ -96,9 +96,9 @@ type ReportEntry struct {
 	QuerySeries          QuerySeriesOptions           `json:"querySeries"`
 }
 
-var db *sql.DB
+var dbMain *sql.DB
 var dbLock sync.RWMutex
-var queries = make(map[uint64]*Query)
+var queriesMap = make(map[uint64]*Query)
 var queriesLock sync.RWMutex
 var queryID uint64
 var eventQueue = make(chan Event, 10000)
@@ -117,7 +117,7 @@ const dbLimit = 1048576 * 96
 // Startup starts the reports service
 func Startup() {
 	var err error
-	db, err = sql.Open("sqlite3", dbFilename)
+	dbMain, err = sql.Open("sqlite3", dbFilename)
 
 	if err != nil {
 		logger.Err("Failed to open database: %s\n", err.Error())
@@ -135,7 +135,7 @@ func Startup() {
 
 // Shutdown stops the reports service
 func Shutdown() {
-	db.Close()
+	dbMain.Close()
 }
 
 func unmarshall(reportEntryStr string, reportEntry *ReportEntry) error {
@@ -183,9 +183,9 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	values := conditionValues(reportEntry.Conditions)
 
 	logger.Debug("SQL: %v %v\n", sqlStr, values)
-	rows, err = db.Query(sqlStr, values...)
+	rows, err = dbMain.Query(sqlStr, values...)
 	if err != nil {
-		logger.Err("db.Query error: %s\n", err)
+		logger.Err("dbMain.Query error: %s\n", err)
 		dbLock.RUnlock()
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	q.Rows = rows
 
 	queriesLock.Lock()
-	queries[q.ID] = q
+	queriesMap[q.ID] = q
 	queriesLock.Unlock()
 	go func() {
 		time.Sleep(30 * time.Second)
@@ -209,7 +209,7 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 // GetData returns the data for the provided QueryID
 func GetData(queryID uint64) (string, error) {
 	queriesLock.RLock()
-	q := queries[queryID]
+	q := queriesMap[queryID]
 	queriesLock.RUnlock()
 	if q == nil {
 		logger.Warn("Query not found: %d\n", queryID)
@@ -230,7 +230,7 @@ func GetData(queryID uint64) (string, error) {
 // CloseQuery closes the query now
 func CloseQuery(queryID uint64) (string, error) {
 	queriesLock.RLock()
-	q := queries[queryID]
+	q := queriesMap[queryID]
 	queriesLock.RUnlock()
 	if q == nil {
 		logger.Warn("Query not found: %d\n", queryID)
@@ -402,7 +402,7 @@ func logInsertEvent(event Event) {
 	defer dbLock.Unlock()
 
 	logger.Debug("SQL: %s\n", sqlStr)
-	stmt, err := db.Prepare(sqlStr)
+	stmt, err := dbMain.Prepare(sqlStr)
 	if err != nil {
 		logger.Warn("Failed to prepare statement: %s %s\n", err.Error(), sqlStr)
 		return
@@ -450,7 +450,7 @@ func logUpdateEvent(event Event) {
 	defer dbLock.Unlock()
 
 	logger.Debug("SQL: %s\n", sqlStr)
-	stmt, err := db.Prepare(sqlStr)
+	stmt, err := dbMain.Prepare(sqlStr)
 	if err != nil {
 		logger.Warn("Failed to prepare statement: %s %s\n", err.Error(), sqlStr)
 		return
@@ -512,7 +512,7 @@ func cleanupQuery(query *Query) {
 	logger.Debug("cleanupQuery(%d)\n", query.ID)
 	queriesLock.Lock()
 	defer queriesLock.Unlock()
-	delete(queries, query.ID)
+	delete(queriesMap, query.ID)
 	if query.Rows != nil {
 		query.Rows.Close()
 		query.Rows = nil
@@ -526,7 +526,7 @@ func createTables() {
 	dbLock.Lock()
 	defer dbLock.Unlock()
 
-	_, err = db.Exec(
+	_, err = dbMain.Exec(
 		`CREATE TABLE IF NOT EXISTS sessions (
 			session_id int8 PRIMARY KEY NOT NULL,
 			time_stamp bigint NOT NULL,
@@ -593,7 +593,7 @@ func createTables() {
 	// FIXME add domain_category
 	// We need to add domain level categorization
 
-	_, err = db.Exec(
+	_, err = dbMain.Exec(
 		`CREATE TABLE IF NOT EXISTS session_stats (
 			session_id int8 NOT NULL,
 			time_stamp bigint NOT NULL,
@@ -614,7 +614,7 @@ func createTables() {
 		logger.Err("Failed to create table: %s\n", err.Error())
 	}
 
-	_, err = db.Exec(
+	_, err = dbMain.Exec(
 		`CREATE TABLE IF NOT EXISTS interface_stats (
 			time_stamp bigint NOT NULL,
 			interface_id int1,
@@ -793,7 +793,7 @@ func trimPercent(table string, percent float32) {
 // errors are logged
 func runSQL(sqlStr string) {
 	logger.Debug("SQL: %s\n", sqlStr)
-	stmt, err := db.Prepare(sqlStr)
+	stmt, err := dbMain.Prepare(sqlStr)
 	if err != nil {
 		logger.Warn("Failed to prepare statement: %s %s\n", err.Error(), sqlStr)
 		return
