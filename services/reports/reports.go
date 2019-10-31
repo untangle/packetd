@@ -291,9 +291,9 @@ func eventLogger() {
 
 		eventLogCounter = eventLogCounter + 1
 		if eventLogCounter%10000 == 0 {
-			logger.Info("Database starting shrink_memory operation\n")
+			logger.Debug("Database starting shrink_memory operation\n")
 			runSQL("PRAGMA shrink_memory")
-			logger.Info("Database finished shrink_memory operation\n")
+			logger.Debug("Database finished shrink_memory operation\n")
 		}
 
 		if event.SQLOp == 1 {
