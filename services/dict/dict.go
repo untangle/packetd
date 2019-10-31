@@ -842,7 +842,5 @@ func cleanDictionary() {
 		}
 	}
 
-	logger.Info("----- Dictionary Cleanup -----\n")
-	logger.Info("Removed %d of %d sessions from dict\n", dictClean, dictCount)
-	logger.Info("Cleanup table Add:%d Del:%d Now:%d\n", tableAdd, tableDel, len(cleanupTable))
+	logger.Debug("Dictionary Cleanup - COUNT:%d CLEAN:%d ADD:%d DEL:%d LEN:%d\n", dictCount, dictClean, tableAdd, tableDel, len(cleanupTable))
 }
