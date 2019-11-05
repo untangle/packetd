@@ -18,6 +18,7 @@ type interfaceInfo struct {
 	InterfaceName    string   `json:"name"`
 	InterfaceType    string   `json:"type"`
 	Wan              bool     `json:"wan"`
+	AddressSource    string   `json:"addressSource"`
 	Connected        bool     `json:"connected"`
 	IP4Addr          []string `json:"ip4Addr"`
 	IP4Gateway       string   `json:"ip4Gateway"`
@@ -226,6 +227,11 @@ func attachNetworkDetails(worker *interfaceInfo, ubusNetworkList []interface{}, 
 		// continue if this isn't the device we are looking for
 		if search != item["device"].(string) {
 			continue
+		}
+
+		// add the address source info, if available
+		if val, found := item["proto"]; found {
+			worker.AddressSource = val.(string)
 		}
 
 		// walk through each ipv4-address object for the interface
