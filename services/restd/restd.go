@@ -200,9 +200,8 @@ func noRouteHandler(c *gin.Context) {
 	// MFW-704 - return 200 for JS map files requested by Safari on Mac
 	if strings.Contains(c.Request.URL.Path, ".js.map") {
 		c.String(http.StatusOK, "")
-	} else {
-		c.JSON(http.StatusNotFound, gin.H{"code": http.StatusNotFound})
 	}
+	// otherwise browser will default to its 404 handler
 }
 
 func pingHandler(c *gin.Context) {
