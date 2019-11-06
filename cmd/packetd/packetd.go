@@ -16,7 +16,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -496,8 +495,6 @@ func printStats() {
 	logger.Info("Memory TotalAlloc: %d kB\n", (mem.TotalAlloc / 1024))
 	logger.Info("Memory HeapAlloc: %d kB\n", (mem.HeapAlloc / 1024))
 	logger.Info("Memory HeapSys: %d kB\n", (mem.HeapSys / 1024))
-
-	logger.Info("Reports EventsLogged: %d\n", atomic.LoadUint64(&reports.EventsLogged))
 	stats, err := getProcStats()
 	if err == nil {
 		for _, line := range strings.Split(stats, "\n") {
