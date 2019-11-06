@@ -103,23 +103,20 @@ var queryID uint64
 var eventQueue = make(chan Event, 10000)
 var cloudQueue = make(chan Event, 1000)
 
-// EventsLogged records the number of events logged
-var EventsLogged uint64
-
 // The filename and path for the sqlite database file. We split these up to make
 // it easy for the file size limitation logic to get the total size of the target
 // directory so we can calculate our limit as a percentage of the total size.
-const dbFileName = "reports.db"
-const dbFilePath = "/tmp"
-const oneMegabyte = 1024 * 1024
+const dbFILENAME = "reports.db"
+const dbFILEPATH = "/tmp"
+const oneMEGABYTE = 1024 * 1024
 
-// dbDiskPercentage is used to calculate the maximum database file size
-var dbDiskPercentage float64 = 0.40
+// dbDISKPERCENTAGE is used to calculate the maximum database file size
+const dbDISKPERCENTAGE = 0.40
 
-// dbFreeMinimum sets the minimum amount of free page space below which
+// dbFREEMINIMUM sets the minimum amount of free page space below which
 // we will start deleting older rows from the database tables once
 // the database file grows to the maximum calculated size
-var dbFreeMinimum int64 = 32768
+const dbFREEMINIMUM int64 = 32768
 
 // dbSizeLimit is the calculated maximum size for the database file
 var dbSizeLimit int64
@@ -131,10 +128,10 @@ func Startup() {
 	var err error
 
 	// get the file system stats for the path where the database will be stored
-	syscall.Statfs(dbFilePath, &stat)
+	syscall.Statfs(dbFILEPATH, &stat)
 
 	// set the database size limit to 60 percent of the total space available
-	dbSizeLimit = int64(float64(stat.Bsize) * float64(stat.Blocks) * dbDiskPercentage)
+	dbSizeLimit = int64(float64(stat.Bsize) * float64(stat.Blocks) * dbDISKPERCENTAGE)
 
 	// register a custom driver with a connect hook where we can set our pragma's for
 	// all connections that get created. This is needed because pragma's are applied
@@ -143,13 +140,13 @@ func Startup() {
 	sql.Register("sqlite3_custom", &sqlite3.SQLiteDriver{ConnectHook: customHook})
 
 	dbVersion, _, _ := sqlite3.Version()
-	dsn = fmt.Sprintf("file:%s/%s?cache=shared&mode=rwc", dbFilePath, dbFileName)
+	dsn = fmt.Sprintf("file:%s/%s?cache=shared&mode=rwc", dbFILEPATH, dbFILENAME)
 	dbMain, err = sql.Open("sqlite3_custom", dsn)
 
 	if err != nil {
 		logger.Err("Failed to open database: %s\n", err.Error())
 	} else {
-		logger.Info("SQLite3 Database Version:%s  File:%s/%s  Limit:%d MB\n", dbVersion, dbFilePath, dbFileName, dbSizeLimit/oneMegabyte)
+		logger.Info("SQLite3 Database Version:%s  File:%s/%s  Limit:%d MB\n", dbVersion, dbFILEPATH, dbFILENAME, dbSizeLimit/oneMEGABYTE)
 	}
 
 	dbMain.SetMaxOpenConns(4)
@@ -326,7 +323,6 @@ func eventLogger() {
 			}
 		}
 		logger.Debug("Log Event: %s %v\n", summary, event.SQLOp)
-		atomic.AddUint64(&EventsLogged, 1)
 
 		if event.SQLOp == 1 {
 			logInsertEvent(event)
@@ -827,7 +823,7 @@ func dbCleaner() {
 		}
 
 		currentSize := (pageSize * pageCount)
-		logger.Info("Database Size:%v MB  Limit:%v MB  Free Pages:%v\n", currentSize/oneMegabyte, dbSizeLimit/oneMegabyte, freeCount)
+		logger.Info("Database Size:%v MB  Limit:%v MB  Free Pages:%v\n", currentSize/oneMEGABYTE, dbSizeLimit/oneMEGABYTE, freeCount)
 
 		// if we haven't reached the size limit just continue
 		if currentSize < dbSizeLimit {
@@ -835,7 +831,7 @@ func dbCleaner() {
 		}
 
 		// if we haven't dropped below the minimum free page limit just continue
-		if freeCount >= (dbFreeMinimum / pageSize) {
+		if freeCount >= (dbFREEMINIMUM / pageSize) {
 			continue
 		}
 
