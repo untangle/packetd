@@ -101,7 +101,6 @@ var queriesMap = make(map[uint64]*Query)
 var queriesLock sync.RWMutex
 var queryID uint64
 var eventQueue = make(chan Event, 10000)
-var eventLogCounter = 0
 var cloudQueue = make(chan Event, 1000)
 
 // EventsLogged records the number of events logged
@@ -137,9 +136,15 @@ func Startup() {
 	// set the database size limit to 60 percent of the total space available
 	dbSizeLimit = int64(float64(stat.Bsize) * float64(stat.Blocks) * dbDiskPercentage)
 
+	// register a custom driver with a connect hook where we can set our pragma's for
+	// all connections that get created. This is needed because pragma's are applied
+	// per connection. Since the sql package does connection pooling and management,
+	// the hook lets us set the right pragma's for each and every connection.
+	sql.Register("sqlite3_custom", &sqlite3.SQLiteDriver{ConnectHook: customHook})
+
 	dbVersion, _, _ := sqlite3.Version()
 	dsn = fmt.Sprintf("file:%s/%s?cache=shared&mode=rwc", dbFilePath, dbFileName)
-	dbMain, err = sql.Open("sqlite3", dsn)
+	dbMain, err = sql.Open("sqlite3_custom", dsn)
 
 	if err != nil {
 		logger.Err("Failed to open database: %s\n", err.Error())
@@ -149,17 +154,6 @@ func Startup() {
 
 	dbMain.SetMaxOpenConns(4)
 	dbMain.SetMaxIdleConns(2)
-
-	// turn off sync to disk after every transaction for improved performance
-	runSQL("PRAGMA synchronous = OFF")
-
-	// store the rollback journal in memory for improved performance
-	runSQL("PRAGMA journal_mode = MEMORY")
-
-	// setting a busy timeout will allow the driver to retry for the specified
-	// number of milliseconds instead of immediately returning SQLITE_BUSY when
-	// a table is locked
-	runSQL("PRAGMA busy_timeout = 10000")
 
 	createTables()
 
@@ -174,6 +168,28 @@ func Startup() {
 // Shutdown stops the reports service
 func Shutdown() {
 	dbMain.Close()
+}
+
+// customHook is used set the parameters we need for every database connection
+func customHook(conn *sqlite3.SQLiteConn) error {
+	// turn off sync to disk after every transaction for improved performance
+	if _, err := conn.Exec("PRAGMA synchronous = OFF", nil); err != nil {
+		logger.Warn("Error setting synchronous: %v\n", err)
+	}
+
+	// store the rollback journal in memory for improved performance
+	if _, err := conn.Exec("PRAGMA journal_mode = MEMORY", nil); err != nil {
+		logger.Warn("Error setting journal_mode: %v\n", err)
+	}
+
+	// setting a busy timeout will allow the driver to retry for the specified
+	// number of milliseconds instead of immediately returning SQLITE_BUSY when
+	// a table is locked
+	if _, err := conn.Exec("PRAGMA busy_timeout = 10000", nil); err != nil {
+		logger.Warn("Error setting busy_timeout: %v\n", err)
+	}
+
+	return nil
 }
 
 func unmarshall(reportEntryStr string, reportEntry *ReportEntry) error {
@@ -312,13 +328,6 @@ func eventLogger() {
 		logger.Debug("Log Event: %s %v\n", summary, event.SQLOp)
 		atomic.AddUint64(&EventsLogged, 1)
 
-		eventLogCounter = eventLogCounter + 1
-		if eventLogCounter%10000 == 0 {
-			logger.Debug("Database starting shrink_memory operation\n")
-			runSQL("PRAGMA shrink_memory")
-			logger.Debug("Database finished shrink_memory operation\n")
-		}
-
 		if event.SQLOp == 1 {
 			logInsertEvent(event)
 		}
@@ -413,7 +422,6 @@ func prepareEventValues(data interface{}) interface{} {
 func logInsertEvent(event Event) {
 	var sqlStr = "INSERT INTO " + event.Table + "("
 	var valueStr = "("
-
 	var first = true
 	var values []interface{}
 	for k, v := range event.Columns {
@@ -430,26 +438,31 @@ func logInsertEvent(event Event) {
 	valueStr += ")"
 	sqlStr += " VALUES " + valueStr
 
-	logger.Debug("SQL: %s\n", sqlStr)
-	stmt, err := dbMain.Prepare(sqlStr)
+	tx, err := dbMain.Begin()
 	if err != nil {
-		logger.Warn("Failed to prepare statement: %s %s\n", err.Error(), sqlStr)
+		logger.Warn("Failed to begin transaction: %s %s\n", err.Error(), sqlStr)
 		return
 	}
 
-	// stmt is valid  so make sure it gets closed
-	defer stmt.Close()
-
-	_, err = stmt.Exec(values...)
+	res, err := tx.Exec(sqlStr, values...)
 	if err != nil {
-		logger.Warn("Failed to exec statement: %s %s\n", err.Error(), sqlStr)
+		logger.Warn("Failed to execute transaction: %s %s\n", err.Error(), sqlStr)
+		tx.Rollback()
+		return
+	}
+
+	rowCount, _ := res.RowsAffected()
+	logger.Debug("SQL:%s ROWS:%d\n", sqlStr, rowCount)
+
+	err = tx.Commit()
+	if err != nil {
+		logger.Warn("Failed to commit transaction: %s %s\n", err.Error(), sqlStr)
 		return
 	}
 }
 
 func logUpdateEvent(event Event) {
 	var sqlStr = "UPDATE " + event.Table + " SET"
-
 	var first = true
 	var values []interface{}
 	for k, v := range event.ModifiedColumns {
@@ -474,19 +487,25 @@ func logUpdateEvent(event Event) {
 		first = false
 	}
 
-	logger.Debug("SQL: %s\n", sqlStr)
-	stmt, err := dbMain.Prepare(sqlStr)
+	tx, err := dbMain.Begin()
 	if err != nil {
-		logger.Warn("Failed to prepare statement: %s %s\n", err.Error(), sqlStr)
+		logger.Warn("Failed to begin transaction: %s %s\n", err.Error(), sqlStr)
 		return
 	}
 
-	// stmt is valid  so make sure it gets closed
-	defer stmt.Close()
-
-	_, err = stmt.Exec(values...)
+	res, err := tx.Exec(sqlStr, values...)
 	if err != nil {
-		logger.Warn("Failed to exec statement: %s %s\n", err.Error(), sqlStr)
+		logger.Warn("Failed to execute transaction: %s %s\n", err.Error(), sqlStr)
+		tx.Rollback()
+		return
+	}
+
+	rowCount, _ := res.RowsAffected()
+	logger.Debug("SQL:%s ROWS:%d\n", sqlStr, rowCount)
+
+	err = tx.Commit()
+	if err != nil {
+		logger.Warn("Failed to commit transaction: %s %s\n", err.Error(), sqlStr)
 		return
 	}
 }
