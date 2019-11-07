@@ -10,11 +10,11 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/mattn/go-sqlite3"
@@ -97,39 +97,60 @@ type ReportEntry struct {
 }
 
 var dbMain *sql.DB
-var dbLock sync.RWMutex
 var queriesMap = make(map[uint64]*Query)
 var queriesLock sync.RWMutex
 var queryID uint64
 var eventQueue = make(chan Event, 10000)
-var eventLogCounter = 0
 var cloudQueue = make(chan Event, 1000)
 
-// EventsLogged records the number of events logged
-var EventsLogged uint64
+// The filename and path for the sqlite database file. We split these up to make
+// it easy for the file size limitation logic to get the total size of the target
+// directory so we can calculate our limit as a percentage of the total size.
+const dbFILENAME = "reports.db"
+const dbFILEPATH = "/tmp"
+const oneMEGABYTE = 1024 * 1024
 
-// DbFilename is the sqlite db filename
-const dbFilename = "/tmp/reports.db"
+// dbDISKPERCENTAGE is used to calculate the maximum database file size
+const dbDISKPERCENTAGE = 0.40
 
-// the DB soft size limit
-const dbLimit = 1048576 * 96
+// dbFREEMINIMUM sets the minimum amount of free page space below which
+// we will start deleting older rows from the database tables once
+// the database file grows to the maximum calculated size
+const dbFREEMINIMUM int64 = 32768
+
+// dbSizeLimit is the calculated maximum size for the database file
+var dbSizeLimit int64
 
 // Startup starts the reports service
 func Startup() {
+	var stat syscall.Statfs_t
 	var dsn string
 	var err error
 
+	// get the file system stats for the path where the database will be stored
+	syscall.Statfs(dbFILEPATH, &stat)
+
+	// set the database size limit to 60 percent of the total space available
+	dbSizeLimit = int64(float64(stat.Bsize) * float64(stat.Blocks) * dbDISKPERCENTAGE)
+
+	// register a custom driver with a connect hook where we can set our pragma's for
+	// all connections that get created. This is needed because pragma's are applied
+	// per connection. Since the sql package does connection pooling and management,
+	// the hook lets us set the right pragma's for each and every connection.
+	sql.Register("sqlite3_custom", &sqlite3.SQLiteDriver{ConnectHook: customHook})
+
 	dbVersion, _, _ := sqlite3.Version()
-	dsn = fmt.Sprintf("file:%s?cache=shared&mode=rwc", dbFilename)
-	dbMain, err = sql.Open("sqlite3", dsn)
+	dsn = fmt.Sprintf("file:%s/%s?cache=shared&mode=rwc", dbFILEPATH, dbFILENAME)
+	dbMain, err = sql.Open("sqlite3_custom", dsn)
 
 	if err != nil {
 		logger.Err("Failed to open database: %s\n", err.Error())
 	} else {
-		logger.Info("SQLite3 Database Version: %s File:%s\n", dbVersion, dbFilename)
+		logger.Info("SQLite3 Database Version:%s  File:%s/%s  Limit:%d MB\n", dbVersion, dbFILEPATH, dbFILENAME, dbSizeLimit/oneMEGABYTE)
 	}
 
-	dbMain.SetMaxOpenConns(1)
+	dbMain.SetMaxOpenConns(4)
+	dbMain.SetMaxIdleConns(2)
 
 	createTables()
 
@@ -144,6 +165,28 @@ func Startup() {
 // Shutdown stops the reports service
 func Shutdown() {
 	dbMain.Close()
+}
+
+// customHook is used set the parameters we need for every database connection
+func customHook(conn *sqlite3.SQLiteConn) error {
+	// turn off sync to disk after every transaction for improved performance
+	if _, err := conn.Exec("PRAGMA synchronous = OFF", nil); err != nil {
+		logger.Warn("Error setting synchronous: %v\n", err)
+	}
+
+	// store the rollback journal in memory for improved performance
+	if _, err := conn.Exec("PRAGMA journal_mode = MEMORY", nil); err != nil {
+		logger.Warn("Error setting journal_mode: %v\n", err)
+	}
+
+	// setting a busy timeout will allow the driver to retry for the specified
+	// number of milliseconds instead of immediately returning SQLITE_BUSY when
+	// a table is locked
+	if _, err := conn.Exec("PRAGMA busy_timeout = 10000", nil); err != nil {
+		logger.Warn("Error setting busy_timeout: %v\n", err)
+	}
+
+	return nil
 }
 
 func unmarshall(reportEntryStr string, reportEntry *ReportEntry) error {
@@ -179,13 +222,9 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	var rows *sql.Rows
 	var sqlStr string
 
-	// Hold RLock, gets unlocked in CloseQuery/cleanupQuery
-	dbLock.RLock()
-
 	sqlStr, err = makeSQLString(reportEntry)
 	if err != nil {
 		logger.Warn("Failed to make SQL: %v\n", err)
-		dbLock.RUnlock()
 		return nil, err
 	}
 	values := conditionValues(reportEntry.Conditions)
@@ -194,11 +233,8 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	rows, err = dbMain.Query(sqlStr, values...)
 	if err != nil {
 		logger.Err("dbMain.Query error: %s\n", err)
-		dbLock.RUnlock()
 		return nil, err
 	}
-
-	dbLock.RUnlock()
 
 	q := new(Query)
 	q.ID = atomic.AddUint64(&queryID, 1)
@@ -287,14 +323,6 @@ func eventLogger() {
 			}
 		}
 		logger.Debug("Log Event: %s %v\n", summary, event.SQLOp)
-		atomic.AddUint64(&EventsLogged, 1)
-
-		eventLogCounter = eventLogCounter + 1
-		if eventLogCounter%10000 == 0 {
-			logger.Debug("Database starting shrink_memory operation\n")
-			runSQL("PRAGMA shrink_memory")
-			logger.Debug("Database finished shrink_memory operation\n")
-		}
 
 		if event.SQLOp == 1 {
 			logInsertEvent(event)
@@ -390,7 +418,6 @@ func prepareEventValues(data interface{}) interface{} {
 func logInsertEvent(event Event) {
 	var sqlStr = "INSERT INTO " + event.Table + "("
 	var valueStr = "("
-
 	var first = true
 	var values []interface{}
 	for k, v := range event.Columns {
@@ -407,30 +434,31 @@ func logInsertEvent(event Event) {
 	valueStr += ")"
 	sqlStr += " VALUES " + valueStr
 
-	dbLock.Lock()
-	defer dbLock.Unlock()
-
-	logger.Debug("SQL: %s\n", sqlStr)
-	stmt, err := dbMain.Prepare(sqlStr)
+	tx, err := dbMain.Begin()
 	if err != nil {
-		logger.Warn("Failed to prepare statement: %s %s\n", err.Error(), sqlStr)
-		return
-	}
-	_, err = stmt.Exec(values...)
-	if err != nil {
-		logger.Warn("Failed to exec statement: %s %s\n", err.Error(), sqlStr)
+		logger.Warn("Failed to begin transaction: %s %s\n", err.Error(), sqlStr)
 		return
 	}
 
-	err = stmt.Close()
+	res, err := tx.Exec(sqlStr, values...)
 	if err != nil {
-		logger.Warn("Failed to close statement: %s %s\n", err.Error(), sqlStr)
+		logger.Warn("Failed to execute transaction: %s %s\n", err.Error(), sqlStr)
+		tx.Rollback()
+		return
+	}
+
+	rowCount, _ := res.RowsAffected()
+	logger.Debug("SQL:%s ROWS:%d\n", sqlStr, rowCount)
+
+	err = tx.Commit()
+	if err != nil {
+		logger.Warn("Failed to commit transaction: %s %s\n", err.Error(), sqlStr)
+		return
 	}
 }
 
 func logUpdateEvent(event Event) {
 	var sqlStr = "UPDATE " + event.Table + " SET"
-
 	var first = true
 	var values []interface{}
 	for k, v := range event.ModifiedColumns {
@@ -455,24 +483,26 @@ func logUpdateEvent(event Event) {
 		first = false
 	}
 
-	dbLock.Lock()
-	defer dbLock.Unlock()
-
-	logger.Debug("SQL: %s\n", sqlStr)
-	stmt, err := dbMain.Prepare(sqlStr)
+	tx, err := dbMain.Begin()
 	if err != nil {
-		logger.Warn("Failed to prepare statement: %s %s\n", err.Error(), sqlStr)
-		return
-	}
-	_, err = stmt.Exec(values...)
-	if err != nil {
-		logger.Warn("Failed to exec statement: %s %s\n", err.Error(), sqlStr)
+		logger.Warn("Failed to begin transaction: %s %s\n", err.Error(), sqlStr)
 		return
 	}
 
-	err = stmt.Close()
+	res, err := tx.Exec(sqlStr, values...)
 	if err != nil {
-		logger.Warn("Failed to close statement: %s %s\n", err.Error(), sqlStr)
+		logger.Warn("Failed to execute transaction: %s %s\n", err.Error(), sqlStr)
+		tx.Rollback()
+		return
+	}
+
+	rowCount, _ := res.RowsAffected()
+	logger.Debug("SQL:%s ROWS:%d\n", sqlStr, rowCount)
+
+	err = tx.Commit()
+	if err != nil {
+		logger.Warn("Failed to commit transaction: %s %s\n", err.Error(), sqlStr)
+		return
 	}
 }
 
@@ -531,9 +561,6 @@ func cleanupQuery(query *Query) {
 
 func createTables() {
 	var err error
-
-	dbLock.Lock()
-	defer dbLock.Unlock()
 
 	_, err = dbMain.Exec(
 		`CREATE TABLE IF NOT EXISTS sessions (
@@ -754,10 +781,21 @@ func mergeConditions(reportEntry *ReportEntry) {
 	reportEntry.UserConditions = []ReportCondition{}
 }
 
-// dbCleaner checks the size of the sqlite DB and trims it when it gets over
-// the predetermined size
+/**
+ * dbCleaner monitors the size of the sqlite database. Once the database file grows to
+ * the size limit, we begin deleting the oldest data to keep the file from growing too
+ * large. Since deleting rows doesn't reduce the file size, we use the number of free
+ * pages to decide when to trim the oldest data. We no longer perform a vacuum operation
+ * since it is very expensive, and we don't believe it provides commensurate benefit in
+ * this environment. The database is relatively small, most of the records are of similar
+ * size, and it's typically stored in a memory-based filesystem, so we don't believe
+ * fragmentation is a significant concern.
+**/
 func dbCleaner() {
+	var pageSize, pageCount, freeCount int64
+	var err error
 	ch := make(chan bool, 1)
+	ch <- true
 
 	for {
 		select {
@@ -765,27 +803,46 @@ func dbCleaner() {
 		case <-time.After(60 * time.Second):
 		}
 
-		dbFile, err := os.Stat(dbFilename)
-		if err != nil {
-			logger.Warn("Error checking DB file: %v\n", err.Error())
+		// we get the page size, page count, and free list size for our limit calculations
+		pageSize, err = strconv.ParseInt(runSQL("PRAGMA page_size"), 10, 64)
+		if err != nil || pageSize == 0 {
+			logger.Crit("Unable to parse database page_size: %v\n", err)
 			continue
 		}
-		// get the size
-		size := dbFile.Size()
-		logger.Info("Database current size: %.1fM\n", (float32(size) / float32(1024*1024)))
-		if size > dbLimit {
-			logger.Info("Database starting trim operation\n")
-			dbLock.Lock()
-			trimPercent("sessions", .1)
-			trimPercent("session_stats", .1)
-			trimPercent("interface_stats", .1)
-			logger.Info("Database starting vacuum operation\n")
-			runSQL("VACUUM")
-			dbLock.Unlock()
-			logger.Info("Database cleanup completed\n")
-			// re-run and check size with no delay
-			ch <- true
+
+		pageCount, err = strconv.ParseInt(runSQL("PRAGMA page_count"), 10, 64)
+		if err != nil {
+			logger.Crit("Unable to parse database page_count: %v\n", err)
+			continue
 		}
+
+		freeCount, err = strconv.ParseInt(runSQL("PRAGMA freelist_count"), 10, 64)
+		if err != nil {
+			logger.Crit("Unable to parse database freelist_count: %v\n", err)
+			continue
+		}
+
+		currentSize := (pageSize * pageCount)
+		logger.Info("Database Size:%v MB  Limit:%v MB  Free Pages:%v\n", currentSize/oneMEGABYTE, dbSizeLimit/oneMEGABYTE, freeCount)
+
+		// if we haven't reached the size limit just continue
+		if currentSize < dbSizeLimit {
+			continue
+		}
+
+		// if we haven't dropped below the minimum free page limit just continue
+		if freeCount >= (dbFREEMINIMUM / pageSize) {
+			continue
+		}
+
+		// database is getting full so clean out some of the oldest data
+		logger.Info("Database starting trim operation\n")
+		trimPercent("sessions", .10)
+		trimPercent("session_stats", .10)
+		trimPercent("interface_stats", .10)
+		logger.Info("Database trim operation completed\n")
+		// re-run and check size with no delay
+		ch <- true
 	}
 }
 
@@ -797,23 +854,36 @@ func trimPercent(table string, percent float32) {
 	runSQL(sqlStr)
 }
 
-// runSQL runs the specified SQL
-// results are not read
-// errors are logged
-func runSQL(sqlStr string) {
+// runSQL runs the specified SQL and returns the result which may be nothing
+// mainly used for the PRAGMA commands used to get information about the database
+func runSQL(sqlStr string) string {
+	var stmt *sql.Stmt
+	var rows *sql.Rows
+	var err error
+	var result string = ""
+
 	logger.Debug("SQL: %s\n", sqlStr)
-	stmt, err := dbMain.Prepare(sqlStr)
+
+	stmt, err = dbMain.Prepare(sqlStr)
 	if err != nil {
-		logger.Warn("Failed to prepare statement: %s %s\n", err.Error(), sqlStr)
-		return
+		logger.Warn("Failed to Prepare statement: %s %s\n", err.Error(), sqlStr)
+		return result
 	}
-	_, err = stmt.Exec()
+
+	defer stmt.Close()
+
+	rows, err = stmt.Query()
 	if err != nil {
-		logger.Warn("Failed to exec statement: %s %s\n", err.Error(), sqlStr)
-		return
+		logger.Warn("Failed to Query statement: %s %s\n", err.Error(), sqlStr)
+		return result
 	}
-	err = stmt.Close()
-	if err != nil {
-		logger.Warn("Failed to close statement: %s %s\n", err.Error(), sqlStr)
+
+	defer rows.Close()
+
+	// we only look at the first row returned
+	if rows.Next() {
+		rows.Scan(&result)
 	}
+
+	return result
 }

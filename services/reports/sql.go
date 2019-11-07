@@ -10,7 +10,6 @@ import (
 )
 
 // makeSQLString makes a SQL string from a ReportEntry
-// You must hold the dbLock read lock to call this function
 func makeSQLString(reportEntry *ReportEntry) (string, error) {
 	if reportEntry.Table == "" {
 		return "", errors.New("Missing required attribute Table")
@@ -304,11 +303,14 @@ func getDistinctValues(reportEntry *ReportEntry) ([]string, error) {
 		logger.Warn("Failed to get Distinct values: %v\n", err)
 		return nil, err
 	}
+
+	// rows is valid so make sure it gets closed
+	defer rows.Close()
+
 	categories, err := getRows(rows, reportEntry.QueryCategories.Limit)
 	if err != nil {
 		return nil, err
 	}
-	rows.Close()
 
 	var values []string
 

@@ -133,6 +133,8 @@ func Startup() {
 	engine.Static("/reports", "/www/reports")
 	engine.Static("/setup", "/www/setup")
 	engine.Static("/static", "/www/static")
+	// handle 404 routes
+	engine.NoRoute(noRouteHandler)
 
 	prof := engine.Group("/pprof")
 	prof.Use(authRequired(engine))
@@ -191,6 +193,15 @@ func rootHandler(c *gin.Context) {
 	} else {
 		c.Redirect(http.StatusTemporaryRedirect, "/setup")
 	}
+}
+
+// handles 404 routes
+func noRouteHandler(c *gin.Context) {
+	// MFW-704 - return 200 for JS map files requested by Safari on Mac
+	if strings.Contains(c.Request.URL.Path, ".js.map") {
+		c.String(http.StatusOK, "")
+	}
+	// otherwise browser will default to its 404 handler
 }
 
 func pingHandler(c *gin.Context) {
