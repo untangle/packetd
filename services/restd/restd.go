@@ -64,14 +64,16 @@ func Startup() {
 
 	engine.GET("/ping", pingHandler)
 
-	engine.POST("/account/login", authLogin)
+	engine.GET("/admin", authRequired())
+
+	engine.POST("/account/login", authRequired())
 	//engine.GET("/account/login", authLogin)
 	engine.POST("/account/logout", authLogout)
 	engine.GET("/account/logout", authLogout)
 	engine.GET("/account/status", authStatus)
 
 	api := engine.Group("/api")
-	api.Use(authRequired(engine))
+	api.Use(authRequired())
 
 	api.GET("/settings", getSettings)
 	api.GET("/settings/*path", getSettings)
@@ -137,7 +139,7 @@ func Startup() {
 	engine.NoRoute(noRouteHandler)
 
 	prof := engine.Group("/pprof")
-	prof.Use(authRequired(engine))
+	prof.Use(authRequired())
 
 	prof.GET("/", pprofHandler(pprof.Index))
 	prof.GET("/cmdline", pprofHandler(pprof.Cmdline))

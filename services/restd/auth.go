@@ -29,7 +29,7 @@ type CustomJWTPayload struct {
 	//IsLoggedIn  bool   `json:"isLoggedIn"`
 }
 
-func authRequired(engine *gin.Engine) gin.HandlerFunc {
+func authRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// If alread logged in, continue
 		session := sessions.Default(c)
@@ -505,9 +505,19 @@ func checkCommandCenterToken(c *gin.Context) bool {
 			return false
 		}
 		if string(b) == "true" {
+			session := sessions.Default(c)
+			session.Set("username", "root")
+			err := session.Save()
+			if err == nil {
 			return true
 		}
+
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
+			return false
+		}
 	}
+
+	logger.Info("Token verification failed %v\n", resp)
 
 	return false
 }
