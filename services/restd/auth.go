@@ -502,7 +502,16 @@ func checkCommandCenterToken(c *gin.Context) bool {
 	}
 
 	logger.Info("Verify token: %v\n", token)
-	resp, err := http.Post("https://auth.untangle.com/v1/CheckTokenAccess", "application/json", bytes.NewBuffer(bytesdata))
+
+	transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	client := &http.Client{Transport: transport, Timeout: time.Duration(5 * time.Second)}
+
+	req, err := http.NewRequest("POST", "https://auth.untangle.com/v1/CheckTokenAccess", bytes.NewBuffer(bytesdata))
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("AuthRequest", "93BE7735-E9F2-487A-9DD4-9D05B95640F5")
+
+	resp, err := client.Do(req)
+
 	if err != nil {
 		logger.Warn("Failed to verify token: %s\n", err.Error())
 		return false
@@ -514,9 +523,15 @@ func checkCommandCenterToken(c *gin.Context) bool {
 			logger.Warn("Failed to parse body: %s\n", err.Error())
 			return false
 		}
+
+		logger.Info("Checking response... %v\n", string(b))
+
 		if string(b) == "true" {
+
+			logger.Info("Token verification successful \n")
+
 			session := sessions.Default(c)
-			session.Set("username", "root")
+			session.Set("username", "command-center")
 			err := session.Save()
 			if err == nil {
 			return true
