@@ -51,6 +51,13 @@ func authRequired() gin.HandlerFunc {
 			return
 		}
 
+		//Check UN/PW form data
+		if authLogin(c) {
+			c.Next()
+			return
+		}
+
+		//Check the token from cmd/command center
 		if checkCommandCenterToken(c) {
 			c.Next()
 			return
@@ -251,7 +258,7 @@ func checkAuthLocal(c *gin.Context) bool {
 	return false
 }
 
-func authLogin(c *gin.Context) {
+func authLogin(c *gin.Context) bool {
 	// If this is not a POST, send them to the login page
 	// if c.Request.Method != http.MethodPost {
 	// 	c.File("/www/admin/login.html")
@@ -263,7 +270,7 @@ func authLogin(c *gin.Context) {
 	password := c.PostForm("password")
 	if strings.Trim(username, " ") == "" || strings.Trim(password, " ") == "" {
 		c.File("/admin/login.html")
-		return
+		return false
 	}
 
 	// This is a POST, with a username/password. Try to login, set an expiration token for 86400 seconds (24 hours)
@@ -274,12 +281,15 @@ func authLogin(c *gin.Context) {
 		err := session.Save()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
-		} else {
-			c.JSON(http.StatusOK, gin.H{"message": "Successfully authenticated user"})
+			return false
 		}
-	} else {
+
+			c.JSON(http.StatusOK, gin.H{"message": "Successfully authenticated user"})
+		return true
+		}
+
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization failed: Invalid username/password"})
-	}
+	return false
 }
 
 func authLogout(c *gin.Context) {
