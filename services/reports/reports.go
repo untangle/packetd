@@ -140,7 +140,7 @@ func Startup() {
 	sql.Register("sqlite3_custom", &sqlite3.SQLiteDriver{ConnectHook: customHook})
 
 	dbVersion, _, _ := sqlite3.Version()
-	dsn = fmt.Sprintf("file:%s/%s?cache=shared&mode=rwc", dbFILEPATH, dbFILENAME)
+	dsn = fmt.Sprintf("file:%s/%s?mode=rwc", dbFILEPATH, dbFILENAME)
 	dbMain, err = sql.Open("sqlite3_custom", dsn)
 
 	if err != nil {
