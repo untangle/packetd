@@ -23,6 +23,9 @@ const cloudAPIPort = "443"
 // number of seconds to wait before timeout of connection Write and Read calls
 const cloudAPITimeout = 10
 
+// the interval with no traffic to send a dummy request to the cloud server to keep the session alive
+const cloudAPIKeepalive = 45
+
 // authRequestKey contains the authrequestkey for authenticating against the cloud API endpoint
 const authRequestKey = "4E6FAB77-B2DF-4DEA-B6BD-2B434A3AE981"
 
@@ -258,7 +261,7 @@ func lookupWorker(index int) {
 		return
 	}
 
-	// process requests until the goodbye flag is set by the shutdown channel
+	// process requests until the goodbye flag gets set via the shutdown channel
 	// The trafficLookup function will return true if a connection problem was
 	// detected so we use that to trigger reconnect. If the reconnect fails here
 	// the next time we try to handle a request the broken connection will be
@@ -266,6 +269,9 @@ func lookupWorker(index int) {
 	// When trafficLookup does indicate a connection problem it will NOT write
 	// to the result channel and we push the request back on the request channel
 	// allowing another lookup attempt.
+	// The cloud server seems to timeout active connections after a period of
+	// inactivity so we use a timeout case to force a dummy request when we go
+	// too long without servicing an actual prediction request.
 	for goodbye == false {
 		select {
 		case request := <-requestChannel:
@@ -295,6 +301,9 @@ func lookupWorker(index int) {
 			}
 		case <-shutdownChannel:
 			goodbye = true
+		case <-time.After(cloudAPIKeepalive * time.Second):
+			logger.Info("Lookup worker %d sending keep-alive message\n", index)
+			sessionKeepalive(conn, buffer)
 		}
 	}
 
@@ -417,4 +426,78 @@ func trafficLookup(conn *tls.Conn, buffer []byte, request *predictionRequest) bo
 	logger.Debug("Prediction response: %v\n", trafficResponse)
 	request.resultChannel <- trafficResponse
 	return false
+}
+
+// sessionKeepalive sends a dummy request just to generate traffic and keep our persistent connection active
+func sessionKeepalive(conn *tls.Conn, buffer []byte) {
+	var message strings.Builder
+	var reply string
+	var err error
+	var count int
+
+	// create the GET request
+	message.WriteString("GET /v1/traffic?ip=0.0.0.0&port=0&protocolId=0 HTTP/1.1\r\n")
+	message.WriteString("Host: " + cloudAPIHost + "\r\n")
+	message.WriteString("User-Agent: Untangle Packet Daemon\r\n")
+	message.WriteString("Content-Type: application/json\r\n")
+	message.WriteString("AuthRequest: " + authRequestKey + "\r\n")
+	message.WriteString("Connection: Keep-Alive\r\n")
+	message.WriteString("\r\n")
+
+	// write the request to the server
+	conn.SetWriteDeadline(time.Now().Add(cloudAPITimeout * time.Second))
+	count, err = conn.Write([]byte(message.String()))
+	if err != nil {
+		logger.Err("Error writing keepAlive to server: %v\n", err)
+		return
+	}
+
+	if count != message.Len() {
+		logger.Warn("Truncation writing keepAlive to server. Have:%d Sent:%d\n", message.Len(), count)
+		return
+	}
+
+	logger.Trace("Transmitted %d keepAlive bytes to server...\n%v\n", count, message.String())
+
+	// reset our string builder so we can use it to store the server response
+	message.Reset()
+
+	// read from the server until we get a complete response or we timeout
+	for {
+		conn.SetReadDeadline(time.Now().Add(cloudAPITimeout * time.Second))
+		count, err = conn.Read(buffer)
+		if err != nil {
+			logger.Err("Error reading keepAlive from server: %v\n", err)
+			return
+		}
+
+		// make sure we got something from the server
+		if count < 1 {
+			continue
+		}
+
+		// append the data we received to the message buffer
+		message.Write(buffer[:count])
+		reply = message.String()
+
+		// if we don't find the header/end body/top go back for more data
+		if strings.Index(reply, "\r\n\r\n") < 0 {
+			continue
+		}
+
+		// if the last character isn't the final JSON bracket go back for more data
+		if reply[message.Len()-1] != '}' {
+			continue
+		}
+
+		// FIXME - the cleanest way to ensure we have the full response would be to find
+		// Content-Length in the header and verify we get a response body of the indicated
+		// size. That's a lot of extra parsing and probably overkill. I have yet to see the
+		// full reply need more than a single read, so the simple checks above should be fine.
+
+		// we seem to have a valid response so break out of the read loop
+		break
+	}
+
+	logger.Info("Received %d keepAlive bytes from server...\n%s\n", count, reply)
 }
