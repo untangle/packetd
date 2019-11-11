@@ -302,7 +302,7 @@ func lookupWorker(index int) {
 		case <-shutdownChannel:
 			goodbye = true
 		case <-time.After(cloudAPIKeepalive * time.Second):
-			logger.Info("Lookup worker %d sending keep-alive message\n", index)
+			logger.Debug("%OC|Lookup worker %d sending keep-alive message\n", "predict_server_keepalive", 0, index)
 			sessionKeepalive(conn, buffer)
 		}
 	}
