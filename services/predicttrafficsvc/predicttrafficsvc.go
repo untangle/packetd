@@ -499,5 +499,5 @@ func sessionKeepalive(conn *tls.Conn, buffer []byte) {
 		break
 	}
 
-	logger.Info("Received %d keepAlive bytes from server...\n%s\n", count, reply)
+	logger.Trace("Received %d keepAlive bytes from server...\n%s\n", count, reply)
 }
