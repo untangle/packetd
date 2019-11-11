@@ -36,7 +36,14 @@ type predictionRequest struct {
 	ipProtocol    uint8
 	servicePort   uint16
 	resultChannel chan *ClassifiedTraffic
+	hitCount      int
 }
+
+// number of times to retry prediction lookup after failure due to connection problems
+// this will be calculated as CPU_COUNT + 1 to handle the worst case scenario where all
+// of the active connections timeout at the same time and a request just happens to
+// be tried by all of them.
+var cloudAPIRetry int
 
 // ClassifiedTraffic struct contains the API response data
 type ClassifiedTraffic struct {
@@ -68,7 +75,7 @@ var trafficMutex sync.Mutex
 var shutdownChannel = make(chan bool)
 
 // requestChannel is polled by all of the prediction worker goroutines
-var requestChannel = make(chan *predictionRequest)
+var requestChannel = make(chan *predictionRequest, 16)
 
 // workerGroup is used to allow the Shutdown function to wait for all worker goroutines to finish
 var workerGroup sync.WaitGroup
@@ -81,6 +88,8 @@ func Startup() {
 	// start the cleanup goroutine
 	workerGroup.Add(1)
 	go cleanStaleTrafficItems()
+
+	cloudAPIRetry = (runtime.NumCPU() + 1)
 
 	// create one worker goroutine for each CPU for processing prediction requests
 	for x := 0; x < runtime.NumCPU(); x++ {
@@ -135,6 +144,7 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 		xmit.ipAddress = ipAdd.String()
 		xmit.servicePort = port
 		xmit.ipProtocol = protoID
+		xmit.hitCount = 0
 		xmit.resultChannel = make(chan *ClassifiedTraffic, 1)
 		requestChannel <- xmit
 		classifiedTraffic = <-xmit.resultChannel
@@ -250,14 +260,26 @@ func lookupWorker(index int) {
 
 	// process requests until the goodbye flag is set by the shutdown channel
 	// The trafficLookup function will return true if a connection problem was
-	// detected so we use that to trigger the reconnect. If the reconnect fails
-	// here, the next time we try to handle a request the broken connection will
-	// be detected by trafficLookup which will trigger another reconnect attempt.
+	// detected so we use that to trigger reconnect. If the reconnect fails here
+	// the next time we try to handle a request the broken connection will be
+	// detected by trafficLookup which will trigger another reconnect attempt.
+	// When trafficLookup does indicate a connection problem it will NOT write
+	// to the result channel and we push the request back on the request channel
+	// allowing another lookup attempt.
 	for goodbye == false {
 		select {
 		case request := <-requestChannel:
+			// if this request has exceeded the retry count send the unknown result
+			if request.hitCount > cloudAPIRetry {
+				logger.Warn("Exceeded retry count for %v\n", request)
+				request.resultChannel <- unknownTrafficItem
+				continue
+			}
 			problem := trafficLookup(conn, buffer, request)
 			if problem == true {
+				// couldn't talk to the server so increment the hit count and push the request back on the channel for another try
+				request.hitCount++
+				requestChannel <- request
 				logger.Warn("Lookup worker %d recycling connection\n", index)
 				conn.Close()
 				conn, err = tls.Dial("tcp", cloudAPIHost+":"+cloudAPIPort, nil)
@@ -308,14 +330,12 @@ func trafficLookup(conn *tls.Conn, buffer []byte, request *predictionRequest) bo
 	count, err = conn.Write([]byte(message.String()))
 	if err != nil {
 		logger.Err("Error writing to server: %v\n", err)
-		request.resultChannel <- unknownTrafficItem
 		return true
 	}
 
 	if count != message.Len() {
 		logger.Warn("Truncation writing to server. Have:%d Sent:%d\n", message.Len(), count)
-		request.resultChannel <- unknownTrafficItem
-		return false
+		return true
 	}
 
 	logger.Trace("Transmitted %d bytes to server...\n%v\n", count, message.String())
@@ -329,7 +349,6 @@ func trafficLookup(conn *tls.Conn, buffer []byte, request *predictionRequest) bo
 		count, err = conn.Read(buffer)
 		if err != nil {
 			logger.Err("Error reading from server: %v\n", err)
-			request.resultChannel <- unknownTrafficItem
 			return true
 		}
 
