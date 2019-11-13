@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -51,12 +52,37 @@ var trafficMutex sync.Mutex
 // shutdownChannel is used when destroying the service to shutdown the cache cleaning utility safely
 var shutdownChannel = make(chan bool)
 
+var transport *http.Transport
+var client *http.Client
+
 // Startup is called during service startup
 func Startup() {
 	logger.Info("Starting up the traffic classification service\n")
 	classifiedTrafficCache = make(map[string]*CachedTrafficItem)
 	go cleanStaleTrafficItems()
 
+	// Build a persistent transport based on the http.DefaultTransport but with
+	// shorter timeouts and idle settings that will keep the connections alive
+	// to allow for quick transactions. We set maximum idle to the number of
+	// CPU's to allow one active connection per nfqueue thread.
+	transport = &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   5 * time.Second,
+			KeepAlive: 300 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          runtime.NumCPU(),
+		MaxIdleConnsPerHost:   runtime.NumCPU(),
+		IdleConnTimeout:       300 * time.Second,
+		TLSHandshakeTimeout:   5 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	client = &http.Client{
+		Timeout:   5 * time.Second,
+		Transport: transport,
+	}
 }
 
 // Shutdown is called to handle service shutdown
@@ -87,6 +113,7 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 	trafficMutex.Lock()
 	classifiedTraffic = findCachedTraffic(mapKey)
 	trafficMutex.Unlock()
+
 	if classifiedTraffic == nil {
 		classifiedTraffic = sendClassifyRequest(ipAdd, port, protoID)
 		storeCachedTraffic(mapKey, classifiedTraffic)
@@ -108,30 +135,15 @@ func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) *ClassifiedTr
 	var trafficResponse *ClassifiedTraffic
 
 	requestURL := formRequestURL(ipAdd, port, protoID)
-
-	// build the transport based on the http.DefaultTransport, but with 1 second timeouts
-	tr := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   1 * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
-		}).DialContext,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   1 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
+	logger.Debug("Prediction request: %s\n", requestURL)
 
 	req, err := http.NewRequest("GET", requestURL, nil)
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("AuthRequest", authRequestKey)
 
-	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
 
 	if err != nil {
-
 		// timeout requests are handled differently
 		if err.(net.Error).Timeout() {
 			logger.Warn("%OC|Cloud API request to %s has timed out, error: %v\n", "traffic_prediction_cloud_api_timeout", 10, cloudAPIEndpoint, err)
@@ -154,6 +166,7 @@ func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) *ClassifiedTr
 
 		json.Unmarshal([]byte(bodyString), &trafficResponse)
 
+		logger.Debug("Prediction response: %v\n", *trafficResponse)
 		return trafficResponse
 	}
 
