@@ -292,8 +292,8 @@ func attachNetworkDetails(worker *interfaceInfo, ubusNetworkList []interface{}, 
 func attachDeviceDetails(worker *interfaceInfo, ubusDeviceMap map[string]interface{}) {
 	// The ubus network.device status returns a json object that includes details
 	// for every configured device. It includes any defined bridges and the list
-	// of members, but fortunately it also has a valid up boolean for each member
-	// so we don't have to mess with parsing the bridge-members array.
+	// of members, but fortunately it also has a valid carrier boolean for each
+	// member so we don't have to mess with parsing the bridge-members array.
 	for device, item := range ubusDeviceMap {
 		// see if the device matches the one we are looking for
 		if device != worker.Device {
@@ -303,8 +303,8 @@ func attachDeviceDetails(worker *interfaceInfo, ubusDeviceMap map[string]interfa
 		// make a map of the values for the interface
 		if list, ok := item.(map[string]interface{}); ok {
 
-			// look for and extract the up boolan
-			if ptr, ok := list["up"]; ok {
+			// look for and extract the carrier boolan
+			if ptr, ok := list["carrier"]; ok {
 				worker.Connected = ptr.(bool)
 			}
 		}
