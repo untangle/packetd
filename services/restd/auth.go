@@ -285,11 +285,11 @@ func authLogin(c *gin.Context) bool {
 			return false
 		}
 
-			c.JSON(http.StatusOK, gin.H{"message": "Successfully authenticated user"})
+		c.JSON(http.StatusOK, gin.H{"message": "Successfully authenticated user"})
 		return true
-		}
+	}
 
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization failed: Invalid username/password"})
+	c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization failed: Invalid username/password"})
 	return false
 }
 
@@ -502,7 +502,7 @@ func checkCommandCenterToken(c *gin.Context) bool {
 		return false
 	}
 
-	logger.Info("Verify token: %v\n", token)
+	logger.Debug("Verify token: %v\n", token)
 
 	transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 	client := &http.Client{Transport: transport, Timeout: time.Duration(5 * time.Second)}
@@ -525,25 +525,25 @@ func checkCommandCenterToken(c *gin.Context) bool {
 			return false
 		}
 
-		logger.Info("Checking response... %v\n", string(b))
+		logger.Debug("Checking response... %v\n", string(b))
 
 		if string(b) == "true" {
 
-			logger.Info("Token verification successful \n")
+			logger.Debug("Token verification successful \n")
 
 			session := sessions.Default(c)
 			session.Set("username", "command-center")
 			err := session.Save()
 			if err == nil {
-			return true
-		}
+				return true
+			}
 
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
 			return false
 		}
 	}
 
-	logger.Info("Token verification failed %v\n", resp)
+	logger.Debug("Token verification failed %v\n", resp)
 
 	return false
 }
