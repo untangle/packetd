@@ -76,7 +76,7 @@ func Startup() {
 		MaxIdleConnsPerHost:   runtime.NumCPU(),
 		IdleConnTimeout:       300 * time.Second,
 		TLSHandshakeTimeout:   5 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
+		ExpectContinueTimeout: 0,
 	}
 
 	client = &http.Client{
@@ -140,6 +140,7 @@ func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) *ClassifiedTr
 	req, err := http.NewRequest("GET", requestURL, nil)
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("AuthRequest", authRequestKey)
+	req.Header.Add("Connection", "Keep-Alive")
 
 	resp, err := client.Do(req)
 
