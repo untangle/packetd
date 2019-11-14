@@ -260,11 +260,10 @@ func checkAuthLocal(c *gin.Context) bool {
 }
 
 func authLogin(c *gin.Context) bool {
-	// If this is not a POST, send them to the login page
-	// if c.Request.Method != http.MethodPost {
-	// 	c.File("/www/admin/login.html")
-	// 	return
-	// }
+	// If this is not a POST, just return false
+	if c.Request.Method != http.MethodPost {
+		return false
+	}
 
 	// If this is a POST, but does not have username/password, send them to the login page
 	username := c.PostForm("username")
