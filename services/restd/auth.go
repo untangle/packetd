@@ -2,6 +2,7 @@ package restd
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -29,7 +30,7 @@ type CustomJWTPayload struct {
 	//IsLoggedIn  bool   `json:"isLoggedIn"`
 }
 
-func authRequired(engine *gin.Engine) gin.HandlerFunc {
+func authRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// If alread logged in, continue
 		session := sessions.Default(c)
@@ -51,6 +52,13 @@ func authRequired(engine *gin.Engine) gin.HandlerFunc {
 			return
 		}
 
+		//Check UN/PW form data
+		if authLogin(c) {
+			c.Next()
+			return
+		}
+
+		//Check the token from cmd/command center
 		if checkCommandCenterToken(c) {
 			c.Next()
 			return
@@ -251,7 +259,7 @@ func checkAuthLocal(c *gin.Context) bool {
 	return false
 }
 
-func authLogin(c *gin.Context) {
+func authLogin(c *gin.Context) bool {
 	// If this is not a POST, send them to the login page
 	// if c.Request.Method != http.MethodPost {
 	// 	c.File("/www/admin/login.html")
@@ -263,7 +271,7 @@ func authLogin(c *gin.Context) {
 	password := c.PostForm("password")
 	if strings.Trim(username, " ") == "" || strings.Trim(password, " ") == "" {
 		c.File("/admin/login.html")
-		return
+		return false
 	}
 
 	// This is a POST, with a username/password. Try to login, set an expiration token for 86400 seconds (24 hours)
@@ -274,12 +282,15 @@ func authLogin(c *gin.Context) {
 		err := session.Save()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
-		} else {
-			c.JSON(http.StatusOK, gin.H{"message": "Successfully authenticated user"})
+			return false
 		}
-	} else {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization failed: Invalid username/password"})
+
+		c.JSON(http.StatusOK, gin.H{"message": "Successfully authenticated user"})
+		return true
 	}
+
+	c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization failed: Invalid username/password"})
+	return false
 }
 
 func authLogout(c *gin.Context) {
@@ -491,8 +502,17 @@ func checkCommandCenterToken(c *gin.Context) bool {
 		return false
 	}
 
-	logger.Info("Verify token: %v\n", token)
-	resp, err := http.Post("https://auth.untangle.com/v1/CheckTokenAccess", "application/json", bytes.NewBuffer(bytesdata))
+	logger.Debug("Verify token: %v\n", token)
+
+	transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	client := &http.Client{Transport: transport, Timeout: time.Duration(5 * time.Second)}
+
+	req, err := http.NewRequest("POST", "https://auth.untangle.com/v1/CheckTokenAccess", bytes.NewBuffer(bytesdata))
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("AuthRequest", "93BE7735-E9F2-487A-9DD4-9D05B95640F5")
+
+	resp, err := client.Do(req)
+
 	if err != nil {
 		logger.Warn("Failed to verify token: %s\n", err.Error())
 		return false
@@ -504,10 +524,26 @@ func checkCommandCenterToken(c *gin.Context) bool {
 			logger.Warn("Failed to parse body: %s\n", err.Error())
 			return false
 		}
+
+		logger.Debug("Checking response... %v\n", string(b))
+
 		if string(b) == "true" {
-			return true
+
+			logger.Debug("Token verification successful \n")
+
+			session := sessions.Default(c)
+			session.Set("username", "command-center")
+			err := session.Save()
+			if err == nil {
+				return true
+			}
+
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
+			return false
 		}
 	}
+
+	logger.Debug("Token verification failed %v\n", resp)
 
 	return false
 }
