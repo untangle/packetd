@@ -65,7 +65,6 @@ func Startup() {
 	engine.GET("/ping", pingHandler)
 
 	engine.POST("/account/login", authRequired())
-	//engine.GET("/account/login", authLogin)
 	engine.POST("/account/logout", authLogout)
 	engine.GET("/account/logout", authLogout)
 	engine.GET("/account/status", authStatus)
