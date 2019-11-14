@@ -634,6 +634,7 @@ func addTokenToSession(c *gin.Context) {
 	if err != nil {
 		logger.Warn("Error saving session: %s\n", err.Error())
 	}
+	authRequired()
 }
 
 // returns true if the setup wizard is completed, or false if not
