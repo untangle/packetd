@@ -42,24 +42,48 @@ func authRequired() gin.HandlerFunc {
 
 		// If the connection is from the local host, check if its authorized
 		if checkAuthLocal(c) {
+			if !setAuthSession(c, "root", "") {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create 'root' session"})
+				c.Abort()
+			}
+
 			c.Next()
 			return
 		}
 
 		// Check if the connection has valid basic http auth credentials
-		if checkHTTPAuth(c) {
+		httpAuth, username, password := checkHTTPAuth(c)
+		if httpAuth {
+			if !setAuthSession(c, username, password) {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create HTTP auth session"})
+				c.Abort()
+			}
+
+			c.JSON(http.StatusOK, gin.H{"message": "Successfully authenticated user"})
 			c.Next()
 			return
 		}
 
 		//Check UN/PW form data
-		if authLogin(c) {
+		formAuth, username, password := checkFormAuth(c)
+
+		if formAuth {
+			if !setAuthSession(c, username, password) {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create form auth session"})
+				c.Abort()
+			}
+			c.JSON(http.StatusOK, gin.H{"message": "Successfully authenticated user"})
 			c.Next()
 			return
 		}
 
 		//Check the token from cmd/command center
 		if checkCommandCenterToken(c) {
+			if !setAuthSession(c, "command-center", "") {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create 'command-center' session"})
+				c.Abort()
+			}
+
 			c.Next()
 			return
 		}
@@ -74,6 +98,11 @@ func authRequired() gin.HandlerFunc {
 
 		// if the setup wizard is not completed, auth is not required
 		if !isSetupWizardCompleted() {
+			if !setAuthSession(c, "setup", "") {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create 'setup' session"})
+				c.Abort()
+			}
+
 			c.Next()
 			return
 		}
@@ -140,10 +169,7 @@ func checkJWTToken(c *gin.Context) (bool, string) {
 		}
 	}
 
-	session := sessions.Default(c)
-	session.Set("username", payload.Payload.Subject)
-	err = session.Save()
-	if err == nil {
+	if setAuthSession(c, payload.Payload.Subject, "") {
 		logger.Info("JWT accepted: %s\n", payload.Payload.Subject)
 		return true, payload.Payload.Subject
 	}
@@ -190,48 +216,40 @@ func createJWTToken(username string) ([]byte, error) {
 // checkHTTPAuth checks the basic http auth & bearer http auth
 // returns false if request should continue to next auth technique
 // returns true if the auth is valid and the request should be allowed
-func checkHTTPAuth(c *gin.Context) bool {
+func checkHTTPAuth(c *gin.Context) (bool, string, string) {
 	authHeader := c.Request.Header.Get("Authorization")
 	if authHeader == "" {
 		// continue, not an error though so don't set an error
-		return false
+		return false, "", ""
 	}
 
 	auth := strings.SplitN(c.Request.Header.Get("Authorization"), " ", 2)
 	if len(auth) != 2 {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Invalid Authorization Header"})
-		return false
+		return false, "", ""
 	}
 	if auth[0] != "Basic" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Invalid Authorization Type"})
-		return false
+		return false, "", ""
 	}
 
 	decoded, err := base64.StdEncoding.DecodeString(auth[1])
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Invalid Base64 Format in Authorization Header"})
-		return false
+		return false, "", ""
 	}
 
 	pair := strings.SplitN(string(decoded), ":", 2)
 	if len(pair) != 2 {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Invalid Authorization Header Format"})
-		return false
+		return false, "", ""
 	}
 	if !validate(pair[0], pair[1]) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Authorization Failed"})
-		return false
+		return false, "", ""
 	}
 
-	session := sessions.Default(c)
-	session.Set("username", pair[0])
-	err = session.Save()
-	if err == nil {
-		return true
-	}
-
-	c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
-	return false
+	return true, pair[0], pair[1]
 }
 
 // checkAuthLocal checks if the local connecting process is authorized
@@ -244,53 +262,32 @@ func checkAuthLocal(c *gin.Context) bool {
 
 	if err == nil && (ip == "::1" || ip == "127.0.0.1") {
 		if isLocalProcessRoot(ip, port) {
-			session := sessions.Default(c)
-			session.Set("username", "root")
-			err := session.Save()
-			if err == nil {
-				return true
-			}
-
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
-			return false
+			return true
 		}
 	}
 	// continue, not an error though so don't set an error
 	return false
 }
 
-func authLogin(c *gin.Context) bool {
-	// If this is not a POST, send them to the login page
-	// if c.Request.Method != http.MethodPost {
-	// 	c.File("/www/admin/login.html")
-	// 	return
-	// }
+func checkFormAuth(c *gin.Context) (bool, string, string) {
+	// If this is not a POST, just return false
+	if c.Request.Method != http.MethodPost {
+		return false, "", ""
+	}
 
 	// If this is a POST, but does not have username/password, send them to the login page
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 	if strings.Trim(username, " ") == "" || strings.Trim(password, " ") == "" {
-		c.File("/admin/login.html")
-		return false
+		return false, "", ""
 	}
 
 	// This is a POST, with a username/password. Try to login, set an expiration token for 86400 seconds (24 hours)
-	session := sessions.Default(c)
 	if validate(username, password) {
-		session.Set("username", username)
-		session.Options(sessions.Options{Path: "/", MaxAge: 86400})
-		err := session.Save()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
-			return false
-		}
-
-		c.JSON(http.StatusOK, gin.H{"message": "Successfully authenticated user"})
-		return true
+		return true, username, password
 	}
 
-	c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization failed: Invalid username/password"})
-	return false
+	return false, "", ""
 }
 
 func authLogout(c *gin.Context) {
@@ -530,20 +527,29 @@ func checkCommandCenterToken(c *gin.Context) bool {
 		if string(b) == "true" {
 
 			logger.Debug("Token verification successful \n")
-
-			session := sessions.Default(c)
-			session.Set("username", "command-center")
-			err := session.Save()
-			if err == nil {
-				return true
-			}
-
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create session"})
-			return false
+			return true
 		}
 	}
 
 	logger.Debug("Token verification failed %v\n", resp)
+
+	return false
+}
+
+func setAuthSession(c *gin.Context, username string, password string) bool {
+	session := sessions.Default(c)
+	session.Set("username", username)
+
+	if strings.Trim(password, " ") != "" {
+		session.Set("password", password)
+	}
+
+	session.Options(sessions.Options{Path: "/", MaxAge: 86400})
+
+	err := session.Save()
+	if err == nil {
+		return true
+	}
 
 	return false
 }
