@@ -307,6 +307,8 @@ func authLogout(c *gin.Context) {
 		session.Save()
 		c.JSON(http.StatusOK, gin.H{"message": "Successfully logged out"})
 	}
+
+	return
 }
 
 // authStatus returns (via a json http reply) the auth status of the current session
