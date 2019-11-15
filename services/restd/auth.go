@@ -350,6 +350,8 @@ func authStatus(c *gin.Context) {
 		}
 		c.JSON(http.StatusOK, credentialsJSON)
 	}
+
+	return
 }
 
 func getCredentials(username string) map[string]interface{} {
