@@ -45,6 +45,7 @@ func authRequired() gin.HandlerFunc {
 			if !setAuthSession(c, "root", "") {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create 'root' session"})
 				c.Abort()
+				return
 			}
 
 			c.Next()
@@ -57,6 +58,7 @@ func authRequired() gin.HandlerFunc {
 			if !setAuthSession(c, username, password) {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create HTTP auth session"})
 				c.Abort()
+				return
 			}
 
 			c.JSON(http.StatusOK, gin.H{"message": "Successfully authenticated user"})
@@ -71,6 +73,7 @@ func authRequired() gin.HandlerFunc {
 			if !setAuthSession(c, username, password) {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create form auth session"})
 				c.Abort()
+				return
 			}
 			c.JSON(http.StatusOK, gin.H{"message": "Successfully authenticated user"})
 			c.Next()
@@ -82,6 +85,7 @@ func authRequired() gin.HandlerFunc {
 			if !setAuthSession(c, "command-center", "") {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create 'command-center' session"})
 				c.Abort()
+				return
 			}
 
 			c.Next()
@@ -101,6 +105,7 @@ func authRequired() gin.HandlerFunc {
 			if !setAuthSession(c, "setup", "") {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create 'setup' session"})
 				c.Abort()
+				return
 			}
 
 			c.Next()
@@ -109,6 +114,7 @@ func authRequired() gin.HandlerFunc {
 
 		c.JSON(http.StatusForbidden, gin.H{"error": "Authorization failed"})
 		c.Abort()
+		return
 	}
 }
 
