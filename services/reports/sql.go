@@ -67,6 +67,15 @@ func makeTextSQLString(reportEntry *ReportEntry) (string, error) {
 
 // makeEventsSQLString makes a SQL string from a EVENTS type ReportEntry
 func makeEventsSQLString(reportEntry *ReportEntry) (string, error) {
+	var orderByColumn = "time_stamp"
+	var order = "DESC"
+	if reportEntry.QueryEvents.OrderByColumn != "" {
+		orderByColumn = reportEntry.QueryEvents.OrderByColumn
+	}
+	if reportEntry.QueryEvents.OrderAsc {
+		order = "ASC"
+	}
+
 	sqlStr := "SELECT * FROM"
 	sqlStr += " " + escape(reportEntry.Table)
 	sqlStr += " WHERE"
@@ -81,6 +90,10 @@ func makeEventsSQLString(reportEntry *ReportEntry) (string, error) {
 		}
 		sqlStr += newStr
 	}
+
+	sqlStr += fmt.Sprintf(" ORDER BY %s %s", orderByColumn, order)
+
+	logger.Debug("Events SQL: %v %v\n", sqlStr)
 	return sqlStr, nil
 }
 
