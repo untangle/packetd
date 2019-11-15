@@ -30,6 +30,8 @@ type CustomJWTPayload struct {
 	//IsLoggedIn  bool   `json:"isLoggedIn"`
 }
 
+// authRequired is a middleware handler function within go that should be used for any authenticated endpoints within restD
+// it returns a context that is either successfully authenticated, contains an authorization error, or a server error for failed session creation
 func authRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// If alread logged in, continue
@@ -45,6 +47,7 @@ func authRequired() gin.HandlerFunc {
 			if !setAuthSession(c, "root", "") {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create 'root' session"})
 				c.Abort()
+				return
 			}
 
 			c.Next()
@@ -57,6 +60,7 @@ func authRequired() gin.HandlerFunc {
 			if !setAuthSession(c, username, password) {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create HTTP auth session"})
 				c.Abort()
+				return
 			}
 
 			c.JSON(http.StatusOK, gin.H{"message": "Successfully authenticated user"})
@@ -71,6 +75,7 @@ func authRequired() gin.HandlerFunc {
 			if !setAuthSession(c, username, password) {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create form auth session"})
 				c.Abort()
+				return
 			}
 			c.JSON(http.StatusOK, gin.H{"message": "Successfully authenticated user"})
 			c.Next()
@@ -82,6 +87,7 @@ func authRequired() gin.HandlerFunc {
 			if !setAuthSession(c, "command-center", "") {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create 'command-center' session"})
 				c.Abort()
+				return
 			}
 
 			c.Next()
@@ -101,6 +107,7 @@ func authRequired() gin.HandlerFunc {
 			if !setAuthSession(c, "setup", "") {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Authorization failed: Failed to create 'setup' session"})
 				c.Abort()
+				return
 			}
 
 			c.Next()
@@ -109,6 +116,7 @@ func authRequired() gin.HandlerFunc {
 
 		c.JSON(http.StatusForbidden, gin.H{"error": "Authorization failed"})
 		c.Abort()
+		return
 	}
 }
 
@@ -214,8 +222,9 @@ func createJWTToken(username string) ([]byte, error) {
 }
 
 // checkHTTPAuth checks the basic http auth & bearer http auth
-// returns false if request should continue to next auth technique
-// returns true if the auth is valid and the request should be allowed
+// returns bool - true for successful auth, false if we should continue to next auth method
+// returns string - the username from a successful http auth, to be stored in the session
+// returns string - the password from a successful http auth, to be stored in the session
 func checkHTTPAuth(c *gin.Context) (bool, string, string) {
 	authHeader := c.Request.Header.Get("Authorization")
 	if authHeader == "" {
@@ -253,8 +262,7 @@ func checkHTTPAuth(c *gin.Context) (bool, string, string) {
 }
 
 // checkAuthLocal checks if the local connecting process is authorized
-// returns false if request should continue to next auth technique
-// returns true if the auth is valid and the request should be allowed
+// returns bool - true for successful auth, false if we should continue to next auth method
 func checkAuthLocal(c *gin.Context) bool {
 	// If the connection is from the local host, check if its authorized
 	ip, port, err := net.SplitHostPort(c.Request.RemoteAddr)
@@ -269,6 +277,10 @@ func checkAuthLocal(c *gin.Context) bool {
 	return false
 }
 
+// checkFormAuth validates the authentication method using form data from a POST request
+// returns bool - true for successful auth, false if we should continue to next auth method
+// returns string - the username from a successful form POST auth, to be stored in the session
+// returns string - the password from a successful form POST auth, to be stored in the session
 func checkFormAuth(c *gin.Context) (bool, string, string) {
 	// If this is not a POST, just return false
 	if c.Request.Method != http.MethodPost {
@@ -290,6 +302,7 @@ func checkFormAuth(c *gin.Context) (bool, string, string) {
 	return false, "", ""
 }
 
+// authLogout will attempt to get the current username from session and remove that session data, causing a logout
 func authLogout(c *gin.Context) {
 	session := sessions.Default(c)
 	user := session.Get("username")
@@ -301,6 +314,8 @@ func authLogout(c *gin.Context) {
 		session.Save()
 		c.JSON(http.StatusOK, gin.H{"message": "Successfully logged out"})
 	}
+
+	return
 }
 
 // authStatus returns (via a json http reply) the auth status of the current session
@@ -344,8 +359,12 @@ func authStatus(c *gin.Context) {
 		}
 		c.JSON(http.StatusOK, credentialsJSON)
 	}
+
+	return
 }
 
+// getCredentials will retrieve configured credentials for a specific username
+// returns map[string]interface{} - the stored credentials for a specific username
 func getCredentials(username string) map[string]interface{} {
 	credentialsJSON, err := settings.GetCurrentSettings([]string{"accounts", "credentials"})
 	if credentialsJSON == nil || err != nil {
@@ -469,6 +488,7 @@ func isLocalProcessRoot(ip string, port string) bool {
 }
 
 // checkCommandCenterToken checks if the untangle auth token is valid
+// returns bool - true for successful auth, false if we should continue to next auth method
 func checkCommandCenterToken(c *gin.Context) bool {
 	token := c.Query("token")
 	if token == "" {
@@ -536,6 +556,10 @@ func checkCommandCenterToken(c *gin.Context) bool {
 	return false
 }
 
+// setAuthSession will set the proper username/password/sessionExpiration with provided data
+// param username - the username to set in the 'username' session
+// param password - optional - the password to set in the 'password' session
+// returns bool - true for successful session save, false if the session failed to save
 func setAuthSession(c *gin.Context, username string, password string) bool {
 	session := sessions.Default(c)
 	session.Set("username", username)
