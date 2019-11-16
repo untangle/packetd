@@ -65,6 +65,12 @@ type QuerySeriesOptions struct {
 	TimeIntervalSeconds int      `json:"timeIntervalSeconds"`
 }
 
+// QueryEventsOptions stores the query options for EVENTS type reports
+type QueryEventsOptions struct {
+	OrderByColumn string `json:"orderByColumn"`
+	OrderAsc      bool   `json:"orderAsc"`
+}
+
 // ReportCondition holds a SQL reporting condition (ie client = 1.2.3.4)
 type ReportCondition struct {
 	Column   string      `json:"column"`
@@ -94,6 +100,7 @@ type ReportEntry struct {
 	QueryCategories      QueryCategoriesOptions       `json:"queryCategories"`
 	QueryText            QueryTextOptions             `json:"queryText"`
 	QuerySeries          QuerySeriesOptions           `json:"querySeries"`
+	QueryEvents          QueryEventsOptions           `json:"queryEvents"`
 }
 
 var dbMain *sql.DB
