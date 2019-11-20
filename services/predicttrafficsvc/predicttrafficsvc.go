@@ -20,11 +20,14 @@ const cloudAPIEndpoint = "https://labs.untangle.com"
 // authRequestKey contains the authrequestkey for authenticating against the cloud API endpoint
 const authRequestKey = "4E6FAB77-B2DF-4DEA-B6BD-2B434A3AE981"
 
-// positiveCacheTimeout sets how long we store prediction results received from the cloud
-const positiveCacheTimeout = 86400
+// positiveCacheTime sets how long we store good prediction results received from the cloud
+const positiveCacheTime = time.Second * 86400
 
-// negativeCacheTimeout sets how long we store the unknown result when we couldn't reach the cloud
-const negativeCacheTimeout = 60
+// troubledCacheTime sets how long we store unknown result when there is an error or parsing the cloud response
+const troubledCacheTime = time.Second * 3600
+
+// negativeCacheTime sets how long we store an unknown result when we encouter a network error talking to the cloud
+const negativeCacheTime = time.Second * 60
 
 // ClassifiedTraffic struct contains the API response data
 type ClassifiedTraffic struct {
@@ -131,27 +134,13 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 		trafficMutex.Unlock()
 
 		// send the request to the cloud
-		result, neterr := sendClassifyRequest(ipAdd, port, protoID)
+		result, cachetime := sendClassifyRequest(ipAdd, port, protoID)
 
-		// Safely store the response if good, unknown if empty, and set the expiration time
+		// safely store the response and the cache time returned from the lookup
 		holder.dataLocker.Lock()
 		holder.expireTime = time.Now()
-		if result != nil {
-			// Good results always get a positive cache TTL
-			holder.trafficData = result
-			holder.expireTime.Add(time.Second * positiveCacheTimeout)
-		} else {
-			// Empty results get the negative cache TTL if there was a network error so
-			// we can retry in a bit. Any other empty result means we talked to the cloud
-			// but didn't get a valid response. In that case we assume there is no point
-			// in asking over and over and use the positive cache timeout
-			holder.trafficData = unknownTrafficItem
-			if neterr == true {
-				holder.expireTime.Add(time.Second * negativeCacheTimeout)
-			} else {
-				holder.expireTime.Add(time.Second * positiveCacheTimeout)
-			}
-		}
+		holder.trafficData = result
+		holder.expireTime.Add(cachetime)
 		holder.dataLocker.Unlock()
 
 		// clear the waitgroup to release other threads waiting for the response we just added
@@ -178,8 +167,8 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 }
 
 // sendClassifyRequest will send the classification request to the API endpoint using the provided parameters
-// It returns the classification result or nil along with a boolean used to report network problems
-func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) (*ClassifiedTraffic, bool) {
+// It returns the classification result or nil along with how long the response should be cached
+func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) (*ClassifiedTraffic, time.Duration) {
 	requestURL := formRequestURL(ipAdd, port, protoID)
 	logger.Debug("Prediction request: [%d]%s:%d\n", protoID, ipAdd.String(), port)
 
@@ -194,11 +183,11 @@ func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) (*ClassifiedT
 		// timeout requests are handled differently
 		if err.(net.Error).Timeout() {
 			logger.Warn("%OC|Cloud API request to %s has timed out, error: %v\n", "traffic_prediction_cloud_api_timeout", 10, cloudAPIEndpoint, err)
-			return nil, true
+			return unknownTrafficItem, negativeCacheTime
 		}
 
 		logger.Warn("%OC|Cloud API request to %s has failed, error details: %v\n", "traffic_prediction_cloud_api_failure", 10, cloudAPIEndpoint, err)
-		return nil, true
+		return unknownTrafficItem, negativeCacheTime
 	}
 
 	// From the golang docs:
@@ -210,19 +199,19 @@ func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) (*ClassifiedT
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		logger.Err("Error reading body of prediction request: %v\n", err)
-		return nil, false
+		return unknownTrafficItem, negativeCacheTime
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		logger.Err("Error code returned for prediction request: %v\n", err)
-		return nil, false
+		return unknownTrafficItem, troubledCacheTime
 	}
 
 	trafficResponse := new(ClassifiedTraffic)
 	bodyString := string(bodyBytes)
 	json.Unmarshal([]byte(bodyString), &trafficResponse)
 	logger.Debug("Prediction response: [%d]%s:%d = %v\n", protoID, ipAdd.String(), port, *trafficResponse)
-	return trafficResponse, false
+	return trafficResponse, positiveCacheTime
 }
 
 // cleanStaleTrafficItems is a periodic task to clean the stale traffic items
