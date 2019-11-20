@@ -62,20 +62,15 @@ insert_packetd_rules()
 
     # Do not queue invalid or untracked packets
     # These will not have a valid conntrack ID so there is nothing for packetd to attach metadata to
-    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct state invalid return
-    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct state untracked return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct state { invalid, untracked } return
 
     # Don't catch bypassed traffic
     ${NFT} add rule inet ${TABLE_NAME} packetd-queue dict sessions ct id bypass_packetd bool true counter return
     ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct mark and 0x80000000 == 0x80000000 counter return
 
     # Only catch unicast traffic
-    ${NFT} add rule inet ${TABLE_NAME} packetd-queue fib saddr type anycast counter return
-    ${NFT} add rule inet ${TABLE_NAME} packetd-queue fib daddr type anycast counter return
-    ${NFT} add rule inet ${TABLE_NAME} packetd-queue fib saddr type broadcast counter return
-    ${NFT} add rule inet ${TABLE_NAME} packetd-queue fib daddr type broadcast counter return
-    ${NFT} add rule inet ${TABLE_NAME} packetd-queue fib saddr type multicast counter return
-    ${NFT} add rule inet ${TABLE_NAME} packetd-queue fib daddr type multicast counter return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue fib saddr type { anycast, broadcast, multicast } counter return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue fib daddr type { anycast, broadcast, multicast } counter return
 
     # Don't catch deep-sessions
     ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct packets \> 256 counter return
