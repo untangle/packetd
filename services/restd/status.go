@@ -67,6 +67,13 @@ func statusSystem(c *gin.Context) {
 		stats["tmpfs"] = tmpfs
 	}
 
+	clock, err := exec.Command("date", "-R").CombinedOutput()
+	if err != nil {
+		logger.Warn("Error reading system clock: %s\n", err.Error())
+	} else {
+		stats["system_clock"] = strings.TrimRight(string(clock), "\r\n")
+	}
+
 	c.JSON(http.StatusOK, stats)
 }
 
