@@ -15,7 +15,7 @@ import (
 const pluginName = "certfetch"
 const fetchTimeout = 10 * time.Second
 
-var localMutex sync.Mutex
+var localMutex sync.RWMutex
 
 // PluginStartup function is called to allow plugin specific initialization.
 func PluginStartup() {
@@ -54,15 +54,15 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	var target string
 	var found bool
 
-	localMutex.Lock()
-
+	localMutex.RLock()
 	holder, found = certcache.FindCertificate(findkey)
+	localMutex.RUnlock()
+
 	if found {
-		localMutex.Unlock()
 		logger.Debug("Loading certificate for %s ctid:%d\n", findkey, ctid)
 	} else {
 		logger.Debug("Fetching certificate for %s ctid:%d\n", findkey, ctid)
-
+		localMutex.Lock()
 		holder = new(certcache.CertificateHolder)
 		holder.WaitGroup.Add(1)
 		certcache.InsertCertificate(findkey, holder)

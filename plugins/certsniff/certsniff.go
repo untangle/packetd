@@ -20,7 +20,7 @@ const maxPacketCount = 10 // maximum number of packets we'll store and re-assemb
 type dataCollector struct {
 	databuff [maxPacketCount][]byte
 	sequence [maxPacketCount]uint32
-	locker   sync.Mutex
+	locker   sync.RWMutex
 	total    int
 }
 
@@ -51,9 +51,9 @@ func (ME *dataCollector) getBuffer() []byte {
 	var total int
 
 	// hold the lock long enough to gt the current buffer counter
-	ME.locker.Lock()
+	ME.locker.RLock()
 	total = ME.total
-	ME.locker.Unlock()
+	ME.locker.RUnlock()
 
 	// sort the buffers using the TCP sequence number
 	for j := 0; j < total-1; j++ {
