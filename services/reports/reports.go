@@ -626,6 +626,17 @@ func createTables() {
 			client_dns_hint text,
 			server_dns_hint text)`)
 
+	if err != nil {
+		logger.Err("Failed to create table: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(
+		`CREATE INDEX idx_sessions_time_stamp ON sessions (time_stamp)`)
+
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
 	// FIXME add domain (SNI + dns_prediction + cert_prediction)
 	// We need a singular "domain" field that takes all the various domain determination methods into account and chooses the best one
 	// I think the preference order is:
@@ -655,6 +666,13 @@ func createTables() {
 
 	if err != nil {
 		logger.Err("Failed to create table: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(
+		`CREATE INDEX idx_session_stats_time_stamp ON session_stats (time_stamp)`)
+
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
 	}
 
 	_, err = dbMain.Exec(
@@ -715,6 +733,13 @@ func createTables() {
 
 	if err != nil {
 		logger.Err("Failed to create table: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(
+		`CREATE INDEX idx_interface_stats_time_stamp ON interface_stats (time_stamp)`)
+
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
 	}
 }
 
