@@ -313,6 +313,12 @@ func LogEvent(event Event) error {
 func eventLogger() {
 	var summary string
 	for {
+		tx, err := dbMain.Begin()
+		if err != nil {
+			logger.Warn("Failed to begin transaction: %s\n", err.Error())
+			return
+		}
+
 		event := <-eventQueue
 		summary = event.Name + "|" + event.Table + "|"
 		if event.SQLOp == 1 {
@@ -332,10 +338,17 @@ func eventLogger() {
 		logger.Debug("Log Event: %s %v\n", summary, event.SQLOp)
 
 		if event.SQLOp == 1 {
-			logInsertEvent(event)
+			logInsertEvent(event, tx)
 		}
 		if event.SQLOp == 2 {
-			logUpdateEvent(event)
+			logUpdateEvent(event, tx)
+		}
+
+		// end transaction
+		err = tx.Commit()
+		if err != nil {
+			logger.Warn("Failed to commit transaction: %s\n", err.Error())
+			return
 		}
 	}
 }
@@ -422,7 +435,7 @@ func prepareEventValues(data interface{}) interface{} {
 	}
 }
 
-func logInsertEvent(event Event) {
+func logInsertEvent(event Event, tx *sql.Tx) {
 	var sqlStr = "INSERT INTO " + event.Table + "("
 	var valueStr = "("
 	var first = true
@@ -441,12 +454,6 @@ func logInsertEvent(event Event) {
 	valueStr += ")"
 	sqlStr += " VALUES " + valueStr
 
-	tx, err := dbMain.Begin()
-	if err != nil {
-		logger.Warn("Failed to begin transaction: %s %s\n", err.Error(), sqlStr)
-		return
-	}
-
 	res, err := tx.Exec(sqlStr, values...)
 	if err != nil {
 		logger.Warn("Failed to execute transaction: %s %s\n", err.Error(), sqlStr)
@@ -457,14 +464,9 @@ func logInsertEvent(event Event) {
 	rowCount, _ := res.RowsAffected()
 	logger.Debug("SQL:%s ROWS:%d\n", sqlStr, rowCount)
 
-	err = tx.Commit()
-	if err != nil {
-		logger.Warn("Failed to commit transaction: %s %s\n", err.Error(), sqlStr)
-		return
-	}
 }
 
-func logUpdateEvent(event Event) {
+func logUpdateEvent(event Event, tx *sql.Tx) {
 	var sqlStr = "UPDATE " + event.Table + " SET"
 	var first = true
 	var values []interface{}
@@ -490,12 +492,6 @@ func logUpdateEvent(event Event) {
 		first = false
 	}
 
-	tx, err := dbMain.Begin()
-	if err != nil {
-		logger.Warn("Failed to begin transaction: %s %s\n", err.Error(), sqlStr)
-		return
-	}
-
 	res, err := tx.Exec(sqlStr, values...)
 	if err != nil {
 		logger.Warn("Failed to execute transaction: %s %s\n", err.Error(), sqlStr)
@@ -506,11 +502,6 @@ func logUpdateEvent(event Event) {
 	rowCount, _ := res.RowsAffected()
 	logger.Debug("SQL:%s ROWS:%d\n", sqlStr, rowCount)
 
-	err = tx.Commit()
-	if err != nil {
-		logger.Warn("Failed to commit transaction: %s %s\n", err.Error(), sqlStr)
-		return
-	}
 }
 
 func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
