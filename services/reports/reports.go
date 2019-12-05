@@ -329,7 +329,7 @@ func eventLogger(eventBatchSize int) {
 		// when the batch is larger than the configured batch insert size OR we haven't inserted anything in one minute, we need to insert some stuff
 		batchCount := len(eventBatch)
 		if batchCount >= eventBatchSize || time.Since(lastInsert).Seconds() > waitTime {
-			logger.Debug("%v Items ready for batch, starting transaction...\n", batchCount)
+			logger.Debug("%v Items ready for batch, starting transaction at %v...\n", batchCount, time.Now())
 
 			tx, err := dbMain.Begin()
 			if err != nil {
@@ -350,7 +350,7 @@ func eventLogger(eventBatchSize int) {
 				return
 			}
 
-			logger.Debug("Transaction completed, %v items processed at %v Unix time.\n", batchCount, lastInsert)
+			logger.Debug("Transaction completed, %v items processed at %v .\n", batchCount, lastInsert)
 			eventBatch = nil
 			lastInsert = time.Now()
 		}
@@ -488,7 +488,6 @@ func logInsertEvent(event Event, tx *sql.Tx) {
 	res, err := tx.Exec(sqlStr, values...)
 	if err != nil {
 		logger.Warn("Failed to execute transaction: %s %s\n", err.Error(), sqlStr)
-		tx.Rollback()
 		return
 	}
 
@@ -526,7 +525,6 @@ func logUpdateEvent(event Event, tx *sql.Tx) {
 	res, err := tx.Exec(sqlStr, values...)
 	if err != nil {
 		logger.Warn("Failed to execute transaction: %s %s\n", err.Error(), sqlStr)
-		tx.Rollback()
 		return
 	}
 
