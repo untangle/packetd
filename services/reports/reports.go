@@ -133,12 +133,17 @@ func Startup() {
 	var stat syscall.Statfs_t
 	var dsn string
 	var err error
+	// eventBatchSize is the size of event batches for batching inserts/updates from the event queue
+	var eventBatchSize int
 
 	// get the file system stats for the path where the database will be stored
 	syscall.Statfs(dbFILEPATH, &stat)
 
 	// set the database size limit to 60 percent of the total space available
 	dbSizeLimit = int64(float64(stat.Bsize) * float64(stat.Blocks) * dbDISKPERCENTAGE)
+
+	// set the event log processing batch size
+	eventBatchSize = 1000
 
 	// register a custom driver with a connect hook where we can set our pragma's for
 	// all connections that get created. This is needed because pragma's are applied
@@ -161,7 +166,7 @@ func Startup() {
 
 	createTables()
 
-	go eventLogger()
+	go eventLogger(eventBatchSize)
 	go dbCleaner()
 
 	if !kernel.FlagNoCloud {
@@ -310,46 +315,72 @@ func LogEvent(event Event) error {
 }
 
 // eventLogger readns from the eventQueue and logs the events to sqlite
-func eventLogger() {
-	var summary string
+// this processes the items in {batchCount} batches, items that are not in the current batch will remain
+// unread on the channel until the current batch is committed into the database
+func eventLogger(eventBatchSize int) {
+	var eventBatch []Event
+	var lastInsert time.Time
+	waitTime := 60.0
+
 	for {
-		tx, err := dbMain.Begin()
-		if err != nil {
-			logger.Warn("Failed to begin transaction: %s\n", err.Error())
-			return
-		}
+		// read data out of the eventQueue into the eventBatch
+		eventBatch = append(eventBatch, <-eventQueue)
 
-		event := <-eventQueue
-		summary = event.Name + "|" + event.Table + "|"
-		if event.SQLOp == 1 {
-			str, err := json.Marshal(event.Columns)
-			if err == nil {
-				summary = summary + "INSERT: " + string(str)
+		// when the batch is larger than the configured batch insert size OR we haven't inserted anything in one minute, we need to insert some stuff
+		batchCount := len(eventBatch)
+		if batchCount >= eventBatchSize || time.Since(lastInsert).Seconds() > waitTime {
+			logger.Debug("%v Items ready for batch, starting transaction...\n", batchCount)
+
+			tx, err := dbMain.Begin()
+			if err != nil {
+				logger.Warn("Failed to begin transaction: %s\n", err.Error())
+				return
 			}
-		}
-		if event.SQLOp == 2 {
-			str, err := json.Marshal(event.ModifiedColumns)
-			if err == nil {
-				summary = summary + "UPDATE: " + string(str)
-			} else {
-				logger.Warn("ERROR: %s\n", err.Error())
+
+			//iterate events in the batch and send them into the db transaction
+			for _, event := range eventBatch {
+				eventToTransaction(event, tx)
 			}
-		}
-		logger.Debug("Log Event: %s %v\n", summary, event.SQLOp)
 
-		if event.SQLOp == 1 {
-			logInsertEvent(event, tx)
-		}
-		if event.SQLOp == 2 {
-			logUpdateEvent(event, tx)
-		}
+			// end transaction
+			err = tx.Commit()
+			if err != nil {
+				tx.Rollback()
+				logger.Warn("Failed to commit transaction: %s\n", err.Error())
+				return
+			}
 
-		// end transaction
-		err = tx.Commit()
-		if err != nil {
-			logger.Warn("Failed to commit transaction: %s\n", err.Error())
-			return
+			logger.Debug("Transaction completed, %v items processed at %v Unix time.\n", batchCount, lastInsert)
+			eventBatch = nil
+			lastInsert = time.Now()
 		}
+	}
+
+}
+
+func eventToTransaction(event Event, tx *sql.Tx) {
+	summary := event.Name + "|" + event.Table + "|"
+	if event.SQLOp == 1 {
+		str, err := json.Marshal(event.Columns)
+		if err == nil {
+			summary = summary + "INSERT: " + string(str)
+		}
+	}
+	if event.SQLOp == 2 {
+		str, err := json.Marshal(event.ModifiedColumns)
+		if err == nil {
+			summary = summary + "UPDATE: " + string(str)
+		} else {
+			logger.Warn("ERROR: %s\n", err.Error())
+		}
+	}
+	logger.Debug("Log Event: %s %v\n", summary, event.SQLOp)
+
+	if event.SQLOp == 1 {
+		logInsertEvent(event, tx)
+	}
+	if event.SQLOp == 2 {
+		logUpdateEvent(event, tx)
 	}
 }
 
