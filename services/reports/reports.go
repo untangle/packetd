@@ -359,29 +359,63 @@ func eventLogger(eventBatchSize int) {
 }
 
 func eventToTransaction(event Event, tx *sql.Tx) {
-	summary := event.Name + "|" + event.Table + "|"
-	if event.SQLOp == 1 {
-		str, err := json.Marshal(event.Columns)
-		if err == nil {
-			summary = summary + "INSERT: " + string(str)
-		}
-	}
-	if event.SQLOp == 2 {
-		str, err := json.Marshal(event.ModifiedColumns)
-		if err == nil {
-			summary = summary + "UPDATE: " + string(str)
-		} else {
-			logger.Warn("ERROR: %s\n", err.Error())
-		}
-	}
-	logger.Debug("Log Event: %s %v\n", summary, event.SQLOp)
+	var sqlStr string
+	var values []interface{}
+	var first = true
 
+	// sqlOP 1 is an INSERT
 	if event.SQLOp == 1 {
-		logInsertEvent(event, tx)
+		sqlStr = "INSERT INTO " + event.Table + "("
+		var valueStr = "("
+		for k, v := range event.Columns {
+			if !first {
+				sqlStr += ","
+				valueStr += ","
+		}
+			sqlStr += k
+			valueStr += "?"
+			first = false
+			values = append(values, prepareEventValues(v))
 	}
+		sqlStr += ")"
+		valueStr += ")"
+		sqlStr += " VALUES " + valueStr
+	}
+
+	// sqlOP 2 is an UPDATE
 	if event.SQLOp == 2 {
-		logUpdateEvent(event, tx)
+		sqlStr = "UPDATE " + event.Table + " SET"
+		for k, v := range event.ModifiedColumns {
+			if !first {
+				sqlStr += ","
+			}
+
+			sqlStr += " " + k + " = ?"
+			values = append(values, prepareEventValues(v))
+			first = false
+		}
+
+		sqlStr += " WHERE "
+		first = true
+		for k, v := range event.Columns {
+			if !first {
+				sqlStr += " AND "
 	}
+
+			sqlStr += " " + k + " = ?"
+			values = append(values, prepareEventValues(v))
+			first = false
+		}
+	}
+
+	res, err := tx.Exec(sqlStr, values...)
+	if err != nil {
+		logger.Warn("Failed to execute transaction: %s %s\n", err.Error(), sqlStr)
+		return
+	}
+
+	rowCount, _ := res.RowsAffected()
+	logger.Debug("SQL:%s ROWS:%d\n", sqlStr, rowCount)
 }
 
 // CloudEvent adds an Event to the cloudQueue for later sending to the cloud
@@ -464,73 +498,6 @@ func prepareEventValues(data interface{}) interface{} {
 	default:
 		return data
 	}
-}
-
-func logInsertEvent(event Event, tx *sql.Tx) {
-	var sqlStr = "INSERT INTO " + event.Table + "("
-	var valueStr = "("
-	var first = true
-	var values []interface{}
-	for k, v := range event.Columns {
-		if !first {
-			sqlStr += ","
-			valueStr += ","
-		}
-		sqlStr += k
-		valueStr += "?"
-		first = false
-		values = append(values, prepareEventValues(v))
-	}
-	sqlStr += ")"
-	valueStr += ")"
-	sqlStr += " VALUES " + valueStr
-
-	res, err := tx.Exec(sqlStr, values...)
-	if err != nil {
-		logger.Warn("Failed to execute transaction: %s %s\n", err.Error(), sqlStr)
-		return
-	}
-
-	rowCount, _ := res.RowsAffected()
-	logger.Debug("SQL:%s ROWS:%d\n", sqlStr, rowCount)
-
-}
-
-func logUpdateEvent(event Event, tx *sql.Tx) {
-	var sqlStr = "UPDATE " + event.Table + " SET"
-	var first = true
-	var values []interface{}
-	for k, v := range event.ModifiedColumns {
-		if !first {
-			sqlStr += ","
-		}
-
-		sqlStr += " " + k + " = ?"
-		values = append(values, prepareEventValues(v))
-		first = false
-	}
-
-	sqlStr += " WHERE "
-	first = true
-	for k, v := range event.Columns {
-		if !first {
-			sqlStr += " AND "
-		}
-
-		sqlStr += " " + k + " = ?"
-		values = append(values, prepareEventValues(v))
-		first = false
-	}
-
-	res, err := tx.Exec(sqlStr, values...)
-	if err != nil {
-		logger.Warn("Failed to execute transaction: %s %s\n", err.Error(), sqlStr)
-		return
-	}
-
-	rowCount, _ := res.RowsAffected()
-	logger.Debug("SQL:%s ROWS:%d\n", sqlStr, rowCount)
-
 }
 
 func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
