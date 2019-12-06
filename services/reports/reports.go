@@ -336,7 +336,6 @@ func eventLogger(eventBatchSize int) {
 			tx, err := dbMain.Begin()
 			if err != nil {
 				logger.Warn("Failed to begin transaction: %s\n", err.Error())
-				return
 			}
 
 			//iterate events in the batch and send them into the db transaction
@@ -349,7 +348,6 @@ func eventLogger(eventBatchSize int) {
 			if err != nil {
 				tx.Rollback()
 				logger.Warn("Failed to commit transaction: %s\n", err.Error())
-				return
 			}
 
 			logger.Debug("Transaction completed, %v items processed at %v .\n", batchCount, lastInsert)
