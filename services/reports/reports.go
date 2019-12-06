@@ -315,8 +315,10 @@ func LogEvent(event Event) error {
 }
 
 // eventLogger readns from the eventQueue and logs the events to sqlite
-// this processes the items in {batchCount} batches, items that are not in the current batch will remain
+// this processes the items in {eventBatchSize} batches, or after 60 seconds of being unread in the channel
+// items that are not in the current batch will remain
 // unread on the channel until the current batch is committed into the database
+// param eventBatchSize (int) - the size of the batch to commit into the database
 func eventLogger(eventBatchSize int) {
 	var eventBatch []Event
 	var lastInsert time.Time
@@ -358,6 +360,9 @@ func eventLogger(eventBatchSize int) {
 
 }
 
+// eventToTransaction converts the Event object into a Sql Transaction and appends it into the current transaction context
+// param event (Event) - the event to process
+// param tx (*sql.Tx) - the transaction context
 func eventToTransaction(event Event, tx *sql.Tx) {
 	var sqlStr string
 	var values []interface{}
@@ -371,12 +376,12 @@ func eventToTransaction(event Event, tx *sql.Tx) {
 			if !first {
 				sqlStr += ","
 				valueStr += ","
-		}
+			}
 			sqlStr += k
 			valueStr += "?"
 			first = false
 			values = append(values, prepareEventValues(v))
-	}
+		}
 		sqlStr += ")"
 		valueStr += ")"
 		sqlStr += " VALUES " + valueStr
@@ -400,7 +405,7 @@ func eventToTransaction(event Event, tx *sql.Tx) {
 		for k, v := range event.Columns {
 			if !first {
 				sqlStr += " AND "
-	}
+			}
 
 			sqlStr += " " + k + " = ?"
 			values = append(values, prepareEventValues(v))
@@ -553,6 +558,7 @@ func cleanupQuery(query *Query) {
 	logger.Debug("cleanupQuery(%d) finished\n", query.ID)
 }
 
+// createTables builds the reports.db tables and indexes
 func createTables() {
 	var err error
 
