@@ -815,8 +815,6 @@ func mergeConditions(reportEntry *ReportEntry) {
  * fragmentation is a significant concern.
 **/
 func dbCleaner() {
-	var pageSize, pageCount, freeCount int64
-	var err error
 	ch := make(chan bool, 1)
 	ch <- true
 
@@ -826,27 +824,9 @@ func dbCleaner() {
 		case <-time.After(60 * time.Second):
 		}
 
-		// we get the page size, page count, and free list size for our limit calculations
-		pageSize, err = strconv.ParseInt(runSQL("PRAGMA page_size"), 10, 64)
-		if err != nil || pageSize == 0 {
-			logger.Crit("Unable to parse database page_size: %v\n", err)
-			continue
-		}
+		currentSize, pageSize, pageCount, maxPageCount, freeCount := loadDbStats()
 
-		pageCount, err = strconv.ParseInt(runSQL("PRAGMA page_count"), 10, 64)
-		if err != nil {
-			logger.Crit("Unable to parse database page_count: %v\n", err)
-			continue
-		}
-
-		freeCount, err = strconv.ParseInt(runSQL("PRAGMA freelist_count"), 10, 64)
-		if err != nil {
-			logger.Crit("Unable to parse database freelist_count: %v\n", err)
-			continue
-		}
-
-		currentSize := (pageSize * pageCount)
-		logger.Info("Database Size:%v MB  Limit:%v MB  Free Pages:%v\n", currentSize/oneMEGABYTE, dbSizeLimit/oneMEGABYTE, freeCount)
+		logger.Info("Database Size:%v MB  Limit:%v MB  Free Pages:%v Page Size: %v Page Count: %v Max Page Count: %v \n", currentSize, dbSizeLimit, freeCount, pageSize, pageCount, maxPageCount)
 
 		// if we haven't reached the size limit just continue
 		if currentSize < dbSizeLimit {
@@ -861,12 +841,44 @@ func dbCleaner() {
 		// database is getting full so clean out some of the oldest data
 		logger.Info("Database starting trim operation\n")
 		trimPercent("sessions", .10)
-		trimPercent("session_stats", .10)
+		trimPercent("session_stats", .25)
 		trimPercent("interface_stats", .10)
 		logger.Info("Database trim operation completed\n")
+
+		currentSize, pageSize, pageCount, maxPageCount, freeCount = loadDbStats()
+		logger.Info("POST TRIM Database Size:%v MB  Limit:%v MB  Free Pages:%v Page Size: %v Page Count: %v Max Page Count: %v \n", currentSize, dbSizeLimit, freeCount, pageSize, pageCount, maxPageCount)
 		// re-run and check size with no delay
 		ch <- true
 	}
+}
+
+func loadDbStats() (currentSize int64, pageSize int64, pageCount int64, maxPageCount int64, freeCount int64) {
+	var err error
+
+	// we get the page size, page count, and free list size for our limit calculations
+	pageSize, err = strconv.ParseInt(runSQL("PRAGMA page_size"), 10, 64)
+	if err != nil || pageSize == 0 {
+		logger.Crit("Unable to parse database page_size: %v\n", err)
+	}
+
+	pageCount, err = strconv.ParseInt(runSQL("PRAGMA page_count"), 10, 64)
+	if err != nil {
+		logger.Crit("Unable to parse database page_count: %v\n", err)
+	}
+
+	maxPageCount, err = strconv.ParseInt(runSQL("PRAGMA max_page_count"), 10, 64)
+	if err != nil {
+		logger.Crit("Unable to parse database page_count: %v\n", err)
+	}
+
+	freeCount, err = strconv.ParseInt(runSQL("PRAGMA freelist_count"), 10, 64)
+	if err != nil {
+		logger.Crit("Unable to parse database freelist_count: %v\n", err)
+	}
+
+	currentSize = (pageSize * pageCount)
+
+	return
 }
 
 // trimPercent trims the specified table by the specified percent (by time)
@@ -874,6 +886,7 @@ func dbCleaner() {
 func trimPercent(table string, percent float32) {
 	logger.Info("Trimming %s by %.1f%% percent...\n", table, percent*100.0)
 	sqlStr := fmt.Sprintf("DELETE FROM %s WHERE time_stamp < (SELECT min(time_stamp)+cast((max(time_stamp)-min(time_stamp))*%f as int) from %s)", table, percent, table)
+	logger.Debug("Trimming DB statement:\n %s \n", sqlStr)
 	runSQL(sqlStr)
 }
 
