@@ -625,13 +625,40 @@ func createTables() {
 		logger.Err("Failed to create table: %s\n", err.Error())
 	}
 
-	_, err = dbMain.Exec(
-		`CREATE INDEX idx_sessions_time_stamp ON sessions (time_stamp)`)
-
+	_, err = dbMain.Exec(`CREATE INDEX idx_sessions_time_stamp ON sessions (time_stamp DESC)`)
 	if err != nil {
 		logger.Err("Failed to create index: %s\n", err.Error())
 	}
 
+	_, err = dbMain.Exec(`CREATE INDEX idx_sessions_session_id_time_stamp ON sessions (session_id, time_stamp DESC)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_wan_routing ON sessions (wan_rule_chain, server_interface_type, time_stamp DESC)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_sessions_client_address ON sessions (session_id, time_stamp DESC, client_address)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_sessions_server_port ON sessions (session_id, time_stamp DESC, server_port)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_sessions_app_name ON sessions (session_id, time_stamp DESC, application_name)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_sessions_app_proto ON sessions (session_id, time_stamp DESC, application_protochain)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
 	// FIXME add domain (SNI + dns_prediction + cert_prediction)
 	// We need a singular "domain" field that takes all the various domain determination methods into account and chooses the best one
 	// I think the preference order is:
@@ -663,9 +690,12 @@ func createTables() {
 		logger.Err("Failed to create table: %s\n", err.Error())
 	}
 
-	_, err = dbMain.Exec(
-		`CREATE INDEX idx_session_stats_time_stamp ON session_stats (time_stamp)`)
+	_, err = dbMain.Exec(`CREATE INDEX idx_session_stats_time_stamp ON session_stats (time_stamp DESC)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
 
+	_, err = dbMain.Exec(`CREATE INDEX idx_session_stats_session_id_time_stamp ON session_stats (session_id, time_stamp DESC)`)
 	if err != nil {
 		logger.Err("Failed to create index: %s\n", err.Error())
 	}
@@ -730,9 +760,37 @@ func createTables() {
 		logger.Err("Failed to create table: %s\n", err.Error())
 	}
 
-	_, err = dbMain.Exec(
-		`CREATE INDEX idx_interface_stats_time_stamp ON interface_stats (time_stamp)`)
+	_, err = dbMain.Exec(`CREATE INDEX idx_interface_stats_time_stamp ON interface_stats (time_stamp DESC)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
 
+	_, err = dbMain.Exec(`CREATE INDEX idx_ping_timeout ON interface_stats (interface_id, time_stamp DESC, ping_timeout)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_rx_bytes ON interface_stats (interface_id, time_stamp DESC, rx_bytes)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_jitter_1 ON interface_stats (interface_id, time_stamp DESC, jitter_1)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_latency ON interface_stats (interface_id, time_stamp DESC, latency_1)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_active_latency ON interface_stats (interface_id, time_stamp DESC, active_latency_1)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_passive_latency ON interface_stats (interface_id, time_stamp DESC, passive_latency_1)`)
 	if err != nil {
 		logger.Err("Failed to create index: %s\n", err.Error())
 	}
@@ -830,7 +888,7 @@ func dbCleaner() {
 
 		currentSize, pageSize, pageCount, maxPageCount, freeCount := loadDbStats()
 
-		logger.Info("Database Size:%v MB  Limit:%v MB  Free Pages:%v Page Size: %v Page Count: %v Max Page Count: %v \n", currentSize, dbSizeLimit, freeCount, pageSize, pageCount, maxPageCount)
+		logger.Info("Database Size:%v MB  Limit:%v MB  Free Pages:%v Page Size: %v Page Count: %v Max Page Count: %v \n", currentSize/oneMEGABYTE, dbSizeLimit/oneMEGABYTE, freeCount, pageSize, pageCount, maxPageCount)
 
 		// if we haven't reached the size limit just continue
 		if currentSize < dbSizeLimit {
@@ -847,10 +905,13 @@ func dbCleaner() {
 		trimPercent("sessions", .10)
 		trimPercent("session_stats", .25)
 		trimPercent("interface_stats", .10)
+		//also run optimize
+		runSQL("PRAGMA optimize")
+
 		logger.Info("Database trim operation completed\n")
 
 		currentSize, pageSize, pageCount, maxPageCount, freeCount = loadDbStats()
-		logger.Info("POST TRIM Database Size:%v MB  Limit:%v MB  Free Pages:%v Page Size: %v Page Count: %v Max Page Count: %v \n", currentSize, dbSizeLimit, freeCount, pageSize, pageCount, maxPageCount)
+		logger.Info("POST TRIM Database Size:%v MB  Limit:%v MB  Free Pages:%v Page Size: %v Page Count: %v Max Page Count: %v \n", currentSize/oneMEGABYTE, dbSizeLimit/oneMEGABYTE, freeCount, pageSize, pageCount, maxPageCount)
 		// re-run and check size with no delay
 		ch <- true
 	}
