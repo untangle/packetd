@@ -198,6 +198,10 @@ func customHook(conn *sqlite3.SQLiteConn) error {
 		logger.Warn("Error setting busy_timeout: %v\n", err)
 	}
 
+	// enable auto vaccuum = FULL
+	if _, err := conn.Exec("PRAGMA auto_vacuum = FULL", nil); err != nil {
+		logger.Warn("Error setting auto_vacuum: %v\n", err)
+	}
 	return nil
 }
 
