@@ -93,7 +93,7 @@ func makeEventsSQLString(reportEntry *ReportEntry) (string, error) {
 
 	sqlStr += fmt.Sprintf(" ORDER BY %s %s", orderByColumn, order)
 
-	logger.Debug("Events SQL: %v %v\n", sqlStr)
+	logger.Debug("Events SQL: %v\n", sqlStr)
 	return sqlStr, nil
 }
 

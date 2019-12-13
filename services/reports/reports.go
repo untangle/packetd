@@ -133,12 +133,17 @@ func Startup() {
 	var stat syscall.Statfs_t
 	var dsn string
 	var err error
+	// eventBatchSize is the size of event batches for batching inserts/updates from the event queue
+	var eventBatchSize int
 
 	// get the file system stats for the path where the database will be stored
 	syscall.Statfs(dbFILEPATH, &stat)
 
 	// set the database size limit to 60 percent of the total space available
 	dbSizeLimit = int64(float64(stat.Bsize) * float64(stat.Blocks) * dbDISKPERCENTAGE)
+
+	// set the event log processing batch size
+	eventBatchSize = 1000
 
 	// register a custom driver with a connect hook where we can set our pragma's for
 	// all connections that get created. This is needed because pragma's are applied
@@ -161,7 +166,7 @@ func Startup() {
 
 	createTables()
 
-	go eventLogger()
+	go eventLogger(eventBatchSize)
 	go dbCleaner()
 
 	if !kernel.FlagNoCloud {
@@ -310,34 +315,110 @@ func LogEvent(event Event) error {
 }
 
 // eventLogger readns from the eventQueue and logs the events to sqlite
-func eventLogger() {
-	var summary string
-	for {
-		event := <-eventQueue
-		summary = event.Name + "|" + event.Table + "|"
-		if event.SQLOp == 1 {
-			str, err := json.Marshal(event.Columns)
-			if err == nil {
-				summary = summary + "INSERT: " + string(str)
-			}
-		}
-		if event.SQLOp == 2 {
-			str, err := json.Marshal(event.ModifiedColumns)
-			if err == nil {
-				summary = summary + "UPDATE: " + string(str)
-			} else {
-				logger.Warn("ERROR: %s\n", err.Error())
-			}
-		}
-		logger.Debug("Log Event: %s %v\n", summary, event.SQLOp)
+// this processes the items in {eventBatchSize} batches, or after 60 seconds of being unread in the channel
+// items that are not in the current batch will remain
+// unread on the channel until the current batch is committed into the database
+// param eventBatchSize (int) - the size of the batch to commit into the database
+func eventLogger(eventBatchSize int) {
+	var eventBatch []Event
+	var lastInsert time.Time
+	waitTime := 60.0
 
-		if event.SQLOp == 1 {
-			logInsertEvent(event)
-		}
-		if event.SQLOp == 2 {
-			logUpdateEvent(event)
+	for {
+		// read data out of the eventQueue into the eventBatch
+		eventBatch = append(eventBatch, <-eventQueue)
+
+		// when the batch is larger than the configured batch insert size OR we haven't inserted anything in one minute, we need to insert some stuff
+		batchCount := len(eventBatch)
+		if batchCount >= eventBatchSize || time.Since(lastInsert).Seconds() > waitTime {
+			logger.Debug("%v Items ready for batch, starting transaction at %v...\n", batchCount, time.Now())
+
+			tx, err := dbMain.Begin()
+			if err != nil {
+				logger.Warn("Failed to begin transaction: %s\n", err.Error())
+			}
+
+			//iterate events in the batch and send them into the db transaction
+			for _, event := range eventBatch {
+				eventToTransaction(event, tx)
+			}
+
+			// end transaction
+			err = tx.Commit()
+			if err != nil {
+				tx.Rollback()
+				logger.Warn("Failed to commit transaction: %s\n", err.Error())
+			}
+
+			logger.Debug("Transaction completed, %v items processed at %v .\n", batchCount, lastInsert)
+			eventBatch = nil
+			lastInsert = time.Now()
 		}
 	}
+
+}
+
+// eventToTransaction converts the Event object into a Sql Transaction and appends it into the current transaction context
+// param event (Event) - the event to process
+// param tx (*sql.Tx) - the transaction context
+func eventToTransaction(event Event, tx *sql.Tx) {
+	var sqlStr string
+	var values []interface{}
+	var first = true
+
+	// sqlOP 1 is an INSERT
+	if event.SQLOp == 1 {
+		sqlStr = "INSERT INTO " + event.Table + "("
+		var valueStr = "("
+		for k, v := range event.Columns {
+			if !first {
+				sqlStr += ","
+				valueStr += ","
+			}
+			sqlStr += k
+			valueStr += "?"
+			first = false
+			values = append(values, prepareEventValues(v))
+		}
+		sqlStr += ")"
+		valueStr += ")"
+		sqlStr += " VALUES " + valueStr
+	}
+
+	// sqlOP 2 is an UPDATE
+	if event.SQLOp == 2 {
+		sqlStr = "UPDATE " + event.Table + " SET"
+		for k, v := range event.ModifiedColumns {
+			if !first {
+				sqlStr += ","
+			}
+
+			sqlStr += " " + k + " = ?"
+			values = append(values, prepareEventValues(v))
+			first = false
+		}
+
+		sqlStr += " WHERE "
+		first = true
+		for k, v := range event.Columns {
+			if !first {
+				sqlStr += " AND "
+			}
+
+			sqlStr += " " + k + " = ?"
+			values = append(values, prepareEventValues(v))
+			first = false
+		}
+	}
+
+	res, err := tx.Exec(sqlStr, values...)
+	if err != nil {
+		logger.Warn("Failed to execute transaction: %s %s\n", err.Error(), sqlStr)
+		return
+	}
+
+	rowCount, _ := res.RowsAffected()
+	logger.Debug("SQL:%s ROWS:%d\n", sqlStr, rowCount)
 }
 
 // CloudEvent adds an Event to the cloudQueue for later sending to the cloud
@@ -422,97 +503,6 @@ func prepareEventValues(data interface{}) interface{} {
 	}
 }
 
-func logInsertEvent(event Event) {
-	var sqlStr = "INSERT INTO " + event.Table + "("
-	var valueStr = "("
-	var first = true
-	var values []interface{}
-	for k, v := range event.Columns {
-		if !first {
-			sqlStr += ","
-			valueStr += ","
-		}
-		sqlStr += k
-		valueStr += "?"
-		first = false
-		values = append(values, prepareEventValues(v))
-	}
-	sqlStr += ")"
-	valueStr += ")"
-	sqlStr += " VALUES " + valueStr
-
-	tx, err := dbMain.Begin()
-	if err != nil {
-		logger.Warn("Failed to begin transaction: %s %s\n", err.Error(), sqlStr)
-		return
-	}
-
-	res, err := tx.Exec(sqlStr, values...)
-	if err != nil {
-		logger.Warn("Failed to execute transaction: %s %s\n", err.Error(), sqlStr)
-		tx.Rollback()
-		return
-	}
-
-	rowCount, _ := res.RowsAffected()
-	logger.Debug("SQL:%s ROWS:%d\n", sqlStr, rowCount)
-
-	err = tx.Commit()
-	if err != nil {
-		logger.Warn("Failed to commit transaction: %s %s\n", err.Error(), sqlStr)
-		return
-	}
-}
-
-func logUpdateEvent(event Event) {
-	var sqlStr = "UPDATE " + event.Table + " SET"
-	var first = true
-	var values []interface{}
-	for k, v := range event.ModifiedColumns {
-		if !first {
-			sqlStr += ","
-		}
-
-		sqlStr += " " + k + " = ?"
-		values = append(values, prepareEventValues(v))
-		first = false
-	}
-
-	sqlStr += " WHERE "
-	first = true
-	for k, v := range event.Columns {
-		if !first {
-			sqlStr += " AND "
-		}
-
-		sqlStr += " " + k + " = ?"
-		values = append(values, prepareEventValues(v))
-		first = false
-	}
-
-	tx, err := dbMain.Begin()
-	if err != nil {
-		logger.Warn("Failed to begin transaction: %s %s\n", err.Error(), sqlStr)
-		return
-	}
-
-	res, err := tx.Exec(sqlStr, values...)
-	if err != nil {
-		logger.Warn("Failed to execute transaction: %s %s\n", err.Error(), sqlStr)
-		tx.Rollback()
-		return
-	}
-
-	rowCount, _ := res.RowsAffected()
-	logger.Debug("SQL:%s ROWS:%d\n", sqlStr, rowCount)
-
-	err = tx.Commit()
-	if err != nil {
-		logger.Warn("Failed to commit transaction: %s %s\n", err.Error(), sqlStr)
-		return
-	}
-}
-
 func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
 	if rows == nil {
 		return nil, errors.New("Invalid argument")
@@ -566,6 +556,7 @@ func cleanupQuery(query *Query) {
 	logger.Debug("cleanupQuery(%d) finished\n", query.ID)
 }
 
+// createTables builds the reports.db tables and indexes
 func createTables() {
 	var err error
 
@@ -626,6 +617,17 @@ func createTables() {
 			client_dns_hint text,
 			server_dns_hint text)`)
 
+	if err != nil {
+		logger.Err("Failed to create table: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(
+		`CREATE INDEX idx_sessions_time_stamp ON sessions (time_stamp)`)
+
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
 	// FIXME add domain (SNI + dns_prediction + cert_prediction)
 	// We need a singular "domain" field that takes all the various domain determination methods into account and chooses the best one
 	// I think the preference order is:
@@ -655,6 +657,13 @@ func createTables() {
 
 	if err != nil {
 		logger.Err("Failed to create table: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(
+		`CREATE INDEX idx_session_stats_time_stamp ON session_stats (time_stamp)`)
+
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
 	}
 
 	_, err = dbMain.Exec(
@@ -715,6 +724,13 @@ func createTables() {
 
 	if err != nil {
 		logger.Err("Failed to create table: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(
+		`CREATE INDEX idx_interface_stats_time_stamp ON interface_stats (time_stamp)`)
+
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
 	}
 }
 
