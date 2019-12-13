@@ -93,8 +93,8 @@ func makeEventsSQLString(reportEntry *ReportEntry) (string, error) {
 
 	sqlStr += fmt.Sprintf(" ORDER BY %s %s", orderByColumn, order)
 
-	if reportEntry.QueryCategories.Limit != 0 {
-		sqlStr += fmt.Sprintf(" LIMIT %d", reportEntry.QueryCategories.Limit)
+	if reportEntry.QueryEvents.Limit != 0 {
+		sqlStr += fmt.Sprintf(" LIMIT %d", reportEntry.QueryEvents.Limit)
 	}
 
 	logger.Debug("Events SQL: %v\n", sqlStr)

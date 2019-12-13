@@ -69,6 +69,7 @@ type QuerySeriesOptions struct {
 type QueryEventsOptions struct {
 	OrderByColumn string `json:"orderByColumn"`
 	OrderAsc      bool   `json:"orderAsc"`
+	Limit         int    `json:"limit"`
 }
 
 // ReportCondition holds a SQL reporting condition (ie client = 1.2.3.4)
