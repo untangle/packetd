@@ -24,7 +24,7 @@ type AddressHolder struct {
 
 var shutdownChannel = make(chan bool)
 var addressTable map[string]*AddressHolder
-var addressMutex sync.Mutex
+var addressMutex sync.RWMutex
 
 // PluginStartup function is called to allow plugin specific initialization. We
 // increment the argumented WaitGroup so the main process can wait for
@@ -141,9 +141,9 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 
 // FindAddress fetches the cached name for the argumented address.
 func FindAddress(finder net.IP) string {
-	addressMutex.Lock()
+	addressMutex.RLock()
 	entry := addressTable[finder.String()]
-	addressMutex.Unlock()
+	addressMutex.RUnlock()
 	if entry != nil {
 		return entry.Name
 	}

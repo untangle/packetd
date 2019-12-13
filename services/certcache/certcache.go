@@ -21,12 +21,12 @@ type CertificateHolder struct {
 	Certificate  x509.Certificate
 	Available    bool
 	WaitGroup    sync.WaitGroup
-	CertLocker   sync.Mutex
+	CertLocker   sync.RWMutex
 }
 
 var shutdownChannel = make(chan bool)
 var certificateTable map[string]*CertificateHolder
-var certificateMutex sync.Mutex
+var certificateMutex sync.RWMutex
 
 // Startup function is called to allow service specific initialization.
 func Startup() {
@@ -126,9 +126,9 @@ func setSessionList(session *dispatch.Session, field string, value []string, cti
 
 // FindCertificate fetches the cached certificate for the argumented address.
 func FindCertificate(finder string) (*CertificateHolder, bool) {
-	certificateMutex.Lock()
+	certificateMutex.RLock()
 	entry, status := certificateTable[finder]
-	certificateMutex.Unlock()
+	certificateMutex.RUnlock()
 	return entry, status
 }
 
@@ -158,9 +158,9 @@ func cleanCertificateTable() {
 	defer certificateMutex.Unlock()
 
 	for key, val := range certificateTable {
-		val.CertLocker.Lock()
+		val.CertLocker.RLock()
 		creation := val.CreationTime.Unix()
-		val.CertLocker.Unlock()
+		val.CertLocker.RUnlock()
 		if (nowtime.Unix() - creation) < cleanTimeout {
 			continue
 		}

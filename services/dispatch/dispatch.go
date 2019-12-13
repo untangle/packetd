@@ -195,13 +195,13 @@ func AttachNfqueueSubscriptions(session *Session) {
 // MirrorNfqueueSubscriptions creates a copy of the subscriptions for the argumented Session
 func MirrorNfqueueSubscriptions(session *Session) map[string]SubscriptionHolder {
 	mirror := make(map[string]SubscriptionHolder)
-	session.subLocker.Lock()
+	session.subLocker.RLock()
 
 	for k, v := range session.subscriptions {
 		mirror[k] = v
 	}
 
-	session.subLocker.Unlock()
+	session.subLocker.RUnlock()
 	return (mirror)
 }
 
@@ -277,8 +277,8 @@ func HandleWarehouseCleanup() {
 func GetConntrackTable() map[uint32]*Conntrack {
 	newMap := make(map[uint32]*Conntrack)
 
-	conntrackTableMutex.Lock()
-	defer conntrackTableMutex.Unlock()
+	conntrackTableMutex.RLock()
+	defer conntrackTableMutex.RUnlock()
 
 	for k, v := range conntrackTable {
 		newMap[k] = v

@@ -47,7 +47,7 @@ type trafficHolder struct {
 	trafficData *ClassifiedTraffic
 	expireTime  time.Time
 	waitGroup   sync.WaitGroup
-	dataLocker  sync.Mutex
+	dataLocker  sync.RWMutex
 }
 
 // unknownTrafficItem is a pointer for unknown traffic
@@ -57,7 +57,7 @@ var unknownTrafficItem = &ClassifiedTraffic{ID: "Unknown", Name: "Unknown", Conf
 var classifiedTrafficCache map[string]*trafficHolder
 
 // trafficMutex is used to prevent multiple writes into the cache map
-var trafficMutex sync.Mutex
+var trafficMutex sync.RWMutex
 
 // shutdownChannel is used when destroying the service to shutdown the cache cleaning utility safely
 var shutdownChannel = make(chan bool)
@@ -116,17 +116,19 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 	var mapKey = formMapKey(ipAdd, port, protoID)
 
 	// lock the cache mutex and get the traffic holder
-	trafficMutex.Lock()
+	trafficMutex.RLock()
 	holder = classifiedTrafficCache[mapKey]
+	trafficMutex.RUnlock()
 
 	// If we found the holder unlock the map. If not, we create and store the holder
 	// and then send the request to the cloud. We also increment the waitgroup so
 	// other threads trying to do the same lookup can wait for our reply rather
 	// rather than generating multiple cloud requests for the same information
 	if holder != nil {
-		trafficMutex.Unlock()
 		logger.Trace("Loading prediction for %s\n", mapKey)
 	} else {
+		trafficMutex.Lock()
+
 		logger.Trace("Fetching prediction for %s\n", mapKey)
 		holder = new(trafficHolder)
 		holder.waitGroup.Add(1)
@@ -158,9 +160,9 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 	// The first one will do the cloud lookup and the others will wait here.
 	holder.waitGroup.Wait()
 
-	holder.dataLocker.Lock()
+	holder.dataLocker.RLock()
 	traffic := holder.trafficData
-	holder.dataLocker.Unlock()
+	holder.dataLocker.RUnlock()
 
 	logger.Trace("Found prediction for %s - %v\n", mapKey, traffic)
 	return traffic

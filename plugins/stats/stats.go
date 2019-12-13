@@ -27,10 +27,10 @@ var passiveCollector [256]*Collector
 var activeCollector [256]*Collector
 var jitterCollector [256]*Collector
 
-var statsLocker [256]sync.Mutex
-var passiveLocker [256]sync.Mutex
-var activeLocker [256]sync.Mutex
-var jitterLocker [256]sync.Mutex
+var statsLocker [256]sync.RWMutex
+var passiveLocker [256]sync.RWMutex
+var activeLocker [256]sync.RWMutex
+var jitterLocker [256]sync.RWMutex
 
 var interfaceDetailMap map[string]*interfaceDetail
 var interfaceDetailLocker sync.RWMutex
@@ -43,7 +43,7 @@ var interfaceHashLocker sync.Mutex
 
 var interfaceStatsMap map[string]*linux.NetworkStat
 var interfaceDiffMap map[string]*linux.NetworkStat
-var interfaceDiffLocker sync.Mutex
+var interfaceDiffLocker sync.RWMutex
 
 var interfaceChannel = make(chan bool, 1)
 var pingerChannel = make(chan bool, 1)
@@ -279,21 +279,21 @@ func collectInterfaceStats(seconds uint64) {
 			interfaceMetricLocker.Unlock()
 
 			// get copies of the three latency collectors
-			statsLocker[interfaceID].Lock()
+			statsLocker[interfaceID].RLock()
 			combo := statsCollector[interfaceID].MakeCopy()
-			statsLocker[interfaceID].Unlock()
+			statsLocker[interfaceID].RUnlock()
 
-			passiveLocker[interfaceID].Lock()
+			passiveLocker[interfaceID].RLock()
 			passive := passiveCollector[interfaceID].MakeCopy()
-			passiveLocker[interfaceID].Unlock()
+			passiveLocker[interfaceID].RUnlock()
 
-			activeLocker[interfaceID].Lock()
+			activeLocker[interfaceID].RLock()
 			active := activeCollector[interfaceID].MakeCopy()
-			activeLocker[interfaceID].Unlock()
+			activeLocker[interfaceID].RUnlock()
 
-			jitterLocker[interfaceID].Lock()
+			jitterLocker[interfaceID].RLock()
 			jitter := jitterCollector[interfaceID].MakeCopy()
-			jitterLocker[interfaceID].Unlock()
+			jitterLocker[interfaceID].RUnlock()
 
 			istat := MakeInterfaceStatsJSON(interfaceID, combo.Latency1Min.Value, combo.Latency5Min.Value, combo.Latency15Min.Value)
 			istats = append(istats, istat)
@@ -642,8 +642,8 @@ func logHopCount(ctid uint32, mess dispatch.NfqueueMessage, name string) {
 func GetInterfaceRateDetails(facename string) map[string]uint64 {
 	var retmap map[string]uint64
 
-	interfaceDiffLocker.Lock()
-	defer interfaceDiffLocker.Unlock()
+	interfaceDiffLocker.RLock()
+	defer interfaceDiffLocker.RUnlock()
 
 	diffInfo := interfaceDiffMap[facename]
 
