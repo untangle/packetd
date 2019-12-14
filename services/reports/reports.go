@@ -162,7 +162,7 @@ func Startup() {
 		logger.Info("SQLite3 Database Version:%s  File:%s/%s  Limit:%d MB\n", dbVersion, dbFILEPATH, dbFILENAME, dbSizeLimit/oneMEGABYTE)
 	}
 
-	dbMain.SetMaxOpenConns(4)
+	dbMain.SetMaxOpenConns(1)
 	dbMain.SetMaxIdleConns(2)
 
 	createTables()
