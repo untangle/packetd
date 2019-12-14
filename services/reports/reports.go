@@ -904,7 +904,7 @@ func dbCleaner() {
 		// database is getting full so clean out some of the oldest data
 		logger.Info("Database starting trim operation\n")
 		trimPercent("sessions", .10)
-		trimPercent("session_stats", .25)
+		trimPercent("session_stats", .10)
 		trimPercent("interface_stats", .10)
 		//also run optimize
 		runSQL("PRAGMA optimize")
