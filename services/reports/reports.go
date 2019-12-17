@@ -110,6 +110,8 @@ var queriesLock sync.RWMutex
 var queryID uint64
 var eventQueue = make(chan Event, 10000)
 var cloudQueue = make(chan Event, 1000)
+var preparedStatements = map[string]*sql.Stmt{}
+var preparedStatementsMutex = sync.RWMutex{}
 
 // The filename and path for the sqlite database file. We split these up to make
 // it easy for the file size limitation logic to get the total size of the target
@@ -237,19 +239,20 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	}
 
 	var rows *sql.Rows
-	var sqlStr string
+	var sqlStmt *sql.Stmt
 
-	sqlStr, err = makeSQLString(reportEntry)
+	sqlStmt, err = getPreparedStatement(reportEntry, dbMain)
 	if err != nil {
-		logger.Warn("Failed to make SQL: %v\n", err)
+		logger.Warn("Failed to get prepared SQL: %v\n", err)
 		return nil, err
 	}
 	values := conditionValues(reportEntry.Conditions)
 
-	logger.Debug("SQL: %v %v\n", sqlStr, values)
-	rows, err = dbMain.Query(sqlStr, values...)
+	logger.Debug("SQL Values: %v \n", values)
+
+	rows, err = sqlStmt.Query(values...)
 	if err != nil {
-		logger.Err("dbMain.Query error: %s\n", err)
+		logger.Err("sqlStmt.Query error: %s\n", err)
 		return nil, err
 	}
 
@@ -260,11 +263,55 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	queriesLock.Lock()
 	queriesMap[q.ID] = q
 	queriesLock.Unlock()
+
+	// I believe this is here to cleanup stray queries that may be locking the database?
 	go func() {
 		time.Sleep(30 * time.Second)
 		cleanupQuery(q)
 	}()
 	return q, nil
+}
+
+// getPreparedStatement retrieves the prepared statements from the prepared statements mutex, and creates it if it does not exist
+// this largely takes from the ideas here: https://thenotexpert.com/golang-sql-recipe/
+//
+//
+func getPreparedStatement(reportEntry *ReportEntry, db *sql.DB) (*sql.Stmt, error) {
+
+	var stmt *sql.Stmt
+	var present bool
+
+	query, err := makeSQLString(reportEntry)
+	if err != nil {
+		logger.Warn("Failed to make SQL: %v\n", err)
+		return nil, err
+	}
+
+	preparedStatementsMutex.RLock()
+	if stmt, present = preparedStatements[query]; present {
+		preparedStatementsMutex.RUnlock()
+		return stmt, nil
+	}
+
+	//If not present, let's create.
+	preparedStatementsMutex.RUnlock()
+	//Locking for both reading and writing now.
+	preparedStatementsMutex.Lock()
+	defer preparedStatementsMutex.Unlock()
+
+	//There is a tiny possibility that one goroutine creates a statement but another one gets here as well.
+	//Then the latter will receive the prepared statement instead of recreating it.
+	if stmt, present = preparedStatements[query]; present {
+		return stmt, nil
+	}
+
+	stmt, err = db.Prepare(query)
+	if err != nil {
+		return nil, err
+	}
+
+	preparedStatements[query] = stmt
+	return stmt, nil
 }
 
 // GetData returns the data for the provided QueryID

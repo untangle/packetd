@@ -244,7 +244,7 @@ func makeCategoriesSeriesSQLString(reportEntry *ReportEntry) (string, error) {
 	}
 	if len(columns) == 0 {
 		//return "", errors.New("No values for series")
-		return "SELECT null", nil
+		return "SELECT null WHERE null > ? AND NULL < ?;", nil
 	}
 	reportEntry.QuerySeries.Columns = columns
 
