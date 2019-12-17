@@ -903,9 +903,26 @@ func dbCleaner() {
 
 		// database is getting full so clean out some of the oldest data
 		logger.Info("Database starting trim operation\n")
-		trimPercent("sessions", .10)
-		trimPercent("session_stats", .10)
-		trimPercent("interface_stats", .10)
+
+		tx, err := dbMain.Begin()
+		if err != nil {
+			logger.Warn("Failed to begin transaction: %s\n", err.Error())
+		}
+
+		trimPercent("sessions", .10, tx)
+		trimPercent("session_stats", .10, tx)
+		trimPercent("interface_stats", .10, tx)
+
+		logger.Info("Committing database trim...\n")
+
+		// end transaction
+		err = tx.Commit()
+		if err != nil {
+			tx.Rollback()
+			logger.Warn("Failed to commit transaction: %s\n", err.Error())
+		}
+		logger.Info("Database trim operation completed\n")
+
 		//also run optimize
 		runSQL("PRAGMA optimize")
 
@@ -949,11 +966,15 @@ func loadDbStats() (currentSize int64, pageSize int64, pageCount int64, maxPageC
 
 // trimPercent trims the specified table by the specified percent (by time)
 // example: trimPercent("sessions",.1) will drop the oldest 10% of events in sessions by time
-func trimPercent(table string, percent float32) {
+func trimPercent(table string, percent float32, tx *sql.Tx) {
 	logger.Info("Trimming %s by %.1f%% percent...\n", table, percent*100.0)
 	sqlStr := fmt.Sprintf("DELETE FROM %s WHERE time_stamp < (SELECT min(time_stamp)+cast((max(time_stamp)-min(time_stamp))*%f as int) from %s)", table, percent, table)
 	logger.Debug("Trimming DB statement:\n %s \n", sqlStr)
-	runSQL(sqlStr)
+	res, err := tx.Exec(sqlStr)
+	if err != nil {
+		logger.Warn("Failed to execute transaction: %s %s\n", err.Error(), sqlStr)
+	}
+	logger.Debug("Log trim result: %v\n", res)
 }
 
 // runSQL runs the specified SQL and returns the result which may be nothing
