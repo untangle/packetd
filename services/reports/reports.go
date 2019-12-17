@@ -573,7 +573,7 @@ func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
 	values := make([]interface{}, columnCount)
 	valuePtrs := make([]interface{}, columnCount)
 
-	for i := 0; rows.Next() && i < limit; i++ {
+	for i := 0; i < limit && rows.Next(); i++ {
 		for i := 0; i < columnCount; i++ {
 			valuePtrs[i] = &values[i]
 		}
