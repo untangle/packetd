@@ -52,7 +52,7 @@ type Conntrack struct {
 }
 
 var conntrackTable map[uint32]*Conntrack
-var conntrackTableMutex sync.Mutex
+var conntrackTableMutex sync.RWMutex
 
 // String returns string representation of conntrack
 func (ct *Conntrack) String() string {
@@ -308,9 +308,9 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 
 // findConntrack finds an entry in the conntrack table
 func findConntrack(ctid uint32) (*Conntrack, bool) {
-	conntrackTableMutex.Lock()
+	conntrackTableMutex.RLock()
 	entry, status := conntrackTable[ctid]
-	conntrackTableMutex.Unlock()
+	conntrackTableMutex.RUnlock()
 	return entry, status
 }
 

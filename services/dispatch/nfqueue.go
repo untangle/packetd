@@ -48,12 +48,15 @@ type subscriberResult struct {
 
 // ReleaseSession is called by a subscriber to stop receiving traffic for a session
 func ReleaseSession(session *Session, owner string) {
-	session.subLocker.Lock()
+	session.subLocker.RLock()
 	origLen := len(session.subscriptions)
+	session.subLocker.RUnlock()
+
 	if origLen == 0 {
-		session.subLocker.Unlock()
 		return
 	}
+
+	session.subLocker.Lock()
 	delete(session.subscriptions, owner)
 	len := len(session.subscriptions)
 	if origLen != len {

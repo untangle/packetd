@@ -22,7 +22,7 @@ const cleanMaxSeconds = 3600
 
 var cleanupTable = make(map[uint64]int64)
 var shutdownChannel = make(chan bool)
-var readMutex = &sync.Mutex{}
+var readMutex sync.RWMutex
 var disabled = false
 
 // Startup dict service
@@ -618,7 +618,7 @@ func GetDictionary(table string, key interface{}) ([]Entry, error) {
 
 	defer file.Close()
 
-	readMutex.Lock()
+	readMutex.RLock()
 	_, err = file.WriteString(setstr)
 
 	if err != nil {
@@ -634,7 +634,7 @@ func GetDictionary(table string, key interface{}) ([]Entry, error) {
 	for scanner.Scan() {
 		entries = append(entries, parseEntry(scanner.Text()))
 	}
-	readMutex.Unlock()
+	readMutex.RUnlock()
 	return entries, err
 }
 
@@ -652,7 +652,7 @@ func GetTable(table string) ([]Entry, error) {
 
 	defer file.Close()
 
-	readMutex.Lock()
+	readMutex.RLock()
 	_, err = file.WriteString(setstr)
 
 	if err != nil {
@@ -668,7 +668,7 @@ func GetTable(table string) ([]Entry, error) {
 	for scanner.Scan() {
 		entries = append(entries, parseEntry(scanner.Text()))
 	}
-	readMutex.Unlock()
+	readMutex.RUnlock()
 	return entries, err
 }
 

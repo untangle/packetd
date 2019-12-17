@@ -46,15 +46,15 @@ type Session struct {
 
 	// creationTime stores the creation time of the session
 	creationTime time.Time
-	creationLock sync.Mutex
+	creationLock sync.RWMutex
 
 	// clientSideTuple stores the client-side (pre-NAT) session tuple
 	clientSideTuple Tuple
-	clientSideLock  sync.Mutex
+	clientSideLock  sync.RWMutex
 
 	// serverSideTuple stores the server-side (post-NAT) session tuple
 	serverSideTuple Tuple
-	serverSideLock  sync.Mutex
+	serverSideLock  sync.RWMutex
 
 	// stores the client and server side interface index and type using int32 because the atomic
 	// package doesn't have anything smaller but the get and set take and return them as uint8
@@ -74,26 +74,26 @@ type Session struct {
 
 	// The conntrack entry associated with this session
 	conntrackPointer *Conntrack
-	conntrackLock    sync.Mutex
+	conntrackLock    sync.RWMutex
 
 	// subscriptions stores the nfqueue subscribers
 	subscriptions map[string]SubscriptionHolder
-	subLocker     sync.Mutex
+	subLocker     sync.RWMutex
 
 	// attachments stores the metadata attachments
 	attachments    map[string]interface{}
-	attachmentLock sync.Mutex
+	attachmentLock sync.RWMutex
 
 	// used to keep track of the last session activity
 	lastActivityTime time.Time
-	lastActivityLock sync.Mutex
+	lastActivityLock sync.RWMutex
 }
 
 // sessionTable is the global session table
 var sessionTable map[uint32]*Session
 
 // sessionMutex is the lock for sessionTable
-var sessionMutex sync.Mutex
+var sessionMutex sync.RWMutex
 
 // sessionIndex stores the next available unique SessionID
 var sessionIndex int64
@@ -107,9 +107,9 @@ func (sess *Session) PutAttachment(name string, value interface{}) {
 
 // GetAttachment is used to safely get an attachment from a session object
 func (sess *Session) GetAttachment(name string) interface{} {
-	sess.attachmentLock.Lock()
+	sess.attachmentLock.RLock()
 	value := sess.attachments[name]
-	sess.attachmentLock.Unlock()
+	sess.attachmentLock.RUnlock()
 	return value
 }
 
@@ -162,9 +162,9 @@ func (sess *Session) SetConntrackID(value uint32) uint32 {
 
 // GetClientSideTuple gets the client side Tuple
 func (sess *Session) GetClientSideTuple() Tuple {
-	sess.clientSideLock.Lock()
+	sess.clientSideLock.RLock()
 	value := sess.clientSideTuple
-	sess.clientSideLock.Unlock()
+	sess.clientSideLock.RUnlock()
 	return value
 }
 
@@ -177,9 +177,9 @@ func (sess *Session) SetClientSideTuple(tuple Tuple) {
 
 // GetServerSideTuple gets the server side Tuple
 func (sess *Session) GetServerSideTuple() Tuple {
-	sess.serverSideLock.Lock()
+	sess.serverSideLock.RLock()
 	value := sess.serverSideTuple
-	sess.serverSideLock.Unlock()
+	sess.serverSideLock.RUnlock()
 	return value
 }
 
@@ -300,9 +300,9 @@ func (sess *Session) AddNavlCount(value uint64) uint64 {
 
 // GetCreationTime gets the time the entry was created
 func (sess *Session) GetCreationTime() time.Time {
-	sess.creationLock.Lock()
+	sess.creationLock.RLock()
 	value := sess.creationTime
-	sess.creationLock.Unlock()
+	sess.creationLock.RUnlock()
 	return value
 }
 
@@ -315,9 +315,9 @@ func (sess *Session) SetCreationTime(value time.Time) {
 
 // GetLastActivity gets the time of the last session activity
 func (sess *Session) GetLastActivity() time.Time {
-	sess.lastActivityLock.Lock()
+	sess.lastActivityLock.RLock()
 	value := sess.lastActivityTime
-	sess.lastActivityLock.Unlock()
+	sess.lastActivityLock.RUnlock()
 	return value
 }
 
@@ -347,9 +347,9 @@ func (sess *Session) SetConntrackConfirmed(argument bool) {
 
 // GetConntrackPointer gets the conntrack pointer
 func (sess *Session) GetConntrackPointer() *Conntrack {
-	sess.conntrackLock.Lock()
+	sess.conntrackLock.RLock()
 	value := sess.conntrackPointer
-	sess.conntrackLock.Unlock()
+	sess.conntrackLock.RUnlock()
 	return value
 }
 
@@ -412,10 +412,10 @@ func nextSessionID() int64 {
 
 // findSession searches for an sess in the session table
 func findSession(ctid uint32) *Session {
-	sessionMutex.Lock()
+	sessionMutex.RLock()
 	sess, status := sessionTable[ctid]
 	logger.Trace("Lookup session index %v -> %v\n", ctid, status)
-	sessionMutex.Unlock()
+	sessionMutex.RUnlock()
 	if status == false {
 		return nil
 	}
@@ -468,8 +468,8 @@ func cleanSessionTable() {
 
 // printSessionTable prints the session table
 func printSessionTable() {
-	sessionMutex.Lock()
-	defer sessionMutex.Unlock()
+	sessionMutex.RLock()
+	defer sessionMutex.RUnlock()
 	for k, v := range sessionTable {
 		logger.Debug("Session[%v] = %s\n", k, v.GetClientSideTuple().String())
 	}

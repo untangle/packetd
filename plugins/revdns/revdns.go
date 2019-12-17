@@ -28,9 +28,9 @@ const reverseTimeout = 120
 
 var shutdownChannel = make(chan bool)
 var reverseTable map[string]*ReverseHolder
-var reverseMutex sync.Mutex
-var clientMutex sync.Mutex
-var serverMutex sync.Mutex
+var reverseMutex sync.RWMutex
+var clientMutex sync.RWMutex
+var serverMutex sync.RWMutex
 
 // PluginStartup function is called to allow plugin specific initialization.
 func PluginStartup() {
@@ -76,15 +76,15 @@ func PluginNfqueueClientHandler(mess dispatch.NfqueueMessage, ctid uint32, newSe
 
 	var holder *ReverseHolder
 
-	clientMutex.Lock()
-
+	clientMutex.RLock()
 	holder = findReverse(findkey)
+	clientMutex.RUnlock()
+
 	if holder != nil {
-		clientMutex.Unlock()
 		logger.Debug("Loading reverse names for %s ctid:%d\n", findkey, ctid)
 	} else {
 		logger.Debug("Fetching reverse names for %s ctid:%d\n", findkey, ctid)
-
+		clientMutex.Lock()
 		holder = new(ReverseHolder)
 		holder.WaitGroup.Add(1)
 		insertReverse(findkey, holder)
@@ -148,15 +148,15 @@ func PluginNfqueueServerHandler(mess dispatch.NfqueueMessage, ctid uint32, newSe
 
 	var holder *ReverseHolder
 
-	serverMutex.Lock()
-
+	serverMutex.RLock()
 	holder = findReverse(findkey)
+	serverMutex.RUnlock()
+
 	if holder != nil {
-		serverMutex.Unlock()
 		logger.Debug("Loading reverse names for %s ctid:%d\n", findkey, ctid)
 	} else {
 		logger.Debug("Fetching reverse names for %s ctid:%d\n", findkey, ctid)
-
+		serverMutex.Lock()
 		holder = new(ReverseHolder)
 		holder.WaitGroup.Add(1)
 		insertReverse(findkey, holder)
@@ -218,9 +218,9 @@ func attachReverseNamesToSession(keyname string, session *dispatch.Session, list
 
 // findReverse fetches the cached names for the argumented address.
 func findReverse(finder string) *ReverseHolder {
-	reverseMutex.Lock()
+	reverseMutex.RLock()
 	entry := reverseTable[finder]
-	reverseMutex.Unlock()
+	reverseMutex.RUnlock()
 	return entry
 }
 
