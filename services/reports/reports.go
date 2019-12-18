@@ -936,7 +936,12 @@ func dbCleaner() {
 		case <-time.After(60 * time.Second):
 		}
 
-		currentSize, pageSize, pageCount, maxPageCount, freeCount := loadDbStats()
+		currentSize, pageSize, pageCount, maxPageCount, freeCount, err := loadDbStats()
+
+		if err != nil {
+			logger.Crit("Unable to load DB Stats: %s\n", err.Error())
+			continue
+		}
 
 		logger.Info("Database Size:%v MB  Limit:%v MB  Free Pages:%v Page Size: %v Page Count: %v Max Page Count: %v \n", currentSize/oneMEGABYTE, dbSizeLimit/oneMEGABYTE, freeCount, pageSize, pageCount, maxPageCount)
 
@@ -977,7 +982,12 @@ func dbCleaner() {
 
 		logger.Info("Database trim operation completed\n")
 
-		currentSize, pageSize, pageCount, maxPageCount, freeCount = loadDbStats()
+		currentSize, pageSize, pageCount, maxPageCount, freeCount, err = loadDbStats()
+		if err != nil {
+			logger.Crit("Unable to load DB Stats POST TRIM: %s\n", err.Error())
+			continue
+		}
+
 		logger.Info("POST TRIM Database Size:%v MB  Limit:%v MB  Free Pages:%v Page Size: %v Page Count: %v Max Page Count: %v \n", currentSize/oneMEGABYTE, dbSizeLimit/oneMEGABYTE, freeCount, pageSize, pageCount, maxPageCount)
 		// re-run and check size with no delay
 		ch <- true
@@ -990,9 +1000,7 @@ func dbCleaner() {
 // returns pageCount (int64) - The current number of pages in the database
 // returns maxPageCount (int64) - The maximum number of pages the database can hold
 // returns freeCount (int64) - The number of free pages in the DB file
-func loadDbStats() (currentSize int64, pageSize int64, pageCount int64, maxPageCount int64, freeCount int64) {
-	var err error
-
+func loadDbStats() (currentSize int64, pageSize int64, pageCount int64, maxPageCount int64, freeCount int64, err error) {
 	// we get the page size, page count, and free list size for our limit calculations
 	pageSize, err = strconv.ParseInt(runSQL("PRAGMA page_size"), 10, 64)
 	if err != nil || pageSize == 0 {
