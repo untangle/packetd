@@ -243,7 +243,7 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	var rows *sql.Rows
 	var sqlStmt *sql.Stmt
 
-	sqlStmt, err = getPreparedStatement(reportEntry, dbMain)
+	sqlStmt, err = getPreparedStatement(reportEntry)
 	if err != nil {
 		logger.Warn("Failed to get prepared SQL: %v\n", err)
 		return nil, err
@@ -278,7 +278,7 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 // this largely takes from the ideas here: https://thenotexpert.com/golang-sql-recipe/
 //
 //
-func getPreparedStatement(reportEntry *ReportEntry, db *sql.DB) (*sql.Stmt, error) {
+func getPreparedStatement(reportEntry *ReportEntry) (*sql.Stmt, error) {
 
 	var stmt *sql.Stmt
 	var present bool
@@ -307,7 +307,7 @@ func getPreparedStatement(reportEntry *ReportEntry, db *sql.DB) (*sql.Stmt, erro
 		return stmt, nil
 	}
 
-	stmt, err = db.Prepare(query)
+	stmt, err = dbMain.Prepare(query)
 	if err != nil {
 		return nil, err
 	}
