@@ -201,7 +201,9 @@ func customHook(conn *sqlite3.SQLiteConn) error {
 		logger.Warn("Error setting busy_timeout: %v\n", err)
 	}
 
-	// enable auto vaccuum = FULL
+	// enable auto vaccuum = FULL, this will clean up empty pages by moving them
+	// to the end of the DB file. This will reclaim data from data that has been
+	// removed from the database.
 	if _, err := conn.Exec("PRAGMA auto_vacuum = FULL", nil); err != nil {
 		logger.Warn("Error setting auto_vacuum: %v\n", err)
 	}
@@ -985,7 +987,7 @@ func dbCleaner() {
 // loadDbStats gets the page size, page count, free list size, and current DB size from the database
 // returns currentSize (int64) - The DB Size in bytes
 // returns pageSize (int64) - The current page size of each DB page
-// returns pageCount (int64) - The current number of pages in the database 
+// returns pageCount (int64) - The current number of pages in the database
 // returns maxPageCount (int64) - The maximum number of pages the database can hold
 // returns freeCount (int64) - The number of free pages in the DB file
 func loadDbStats() (currentSize int64, pageSize int64, pageCount int64, maxPageCount int64, freeCount int64) {
