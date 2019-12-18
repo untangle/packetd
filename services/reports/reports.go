@@ -982,6 +982,12 @@ func dbCleaner() {
 	}
 }
 
+// loadDbStats gets the page size, page count, free list size, and current DB size from the database
+// returns currentSize (int64) - The DB Size in bytes
+// returns pageSize (int64) - The current page size of each DB page
+// returns pageCount (int64) - The current number of pages in the database 
+// returns maxPageCount (int64) - The maximum number of pages the database can hold
+// returns freeCount (int64) - The number of free pages in the DB file
 func loadDbStats() (currentSize int64, pageSize int64, pageCount int64, maxPageCount int64, freeCount int64) {
 	var err error
 
