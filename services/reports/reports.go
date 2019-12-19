@@ -680,35 +680,16 @@ func createTables() {
 		logger.Err("Failed to create index: %s\n", err.Error())
 	}
 
-	_, err = dbMain.Exec(`CREATE INDEX idx_sessions_session_id_time_stamp ON sessions (session_id, time_stamp DESC)`)
+	_, err = dbMain.Exec(`CREATE INDEX idx_sessions_id_time_stamp ON sessions (session_id, time_stamp DESC)`)
 	if err != nil {
 		logger.Err("Failed to create index: %s\n", err.Error())
 	}
 
-	_, err = dbMain.Exec(`CREATE INDEX idx_wan_routing ON sessions (wan_rule_chain, server_interface_type, time_stamp DESC)`)
+	_, err = dbMain.Exec(`CREATE INDEX idx_sessions_wan_interface_time_stamp ON sessions (wan_rule_chain, server_interface_type, time_stamp DESC)`)
 	if err != nil {
 		logger.Err("Failed to create index: %s\n", err.Error())
 	}
 
-	_, err = dbMain.Exec(`CREATE INDEX idx_sessions_client_address ON sessions (session_id, time_stamp DESC, client_address)`)
-	if err != nil {
-		logger.Err("Failed to create index: %s\n", err.Error())
-	}
-
-	_, err = dbMain.Exec(`CREATE INDEX idx_sessions_server_port ON sessions (session_id, time_stamp DESC, server_port)`)
-	if err != nil {
-		logger.Err("Failed to create index: %s\n", err.Error())
-	}
-
-	_, err = dbMain.Exec(`CREATE INDEX idx_sessions_app_name ON sessions (session_id, time_stamp DESC, application_name)`)
-	if err != nil {
-		logger.Err("Failed to create index: %s\n", err.Error())
-	}
-
-	_, err = dbMain.Exec(`CREATE INDEX idx_sessions_app_proto ON sessions (session_id, time_stamp DESC, application_protochain)`)
-	if err != nil {
-		logger.Err("Failed to create index: %s\n", err.Error())
-	}
 	// FIXME add domain (SNI + dns_prediction + cert_prediction)
 	// We need a singular "domain" field that takes all the various domain determination methods into account and chooses the best one
 	// I think the preference order is:
@@ -810,37 +791,42 @@ func createTables() {
 		logger.Err("Failed to create table: %s\n", err.Error())
 	}
 
-	_, err = dbMain.Exec(`CREATE INDEX idx_interface_stats_time_stamp ON interface_stats (time_stamp DESC)`)
+	_, err = dbMain.Exec(`CREATE INDEX idx_iface_stats_time_stamp ON interface_stats (time_stamp DESC)`)
 	if err != nil {
 		logger.Err("Failed to create index: %s\n", err.Error())
 	}
 
-	_, err = dbMain.Exec(`CREATE INDEX idx_ping_timeout ON interface_stats (interface_id, time_stamp DESC, ping_timeout)`)
+	_, err = dbMain.Exec(`CREATE INDEX idx_iface_stats_id_time_stamp ON interface_stats (interface_id, time_stamp DESC)`)
 	if err != nil {
 		logger.Err("Failed to create index: %s\n", err.Error())
 	}
 
-	_, err = dbMain.Exec(`CREATE INDEX idx_rx_bytes ON interface_stats (interface_id, time_stamp DESC, rx_bytes)`)
+	_, err = dbMain.Exec(`CREATE INDEX idx_iface_stats_id_ts_pt ON interface_stats (interface_id, time_stamp DESC, ping_timeout)`)
 	if err != nil {
 		logger.Err("Failed to create index: %s\n", err.Error())
 	}
 
-	_, err = dbMain.Exec(`CREATE INDEX idx_jitter_1 ON interface_stats (interface_id, time_stamp DESC, jitter_1)`)
+	_, err = dbMain.Exec(`CREATE INDEX idx_iface_stats_id_ts_rb ON interface_stats (interface_id, time_stamp DESC, rx_bytes)`)
 	if err != nil {
 		logger.Err("Failed to create index: %s\n", err.Error())
 	}
 
-	_, err = dbMain.Exec(`CREATE INDEX idx_latency ON interface_stats (interface_id, time_stamp DESC, latency_1)`)
+	_, err = dbMain.Exec(`CREATE INDEX idx_iface_stats_id_ts_jit ON interface_stats (interface_id, time_stamp DESC, jitter_1)`)
 	if err != nil {
 		logger.Err("Failed to create index: %s\n", err.Error())
 	}
 
-	_, err = dbMain.Exec(`CREATE INDEX idx_active_latency ON interface_stats (interface_id, time_stamp DESC, active_latency_1)`)
+	_, err = dbMain.Exec(`CREATE INDEX idx_iface_stats_id_ts_lat ON interface_stats (interface_id, time_stamp DESC, latency_1)`)
 	if err != nil {
 		logger.Err("Failed to create index: %s\n", err.Error())
 	}
 
-	_, err = dbMain.Exec(`CREATE INDEX idx_passive_latency ON interface_stats (interface_id, time_stamp DESC, passive_latency_1)`)
+	_, err = dbMain.Exec(`CREATE INDEX idx_iface_stats_id_ts_al ON interface_stats (interface_id, time_stamp DESC, active_latency_1)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_iface_stats_id_ts_pl ON interface_stats (interface_id, time_stamp DESC, passive_latency_1)`)
 	if err != nil {
 		logger.Err("Failed to create index: %s\n", err.Error())
 	}
