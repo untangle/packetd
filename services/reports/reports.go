@@ -268,7 +268,7 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 
 	// I believe this is here to cleanup stray queries that may be locking the database?
 	go func() {
-		time.Sleep(30 * time.Second)
+		time.Sleep(60 * time.Second)
 		cleanupQuery(q)
 	}()
 	return q, nil
