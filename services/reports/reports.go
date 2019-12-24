@@ -69,6 +69,7 @@ type QuerySeriesOptions struct {
 type QueryEventsOptions struct {
 	OrderByColumn string `json:"orderByColumn"`
 	OrderAsc      bool   `json:"orderAsc"`
+	Limit         int    `json:"limit"`
 }
 
 // ReportCondition holds a SQL reporting condition (ie client = 1.2.3.4)
@@ -109,6 +110,8 @@ var queriesLock sync.RWMutex
 var queryID uint64
 var eventQueue = make(chan Event, 10000)
 var cloudQueue = make(chan Event, 1000)
+var preparedStatements = map[string]*sql.Stmt{}
+var preparedStatementsMutex = sync.RWMutex{}
 
 // The filename and path for the sqlite database file. We split these up to make
 // it easy for the file size limitation logic to get the total size of the target
@@ -198,6 +201,12 @@ func customHook(conn *sqlite3.SQLiteConn) error {
 		logger.Warn("Error setting busy_timeout: %v\n", err)
 	}
 
+	// enable auto vaccuum = FULL, this will clean up empty pages by moving them
+	// to the end of the DB file. This will reclaim data from data that has been
+	// removed from the database.
+	if _, err := conn.Exec("PRAGMA auto_vacuum = FULL", nil); err != nil {
+		logger.Warn("Error setting auto_vacuum: %v\n", err)
+	}
 	return nil
 }
 
@@ -232,19 +241,20 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	}
 
 	var rows *sql.Rows
-	var sqlStr string
+	var sqlStmt *sql.Stmt
 
-	sqlStr, err = makeSQLString(reportEntry)
+	sqlStmt, err = getPreparedStatement(reportEntry)
 	if err != nil {
-		logger.Warn("Failed to make SQL: %v\n", err)
+		logger.Warn("Failed to get prepared SQL: %v\n", err)
 		return nil, err
 	}
 	values := conditionValues(reportEntry.Conditions)
 
-	logger.Debug("SQL: %v %v\n", sqlStr, values)
-	rows, err = dbMain.Query(sqlStr, values...)
+	logger.Debug("SQL Values: %v \n", values)
+
+	rows, err = sqlStmt.Query(values...)
 	if err != nil {
-		logger.Err("dbMain.Query error: %s\n", err)
+		logger.Err("sqlStmt.Query error: %s\n", err)
 		return nil, err
 	}
 
@@ -255,11 +265,55 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	queriesLock.Lock()
 	queriesMap[q.ID] = q
 	queriesLock.Unlock()
+
+	// I believe this is here to cleanup stray queries that may be locking the database?
 	go func() {
-		time.Sleep(30 * time.Second)
+		time.Sleep(60 * time.Second)
 		cleanupQuery(q)
 	}()
 	return q, nil
+}
+
+// getPreparedStatement retrieves the prepared statements from the prepared statements mutex, and creates it if it does not exist
+// this largely takes from the ideas here: https://thenotexpert.com/golang-sql-recipe/
+//
+//
+func getPreparedStatement(reportEntry *ReportEntry) (*sql.Stmt, error) {
+
+	var stmt *sql.Stmt
+	var present bool
+
+	query, err := makeSQLString(reportEntry)
+	if err != nil {
+		logger.Warn("Failed to make SQL: %v\n", err)
+		return nil, err
+	}
+
+	preparedStatementsMutex.RLock()
+	if stmt, present = preparedStatements[query]; present {
+		preparedStatementsMutex.RUnlock()
+		return stmt, nil
+	}
+
+	//If not present, let's create.
+	preparedStatementsMutex.RUnlock()
+	//Locking for both reading and writing now.
+	preparedStatementsMutex.Lock()
+	defer preparedStatementsMutex.Unlock()
+
+	//There is a tiny possibility that one goroutine creates a statement but another one gets here as well.
+	//Then the latter will receive the prepared statement instead of recreating it.
+	if stmt, present = preparedStatements[query]; present {
+		return stmt, nil
+	}
+
+	stmt, err = dbMain.Prepare(query)
+	if err != nil {
+		return nil, err
+	}
+
+	preparedStatements[query] = stmt
+	return stmt, nil
 }
 
 // GetData returns the data for the provided QueryID
@@ -521,7 +575,7 @@ func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
 	values := make([]interface{}, columnCount)
 	valuePtrs := make([]interface{}, columnCount)
 
-	for i := 0; rows.Next() && i < limit; i++ {
+	for i := 0; i < limit && rows.Next(); i++ {
 		for i := 0; i < columnCount; i++ {
 			valuePtrs[i] = &values[i]
 		}
@@ -621,9 +675,17 @@ func createTables() {
 		logger.Err("Failed to create table: %s\n", err.Error())
 	}
 
-	_, err = dbMain.Exec(
-		`CREATE INDEX idx_sessions_time_stamp ON sessions (time_stamp)`)
+	_, err = dbMain.Exec(`CREATE INDEX idx_sessions_time_stamp ON sessions (time_stamp DESC)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
 
+	_, err = dbMain.Exec(`CREATE INDEX idx_sessions_id_time_stamp ON sessions (session_id, time_stamp DESC)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_sessions_wan_interface_time_stamp ON sessions (wan_rule_chain, server_interface_type, time_stamp DESC)`)
 	if err != nil {
 		logger.Err("Failed to create index: %s\n", err.Error())
 	}
@@ -659,9 +721,12 @@ func createTables() {
 		logger.Err("Failed to create table: %s\n", err.Error())
 	}
 
-	_, err = dbMain.Exec(
-		`CREATE INDEX idx_session_stats_time_stamp ON session_stats (time_stamp)`)
+	_, err = dbMain.Exec(`CREATE INDEX idx_session_stats_time_stamp ON session_stats (time_stamp DESC)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
 
+	_, err = dbMain.Exec(`CREATE INDEX idx_session_stats_session_id_time_stamp ON session_stats (session_id, time_stamp DESC)`)
 	if err != nil {
 		logger.Err("Failed to create index: %s\n", err.Error())
 	}
@@ -726,9 +791,42 @@ func createTables() {
 		logger.Err("Failed to create table: %s\n", err.Error())
 	}
 
-	_, err = dbMain.Exec(
-		`CREATE INDEX idx_interface_stats_time_stamp ON interface_stats (time_stamp)`)
+	_, err = dbMain.Exec(`CREATE INDEX idx_iface_stats_time_stamp ON interface_stats (time_stamp DESC)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
 
+	_, err = dbMain.Exec(`CREATE INDEX idx_iface_stats_id_time_stamp ON interface_stats (interface_id, time_stamp DESC)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_iface_stats_id_ts_pt ON interface_stats (interface_id, time_stamp DESC, ping_timeout)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_iface_stats_id_ts_rb ON interface_stats (interface_id, time_stamp DESC, rx_bytes)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_iface_stats_id_ts_jit ON interface_stats (interface_id, time_stamp DESC, jitter_1)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_iface_stats_id_ts_lat ON interface_stats (interface_id, time_stamp DESC, latency_1)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_iface_stats_id_ts_al ON interface_stats (interface_id, time_stamp DESC, active_latency_1)`)
+	if err != nil {
+		logger.Err("Failed to create index: %s\n", err.Error())
+	}
+
+	_, err = dbMain.Exec(`CREATE INDEX idx_iface_stats_id_ts_pl ON interface_stats (interface_id, time_stamp DESC, passive_latency_1)`)
 	if err != nil {
 		logger.Err("Failed to create index: %s\n", err.Error())
 	}
@@ -815,8 +913,6 @@ func mergeConditions(reportEntry *ReportEntry) {
  * fragmentation is a significant concern.
 **/
 func dbCleaner() {
-	var pageSize, pageCount, freeCount int64
-	var err error
 	ch := make(chan bool, 1)
 	ch <- true
 
@@ -826,27 +922,14 @@ func dbCleaner() {
 		case <-time.After(60 * time.Second):
 		}
 
-		// we get the page size, page count, and free list size for our limit calculations
-		pageSize, err = strconv.ParseInt(runSQL("PRAGMA page_size"), 10, 64)
-		if err != nil || pageSize == 0 {
-			logger.Crit("Unable to parse database page_size: %v\n", err)
-			continue
-		}
+		currentSize, pageSize, pageCount, maxPageCount, freeCount, err := loadDbStats()
 
-		pageCount, err = strconv.ParseInt(runSQL("PRAGMA page_count"), 10, 64)
 		if err != nil {
-			logger.Crit("Unable to parse database page_count: %v\n", err)
+			logger.Crit("Unable to load DB Stats: %s\n", err.Error())
 			continue
 		}
 
-		freeCount, err = strconv.ParseInt(runSQL("PRAGMA freelist_count"), 10, 64)
-		if err != nil {
-			logger.Crit("Unable to parse database freelist_count: %v\n", err)
-			continue
-		}
-
-		currentSize := (pageSize * pageCount)
-		logger.Info("Database Size:%v MB  Limit:%v MB  Free Pages:%v\n", currentSize/oneMEGABYTE, dbSizeLimit/oneMEGABYTE, freeCount)
+		logger.Info("Database Size:%v MB  Limit:%v MB  Free Pages:%v Page Size: %v Page Count: %v Max Page Count: %v \n", currentSize/oneMEGABYTE, dbSizeLimit/oneMEGABYTE, freeCount, pageSize, pageCount, maxPageCount)
 
 		// if we haven't reached the size limit just continue
 		if currentSize < dbSizeLimit {
@@ -860,21 +943,87 @@ func dbCleaner() {
 
 		// database is getting full so clean out some of the oldest data
 		logger.Info("Database starting trim operation\n")
-		trimPercent("sessions", .10)
-		trimPercent("session_stats", .10)
-		trimPercent("interface_stats", .10)
+
+		tx, err := dbMain.Begin()
+		if err != nil {
+			logger.Warn("Failed to begin transaction: %s\n", err.Error())
+		}
+
+		trimPercent("sessions", .10, tx)
+		trimPercent("session_stats", .10, tx)
+		trimPercent("interface_stats", .10, tx)
+
+		logger.Info("Committing database trim...\n")
+
+		// end transaction
+		err = tx.Commit()
+		if err != nil {
+			tx.Rollback()
+			logger.Warn("Failed to commit transaction: %s\n", err.Error())
+		}
 		logger.Info("Database trim operation completed\n")
+
+		//also run optimize
+		runSQL("PRAGMA optimize")
+
+		logger.Info("Database trim operation completed\n")
+
+		currentSize, pageSize, pageCount, maxPageCount, freeCount, err = loadDbStats()
+		if err != nil {
+			logger.Crit("Unable to load DB Stats POST TRIM: %s\n", err.Error())
+			continue
+		}
+
+		logger.Info("POST TRIM Database Size:%v MB  Limit:%v MB  Free Pages:%v Page Size: %v Page Count: %v Max Page Count: %v \n", currentSize/oneMEGABYTE, dbSizeLimit/oneMEGABYTE, freeCount, pageSize, pageCount, maxPageCount)
 		// re-run and check size with no delay
 		ch <- true
 	}
 }
 
+// loadDbStats gets the page size, page count, free list size, and current DB size from the database
+// returns currentSize (int64) - The DB Size in bytes
+// returns pageSize (int64) - The current page size of each DB page
+// returns pageCount (int64) - The current number of pages in the database
+// returns maxPageCount (int64) - The maximum number of pages the database can hold
+// returns freeCount (int64) - The number of free pages in the DB file
+func loadDbStats() (currentSize int64, pageSize int64, pageCount int64, maxPageCount int64, freeCount int64, err error) {
+	// we get the page size, page count, and free list size for our limit calculations
+	pageSize, err = strconv.ParseInt(runSQL("PRAGMA page_size"), 10, 64)
+	if err != nil || pageSize == 0 {
+		logger.Crit("Unable to parse database page_size: %v\n", err)
+	}
+
+	pageCount, err = strconv.ParseInt(runSQL("PRAGMA page_count"), 10, 64)
+	if err != nil {
+		logger.Crit("Unable to parse database page_count: %v\n", err)
+	}
+
+	maxPageCount, err = strconv.ParseInt(runSQL("PRAGMA max_page_count"), 10, 64)
+	if err != nil {
+		logger.Crit("Unable to parse database page_count: %v\n", err)
+	}
+
+	freeCount, err = strconv.ParseInt(runSQL("PRAGMA freelist_count"), 10, 64)
+	if err != nil {
+		logger.Crit("Unable to parse database freelist_count: %v\n", err)
+	}
+
+	currentSize = (pageSize * pageCount)
+
+	return
+}
+
 // trimPercent trims the specified table by the specified percent (by time)
 // example: trimPercent("sessions",.1) will drop the oldest 10% of events in sessions by time
-func trimPercent(table string, percent float32) {
+func trimPercent(table string, percent float32, tx *sql.Tx) {
 	logger.Info("Trimming %s by %.1f%% percent...\n", table, percent*100.0)
 	sqlStr := fmt.Sprintf("DELETE FROM %s WHERE time_stamp < (SELECT min(time_stamp)+cast((max(time_stamp)-min(time_stamp))*%f as int) from %s)", table, percent, table)
-	runSQL(sqlStr)
+	logger.Debug("Trimming DB statement:\n %s \n", sqlStr)
+	res, err := tx.Exec(sqlStr)
+	if err != nil {
+		logger.Warn("Failed to execute transaction: %s %s\n", err.Error(), sqlStr)
+	}
+	logger.Debug("Log trim result: %v\n", res)
 }
 
 // runSQL runs the specified SQL and returns the result which may be nothing

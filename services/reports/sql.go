@@ -93,6 +93,10 @@ func makeEventsSQLString(reportEntry *ReportEntry) (string, error) {
 
 	sqlStr += fmt.Sprintf(" ORDER BY %s %s", orderByColumn, order)
 
+	if reportEntry.QueryEvents.Limit != 0 {
+		sqlStr += fmt.Sprintf(" LIMIT %d", reportEntry.QueryEvents.Limit)
+	}
+
 	logger.Debug("Events SQL: %v\n", sqlStr)
 	return sqlStr, nil
 }
@@ -138,14 +142,15 @@ func makeCategoriesSQLString(reportEntry *ReportEntry) (string, error) {
 		sqlStr += newStr
 	}
 	sqlStr += " GROUP BY " + reportEntry.QueryCategories.GroupColumn
+
+	// remove "0" values
+	sqlStr += " HAVING value > 0"
+
 	sqlStr += fmt.Sprintf(" ORDER BY %d %s", orderByColumn, order)
 
 	if reportEntry.QueryCategories.Limit != 0 {
 		sqlStr += fmt.Sprintf(" LIMIT %d", reportEntry.QueryCategories.Limit)
 	}
-
-	// remove "0" values
-	sqlStr = "SELECT " + reportEntry.QueryCategories.GroupColumn + ", value FROM ( " + sqlStr + " ) WHERE value > 0"
 
 	logger.Debug("Categories SQL: %v %v\n", sqlStr)
 	return sqlStr, nil
@@ -239,7 +244,7 @@ func makeCategoriesSeriesSQLString(reportEntry *ReportEntry) (string, error) {
 	}
 	if len(columns) == 0 {
 		//return "", errors.New("No values for series")
-		return "SELECT null", nil
+		return "SELECT null WHERE null > ? AND NULL < ?;", nil
 	}
 	reportEntry.QuerySeries.Columns = columns
 
