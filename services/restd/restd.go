@@ -121,6 +121,7 @@ func Startup() {
 	api.POST("/gc", gcHandler)
 
 	api.POST("/fetch-licenses", fetchLicensesHandler)
+	api.POST("/factory-reset", factoryResetHandler)
 	api.POST("/sysupgrade", sysupgradeHandler)
 	api.POST("/upgrade", upgradeHandler)
 
@@ -674,6 +675,20 @@ func fetchLicensesHandler(c *gin.Context) {
 	}
 
 	logger.Notice("Fetch licenses... done\n")
+	c.JSON(http.StatusOK, gin.H{"success": true})
+	return
+}
+
+func factoryResetHandler(c *gin.Context) {
+	outraw, err := exec.Command("/usr/bin/sync-settings", "-o", "openwrt", "-c").CombinedOutput()
+	output := string(outraw)
+	if err != nil {
+		logger.Warn("sync-settings failed: %s (%s)\n", err.Error(), output)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to restory factory default settings"})
+		return
+	}
+
+	logger.Notice("Factory reset... done\n")
 	c.JSON(http.StatusOK, gin.H{"success": true})
 	return
 }
