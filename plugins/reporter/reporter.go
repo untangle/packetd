@@ -169,9 +169,15 @@ func PluginNetloggerHandler(netlogger *dispatch.NetloggerMessage) {
 	}
 
 	modifiedColumns := make(map[string]interface{})
-	modifiedColumns["wan_rule_chain"] = traffic.Chain
-	modifiedColumns["wan_rule_id"] = traffic.RuleID
-	modifiedColumns["wan_policy_id"] = traffic.Policy
+	if traffic.Chain != "" {
+		modifiedColumns["wan_rule_chain"] = traffic.Chain
+	}
+	if traffic.RuleID != 0 {
+		modifiedColumns["wan_rule_id"] = traffic.RuleID
+	}
+	if traffic.Policy != 0 {
+		modifiedColumns["wan_policy_id"] = traffic.Policy
+	}
 
 	reports.LogEvent(reports.CreateEvent("reporter_netlogger", "sessions", 2, columns, modifiedColumns))
 	logger.Debug("NetLogger event for %v: %v\n", columns, modifiedColumns)
