@@ -2,6 +2,7 @@ package geoip
 
 import (
 	"compress/gzip"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
+	"github.com/untangle/packetd/services/settings"
 )
 
 const pluginName = "geoip"
@@ -156,6 +158,9 @@ func isPrivateIP(ip net.IP) bool {
 }
 
 func databaseDownload(filename string) {
+	var uid string
+	var err error
+
 	logger.Info("Downloading GeoIP Database...\n")
 
 	// Make sure the target directory exists
@@ -166,8 +171,16 @@ func databaseDownload(filename string) {
 		os.MkdirAll(filename[0:marker], 0755)
 	}
 
-	// Get the GeoIP database from MaxMind
-	resp, err := http.Get("http://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.mmdb.gz")
+	// Get our UID so we can pass it to the download server
+	uid, err = settings.GetUID()
+	if err != nil {
+		uid = "00000000-0000-0000-0000-000000000000"
+		logger.Warn("Unable to read UID: %s - Using all zeros\n", err.Error())
+	}
+
+	// Download the GeoIP database
+	target := fmt.Sprintf("https://downloads.untangle.com/download.php?resource=geoipCountry&uid=%s", uid)
+	resp, err := http.Get(target)
 	if err != nil {
 		return
 	}
