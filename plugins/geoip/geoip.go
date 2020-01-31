@@ -1,6 +1,7 @@
 package geoip
 
 import (
+	"archive/tar"
 	"compress/gzip"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/oschwald/geoip2-golang"
 	"github.com/untangle/packetd/services/dict"
@@ -20,7 +22,8 @@ import (
 
 const pluginName = "geoip"
 
-var geoDatabase *geoip2.Reader
+var shutdownChannel = make(chan bool)
+var geoDatabaseReader *geoip2.Reader
 var geoMutex sync.Mutex
 var privateIPBlocks []*net.IPNet
 
@@ -33,16 +36,21 @@ func PluginStartup() {
 	var filename string
 
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
+
 	geoMutex.Lock()
 	defer geoMutex.Unlock()
 
-	// start by looking for the NGFW city database file
-	db, err := geoip2.Open(findGeoFile(true))
+	filename, valid := checkGeoFile()
+	if valid == false {
+		databaseDownload(filename)
+	}
+
+	db, err := geoip2.Open(filename)
 	if err != nil {
 		logger.Warn("Unable to load GeoIP Database: %s\n", err)
 	} else {
 		logger.Info("Loading GeoIP Database: %s\n", filename)
-		geoDatabase = db
+		geoDatabaseReader = db
 	}
 
 	for _, cidr := range []string{
@@ -57,6 +65,8 @@ func PluginStartup() {
 		_, block, _ := net.ParseCIDR(cidr)
 		privateIPBlocks = append(privateIPBlocks, block)
 	}
+
+	go downloadTask()
 	dispatch.InsertNfqueueSubscription(pluginName, dispatch.GeoipPriority, PluginNfqueueHandler)
 }
 
@@ -65,12 +75,22 @@ func PluginStartup() {
 // process know we're finished.
 func PluginShutdown() {
 	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
+
+	shutdownChannel <- true
+
+	select {
+	case <-shutdownChannel:
+		logger.Info("Successful shutdown of downloadTask\n")
+	case <-time.After(10 * time.Second):
+		logger.Warn("Failed to properly shutdown downloadTask\n")
+	}
+
 	geoMutex.Lock()
 	defer geoMutex.Unlock()
 
-	if geoDatabase != nil {
-		geoDatabase.Close()
-		geoDatabase = nil
+	if geoDatabaseReader != nil {
+		geoDatabaseReader.Close()
+		geoDatabaseReader = nil
 	}
 }
 
@@ -121,15 +141,15 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	// if we have a good database and good addresses and the country
 	// is still unknown we do the database lookup
 
-	if geoDatabase != nil && srcAddr != nil && clientCountry == "XU" {
-		SrcRecord, err := geoDatabase.City(srcAddr)
+	if geoDatabaseReader != nil && srcAddr != nil && clientCountry == "XU" {
+		SrcRecord, err := geoDatabaseReader.City(srcAddr)
 		if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
 			clientCountry = SrcRecord.Country.IsoCode
 		}
 	}
 
-	if geoDatabase != nil && dstAddr != nil && serverCountry == "XU" {
-		DstRecord, err := geoDatabase.City(dstAddr)
+	if geoDatabaseReader != nil && dstAddr != nil && serverCountry == "XU" {
+		DstRecord, err := geoDatabaseReader.City(dstAddr)
 		if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
 			serverCountry = DstRecord.Country.IsoCode
 		}
@@ -157,11 +177,51 @@ func isPrivateIP(ip net.IP) bool {
 	return false
 }
 
+// checkGeoFile determines the location and validity of the MaxMind GeoIP database file
+func checkGeoFile() (string, bool) {
+	var filename string
+	var fileinfo os.FileInfo
+	var err error
+
+	// start by looking where the geoip-database package stores the file
+	filename = "/usr/share/geoip/GeoLite2-Country.mmdb"
+	if fileinfo, err = os.Stat(filename); err != nil {
+		// not found so default to the temporary directory
+		filename = "/tmp/GeoLite2-Country.mmdb"
+		if fileinfo, err = os.Stat(filename); err != nil {
+			// still not found so clear fileinfo to force download
+			fileinfo = nil
+		}
+	}
+
+	// if we can't get the file info return invalid flag
+	if fileinfo == nil {
+		return filename, false
+	}
+
+	// if the file exists but is empty return invalid flag
+	if fileinfo.Size() == 0 {
+		return filename, false
+	}
+
+	filetime := fileinfo.ModTime().Unix()
+	currtime := time.Now().Unix()
+
+	// if the file we found is less than 30 days old go ahead and use it
+	if (filetime + (86400 * 30)) > currtime {
+		return filename, true
+	}
+
+	// we found a file but it is stale so return invalid flag
+	return filename, false
+}
+
+// databaseDownload will download the MaxMind GeoLite2 country database file
 func databaseDownload(filename string) {
 	var uid string
 	var err error
 
-	logger.Info("Downloading GeoIP Database...\n")
+	logger.Info("Starting GeoIP database download: %s\n", filename)
 
 	// Make sure the target directory exists
 	marker := strings.LastIndex(filename, "/")
@@ -178,10 +238,11 @@ func databaseDownload(filename string) {
 		logger.Warn("Unable to read UID: %s - Using all zeros\n", err.Error())
 	}
 
-	// Download the GeoIP database
+	// Download the GeoIP country database which is much smaller than the city version
 	target := fmt.Sprintf("https://downloads.untangle.com/download.php?resource=geoipCountry&uid=%s", uid)
 	resp, err := http.Get(target)
 	if err != nil {
+		logger.Warn("Download error: %v\n", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -193,55 +254,64 @@ func databaseDownload(filename string) {
 	}
 
 	// Create a reader for the compressed data
-	reader, err := gzip.NewReader(resp.Body)
+	zipReader, err := gzip.NewReader(resp.Body)
 	if err != nil {
+		logger.Warn("Error calling gzip.NewReader(): %v\n", err)
 		return
 	}
-	defer reader.Close()
+	defer zipReader.Close()
 
-	// Create the output file
+	// Create a tar reader using the uncompressed data stream
+	tarReader := tar.NewReader(zipReader)
+
+	// Create the file where we'll store the extracted database
 	writer, err := os.Create(filename)
 	if err != nil {
+		logger.Warn("Unable to write database file: %s\n", filename)
 		return
 	}
-	defer writer.Close()
 
-	// Write the uncompressed database to the file
-	io.Copy(writer, reader)
-	logger.Info("Downloaded GeoIP Database.\n")
-}
+	var goodfile = false
 
-// findGeoFile finds the location of the GeoLite2-City.mmdb file
-// it checks several common locations and returns any found
-// if none found it just returns "/tmp/GeoLite2-City.mmdb"
-func findGeoFile(download bool) string {
-	possibleLocations := []string{
-		"/var/cache/untangle-geoip/GeoLite2-City.mmdb",
-		"/tmp/GeoLite2-City.mmdb",
-		"/usr/lib/GeoLite2-City.mmdb",
-		"/usr/share/untangle-geoip/GeoLite2-Country.mmdb",
-		"/usr/share/geoip/GeoLite2-Country.mmdb",
-	}
+	for {
+		// get the next entry in the archive
+		header, err := tarReader.Next()
 
-	for _, filename := range possibleLocations {
-		_, err := os.Stat(filename)
-		if os.IsNotExist(err) {
-			continue
-		} else {
-			return filename
+		// break out of the loop on end of file
+		if err == io.EOF {
+			break
 		}
+
+		// log any other errors and break out of the loop
+		if err != nil {
+			logger.Crit("Error extracting database file: %v\n", err)
+			break
+		}
+
+		// ignore everything that is not a regular file
+		if header.Typeflag != tar.TypeReg {
+			continue
+		}
+
+		// ignore everything except the actual database file
+		if !strings.HasSuffix(header.Name, "GeoLite2-Country.mmdb") {
+			continue
+		}
+
+		// found the database so write to the output file, set the goodfile flag, and break
+		io.Copy(writer, tarReader)
+		goodfile = true
+		logger.Info("Finished GeoIP database download\n")
+		break
 	}
 
-	// If we reach this point it was not found
-	if download {
-		databaseDownload("/usr/lib/GeoLite2-City.mmdb")
-		// try again now that we tried to download
-		// but do not download again
-		return findGeoFile(false)
-	}
+	// close the output file
+	writer.Close()
 
-	// Not found - just return one
-	return "/tmp/GeoLite2-City.mmdb"
+	// if the flag is not set the file is empty or garbage and must be deleted
+	if goodfile == false {
+		os.Remove(filename)
+	}
 }
 
 // logEvent logs an update event that updates the *_country columns
@@ -256,4 +326,43 @@ func logEvent(session *dispatch.Session, clientCountry string, serverCountry str
 	modifiedColumns["server_country"] = serverCountry
 
 	reports.LogEvent(reports.CreateEvent("session_geoip", "sessions", 2, columns, modifiedColumns))
+}
+
+// periodic task to check the database file and download a new version
+// we check once per hour but checkGeoFile determines when the existing file is stale
+func downloadTask() {
+	for {
+		select {
+		case <-shutdownChannel:
+			shutdownChannel <- true
+			return
+		case <-time.After(3600 * time.Second):
+			filename, valid := checkGeoFile()
+
+			// if the existing file is valid we are done
+			if valid == true {
+				break
+			}
+
+			// lock the mutex, close the existing database, and clear the reader
+			geoMutex.Lock()
+			geoDatabaseReader.Close()
+			geoDatabaseReader = nil
+
+			// download a fresh copy of the database
+			databaseDownload(filename)
+
+			// open the database
+			db, err := geoip2.Open(filename)
+			if err != nil {
+				logger.Warn("Unable to open GeoIP Database: %s\n", err)
+			} else {
+				logger.Info("Loading GeoIP Database: %s\n", filename)
+				geoDatabaseReader = db
+			}
+
+			// unlock the mutex
+			geoMutex.Unlock()
+		}
+	}
 }
