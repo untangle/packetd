@@ -142,14 +142,14 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 	// is still unknown we do the database lookup
 
 	if geoDatabaseReader != nil && srcAddr != nil && clientCountry == "XU" {
-		SrcRecord, err := geoDatabaseReader.City(srcAddr)
+		SrcRecord, err := geoDatabaseReader.Country(srcAddr)
 		if (err == nil) && (len(SrcRecord.Country.IsoCode) != 0) {
 			clientCountry = SrcRecord.Country.IsoCode
 		}
 	}
 
 	if geoDatabaseReader != nil && dstAddr != nil && serverCountry == "XU" {
-		DstRecord, err := geoDatabaseReader.City(dstAddr)
+		DstRecord, err := geoDatabaseReader.Country(dstAddr)
 		if (err == nil) && (len(DstRecord.Country.IsoCode) != 0) {
 			serverCountry = DstRecord.Country.IsoCode
 		}
