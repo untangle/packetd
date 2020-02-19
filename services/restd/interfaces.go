@@ -213,9 +213,16 @@ func attachNetworkDetails(worker *interfaceInfo, ubusNetworkList []interface{}, 
 		}
 
 		// we only look at interfaces that have a device value
-		if item["device"] == nil {
-			continue
+		device := item["device"]
+		if device == nil {
+			// tunX interfaces, won't have a 'device' value, but will
+			// have an 'l3_device' value.  Use that as the device.
+			device = item["l3_device"]
+			if device == nil {
+				continue
+			}
 		}
+
 
 		// For bridged devices we look for the bridged-to device name. If there is no mapping
 		// for the interface in the bridgeList then we just use the actual device name.
@@ -225,7 +232,7 @@ func attachNetworkDetails(worker *interfaceInfo, ubusNetworkList []interface{}, 
 		}
 
 		// continue if this isn't the device we are looking for
-		if search != item["device"].(string) {
+		if search != device.(string) {
 			continue
 		}
 
