@@ -237,7 +237,7 @@ func makeCategoriesSeriesSQLString(reportEntry *ReportEntry) (string, error) {
 	aggValue := reportEntry.QueryCategories.AggregationValue
 	for _, column := range distinctValues {
 		columnStr := aggFunc + "("
-		columnStr += "CASE WHEN " + reportEntry.QueryCategories.GroupColumn + " = '" + column + "'"
+		columnStr += "CASE WHEN " + reportEntry.QueryCategories.GroupColumn + " = '" + escapeSingleTick(column) + "'"
 		columnStr += " THEN " + aggValue + " END)"
 		columnStr += " AS '" + escapeSingleTick(column) + "'"
 		columns = append(columns, columnStr)
@@ -394,9 +394,12 @@ func escape(source string) string {
 	return string(desc[0:j])
 }
 
-// escape escapes quotes in as string
+// escapeSingleTick will replace single ticks with a SQLite safe single tick escape sequence
+// hopefully the golang sqlite driver will support better escape characters in the future
+//
 // this is a really gross way to handle SQL safety
 // https://github.com/golang/go/issues/18478
+// @param source - the string to fix the single quotes in
 func escapeSingleTick(source string) string {
 	var j int
 	if len(source) == 0 {
@@ -415,7 +418,7 @@ func escapeSingleTick(source string) string {
 		default:
 		}
 		if flag {
-			desc[j] = '\\'
+			desc[j] = escape
 			desc[j+1] = escape
 			j = j + 2
 		} else {
