@@ -164,6 +164,11 @@ func Startup() {
 		logger.Info("SQLite3 Database Version:%s  File:%s/%s  Limit:%d MB\n", dbVersion, dbFILEPATH, dbFILENAME, dbSizeLimit/oneMEGABYTE)
 	}
 
+	// enable auto vaccuum = FULL, this will clean up empty pages by moving them
+	// to the end of the DB file. This will reclaim data from data that has been
+	// removed from the database.
+	runSQL("PRAGMA auto_vacuum = FULL")
+
 	dbMain.SetMaxOpenConns(4)
 	dbMain.SetMaxIdleConns(2)
 
@@ -201,12 +206,6 @@ func customHook(conn *sqlite3.SQLiteConn) error {
 		logger.Warn("Error setting busy_timeout: %v\n", err)
 	}
 
-	// enable auto vaccuum = FULL, this will clean up empty pages by moving them
-	// to the end of the DB file. This will reclaim data from data that has been
-	// removed from the database.
-	if _, err := conn.Exec("PRAGMA auto_vacuum = FULL", nil); err != nil {
-		logger.Warn("Error setting auto_vacuum: %v\n", err)
-	}
 	return nil
 }
 
