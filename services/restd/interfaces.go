@@ -223,7 +223,6 @@ func attachNetworkDetails(worker *interfaceInfo, ubusNetworkList []interface{}, 
 			}
 		}
 
-
 		// For bridged devices we look for the bridged-to device name. If there is no mapping
 		// for the interface in the bridgeList then we just use the actual device name.
 		search, ok := bridgeList[worker.Device]

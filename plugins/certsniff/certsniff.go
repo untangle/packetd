@@ -26,12 +26,20 @@ type dataCollector struct {
 
 // addPacket adds a packet of server data to the a dataCollector
 func (ME *dataCollector) addPacket(buffer []byte, netseq uint32) {
-	if ME.total == maxPacketCount {
+	var total int
+
+	// hold the read lock long enough to get the current buffer counter
+	ME.locker.RLock()
+	total = ME.total
+	ME.locker.RUnlock()
+
+	// make sure we don't overflow the packet collector
+	if total == maxPacketCount {
 		logger.Warn("Unable to add more data to collector\n")
 		return
 	}
 
-	// hold the lock long enough to get and increment the current buffer counter
+	// hold the full lock long enough to get and increment the current buffer counter
 	ME.locker.Lock()
 	spot := ME.total
 	ME.total++
