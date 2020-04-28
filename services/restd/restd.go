@@ -125,6 +125,9 @@ func Startup() {
 	api.POST("/sysupgrade", sysupgradeHandler)
 	api.POST("/upgrade", upgradeHandler)
 
+	api.POST("/reboot", rebootHandler)
+	api.POST("/shutdown", shutdownHandler)
+
 	api.POST("/releasedhcp/:device", releaseDhcp)
 	api.POST("/renewdhcp/:device", renewDhcp)
 	// files
@@ -821,6 +824,28 @@ func renewDhcp(c *gin.Context) {
 		}
 	}
 
+	c.JSON(http.StatusOK, gin.H{"success": true})
+	return
+}
+
+func rebootHandler(c *gin.Context) {
+	err := exec.Command("reboot").Run()
+	if err != nil {
+		logger.Warn("Failed to reboot system: %s\n", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+	return
+}
+
+func shutdownHandler(c *gin.Context) {
+	err := exec.Command("halt").Run()
+	if err != nil {
+		logger.Warn("Failed to shutdown system: %s\n", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
 	return
 }
