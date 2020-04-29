@@ -115,6 +115,7 @@ func Startup() {
 	api.GET("/status/wwan/:device", statusWwan)
 	api.GET("/status/wifichannels/:device", statusWifiChannels)
 	api.GET("/status/wifimodelist/:device", statusWifiModelist)
+	api.GET("/status/wireguardPublicKey/:device", statusWireguardPublicKey)
 
 	api.GET("/logger/:source", loggerHandler)
 	api.GET("/debug", debugHandler)

@@ -372,6 +372,19 @@ func statusWifiModelist(c *gin.Context) {
 	return
 }
 
+// statusWireguardPublicKey is the RESTD /api/status/wireguardPublicKey handler
+func statusWireguardPublicKey(c *gin.Context) {
+	device := c.Param("device")
+	result, err := exec.Command("/usr/bin/wg", "show", device, "public-key").CombinedOutput()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"publicKey": string(result)})
+	return
+}
+
 type dhcpInfo struct {
 	LeaseExpiration uint   `json:"leaseExpiration"`
 	MACAddress      string `json:"macAddress"`
