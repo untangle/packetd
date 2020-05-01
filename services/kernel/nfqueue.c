@@ -167,7 +167,7 @@ int nfqueue_startup(int index)
 
 	// create a new netfilter queue
 	nfqqh[index] = nfq_create_queue(nfqh[index],cfg_net_queue+index,netq_callback,(void*)(intptr_t)index);
-	if (nfqqh == 0) {
+	if (nfqqh[index] == 0) {
 		logmessage(LOG_ERR,logsrc,"Error returned from nfq_create_queue(%u)\n",cfg_net_queue);
 		set_shutdown_flag();
 		return(4);
