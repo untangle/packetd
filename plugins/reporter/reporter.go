@@ -5,19 +5,28 @@ package reporter
 import (
 	"encoding/json"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
+	"github.com/untangle/packetd/services/settings"
 )
 
 const pluginName = "reporter"
 
+var rulesLookup = make(map[string]string)
+var rulesLookupMutex sync.RWMutex
+var policiesLookup = make(map[string]string)
+var policiesLookupMutex sync.RWMutex
+
 // PluginStartup starts the reporter
 func PluginStartup() {
 	logger.Info("PluginStartup(%s) has been called\n", pluginName)
+	loadRules()
+	loadPolicies()
 	dispatch.InsertNfqueueSubscription(pluginName, dispatch.ReporterPriority, PluginNfqueueHandler)
 	dispatch.InsertConntrackSubscription(pluginName, 1, PluginConntrackHandler)
 	dispatch.InsertNetloggerSubscription(pluginName, 1, PluginNetloggerHandler)
@@ -142,9 +151,9 @@ type TrafficEvent struct {
 	Type   string
 	Table  string
 	Chain  string
-	RuleID int
+	RuleID string
 	Action string
-	Policy int
+	Policy string
 }
 
 // PluginNetloggerHandler receives NFLOG events
@@ -168,19 +177,153 @@ func PluginNetloggerHandler(netlogger *dispatch.NetloggerMessage) {
 		return
 	}
 
+	// load the full GUIDs for rules/policies using the first 8 bytes from the UUID
+	traffic.RuleID = getFullID(traffic.RuleID, rulesLookup, &rulesLookupMutex, loadRules)
+	traffic.Policy = getFullID(traffic.Policy, policiesLookup, &policiesLookupMutex, loadPolicies)
+
 	modifiedColumns := make(map[string]interface{})
 	if traffic.Chain != "" {
 		modifiedColumns["wan_rule_chain"] = traffic.Chain
 	}
-	if traffic.RuleID != 0 {
+	if traffic.RuleID != "" {
 		modifiedColumns["wan_rule_id"] = traffic.RuleID
 	}
-	if traffic.Policy != 0 {
+	if traffic.Policy != "" {
 		modifiedColumns["wan_policy_id"] = traffic.Policy
 	}
 
 	reports.LogEvent(reports.CreateEvent("reporter_netlogger", "sessions", 2, columns, modifiedColumns))
 	logger.Debug("NetLogger event for %v: %v\n", columns, modifiedColumns)
+}
+
+// getFullID retrieves the full GUID from a lookupMap using the first 8 bytes of the GUID
+// param idLookup (string) - the ID to use as a lookup
+// param lookupMap (map[string]string) - the lookup map containing all the guids
+// param lookupMutex (*sync.RWMutex) - the mutex for controlling write access to the lookup map
+// param reloadFunc (func()) - the function to call in the case that we want to try and reload data in the lookupMap from settings
+func getFullID(idLookup string, lookupMap map[string]string, lookupMutex *sync.RWMutex, reloadFunc func()) string {
+	fullID := idLookup
+
+	// These indicate cache so just return them
+	if fullID == "-2" || fullID == "-1" {
+		return fullID
+	}
+
+	// look it up in the hash set
+	lookupMutex.RLock()
+	fullID = lookupMap[fullID]
+	lookupMutex.RUnlock()
+
+	// if not found, reload and look it up (just in case)
+	if fullID == idLookup || fullID == "" {
+		logger.Debug("ID %s cannot be found, calling reloadFunc (%s) to find it. \n", fullID, reloadFunc)
+		reloadFunc()
+		lookupMutex.RLock()
+		fullID = lookupMap[fullID]
+		lookupMutex.RUnlock()
+	}
+	return fullID
+}
+
+// loadRules will load the WAN rule GUIDs from settings into the rulesLookup Map
+func loadRules() {
+	wanChainsIntf, err := settings.GetCurrentSettings([]string{"wan", "policy_chains"})
+
+	if err != nil {
+		logger.Warn("Unable to load wan rules: %s", err)
+		return
+	}
+
+	wanRuleChainMap, ok := wanChainsIntf.([]interface{})
+	if !ok {
+		logger.Warn("Unable to load rule chain map: %s", err)
+		return
+	}
+
+	for _, ruleChain := range wanRuleChainMap {
+		ruleChainInfo, ok := ruleChain.(map[string]interface{})
+
+		if !ok {
+			logger.Warn("Invalid rule chain in settings: %T\n", ruleChain)
+			continue
+		}
+		if ruleChainInfo == nil {
+			logger.Warn("nil rule chain in interface list\n")
+			continue
+		}
+
+		ruleMap, ok := ruleChainInfo["rules"].([]interface{})
+
+		if !ok {
+			logger.Warn("Invalid rule chain in settings: %T\n", ruleChain)
+			continue
+		}
+
+		for _, rules := range ruleMap {
+			ruleInfo, ok := rules.(map[string]interface{})
+
+			if !ok {
+				logger.Warn("Invalid rule in rule-chain: %T\n", ruleChain)
+				continue
+			}
+			if ruleInfo == nil {
+				logger.Warn("nil rule chain in interface list\n")
+				continue
+			}
+
+			logger.Debug("Rule Info being added to lookup map: %s\n", ruleInfo)
+
+			buildGUIDLookup("ruleId", ruleInfo, rulesLookup, &rulesLookupMutex)
+		}
+	}
+
+}
+
+// loadPolicies will load the WAN policy GUIDs from settings into the policiesLookup map
+func loadPolicies() {
+	wanPoliciesintf, err := settings.GetCurrentSettings([]string{"wan", "policies"})
+
+	if err != nil {
+		logger.Warn("Unable to load wan policies: %s", err)
+		return
+	}
+
+	wanPolicyMap, ok := wanPoliciesintf.([]interface{})
+
+	if !ok {
+		logger.Warn("Unable to load wan policies: %s", err)
+		return
+	}
+
+	for _, policy := range wanPolicyMap {
+		policyInfo, ok := policy.(map[string]interface{})
+		if !ok {
+			logger.Warn("Invalid policy in settings: %T\n", policy)
+			continue
+		}
+		if policyInfo == nil {
+			logger.Warn("nil policy in interface list\n")
+			continue
+		}
+
+		logger.Debug("WAN Policy being added to lookup map: %s \n", policyInfo)
+
+		buildGUIDLookup("policyId", policyInfo, policiesLookup, &policiesLookupMutex)
+
+	}
+}
+
+// buildGUIDLookup is used to build the lookupMap passed as a parameter. The lookupMap will be locked with the lookupMutex
+// and the idName and idInfo are used to get the GUID based on the first 8 digits of the GUID
+// param idName (String) - the ID Name to lookup in the info map
+// param idInfo (map[string]inteface{}) - the IDInfo container that contains the ID
+// param lookupMap (map[string]string) - the GUID Lookup map to store the 8 digit guid relation with the full GUID
+// param lookupMutex (*symc.RWMutex) - the locking mutex for locking access to the lookupMap
+func buildGUIDLookup(idName string, idInfo map[string]interface{}, lookupMap map[string]string, lookupMutex *sync.RWMutex) {
+	idRune := []rune(idInfo[idName].(string))
+	lookupMutex.Lock()
+	defer lookupMutex.Unlock()
+	lookupMap[string(idRune[0:8])] = string(idRune)
 }
 
 // doAccounting does the session_minutes accounting
