@@ -41,8 +41,13 @@ func Shutdown() {
 func RegisterNetworkParts(ownerName string, ownerPurpose string, networkAddress net.IP, networkSize int) {
 	var netobj net.IPNet
 	netobj.IP = networkAddress
-	// TODO - need to handle IPv4 and IPv6
-	netobj.Mask = net.CIDRMask(networkSize, 32)
+
+	if networkAddress.To4() == nil {
+		netobj.Mask = net.CIDRMask(networkSize, 128)
+	} else {
+		netobj.Mask = net.CIDRMask(networkSize, 32)
+	}
+
 	RegisterNetworkNet(ownerName, ownerPurpose, netobj)
 }
 
@@ -107,8 +112,13 @@ func ClearOwnerRegistrationPurpose(ownerName string, ownerPurpose string) {
 func IsNetworkAvailableParts(ownerName string, networkAddress net.IP, networkSize int) *NetworkSpace {
 	var netobj net.IPNet
 	netobj.IP = networkAddress
-	// TODO - need to handle IPv4 and IPv6
-	netobj.Mask = net.CIDRMask(networkSize, 32)
+
+	if networkAddress.To4() == nil {
+		netobj.Mask = net.CIDRMask(networkSize, 128)
+	} else {
+		netobj.Mask = net.CIDRMask(networkSize, 32)
+	}
+
 	return IsNetworkAvailableNet(ownerName, netobj)
 }
 
@@ -144,25 +154,7 @@ func IsNetworkAvailableNet(ownerName string, networkInfo net.IPNet) *NetworkSpac
 }
 
 func checkForConflict(one *net.IPNet, two *net.IPNet) bool {
-
-	/*
-		TODO - THIS IS CURRENTLY BROKEN
-		https://play.golang.org/p/Kur5n2hfLg
-
-		test intersect(1.1.1.0/24,1.1.0.0/16)=false expected=true => FAIL
-		test intersect(1.1.0.0/16,1.1.1.0/24)=true expected=true => good
-		test intersect(1.1.1.0/24,1.1.1.0/25)=true expected=true => good
-		test intersect(1.1.1.0/25,1.1.1.0/24)=true expected=true => good
-		test intersect(1.1.1.0/24,1.2.0.0/16)=false expected=false => good
-		test intersect(1.2.0.0/16,1.1.1.0/24)=false expected=false => good
-	*/
-
-	for i := range one.IP {
-		if one.IP[i]&one.Mask[i] != two.IP[i]&two.Mask[i]&one.Mask[i] {
-			return false
-		}
-	}
-	return true
+	return two.Contains(one.IP) || one.Contains(two.IP)
 }
 
 /*
