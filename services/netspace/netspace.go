@@ -2,8 +2,11 @@ package netspace
 
 import (
 	"container/list"
+	"fmt"
+	"math/rand"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/untangle/packetd/services/logger"
 )
@@ -12,6 +15,8 @@ import (
 	Class for managing network address blocks that are in use across all
 	applications and services.
 */
+
+const generationAttempts = 16
 
 // NetworkSpace stores details about a network address block
 type NetworkSpace struct {
@@ -22,24 +27,26 @@ type NetworkSpace struct {
 
 var networkRegistry *list.List
 var networkMutex sync.RWMutex
+var randomGenerator *rand.Rand
 
 // Startup is called to handle service startup
 func Startup() {
-	logger.Debug("The netspace manager is starting\n")
 	networkRegistry = list.New()
-
-	// TODO - this is for testing and should be removed
-	RegisterNetworkCIDR("test", "test", "192.168.222.0/24")
+	randomGenerator = rand.New(rand.NewSource(time.Now().UnixNano()))
 }
 
 // Shutdown is called to handle service shutdown
 func Shutdown() {
-	logger.Debug("The netspace manager is finished\n")
 }
 
 // RegisterNetworkParts is called to register a network address block reservation
+// @param ownerName - The name of the network block owner
+// @param ownerPurpose - What the network block is being used for
+// @param networkAddress - The network address
+// @param networkSize - The network size
 func RegisterNetworkParts(ownerName string, ownerPurpose string, networkAddress net.IP, networkSize int) {
 	var netobj net.IPNet
+
 	netobj.IP = networkAddress
 
 	if networkAddress.To4() == nil {
@@ -52,6 +59,9 @@ func RegisterNetworkParts(ownerName string, ownerPurpose string, networkAddress 
 }
 
 // RegisterNetworkCIDR is called to register a network address block reservation
+// @param ownerName - The name of the network block owner
+// @param ownerPurpose - What the network block is being used for
+// @param networkText - The network in CIDR notation
 func RegisterNetworkCIDR(ownerName string, ownerPurpose string, networkText string) {
 	_, netobj, err := net.ParseCIDR(networkText)
 	if err != nil {
@@ -63,6 +73,9 @@ func RegisterNetworkCIDR(ownerName string, ownerPurpose string, networkText stri
 }
 
 // RegisterNetworkNet is called to register a network address block reservation
+// @param ownerName - The name of the network block owner
+// @param ownerPurpose - What the network block is being used for
+// @param networkInfo - The network
 func RegisterNetworkNet(ownerName string, ownerPurpose string, networkInfo net.IPNet) {
 	space := new(NetworkSpace)
 	space.OwnerName = ownerName
@@ -75,16 +88,17 @@ func RegisterNetworkNet(ownerName string, ownerPurpose string, networkInfo net.I
 }
 
 // ClearOwnerRegistrationAll is called to clear all reservations for a specified owner
+// @param ownerName - The name of the owner for which to clear network registrations
 func ClearOwnerRegistrationAll(ownerName string) {
-	var worker *NetworkSpace
+	var space *NetworkSpace
 
 	networkMutex.Lock()
 
 	for item := networkRegistry.Front(); item != nil; item = item.Next() {
-		worker = item.Value.(*NetworkSpace)
-		if worker.OwnerName == ownerName {
+		space = item.Value.(*NetworkSpace)
+		if space.OwnerName == ownerName {
 			networkRegistry.Remove(item)
-			logger.Debug("Removed Netspace: %v\n", worker)
+			logger.Debug("Removed Netspace: %v\n", space)
 		}
 	}
 
@@ -92,16 +106,18 @@ func ClearOwnerRegistrationAll(ownerName string) {
 }
 
 // ClearOwnerRegistrationPurpose is called to clear all reservations for a specified owner and purpose
+// @param ownerName - The name of the owner for which to clear network registrations
+// @param ownerPurpose - The purpose for which to clear network registrations
 func ClearOwnerRegistrationPurpose(ownerName string, ownerPurpose string) {
-	var worker *NetworkSpace
+	var space *NetworkSpace
 
 	networkMutex.Lock()
 
 	for item := networkRegistry.Front(); item != nil; item = item.Next() {
-		worker = item.Value.(*NetworkSpace)
-		if worker.OwnerName == ownerName && worker.OwnerPurpose == ownerPurpose {
+		space = item.Value.(*NetworkSpace)
+		if space.OwnerName == ownerName && space.OwnerPurpose == ownerPurpose {
 			networkRegistry.Remove(item)
-			logger.Debug("Removed Netspace: %v\n", worker)
+			logger.Debug("Removed Netspace: %v\n", space)
 		}
 	}
 
@@ -109,8 +125,13 @@ func ClearOwnerRegistrationPurpose(ownerName string, ownerPurpose string) {
 }
 
 // IsNetworkAvailableParts checks to see if a a network address block is available
+// @param ownerName - The name of the owner to ignore during the check
+// @param networkAddress - The network block to check
+// @param networkSize - The size of the network block to check
+// @returns The NetworkSpace of the first conflict detected or nil if network is not registered
 func IsNetworkAvailableParts(ownerName string, networkAddress net.IP, networkSize int) *NetworkSpace {
 	var netobj net.IPNet
+
 	netobj.IP = networkAddress
 
 	if networkAddress.To4() == nil {
@@ -123,6 +144,9 @@ func IsNetworkAvailableParts(ownerName string, networkAddress net.IP, networkSiz
 }
 
 // IsNetworkAvailableCIDR checks to see if a a network address block is available
+// @param ownerName - The name of the owner to ignore during the check
+// @param networkText - The network to check in CIDR notation
+// @returns The NetworkSpace of the first conflict detected or nil if network is not registered
 func IsNetworkAvailableCIDR(ownerName string, networkText string) *NetworkSpace {
 	_, netobj, err := net.ParseCIDR(networkText)
 	if err != nil {
@@ -134,18 +158,21 @@ func IsNetworkAvailableCIDR(ownerName string, networkText string) *NetworkSpace 
 }
 
 // IsNetworkAvailableNet checks to see if a a network address block is available
+// @param ownerName - The name of the owner to ignore during the check
+// @param networkText - The network to check
+// @returns The NetworkSpace of the first conflict detected or nil if network is not registered
 func IsNetworkAvailableNet(ownerName string, networkInfo net.IPNet) *NetworkSpace {
-	var worker *NetworkSpace
+	var space *NetworkSpace
 
 	networkMutex.RLock()
 	defer networkMutex.RUnlock()
 
 	for item := networkRegistry.Front(); item != nil; item = item.Next() {
-		worker = item.Value.(*NetworkSpace)
-		if worker.OwnerName != ownerName {
-			if checkForConflict(&networkInfo, &worker.Network) {
-				logger.Debug("Found conflict: %v %v\n", networkInfo, worker)
-				return worker
+		space = item.Value.(*NetworkSpace)
+		if space.OwnerName != ownerName {
+			if checkForConflict(&networkInfo, &space.Network) {
+				logger.Debug("Found conflict: %v %v\n", networkInfo, space)
+				return space
 			}
 		}
 	}
@@ -153,22 +180,186 @@ func IsNetworkAvailableNet(ownerName string, networkInfo net.IPNet) *NetworkSpac
 	return nil
 }
 
+// used internally to check for intersection in two passed networks
+// @param one - The first network for comparison
+// @param two - The second network for comparision
+// @returns true if the passed networks conflict or false if they do not
 func checkForConflict(one *net.IPNet, two *net.IPNet) bool {
 	return two.Contains(one.IP) || one.Contains(two.IP)
 }
 
-/*
+// GetAvailableAddressSpace is used to get an unregistered address space based on a random subnet
+// IPv4 generation will pick something in 192.168.c.d, 172.16-31.c.d, or 10.b.c.d
+// IPv6 generation will pick something in the unique local address (ULA) range
+// @param ipVersion - The IP Version (4 or 6) to generate a space for
+// @param hostID - The host ID
+// @param networkSize - The size of the address space requested
+// @returns - A net.IPNet address that is not conflicting with other address spaces on the appliance
+func GetAvailableAddressSpace(ipVersion int, hostID int, networkSize int) *net.IPNet {
+	if ipVersion != 4 && ipVersion != 6 {
+		logger.Warn("Invalid ipVersion %d passed to GetAvailableAddressSpace\n", ipVersion)
+		return nil
+	}
 
-IPMaskedAddress getAvailableAddressSpace(IPVersion version, int hostId, int networkSize);
+	// validate the hostID
+	if hostID > 255 || hostID < 0 {
+		logger.Warn("Invalid hostID %d passed to GetAvailableAddressSpace\n", hostID)
+		hostID = 0
+	}
 
-InetAddress getFirstUsableAddress(InetAddress networkAddress, Integer networkSize);
+	// validate the networkSize
+	if ipVersion == 4 && networkSize > 32 || networkSize < 0 {
+		logger.Warn("Invalid IPv4 networkSize %d passed to GetAvailableAddressSpace\n", networkSize)
+		networkSize = 24
+	}
 
-InetAddress getFirstUsableAddress(String networkText);
+	if ipVersion == 6 && networkSize > 64 || networkSize < 0 {
+		logger.Warn("Invalid IPv6 networkSize %d passed to GetAvailableAddressSpace\n", networkSize)
+		networkSize = 64
+	}
 
-public static enum IPVersion { IPv4, IPv6 };
+	testMap := make(map[string]bool)
+	var randNet *net.IPNet
 
-private IPMaskedAddress getRandomLocalIp6Address(Random rand, int CIDRSpace);
+	// loop until we find an available network or reach the attempt limit
+	for len(testMap) < generationAttempts {
+		if ipVersion == 6 {
+			randNet = getRandomLocalIP6Address(networkSize)
+		} else {
+			randNet = getRandomLocalIP4Address(hostID, networkSize)
+		}
 
-private IPMaskedAddress getRandomLocalIp4Address(Random rand, int hostIdentifier, int CIDRSpace);
+		randTxt := randNet.String()
 
-*/
+		// if we get a network we already tried don't count as an attempt
+		if testMap[randTxt] {
+			continue
+		}
+
+		// got a network we havent tried yet so add to test map
+		testMap[randTxt] = true
+
+		// see if the network conflicts with anything already registered
+		for item := networkRegistry.Front(); item != nil; item = item.Next() {
+			space := item.Value.(*NetworkSpace)
+			// if we find a conflict nil randNet and break from the loop
+			if checkForConflict(randNet, &space.Network) {
+				randNet = nil
+				break
+			}
+		}
+
+		// if randNet is good we have an available address space to return
+		if randNet != nil {
+			return randNet
+		}
+	}
+
+	// if we get here we could not find an available address space
+	return nil
+}
+
+// used internally to generate a random IPv4 network address space
+// @param hostID - The host ID
+// @param networkSize - The size of the address space requested
+// @returns - A random IPv4 private address space
+func getRandomLocalIP4Address(hostID int, networkSize int) *net.IPNet {
+	var aval, bval, cval int
+
+	// randomly pick the first octet as 192, 172, or 10 and assign the
+	// second octet appropriately based on the first octet
+	index := randomGenerator.Intn(3)
+	switch index {
+	case 0:
+		// 192 must be in the 192.168 space
+		aval = 192
+		bval = 168
+	case 1:
+		// 172 must be in the 172.16 - 172.31 spaces
+		aval = 172
+		bval = randomGenerator.Intn(16) + 16
+	case 2:
+		// everything in the 10 space is valid
+		aval = 10
+		bval = randomGenerator.Intn(256)
+	}
+
+	// randomly generate the third octet
+	cval = randomGenerator.Intn(256)
+
+	// create a CIDR string from all of the different parts and use it to create a net.IPNet object
+	text := fmt.Sprintf("%d.%d.%d.%d/%d", aval, bval, cval, hostID, networkSize)
+	_, netobj, _ := net.ParseCIDR(text)
+
+	return netobj
+}
+
+// used internally to generate a random IPv6 network address space
+// @param networkSize - The size of the address space requested
+// @returns - A random IPv6 unique local address space
+func getRandomLocalIP6Address(networkSize int) *net.IPNet {
+	var aa, bb, cc, dd, ee, ff, gg, hh int
+
+	// use 0xFD as the first octet and randomly generate the next 7
+	aa = 0xFD
+	bb = randomGenerator.Intn(256)
+	cc = randomGenerator.Intn(256)
+	dd = randomGenerator.Intn(256)
+	ee = randomGenerator.Intn(256)
+	ff = randomGenerator.Intn(256)
+	gg = randomGenerator.Intn(256)
+	hh = randomGenerator.Intn(256)
+
+	// create a CIDR string from all of the different parts and use it to create a net.IPNet object
+	text := fmt.Sprintf("%02X%02X:%02X%02X:%02X%02X:%02X%02X::/%d", aa, bb, cc, dd, ee, ff, gg, hh, 128-networkSize)
+	_, netobj, _ := net.ParseCIDR(text)
+
+	return netobj
+}
+
+// GetFirstUsableAddressParts gets the first usable address in a network address space
+// @param networkAddress - The network address space
+// @param networkSize - The size of the network address space
+// @returns The first usable IP address in the network address space
+func GetFirstUsableAddressParts(networkAddress net.IP, networkSize int) net.IP {
+	var netobj net.IPNet
+
+	netobj.IP = networkAddress
+
+	if networkAddress.To4() == nil {
+		netobj.Mask = net.CIDRMask(networkSize, 128)
+	} else {
+		netobj.Mask = net.CIDRMask(networkSize, 32)
+	}
+
+	return GetFirstUsableAddressNet(netobj)
+}
+
+// GetFirstUsableAddressCIDR gets the first usable address in a network address space
+// @param networkText - The network address space
+// @returns The first usable IP address in the network address space
+func GetFirstUsableAddressCIDR(networkText string) net.IP {
+	_, netobj, err := net.ParseCIDR(networkText)
+	if err != nil {
+		logger.Warn("Error %v registering CIDR: %s\n", err, networkText)
+		return nil
+	}
+
+	return GetFirstUsableAddressNet(*netobj)
+}
+
+// GetFirstUsableAddressNet gets the first usable address in a network address space
+// @param networkInfo - The network address space
+// @returns The first usable IP address in the network address space
+func GetFirstUsableAddressNet(networkInfo net.IPNet) net.IP {
+	for i := len(networkInfo.IP) - 1; i >= 0; i-- {
+		// add one to the last byte of the network address to get the first usable
+		networkInfo.IP[i]++
+		// only increment the next byte if we overflowed
+		if networkInfo.IP[i] != 0 {
+			break
+		}
+	}
+
+	return networkInfo.IP
+}
