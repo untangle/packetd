@@ -102,7 +102,7 @@ func ClearOwnerRegistrationAll(ownerName string) {
 		}
 	}
 
-	networkMutex.Lock()
+	networkMutex.Unlock()
 }
 
 // ClearOwnerRegistrationPurpose is called to clear all reservations for a specified owner and purpose
@@ -121,7 +121,7 @@ func ClearOwnerRegistrationPurpose(ownerName string, ownerPurpose string) {
 		}
 	}
 
-	networkMutex.Lock()
+	networkMutex.Unlock()
 }
 
 // IsNetworkAvailableParts checks to see if a a network address block is available
@@ -239,6 +239,8 @@ func GetAvailableAddressSpace(ipVersion int, hostID int, networkSize int) *net.I
 		// got a network we havent tried yet so add to test map
 		testMap[randTxt] = true
 
+		networkMutex.RLock()
+
 		// see if the network conflicts with anything already registered
 		for item := networkRegistry.Front(); item != nil; item = item.Next() {
 			space := item.Value.(*NetworkSpace)
@@ -248,6 +250,8 @@ func GetAvailableAddressSpace(ipVersion int, hostID int, networkSize int) *net.I
 				break
 			}
 		}
+
+		networkMutex.RUnlock()
 
 		// if randNet is good we have an available address space to return
 		if randNet != nil {
