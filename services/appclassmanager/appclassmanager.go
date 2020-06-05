@@ -25,6 +25,10 @@ type ApplicationInfo struct {
 	Plugin       string `json:"plugin"`
 }
 
+// Category info contains details about a category (used when converting ApplicationTable to categories for extjs store)
+type CategoryInfo struct {
+	Name string `json:"name"`
+}
 
 const guidInfoFile = "/usr/share/untangle-classd/protolist.csv"
 
@@ -42,6 +46,56 @@ func Shutdown() {
 	logger.Info("Shutting down the Application Classification Table manager service\n")
 }
 
+// GetApplicationTable returns the application table as JSON
+func GetApplicationTable() (string, error) {
+	logger.Debug("Getting application table...\n")
+
+	// convert it to a slice first
+	appTable := []*ApplicationInfo{}
+
+	for _, val := range ApplicationTable {
+		appTable = append(appTable, val)
+	}
+
+	jsonData, err := json.Marshal(appTable)
+
+	if err != nil {
+		logger.Err("Unable to get ClassD application table: %s\n", err.Error())
+		return "", err
+	}
+
+	return string(jsonData), nil
+}
+
+// GetCategoryTable returns a distinct list of the categories we currently have in the ApplicationTable
+func GetCategoryTable() (string, error) {
+	logger.Debug("Getting Category table...\n")
+
+	// Instead of two loops, create a map that indicates if the items exist in the slice
+	catMap := make(map[string]bool)
+	catSlice := []*CategoryInfo{}
+
+	// Iterate the table, if the map contains the slice then continue, otherwise add it to the map
+	for _, val := range ApplicationTable {
+		if catMap[val.Category] {
+			continue
+		}
+
+		catSlice = append(catSlice, &CategoryInfo{Name: val.Category})
+		catMap[val.Category] = true
+	}
+
+	// Now convert the slice of CategoryInfo into JSON
+	jsonData, err := json.Marshal(catSlice)
+
+	if err != nil {
+		logger.Err("Unable to get ClassD Category table: %s\n", err.Error())
+		return "", err
+	}
+
+	return string(jsonData), nil
+
+}
 
 // loadApplicationTable loads the details for each application
 func loadApplicationTable() {
