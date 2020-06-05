@@ -31,6 +31,7 @@ import (
 	"github.com/untangle/packetd/plugins/revdns"
 	"github.com/untangle/packetd/plugins/sni"
 	"github.com/untangle/packetd/plugins/stats"
+	"github.com/untangle/packetd/services/appclassmanager"
 	"github.com/untangle/packetd/services/certcache"
 	"github.com/untangle/packetd/services/certmanager"
 	"github.com/untangle/packetd/services/dict"
@@ -287,6 +288,7 @@ func startServices() {
 	certcache.Startup()
 	overseer.Startup()
 	certmanager.Startup()
+	appclassmanager.Startup()
 
 	if !kernel.FlagNoCloud {
 		predicttrafficsvc.Startup()
@@ -302,6 +304,7 @@ func stopServices() {
 		}
 		overseer.Shutdown()
 		certmanager.Shutdown()
+		appclassmanager.Shutdown()
 		certcache.Shutdown()
 		restd.Shutdown()
 		dict.Shutdown()
