@@ -584,7 +584,7 @@ func getClassifyCatTable(c *gin.Context) {
 	catTable, err := appclassmanager.GetCategoryTable()
 
 	if err != nil {
-		logger.Warn("Unable to get classd application table: %s \n", err.Error())
+		logger.Warn("Unable to get classd category table: %s \n", err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
