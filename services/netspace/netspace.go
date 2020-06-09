@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/settings"
 )
 
 /*
@@ -201,6 +202,10 @@ func GetAvailableAddressSpace(ipVersion int, hostID int, networkSize int) *net.I
 		return nil
 	}
 
+	// Refresh the list of active network address space reservations so we can find
+	// address space that doesn't conflict with anything currently in use.
+	refreshNetworkRegistry()
+
 	// validate the hostID
 	if hostID > 255 || hostID < 0 {
 		logger.Warn("Invalid hostID %d passed to GetAvailableAddressSpace\n", hostID)
@@ -366,4 +371,62 @@ func GetFirstUsableAddressNet(networkInfo net.IPNet) net.IP {
 	}
 
 	return networkInfo.IP
+}
+
+// refreshNetworkRegistry clears and rebuilds the networkRegistry with
+// all of the in-use networks that we know about.
+func refreshNetworkRegistry() {
+	// clear the network registry
+	networkMutex.Lock()
+	logger.Debug("Clearing %d entries from Netspace registry\n", networkRegistry.Len())
+	networkRegistry.Init()
+	networkMutex.Unlock()
+
+	// get the current network setings
+	networkJSON, err := settings.GetCurrentSettings([]string{"network", "interfaces"})
+	if networkJSON == nil || err != nil {
+		logger.Warn("Unable to read network settings\n")
+	}
+
+	// make sure we find the interfaces
+	networkSlice, ok := networkJSON.([]interface{})
+	if !ok {
+		logger.Warn("Unable to locate interfaces\n")
+		return
+	}
+
+	// walk the list of interfaces and register each network address space
+	for _, value := range networkSlice {
+		item, ok := value.(map[string]interface{})
+		if !ok {
+			logger.Warn("Invalid interface in settings: %T\n", value)
+			continue
+		}
+		// ignore nil interfaces
+		if item == nil {
+			continue
+		}
+		// ignore hidden interfaces
+		hid, found := item["hidden"]
+		if found && hid.(bool) {
+			continue
+		}
+
+		// only look for interfaces with a static address
+		if item["configType"] != nil && item["configType"] != "ADDRESSED" {
+			continue
+		}
+		if item["v4StaticAddress"] != nil && item["v4StaticPrefix"] != nil {
+			netaddr := item["v4StaticAddress"].(string)
+			netsize := int(item["v4StaticPrefix"].(float64))
+			space := fmt.Sprintf("%s/%d", netaddr, netsize)
+			RegisterNetworkCIDR("system", "interface", space)
+		}
+		if item["v6StaticAddress"] != nil && item["v6StaticPrefix"] != nil {
+			netaddr := item["v6StaticAddress"].(string)
+			netsize := int(item["v6StaticPrefix"].(float64))
+			space := fmt.Sprintf("%s/%d", netaddr, netsize)
+			RegisterNetworkCIDR("system", "interface", space)
+		}
+	}
 }

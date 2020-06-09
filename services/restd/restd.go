@@ -885,6 +885,10 @@ func netspaceRequest(c *gin.Context) {
 	}
 
 	network := netspace.GetAvailableAddressSpace(ipVersion, hostID, networkSize)
+	if network == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "unable to find an unused network"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"address": network.IP.String(),
