@@ -890,8 +890,13 @@ func netspaceRequest(c *gin.Context) {
 		return
 	}
 
+	addr := network.IP.String()
+	size, _ := network.Mask.Size()
+	cidr := fmt.Sprintf("%s/%d", addr, size)
+
 	c.JSON(http.StatusOK, gin.H{
-		"address": network.IP.String(),
-		"netmask": network.Mask.String(),
+		"address": addr,
+		"netsize": size,
+		"cidr":    cidr,
 	})
 }
