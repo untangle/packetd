@@ -37,6 +37,7 @@ import (
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/netspace"
 	"github.com/untangle/packetd/services/overseer"
 	"github.com/untangle/packetd/services/predicttrafficsvc"
 	"github.com/untangle/packetd/services/reports"
@@ -285,6 +286,7 @@ func startServices() {
 	dict.Startup()
 	restd.Startup()
 	certcache.Startup()
+	netspace.Startup()
 	overseer.Startup()
 	certmanager.Startup()
 
@@ -301,6 +303,7 @@ func stopServices() {
 			predicttrafficsvc.Shutdown()
 		}
 		overseer.Shutdown()
+		netspace.Shutdown()
 		certmanager.Shutdown()
 		certcache.Shutdown()
 		restd.Shutdown()

@@ -24,6 +24,7 @@ import (
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/netspace"
 	"github.com/untangle/packetd/services/overseer"
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/settings"
@@ -94,6 +95,8 @@ func Startup() {
 	api.POST("/warehouse/cleanup", warehouseCleanup)
 	api.GET("/warehouse/status", warehouseStatus)
 	api.POST("/control/traffic", trafficControl)
+
+	api.POST("/netspace/request", netspaceRequest)
 
 	api.GET("/status/sessions", statusSessions)
 	api.GET("/status/system", statusSystem)
@@ -823,4 +826,72 @@ func renewDhcp(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 	return
+}
+
+// called to request an unused network address block
+func netspaceRequest(c *gin.Context) {
+	var data map[string]string
+	var body []byte
+	var rawdata string
+	var ipVersion int
+	var hostID int
+	var networkSize int
+	var found bool
+	var err error
+
+	body, err = ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	rawdata, found = data["ipVersion"]
+	if found != true {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ipVersion not specified"})
+		return
+	}
+
+	ipVersion, err = strconv.Atoi(rawdata)
+	if err != nil {
+		ipVersion = 4
+	}
+
+	rawdata, found = data["hostID"]
+	if found != true {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "hostID not specified"})
+		return
+	}
+
+	hostID, err = strconv.Atoi(rawdata)
+	if err != nil {
+		hostID = 1
+	}
+
+	rawdata, found = data["networkSize"]
+	if found != true {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "networkSize not specified"})
+		return
+	}
+
+	networkSize, err = strconv.Atoi(rawdata)
+	if err != nil {
+		networkSize = 24
+	}
+
+	network := netspace.GetAvailableAddressSpace(ipVersion, hostID, networkSize)
+	if network == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "unable to find an unused network"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"address": network.IP.String(),
+		"netmask": network.Mask.String(),
+	})
 }
