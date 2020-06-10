@@ -841,19 +841,19 @@ func netspaceRequest(c *gin.Context) {
 
 	body, err = ioutil.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		c.JSON(http.StatusOK, gin.H{"error": err})
 		return
 	}
 
 	err = json.Unmarshal(body, &data)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		c.JSON(http.StatusOK, gin.H{"error": err})
 		return
 	}
 
 	rawdata, found = data["ipVersion"]
 	if found != true {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ipVersion not specified"})
+		c.JSON(http.StatusOK, gin.H{"error": "ipVersion not specified"})
 		return
 	}
 
@@ -864,7 +864,7 @@ func netspaceRequest(c *gin.Context) {
 
 	rawdata, found = data["hostID"]
 	if found != true {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "hostID not specified"})
+		c.JSON(http.StatusOK, gin.H{"error": "hostID not specified"})
 		return
 	}
 
@@ -875,7 +875,7 @@ func netspaceRequest(c *gin.Context) {
 
 	rawdata, found = data["networkSize"]
 	if found != true {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "networkSize not specified"})
+		c.JSON(http.StatusOK, gin.H{"error": "networkSize not specified"})
 		return
 	}
 
@@ -886,7 +886,7 @@ func netspaceRequest(c *gin.Context) {
 
 	network := netspace.GetAvailableAddressSpace(ipVersion, hostID, networkSize)
 	if network == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "unable to find an unused network"})
+		c.JSON(http.StatusOK, gin.H{"error": "unable to find an unused network"})
 		return
 	}
 
