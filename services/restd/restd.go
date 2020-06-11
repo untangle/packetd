@@ -20,6 +20,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"github.com/untangle/packetd/services/appclassmanager"
 	"github.com/untangle/packetd/services/certmanager"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/kernel"
@@ -118,6 +119,9 @@ func Startup() {
 	api.GET("/status/wwan/:device", statusWwan)
 	api.GET("/status/wifichannels/:device", statusWifiChannels)
 	api.GET("/status/wifimodelist/:device", statusWifiModelist)
+
+	api.GET("/classify/applications", getClassifyAppTable)
+	api.GET("/classify/categories", getClassifyCatTable)
 
 	api.GET("/logger/:source", loggerHandler)
 	api.GET("/debug", debugHandler)
@@ -562,6 +566,34 @@ func getLogOutput(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"logresults": output})
+	return
+}
+
+func getClassifyAppTable(c *gin.Context) {
+	appTable, err := appclassmanager.GetApplicationTable()
+
+	if err != nil {
+		logger.Warn("Unable to get classd application table: %s \n", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Header("Content-Type", "application/json")
+	c.String(http.StatusOK, appTable)
+	return
+}
+
+func getClassifyCatTable(c *gin.Context) {
+	catTable, err := appclassmanager.GetCategoryTable()
+
+	if err != nil {
+		logger.Warn("Unable to get classd category table: %s \n", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Header("Content-Type", "application/json")
+	c.String(http.StatusOK, catTable)
 	return
 }
 

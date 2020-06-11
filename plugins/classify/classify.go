@@ -5,10 +5,7 @@
 package classify
 
 import (
-	"bufio"
-	"encoding/csv"
 	"fmt"
-	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -16,6 +13,7 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/untangle/packetd/services/appclassmanager"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/kernel"
@@ -23,24 +21,7 @@ import (
 	"github.com/untangle/packetd/services/reports"
 )
 
-// applicationInfo stores the details for each know application
-type applicationInfo struct {
-	guid         string
-	index        int
-	name         string
-	description  string
-	category     string
-	productivity uint8
-	risk         uint8
-	flags        uint64
-	reference    string
-	plugin       string
-}
-
 const pluginName = "classify"
-const guidInfoFile = "/usr/share/untangle-classd/protolist.csv"
-
-var applicationTable map[string]*applicationInfo
 
 const navlStateTerminated = 0 // Indicates the connection has been terminated
 const navlStateInspecting = 1 // Indicates the connection is under inspection
@@ -92,9 +73,6 @@ func PluginStartup() {
 
 	// we found the daemon so set our flag
 	daemonAvailable = true
-
-	// load the application details
-	loadApplicationTable()
 
 	// start the daemon manager to handle running the daemon process
 	go daemonProcessManager(controlChannel)
@@ -428,12 +406,12 @@ func parseReply(replyString string) (string, string, string, string, int32, stri
 	}
 
 	// lookup the category in the application table
-	appinfo, finder := applicationTable[appid]
+	appinfo, finder := appclassmanager.ApplicationTable[appid]
 	if finder == true {
-		name = appinfo.name
-		category = appinfo.category
-		productivity = appinfo.productivity
-		risk = appinfo.risk
+		name = appinfo.Name
+		category = appinfo.Category
+		productivity = appinfo.Productivity
+		risk = appinfo.Risk
 	}
 
 	return appid, name, protochain, detail, confidence, category, state, productivity, risk
@@ -494,96 +472,6 @@ func logEvent(session *dispatch.Session, attachments map[string]interface{}, cha
 	}
 
 	reports.LogEvent(reports.CreateEvent("session_classify", "sessions", 2, columns, modifiedColumns))
-}
-
-// loadApplicationTable loads the details for each application
-func loadApplicationTable() {
-	var file *os.File
-	var linecount int
-	var infocount int
-	var list []string
-	var err error
-
-	applicationTable = make(map[string]*applicationInfo)
-
-	// open the guid info file provided by Sandvine
-	file, err = os.Open(guidInfoFile)
-
-	// if there was an error log and return
-	if err != nil {
-		logger.Warn("Unable to load application details: %s\n", guidInfoFile)
-		return
-	}
-
-	// create a new CSV reader
-	reader := csv.NewReader(bufio.NewReader(file))
-	for {
-		list, err = reader.Read()
-
-		if err == io.EOF {
-			// on end of file just break out of the read loop
-			break
-		} else if err != nil {
-			// for anything else log the error and break
-			logger.Err("Unable to parse application details: %v\n", err)
-			break
-		}
-
-		// count the number of lines read so we can compare with
-		// the number successfully parsed when we finish loading
-		linecount++
-
-		// skip the first line that holds the file format description
-		if linecount == 1 {
-			continue
-		}
-
-		// if we did not parse exactly 10 fields skip the line
-		if len(list) != 10 {
-			logger.Warn("Invalid line length: %d\n", len(list))
-			continue
-		}
-
-		// create a object to store the details
-		info := new(applicationInfo)
-
-		info.guid = list[0]
-		info.index, err = strconv.Atoi(list[1])
-		if err != nil {
-			logger.Warn("Invalid index: %s\n", list[1])
-		}
-		info.name = list[2]
-		info.description = list[3]
-		info.category = list[4]
-		tempProd, err := strconv.ParseUint(list[5], 10, 8)
-		if err != nil {
-			logger.Warn("Invalid productivity: %s\n", list[5])
-		}
-		info.productivity = uint8(tempProd)
-		tempRisk, err := strconv.ParseUint(list[6], 10, 8)
-		if err != nil {
-			logger.Warn("Invalid risk: %s\n", list[6])
-		}
-		info.risk = uint8(tempRisk)
-		info.flags, err = strconv.ParseUint(list[7], 10, 64)
-		if err != nil {
-			logger.Warn("Invalid flags: %s %s\n", list[7], err)
-		}
-		info.reference = list[8]
-		info.plugin = list[9]
-
-		// store the object in the table using the guid as the index
-		applicationTable[info.guid] = info
-		infocount++
-	}
-
-	file.Close()
-	logger.Info("Loaded classification details for %d applications\n", infocount)
-
-	// if there were any bad lines in the file log a warning
-	if infocount != linecount-1 {
-		logger.Warn("Detected garbage in the application info file: %s\n", guidInfoFile)
-	}
 }
 
 // updateClassifyDetail updates a key/value pair in the session attachments
