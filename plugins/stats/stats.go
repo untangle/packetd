@@ -216,6 +216,11 @@ func collectInterfaceStats(seconds uint64) {
 			continue
 		}
 
+		// MFW-749 - Stop logging LAN interface stats
+		if !getInterfaceWanFlag(item.Iface) {
+			continue
+		}
+
 		// convert the interface name to the ID value
 		interfaceID = getInterfaceIDValue(item.Iface)
 
@@ -373,10 +378,7 @@ func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive
 	event := reports.CreateEvent("interface_stats", "interface_stats", 1, columns, nil)
 	reports.LogEvent(event)
 
-	// for WAN interfaces we also send the stats to the cloud
-	if getInterfaceWanFlag(diffInfo.Iface) {
-		reports.CloudEvent(event)
-	}
+	reports.CloudEvent(event)
 }
 
 // calculateDifference determines the difference between the two argumented values
