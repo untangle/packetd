@@ -213,7 +213,7 @@ func GetAvailableAddressSpace(ipVersion int, hostID int, networkSize int) *net.I
 	}
 
 	// validate the networkSize
-	if ipVersion == 4 && networkSize > 32 || networkSize < 0 {
+	if ipVersion == 4 && networkSize > 32 || networkSize < 8 {
 		logger.Warn("Invalid IPv4 networkSize %d passed to GetAvailableAddressSpace\n", networkSize)
 		networkSize = 24
 	}
@@ -231,7 +231,7 @@ func GetAvailableAddressSpace(ipVersion int, hostID int, networkSize int) *net.I
 		if ipVersion == 6 {
 			randNet = getRandomLocalIP6Address(networkSize)
 		} else {
-			randNet = getRandomLocalIP4Address(hostID, networkSize)
+			randNet = getRandomPrivateIP4Address(hostID, networkSize)
 		}
 
 		randTxt := randNet.String()
@@ -272,12 +272,18 @@ func GetAvailableAddressSpace(ipVersion int, hostID int, networkSize int) *net.I
 // @param hostID - The host ID
 // @param networkSize - The size of the address space requested
 // @returns - A random IPv4 private address space
-func getRandomLocalIP4Address(hostID int, networkSize int) *net.IPNet {
+func getRandomPrivateIP4Address(hostID int, networkSize int) *net.IPNet {
 	var aval, bval, cval int
 
 	// randomly pick the first octet as 192, 172, or 10 and assign the
 	// second octet appropriately based on the first octet
 	index := randomGenerator.Intn(3)
+
+	// force requests for a block larger than /24 to use 10.x.x.x/8 space
+	if networkSize < 24 {
+		index = 2
+	}
+
 	switch index {
 	case 0:
 		// 192 must be in the 192.168 space
