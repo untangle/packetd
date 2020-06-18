@@ -213,7 +213,7 @@ func GetAvailableAddressSpace(ipVersion int, hostID int, networkSize int) *net.I
 	}
 
 	// validate the networkSize
-	if ipVersion == 4 && networkSize > 32 || networkSize < 8 {
+	if ipVersion == 4 && networkSize > 32 || networkSize < 24 {
 		logger.Warn("Invalid IPv4 networkSize %d passed to GetAvailableAddressSpace\n", networkSize)
 		networkSize = 24
 	}
