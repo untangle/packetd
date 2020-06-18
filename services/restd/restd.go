@@ -895,7 +895,7 @@ func netspaceRequest(c *gin.Context) {
 	cidr := fmt.Sprintf("%s/%d", addr, size)
 
 	c.JSON(http.StatusOK, gin.H{
-		"address": addr,
+		"network": addr,
 		"netsize": size,
 		"cidr":    cidr,
 	})
