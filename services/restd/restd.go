@@ -20,10 +20,12 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"github.com/untangle/packetd/services/appclassmanager"
 	"github.com/untangle/packetd/services/certmanager"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/netspace"
 	"github.com/untangle/packetd/services/overseer"
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/settings"
@@ -95,6 +97,8 @@ func Startup() {
 	api.GET("/warehouse/status", warehouseStatus)
 	api.POST("/control/traffic", trafficControl)
 
+	api.POST("/netspace/request", netspaceRequest)
+
 	api.GET("/status/sessions", statusSessions)
 	api.GET("/status/system", statusSystem)
 	api.GET("/status/hardware", statusHardware)
@@ -115,6 +119,9 @@ func Startup() {
 	api.GET("/status/wwan/:device", statusWwan)
 	api.GET("/status/wifichannels/:device", statusWifiChannels)
 	api.GET("/status/wifimodelist/:device", statusWifiModelist)
+
+	api.GET("/classify/applications", getClassifyAppTable)
+	api.GET("/classify/categories", getClassifyCatTable)
 
 	api.GET("/logger/:source", loggerHandler)
 	api.GET("/debug", debugHandler)
@@ -562,6 +569,34 @@ func getLogOutput(c *gin.Context) {
 	return
 }
 
+func getClassifyAppTable(c *gin.Context) {
+	appTable, err := appclassmanager.GetApplicationTable()
+
+	if err != nil {
+		logger.Warn("Unable to get classd application table: %s \n", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Header("Content-Type", "application/json")
+	c.String(http.StatusOK, appTable)
+	return
+}
+
+func getClassifyCatTable(c *gin.Context) {
+	catTable, err := appclassmanager.GetCategoryTable()
+
+	if err != nil {
+		logger.Warn("Unable to get classd category table: %s \n", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Header("Content-Type", "application/json")
+	c.String(http.StatusOK, catTable)
+	return
+}
+
 func setSettings(c *gin.Context) {
 	var segments []string
 	path := c.Param("path")
@@ -823,4 +858,77 @@ func renewDhcp(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 	return
+}
+
+// called to request an unused network address block
+func netspaceRequest(c *gin.Context) {
+	var data map[string]string
+	var body []byte
+	var rawdata string
+	var ipVersion int
+	var hostID int
+	var networkSize int
+	var found bool
+	var err error
+
+	body, err = ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"error": err})
+		return
+	}
+
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"error": err})
+		return
+	}
+
+	rawdata, found = data["ipVersion"]
+	if found != true {
+		c.JSON(http.StatusOK, gin.H{"error": "ipVersion not specified"})
+		return
+	}
+
+	ipVersion, err = strconv.Atoi(rawdata)
+	if err != nil {
+		ipVersion = 4
+	}
+
+	rawdata, found = data["hostID"]
+	if found != true {
+		c.JSON(http.StatusOK, gin.H{"error": "hostID not specified"})
+		return
+	}
+
+	hostID, err = strconv.Atoi(rawdata)
+	if err != nil {
+		hostID = 1
+	}
+
+	rawdata, found = data["networkSize"]
+	if found != true {
+		c.JSON(http.StatusOK, gin.H{"error": "networkSize not specified"})
+		return
+	}
+
+	networkSize, err = strconv.Atoi(rawdata)
+	if err != nil {
+		networkSize = 24
+	}
+
+	network := netspace.GetAvailableAddressSpace(ipVersion, hostID, networkSize)
+	if network == nil {
+		c.JSON(http.StatusOK, gin.H{"error": "unable to find an unused network"})
+		return
+	}
+
+	addr := network.IP.String()
+	size, _ := network.Mask.Size()
+	cidr := fmt.Sprintf("%s/%d", addr, size)
+
+	c.JSON(http.StatusOK, gin.H{
+		"network": addr,
+		"netsize": size,
+		"cidr":    cidr,
+	})
 }
