@@ -29,6 +29,9 @@ const troubledCacheTime = time.Second * 3600
 // negativeCacheTime sets how long we store an unknown result when we encouter a network error talking to the cloud
 const negativeCacheTime = time.Second * 60
 
+// cloud request timeout
+const cloudLookupTimeout = time.Millisecond * 500
+
 // ClassifiedTraffic struct contains the API response data
 type ClassifiedTraffic struct {
 	ID           string  `json:"Application"`
@@ -79,19 +82,19 @@ func Startup() {
 	transport = &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
-			Timeout:   5 * time.Second,
+			Timeout:   cloudLookupTimeout,
 			KeepAlive: 300 * time.Second,
 			DualStack: true,
 		}).DialContext,
 		MaxIdleConns:          runtime.NumCPU(),
 		MaxIdleConnsPerHost:   runtime.NumCPU(),
 		IdleConnTimeout:       300 * time.Second,
-		TLSHandshakeTimeout:   5 * time.Second,
+		TLSHandshakeTimeout:   cloudLookupTimeout,
 		ExpectContinueTimeout: 0,
 	}
 
 	client = &http.Client{
-		Timeout:   5 * time.Second,
+		Timeout:   cloudLookupTimeout,
 		Transport: transport,
 	}
 }
