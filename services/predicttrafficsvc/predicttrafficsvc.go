@@ -14,6 +14,9 @@ import (
 	"github.com/untangle/packetd/services/logger"
 )
 
+// IPPROTO_ICMP is ip protocol 1
+const IPPROTO_ICMP = 1
+
 // cloudAPIEndpoint is the URL of the cloud endpoint
 const cloudAPIEndpoint = "https://labs.untangle.com"
 
@@ -28,6 +31,12 @@ const troubledCacheTime = time.Second * 3600
 
 // negativeCacheTime sets how long we store an unknown result when we encouter a network error talking to the cloud
 const negativeCacheTime = time.Second * 60
+
+// longCacheTime sets how long we store a restult that we essentially want to be permanant
+const longCacheTime = time.Second * 60 * 60 * 24 * 365
+
+// cloud request timeout
+const cloudLookupTimeout = time.Millisecond * 500
 
 // ClassifiedTraffic struct contains the API response data
 type ClassifiedTraffic struct {
@@ -52,6 +61,9 @@ type trafficHolder struct {
 
 // unknownTrafficItem is a pointer for unknown traffic
 var unknownTrafficItem = &ClassifiedTraffic{ID: "Unknown", Name: "Unknown", Confidence: 0, ProtoChain: "Unknown", Productivity: 0, Risk: 0, Category: "Unknown"}
+
+// icmpTrafficItem is a pointer for icmp traffic
+var icmpTrafficItem = &ClassifiedTraffic{ID: "ICMP", Name: "ICMP", Confidence: 100, ProtoChain: "/IP/ICMP", Productivity: 3, Risk: 4, Category: "Network Monitoring"}
 
 // classifiedTrafficCache is a map of ClassifiedTraffic pointer structs
 var classifiedTrafficCache map[string]*trafficHolder
@@ -79,19 +91,19 @@ func Startup() {
 	transport = &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
-			Timeout:   5 * time.Second,
+			Timeout:   cloudLookupTimeout,
 			KeepAlive: 300 * time.Second,
 			DualStack: true,
 		}).DialContext,
 		MaxIdleConns:          runtime.NumCPU(),
 		MaxIdleConnsPerHost:   runtime.NumCPU(),
 		IdleConnTimeout:       300 * time.Second,
-		TLSHandshakeTimeout:   5 * time.Second,
+		TLSHandshakeTimeout:   cloudLookupTimeout,
 		ExpectContinueTimeout: 0,
 	}
 
 	client = &http.Client{
-		Timeout:   5 * time.Second,
+		Timeout:   cloudLookupTimeout,
 		Transport: transport,
 	}
 }
@@ -113,6 +125,8 @@ func Shutdown() {
 // GetTrafficClassification will retrieve the predicted traffic classification, first from memory cache then from cloud API endpoint
 func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *ClassifiedTraffic {
 	var holder *trafficHolder
+	var result *ClassifiedTraffic
+	var cachetime time.Duration
 	var mapKey = formMapKey(ipAdd, port, protoID)
 
 	// lock the cache mutex and get the traffic holder
@@ -135,8 +149,15 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 		classifiedTrafficCache[mapKey] = holder
 		trafficMutex.Unlock()
 
-		// send the request to the cloud
-		result, cachetime := sendClassifyRequest(ipAdd, port, protoID)
+		if protoID == IPPROTO_ICMP {
+			// the cloud only provides tcp and udp predictions
+			// so hardcode icmp results
+			result = icmpTrafficItem
+			cachetime = longCacheTime
+		} else {
+			// send the request to the cloud
+			result, cachetime = sendClassifyRequest(ipAdd, port, protoID)
+		}
 
 		// safely store the response and the cache time returned from the lookup
 		holder.dataLocker.Lock()
