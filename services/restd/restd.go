@@ -120,6 +120,8 @@ func Startup() {
 	api.GET("/status/wifichannels/:device", statusWifiChannels)
 	api.GET("/status/wifimodelist/:device", statusWifiModelist)
 
+	api.GET("/wireguard/keypair", wireguardKeyPair)
+
 	api.GET("/classify/applications", getClassifyAppTable)
 	api.GET("/classify/categories", getClassifyCatTable)
 
@@ -857,6 +859,55 @@ func renewDhcp(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
+	return
+}
+
+func wireguardKeyPair(c *gin.Context) {
+	var privateKey string
+	var publicKey string
+	var out []byte
+	var err error
+	var cmd *exec.Cmd
+	var sin io.WriteCloser
+
+	// first generate a private key
+	cmd = exec.Command("/usr/bin/wg", "genkey")
+	out, err = cmd.Output()
+
+	if err != nil {
+		logger.Err("Error generating private key: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": string(out)})
+		return
+	}
+
+	// generate the public key for the private key
+	privateKey = strings.TrimRight(string(out), "\r\n")
+	cmd = exec.Command("/usr/bin/wg", "pubkey")
+	sin, err = cmd.StdinPipe()
+
+	// use a goroutine to write the private key to stdin because the
+	// wg utility will not return until stdin is closed
+	go func() {
+		defer sin.Close()
+		io.WriteString(sin, privateKey)
+	}()
+
+	out, err = cmd.Output()
+
+	if err != nil {
+		logger.Err("Error generating public key: %v\n", string(out))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": string(out)})
+		return
+	}
+
+	publicKey = strings.TrimRight(string(out), "\r\n")
+
+	// return the private and public keys to the caller
+	c.JSON(http.StatusOK, gin.H{
+		"privateKey": privateKey,
+		"publicKey": publicKey,
+	})
+
 	return
 }
 
