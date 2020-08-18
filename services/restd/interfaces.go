@@ -203,8 +203,16 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 }
 
 // attachL3Interface will find and attach the l3 network interface to the worker
+// we cannot safely assume the first L3Device we find in the ubusnetworklist is the one we want,
+// because we may receive ubus interfaces out of order, this attach function should resolve that
+// @param worker - The interfaceInfo worker
+// @param ubusNetworkList - The ubus network list
 func attachL3Interface(worker *interfaceInfo, ubusNetworkList []interface{}) {
-	logger.Debug("Attaching l3 device for: %s Name: %s\n", worker.Device, worker.InterfaceName)
+	logger.Debug("Attaching l3 device for: %s Name: %s Current L3: %s\n", worker.Device, worker.InterfaceName, worker.L3Device)
+
+	// Initialize with the existing Device, in case we cannot find a valid L3 Device
+	worker.L3Device = worker.Device
+
 	for _, value := range ubusNetworkList {
 		item, ok := value.(map[string]interface{})
 		if !ok {
@@ -217,13 +225,10 @@ func attachL3Interface(worker *interfaceInfo, ubusNetworkList []interface{}) {
 		if device == worker.Device {
 			l3Device := item["l3_device"]
 
-			//Just use the Device if we do not currently have any L3 device on this worker
-			if device != nil && worker.L3Device == "" {
-				worker.L3Device = device.(string)
-			}
-
 			//Attach the l3 Device
-			if l3Device != nil {
+			if l3Device != nil && worker.L3Device != l3Device.(string) {
+				logger.Debug("%s is going to be attached to the L3 Device: %s\n", worker.Device, l3Device)
+
 				worker.L3Device = l3Device.(string)
 			}
 
