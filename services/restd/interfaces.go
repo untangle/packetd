@@ -182,11 +182,8 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 			worker.Wan = val.(bool)
 		}
 
-		// Attach the l3 interface before getting device details
-		attachL3Interface(worker, ubusNetworkList)
-
-		attachDeviceDetails(worker, ubusDeviceMap)
 		attachNetworkDetails(worker, ubusNetworkList, bridgeList)
+		attachDeviceDetails(worker, ubusDeviceMap)
 		attachTrafficDetails(worker)
 
 		// append the completed interfaceInfo to the results list
@@ -202,43 +199,7 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 	return data, nil
 }
 
-// attachL3Interface will find and attach the l3 network interface to the worker
-// we cannot safely assume the first L3Device we find in the ubusnetworklist is the one we want,
-// because we may receive ubus interfaces out of order, this attach function should resolve that
-// @param worker - The interfaceInfo worker
-// @param ubusNetworkList - The ubus network list
-func attachL3Interface(worker *interfaceInfo, ubusNetworkList []interface{}) {
-	logger.Debug("Attaching l3 device for: %s Name: %s Current L3: %s\n", worker.Device, worker.InterfaceName, worker.L3Device)
-
-	// Initialize with the existing Device, in case we cannot find a valid L3 Device
-	worker.L3Device = worker.Device
-
-	for _, value := range ubusNetworkList {
-		item, ok := value.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		device := item["device"]
-
-		//Only attach devices to matching device IDs
-		if device == worker.Device {
-			l3Device := item["l3_device"]
-
-			//Attach the l3 Device
-			if l3Device != nil && worker.L3Device != l3Device.(string) {
-				logger.Debug("%s is going to be attached to the L3 Device: %s\n", worker.Device, l3Device)
-
-				worker.L3Device = l3Device.(string)
-			}
-
-		}
-	}
-
-	logger.Debug("L3 Device Attached to: %s Name: %s L3Device: %s\n", worker.Device, worker.InterfaceName, worker.L3Device)
-}
-
-// attachNetworkDetails gets the IP, DNS, and other details for a target
+// attachNetworkDetails gets the IP, DNS, L3Device, and other details for a target
 // device and adds them to the interfaceInfo object
 func attachNetworkDetails(worker *interfaceInfo, ubusNetworkList []interface{}, bridgeList map[string]string) {
 	// The ubus network.interface dump returns a json object that includes multiple
@@ -252,8 +213,26 @@ func attachNetworkDetails(worker *interfaceInfo, ubusNetworkList []interface{}, 
 			continue
 		}
 
+		// initialize L3Device as worker.Device in case we can't find a valid L3 device
+		worker.L3Device = worker.Device
+
 		// we only look at interfaces that have a device value
 		device := item["device"]
+
+		//Only attach devices to matching device IDs
+		if device == worker.Device {
+			l3Device := item["l3_device"]
+
+			//Attach the l3 Device
+			// we cannot safely assume the first L3Device we find in the ubusnetworklist is the one we want,
+			// because we may receive ubus interfaces out of order
+			if l3Device != nil && worker.L3Device != l3Device.(string) {
+				logger.Debug("%s is going to be attached to the L3 Device: %s\n", worker.Device, l3Device)
+
+				worker.L3Device = l3Device.(string)
+			}
+		}
+
 		proto := item["proto"]
 		if device == nil || proto == "pppoe" {
 			// for tunX and pppoe configurations we want to use
