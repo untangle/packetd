@@ -509,6 +509,14 @@ func loadInterfaceDetailMap() {
 		holder.interfaceID = int(item["interfaceId"].(float64))
 		holder.deviceName = item["device"].(string)
 
+		// Special case for PPPOE handling
+		// This is "fast" to just use the same naming convention we are using
+		// for the PPPOE interface alias, but a more thorough method would be to call:
+		// ubus call network.interface.<name>4 status and grab the l3_device property
+		if item["v4ConfigType"] != nil && item["v4ConfigType"] == "PPPOE" {
+			holder.deviceName = "ppp-" + item["name"].(string)
+		}
+
 		// grab the wan flag for the interface
 		wan, found := item["wan"]
 		if found && wan.(bool) {

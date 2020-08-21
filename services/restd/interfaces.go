@@ -13,6 +13,7 @@ import (
 
 type interfaceInfo struct {
 	Device           string   `json:"device"`
+	L3Device         string   `json:"l3device"`
 	ConfigType       string   `json:"configType"`
 	InterfaceID      int      `json:"interfaceId"`
 	InterfaceName    string   `json:"name"`
@@ -181,8 +182,8 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 			worker.Wan = val.(bool)
 		}
 
-		attachDeviceDetails(worker, ubusDeviceMap)
 		attachNetworkDetails(worker, ubusNetworkList, bridgeList)
+		attachDeviceDetails(worker, ubusDeviceMap)
 		attachTrafficDetails(worker)
 
 		// append the completed interfaceInfo to the results list
@@ -198,7 +199,7 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 	return data, nil
 }
 
-// attachNetworkDetails gets the IP, DNS, and other details for a target
+// attachNetworkDetails gets the IP, DNS, L3Device, and other details for a target
 // device and adds them to the interfaceInfo object
 func attachNetworkDetails(worker *interfaceInfo, ubusNetworkList []interface{}, bridgeList map[string]string) {
 	// The ubus network.interface dump returns a json object that includes multiple
@@ -212,11 +213,30 @@ func attachNetworkDetails(worker *interfaceInfo, ubusNetworkList []interface{}, 
 			continue
 		}
 
+		// initialize L3Device as worker.Device in case we can't find a valid L3 device
+		worker.L3Device = worker.Device
+
 		// we only look at interfaces that have a device value
 		device := item["device"]
-		if device == nil {
-			// tunX interfaces, won't have a 'device' value, but will
-			// have an 'l3_device' value.  Use that as the device.
+
+		//Only attach devices to matching device IDs
+		if device == worker.Device {
+			l3Device := item["l3_device"]
+
+			//Attach the l3 Device
+			// we cannot safely assume the first L3Device we find in the ubusnetworklist is the one we want,
+			// because we may receive ubus interfaces out of order
+			if l3Device != nil && worker.L3Device != l3Device.(string) {
+				logger.Debug("%s is going to be attached to the L3 Device: %s\n", worker.Device, l3Device)
+
+				worker.L3Device = l3Device.(string)
+			}
+		}
+
+		proto := item["proto"]
+		if device == nil || proto == "pppoe" {
+			// for tunX and pppoe configurations we want to use
+			// the tunnel l3_device for our "device"
 			device = item["l3_device"]
 			if device == nil {
 				continue
@@ -225,9 +245,9 @@ func attachNetworkDetails(worker *interfaceInfo, ubusNetworkList []interface{}, 
 
 		// For bridged devices we look for the bridged-to device name. If there is no mapping
 		// for the interface in the bridgeList then we just use the actual device name.
-		search, ok := bridgeList[worker.Device]
+		search, ok := bridgeList[worker.L3Device]
 		if !ok {
-			search = worker.Device
+			search = worker.L3Device
 		}
 
 		// continue if this isn't the device we are looking for
@@ -302,7 +322,7 @@ func attachDeviceDetails(worker *interfaceInfo, ubusDeviceMap map[string]interfa
 	// member so we don't have to mess with parsing the bridge-members array.
 	for device, item := range ubusDeviceMap {
 		// see if the device matches the one we are looking for
-		if device != worker.Device {
+		if device != worker.Device && device != worker.L3Device {
 			continue
 		}
 
@@ -321,26 +341,29 @@ func attachDeviceDetails(worker *interfaceInfo, ubusDeviceMap map[string]interfa
 // device and adds them to the interfaceInfo object
 func attachTrafficDetails(worker *interfaceInfo) {
 	// get the interface stats for the target device
-	stats := stats.GetInterfaceRateDetails(worker.Device)
-	if stats == nil {
-		return
+	trafficStats := stats.GetInterfaceRateDetails(worker.L3Device)
+	if trafficStats == nil {
+		trafficStats := stats.GetInterfaceRateDetails(worker.Device)
+		if trafficStats == nil {
+			return
+		}
 	}
 
 	// store the stats data in passed interfaceInfo object
-	worker.RxByteRate = stats["rx_bytes_rate"]
-	worker.RxPacketRate = stats["rx_packets_rate"]
-	worker.RxErrorRate = stats["rx_errs_rate"]
-	worker.RxDropRate = stats["rx_drop_rate"]
-	worker.RxFifoRate = stats["rx_fifo_rate"]
-	worker.RxFrameRate = stats["rx_frame_rate"]
-	worker.RxCompressedRate = stats["rx_compressed_rate"]
-	worker.RxMulticastRate = stats["rx_multicast_rate"]
-	worker.TxByteRate = stats["tx_bytes_rate"]
-	worker.TxPacketRate = stats["tx_packets_rate"]
-	worker.TxErrorRate = stats["tx_errs_rate"]
-	worker.TxDropRate = stats["tx_drop_rate"]
-	worker.TxFifoRate = stats["tx_fifo_rate"]
-	worker.TxCollisionRate = stats["tx_colls_rate"]
-	worker.TxCarrierRate = stats["tx_carrier_rate"]
-	worker.TxCompressedRate = stats["tx_compressed_rate"]
+	worker.RxByteRate = trafficStats["rx_bytes_rate"]
+	worker.RxPacketRate = trafficStats["rx_packets_rate"]
+	worker.RxErrorRate = trafficStats["rx_errs_rate"]
+	worker.RxDropRate = trafficStats["rx_drop_rate"]
+	worker.RxFifoRate = trafficStats["rx_fifo_rate"]
+	worker.RxFrameRate = trafficStats["rx_frame_rate"]
+	worker.RxCompressedRate = trafficStats["rx_compressed_rate"]
+	worker.RxMulticastRate = trafficStats["rx_multicast_rate"]
+	worker.TxByteRate = trafficStats["tx_bytes_rate"]
+	worker.TxPacketRate = trafficStats["tx_packets_rate"]
+	worker.TxErrorRate = trafficStats["tx_errs_rate"]
+	worker.TxDropRate = trafficStats["tx_drop_rate"]
+	worker.TxFifoRate = trafficStats["tx_fifo_rate"]
+	worker.TxCollisionRate = trafficStats["tx_colls_rate"]
+	worker.TxCarrierRate = trafficStats["tx_carrier_rate"]
+	worker.TxCompressedRate = trafficStats["tx_compressed_rate"]
 }
