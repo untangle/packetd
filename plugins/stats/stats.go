@@ -313,10 +313,16 @@ func collectInterfaceStats(seconds uint64) {
 }
 
 func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive Collector, active Collector, jitter Collector, diffInfo *linux.NetworkStat, diffMetric *interfaceMetric) {
+	// MFW-1012 - we want to show LAN interface stats in the user interface
+	// but don't want them skewing the interface stats graphs so we added
+	// the is_wan boolean so the UI can decide what to show
+	wanFlag := getInterfaceWanFlag(diffInfo.Iface)
+
 	columns := map[string]interface{}{
 		"time_stamp":               time.Now(),
 		"interface_id":             interfaceID,
 		"device_name":              diffInfo.Iface,
+		"is_wan":                   wanFlag,
 		"latency_1":                combo.Latency1Min.Value,
 		"latency_5":                combo.Latency5Min.Value,
 		"latency_15":               combo.Latency15Min.Value,
@@ -374,7 +380,7 @@ func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive
 	reports.LogEvent(event)
 
 	// for WAN interfaces we also send the stats to the cloud
-	if getInterfaceWanFlag(diffInfo.Iface) {
+	if wanFlag {
 		reports.CloudEvent(event)
 	}
 }
@@ -502,6 +508,14 @@ func loadInterfaceDetailMap() {
 		holder := new(interfaceDetail)
 		holder.interfaceID = int(item["interfaceId"].(float64))
 		holder.deviceName = item["device"].(string)
+
+		// Special case for PPPOE handling
+		// This is "fast" to just use the same naming convention we are using
+		// for the PPPOE interface alias, but a more thorough method would be to call:
+		// ubus call network.interface.<name>4 status and grab the l3_device property
+		if item["v4ConfigType"] != nil && item["v4ConfigType"] == "PPPOE" {
+			holder.deviceName = "ppp-" + item["name"].(string)
+		}
 
 		// grab the wan flag for the interface
 		wan, found := item["wan"]

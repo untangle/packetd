@@ -152,7 +152,7 @@ func makeCategoriesSQLString(reportEntry *ReportEntry) (string, error) {
 		sqlStr += fmt.Sprintf(" LIMIT %d", reportEntry.QueryCategories.Limit)
 	}
 
-	logger.Debug("Categories SQL: %v %v\n", sqlStr)
+	logger.Debug("Categories SQL: %v\n", sqlStr)
 	return sqlStr, nil
 }
 
@@ -215,8 +215,8 @@ func makeSeriesSQLString(reportEntry *ReportEntry) (string, error) {
 	sqlStr += " USING (time_trunc) "
 	sqlStr += " ORDER BY time_trunc ASC "
 
-	logger.Debug("Series Query SQL: %v %v\n", qStr)
-	logger.Debug("Series SQL: %v %v\n", sqlStr)
+	logger.Debug("Series Query SQL: %v\n", qStr)
+	logger.Debug("Series SQL: %v\n", sqlStr)
 	return sqlStr, nil
 }
 
@@ -242,15 +242,29 @@ func makeCategoriesSeriesSQLString(reportEntry *ReportEntry) (string, error) {
 		columnStr += " AS '" + escapeSingleTick(column) + "'"
 		columns = append(columns, columnStr)
 	}
+
+	// MFW-967 - If the distinct values query didn't return any data we need to
+	// create a dummy query that will generate an empty result set while also
+	// consuming all of the query arguments that will be passed to the Query
+	// function to prevent sql: expected x arguments, got y errors.
 	if len(columns) == 0 {
-		//return "", errors.New("No values for series")
-		return "SELECT null WHERE null > ? AND NULL < ?;", nil
+		emptyQuery := "SELECT null"
+		for i := range reportEntry.Conditions {
+			if i == 0 {
+				emptyQuery += " WHERE null != ?"
+			} else {
+				emptyQuery += " AND null != ?"
+			}
+		}
+		emptyQuery += ";"
+		return emptyQuery, nil
 	}
+
 	reportEntry.QuerySeries.Columns = columns
 
 	sqlStr, err := makeSeriesSQLString(reportEntry)
 	if sqlStr != "" {
-		logger.Debug("Categories Series SQL: %v %v\n", sqlStr)
+		logger.Debug("Categories Series SQL: %v\n", sqlStr)
 	}
 	return sqlStr, err
 }
@@ -270,7 +284,7 @@ func makeTimelineSQLString(startTime string, endTime string, intervalSec int64) 
 	sqlStr += " (" + makeSeqSQLString("e", 10) + ") "
 	sqlStr += "WHERE time_trunc < " + endTime
 
-	logger.Debug("Timeline SQL: %v %v\n", sqlStr)
+	logger.Debug("Timeline SQL: %v\n", sqlStr)
 	return sqlStr, nil
 }
 

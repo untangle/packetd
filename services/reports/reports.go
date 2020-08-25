@@ -735,6 +735,7 @@ func createTables() {
 			time_stamp bigint NOT NULL,
 			interface_id int1,
 			device_name text,
+			is_wan boolean,
 			latency_1 real,
 			latency_5 real,
 			latency_15 real,
