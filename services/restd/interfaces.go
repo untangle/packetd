@@ -214,7 +214,6 @@ func attachNetworkDetails(worker *interfaceInfo, ubusNetworkList []interface{}, 
 		}
 
 		// initialize L3Device as worker.Device in case we can't find a valid L3 device
-		worker.L3Device = worker.Device
 
 		// we only look at interfaces that have a device value
 		device := item["device"]
@@ -226,11 +225,18 @@ func attachNetworkDetails(worker *interfaceInfo, ubusNetworkList []interface{}, 
 			//Attach the l3 Device
 			// we cannot safely assume the first L3Device we find in the ubusnetworklist is the one we want,
 			// because we may receive ubus interfaces out of order
-			if l3Device != nil && worker.L3Device != l3Device.(string) {
-				logger.Debug("%s is going to be attached to the L3 Device: %s\n", worker.Device, l3Device)
-
-				worker.L3Device = l3Device.(string)
+			if l3Device != nil {
+				// Only update the L3 Device if it doesn't match the device
+				if worker.L3Device != l3Device.(string) {
+					logger.Debug("%s is going to be attached to the L3 Device: %s\n", worker.Device, l3Device)
+					worker.L3Device = l3Device.(string)
+				}
 			}
+		}
+
+		// Assign the L3 Device as the Device for now
+		if worker.L3Device == "" {
+			worker.L3Device = worker.Device
 		}
 
 		proto := item["proto"]
