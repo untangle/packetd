@@ -20,6 +20,7 @@ import (
 	"github.com/mattn/go-sqlite3"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/overseer"
 	"github.com/untangle/packetd/services/settings"
 )
 
@@ -222,6 +223,7 @@ func unmarshall(reportEntryStr string, reportEntry *ReportEntry) error {
 
 // CreateQuery submits a database query and returns the results
 func CreateQuery(reportEntryStr string) (*Query, error) {
+	var clean bool
 	var err error
 	reportEntry := &ReportEntry{}
 
@@ -242,7 +244,7 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	var rows *sql.Rows
 	var sqlStmt *sql.Stmt
 
-	sqlStmt, err = getPreparedStatement(reportEntry)
+	sqlStmt, clean, err = getPreparedStatement(reportEntry)
 	if err != nil {
 		logger.Warn("Failed to get prepared SQL: %v\n", err)
 		return nil, err
@@ -252,6 +254,16 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	logger.Debug("SQL Values: %v \n", values)
 
 	rows, err = sqlStmt.Query(values...)
+
+	// If the prepared statment was not cached the clean flag will be true which
+	// means we have to close the statement so the memory can be released.
+	// Check and do statement cleanup first to make the code a little cleaner
+	// rather than doing it both in and following the Query error handler.
+	if clean {
+		sqlStmt.Close()
+	}
+
+	// now check for any error returned from sqlStmt.Query
 	if err != nil {
 		logger.Err("sqlStmt.Query error: %s\n", err)
 		return nil, err
@@ -273,46 +285,54 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	return q, nil
 }
 
-// getPreparedStatement retrieves the prepared statements from the prepared statements mutex, and creates it if it does not exist
-// this largely takes from the ideas here: https://thenotexpert.com/golang-sql-recipe/
-//
-//
-func getPreparedStatement(reportEntry *ReportEntry) (*sql.Stmt, error) {
-
+// getPreparedStatement retrieves the prepared statements from the prepared statements map
+// and creates it if it does not exist. This largely takes from the ideas here:
+// https://thenotexpert.com/golang-sql-recipe/
+// MFW-1056 added logic to detect and not cache queries that will always be unique. This
+// happens with series type queries where timestamp and other values are passed inline
+// rather than as placeholders that reference argumented values passed into the query.
+func getPreparedStatement(reportEntry *ReportEntry) (*sql.Stmt, bool, error) {
 	var stmt *sql.Stmt
 	var present bool
 
 	query, err := makeSQLString(reportEntry)
 	if err != nil {
 		logger.Warn("Failed to make SQL: %v\n", err)
-		return nil, err
+		return nil, false, err
 	}
 
 	preparedStatementsMutex.RLock()
 	if stmt, present = preparedStatements[query]; present {
 		preparedStatementsMutex.RUnlock()
-		return stmt, nil
+		return stmt, false, nil
 	}
 
-	//If not present, let's create.
+	// If not present, let's create.
 	preparedStatementsMutex.RUnlock()
-	//Locking for both reading and writing now.
+	// Locking for both reading and writing now.
 	preparedStatementsMutex.Lock()
 	defer preparedStatementsMutex.Unlock()
 
-	//There is a tiny possibility that one goroutine creates a statement but another one gets here as well.
-	//Then the latter will receive the prepared statement instead of recreating it.
+	// There is a tiny possibility that one goroutine creates a statement but another one gets here as well.
+	// Then the latter will receive the prepared statement instead of recreating it.
 	if stmt, present = preparedStatements[query]; present {
-		return stmt, nil
+		return stmt, false, nil
 	}
 
 	stmt, err = dbMain.Prepare(query)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
+	// Complex UI series queries have embedded timestamps and such that make them unique so
+	// we return without adding to our cache and tell the caller to do statement cleanup.
+	if (reportEntry.Type == "SERIES" || reportEntry.Type == "CATEGORIES_SERIES") {
+		return stmt, true, nil
+	}
+
+	overseer.AddCounter("reports_prepared_statement_cache", 1)
 	preparedStatements[query] = stmt
-	return stmt, nil
+	return stmt, false, nil
 }
 
 // GetData returns the data for the provided QueryID
