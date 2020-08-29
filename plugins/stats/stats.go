@@ -313,70 +313,74 @@ func collectInterfaceStats(seconds uint64) {
 }
 
 func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive Collector, active Collector, jitter Collector, diffInfo *linux.NetworkStat, diffMetric *interfaceMetric) {
-	columns := map[string]interface{}{
-		"time_stamp":               time.Now(),
-		"interface_id":             interfaceID,
-		"device_name":              diffInfo.Iface,
-		"latency_1":                combo.Latency1Min.Value,
-		"latency_5":                combo.Latency5Min.Value,
-		"latency_15":               combo.Latency15Min.Value,
-		"latency_variance":         combo.LatencyVariance.StdDeviation,
-		"passive_latency_1":        passive.Latency1Min.Value,
-		"passive_latency_5":        passive.Latency5Min.Value,
-		"passive_latency_15":       passive.Latency15Min.Value,
-		"passive_latency_variance": passive.LatencyVariance.StdDeviation,
-		"active_latency_1":         active.Latency1Min.Value,
-		"active_latency_5":         active.Latency5Min.Value,
-		"active_latency_15":        active.Latency15Min.Value,
-		"active_latency_variance":  active.LatencyVariance.StdDeviation,
-		"jitter_1":                 jitter.Latency1Min.Value,
-		"jitter_5":                 jitter.Latency5Min.Value,
-		"jitter_15":                jitter.Latency15Min.Value,
-		"jitter_variance":          jitter.LatencyVariance.StdDeviation,
-		"ping_timeout":             diffMetric.PingTimeout,
-		"ping_timeout_rate":        diffMetric.PingTimeout / seconds,
-		"rx_bytes":                 diffInfo.RxBytes,
-		"rx_bytes_rate":            diffInfo.RxBytes / seconds,
-		"rx_packets":               diffInfo.RxPackets,
-		"rx_packets_rate":          diffInfo.RxPackets / seconds,
-		"rx_errs":                  diffInfo.RxErrs,
-		"rx_errs_rate":             diffInfo.RxErrs / seconds,
-		"rx_drop":                  diffInfo.RxDrop,
-		"rx_drop_rate":             diffInfo.RxDrop / seconds,
-		"rx_fifo":                  diffInfo.RxFifo,
-		"rx_fifo_rate":             diffInfo.RxFifo / seconds,
-		"rx_frame":                 diffInfo.RxFrame,
-		"rx_frame_rate":            diffInfo.RxFrame / seconds,
-		"rx_compressed":            diffInfo.RxCompressed,
-		"rx_compressed_rate":       diffInfo.RxCompressed / seconds,
-		"rx_multicast":             diffInfo.RxMulticast,
-		"rx_multicast_rate":        diffInfo.RxMulticast / seconds,
-		"tx_bytes":                 diffInfo.TxBytes,
-		"tx_bytes_rate":            diffInfo.TxBytes / seconds,
-		"tx_packets":               diffInfo.TxPackets,
-		"tx_packets_rate":          diffInfo.TxPackets / seconds,
-		"tx_errs":                  diffInfo.TxErrs,
-		"tx_errs_rate":             diffInfo.TxErrs / seconds,
-		"tx_drop":                  diffInfo.TxDrop,
-		"tx_drop_rate":             diffInfo.TxDrop / seconds,
-		"tx_fifo":                  diffInfo.TxFifo,
-		"tx_fifo_rate":             diffInfo.TxFifo / seconds,
-		"tx_colls":                 diffInfo.TxColls,
-		"tx_colls_rate":            diffInfo.TxColls / seconds,
-		"tx_carrier":               diffInfo.TxCarrier,
-		"tx_carrier_rate":          diffInfo.TxCarrier / seconds,
-		"tx_compressed":            diffInfo.TxCompressed,
-		"tx_compressed_rate":       diffInfo.TxCompressed / seconds,
-	}
+	var values []interface{}
+	var isWan bool
 
-	// create a stats event and send to the logger
-	event := reports.CreateEvent("interface_stats", "interface_stats", 1, columns, nil)
-	reports.LogEvent(event)
+	// MFW-1012 - we want to show LAN interface stats in the user interface
+	// but don't want them skewing the interface stats graphs so we added
+	// the is_wan boolean so the UI can decide what to show
+	isWan = getInterfaceWanFlag(diffInfo.Iface)
 
-	// for WAN interfaces we also send the stats to the cloud
-	if getInterfaceWanFlag(diffInfo.Iface) {
-		reports.CloudEvent(event)
-	}
+	// build the values interface array by appending the columns in the same
+	// order they are defined in services/reports/events.go so it can be passed
+	// directly to the prepared INSERT statement created from that array
+	values = append(values, time.Now().UnixNano()/1000000)
+	values = append(values, interfaceID)
+	values = append(values, diffInfo.Iface)
+	values = append(values, isWan)
+	values = append(values, combo.Latency1Min.Value)
+	values = append(values, combo.Latency5Min.Value)
+	values = append(values, combo.Latency15Min.Value)
+	values = append(values, combo.LatencyVariance.StdDeviation)
+	values = append(values, passive.Latency1Min.Value)
+	values = append(values, passive.Latency5Min.Value)
+	values = append(values, passive.Latency15Min.Value)
+	values = append(values, passive.LatencyVariance.StdDeviation)
+	values = append(values, active.Latency1Min.Value)
+	values = append(values, active.Latency5Min.Value)
+	values = append(values, active.Latency15Min.Value)
+	values = append(values, active.LatencyVariance.StdDeviation)
+	values = append(values, jitter.Latency1Min.Value)
+	values = append(values, jitter.Latency5Min.Value)
+	values = append(values, jitter.Latency15Min.Value)
+	values = append(values, jitter.LatencyVariance.StdDeviation)
+	values = append(values, diffMetric.PingTimeout)
+	values = append(values, diffMetric.PingTimeout/seconds)
+	values = append(values, diffInfo.RxBytes)
+	values = append(values, diffInfo.RxBytes/seconds)
+	values = append(values, diffInfo.RxPackets)
+	values = append(values, diffInfo.RxPackets/seconds)
+	values = append(values, diffInfo.RxErrs)
+	values = append(values, diffInfo.RxErrs/seconds)
+	values = append(values, diffInfo.RxDrop)
+	values = append(values, diffInfo.RxDrop/seconds)
+	values = append(values, diffInfo.RxFifo)
+	values = append(values, diffInfo.RxFifo/seconds)
+	values = append(values, diffInfo.RxFrame)
+	values = append(values, diffInfo.RxFrame/seconds)
+	values = append(values, diffInfo.RxCompressed)
+	values = append(values, diffInfo.RxCompressed/seconds)
+	values = append(values, diffInfo.RxMulticast)
+	values = append(values, diffInfo.RxMulticast/seconds)
+	values = append(values, diffInfo.TxBytes)
+	values = append(values, diffInfo.TxBytes/seconds)
+	values = append(values, diffInfo.TxPackets)
+	values = append(values, diffInfo.TxPackets/seconds)
+	values = append(values, diffInfo.TxErrs)
+	values = append(values, diffInfo.TxErrs/seconds)
+	values = append(values, diffInfo.TxDrop)
+	values = append(values, diffInfo.TxDrop/seconds)
+	values = append(values, diffInfo.TxFifo)
+	values = append(values, diffInfo.TxFifo/seconds)
+	values = append(values, diffInfo.TxColls)
+	values = append(values, diffInfo.TxColls/seconds)
+	values = append(values, diffInfo.TxCarrier)
+	values = append(values, diffInfo.TxCarrier/seconds)
+	values = append(values, diffInfo.TxCompressed)
+	values = append(values, diffInfo.TxCompressed/seconds)
+
+	// send the interface_stats data to the database
+	reports.LogInterfaceStats(values, isWan)
 }
 
 // calculateDifference determines the difference between the two argumented values
