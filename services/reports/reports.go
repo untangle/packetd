@@ -120,11 +120,11 @@ var interfaceStatsQueue = make(chan []interface{}, 1000)
 var interfaceStatsStatement *sql.Stmt
 
 // queue and prepared statment for writing to the session_stats database table
-var sessionStatsQueue = make(chan []interface{}, 1000)
+var sessionStatsQueue = make(chan []interface{}, 5000)
 var sessionStatsStatement *sql.Stmt
 
 var eventQueue = make(chan Event, 10000)
-var cloudQueue = make(chan string, 1000)
+var cloudQueue = make(chan Event, 1000)
 var preparedStatements = map[string]*sql.Stmt{}
 var preparedStatementsMutex = sync.RWMutex{}
 
@@ -538,9 +538,14 @@ func cloudSender() {
 	target := fmt.Sprintf("https://database.untangle.com/v1/put?source=%s&type=db&queueName=mfw_events", uid)
 
 	for {
-		message := <-cloudQueue
+		event := <-cloudQueue
+		message, err := json.Marshal(event)
+		if err != nil {
+			logger.Warn("Error calling json.Marshal: %s\n", err.Error())
+			continue
+		}
 
-		request, err := http.NewRequest("POST", target, bytes.NewBufferString(message))
+		request, err := http.NewRequest("POST", target, bytes.NewBuffer(message))
 		if err != nil {
 			logger.Warn("Error calling http.NewRequest: %s\n", err.Error())
 			continue
@@ -1101,11 +1106,21 @@ func LogInterfaceStats(values []interface{}, isWan bool) {
 		return
 	}
 
-	// TODO - need to fill message with the JSON event in cloud format
-	var message string
+	// create an event we can send to the cloud
+	columns := make(map[string]interface{})
+	namelist := GetInterfaceStatsColumnList()
+
+	// build a columns map using the column list and argumented values
+	for x := 0; x < len(values); x++ {
+		name := namelist[x]
+		columns[name] = values[x]
+	}
+
+	// create the event and put it in the cloud queue
+	event := CreateEvent("interface_stats", "interface_stats", 1, columns, nil)
 
 	select {
-	case cloudQueue <- message:
+	case cloudQueue <- event:
 	default:
 		// log the event with the OC verb passing the counter name and the repeat message limit as the first two arguments
 		logger.Warn("%OC|Cloud queue at capacity[%d]. Dropping message\n", "reports_cloud_queue_full", 100, cap(cloudQueue))
@@ -1126,11 +1141,15 @@ func statsLogger() {
 	for {
 		select {
 		case interfaceStats := <-interfaceStatsQueue:
-			logger.Emerg("INTERFACE_STATS: %v\n", interfaceStats)
+			if logger.IsTraceEnabled() {
+				logger.Trace("INTERFACE_STATS: %v\n", interfaceStats)
+			}
 			interfaceStatsStatement.Exec(interfaceStats...)
 
 		case sessionStats := <-sessionStatsQueue:
-			logger.Emerg("SESSION_STATS: %v\n", sessionStats)
+			if logger.IsTraceEnabled() {
+				logger.Trace("SESSION_STATS: %v\n", sessionStats)
+			}
 			sessionStatsStatement.Exec(sessionStats...)
 		}
 	}
