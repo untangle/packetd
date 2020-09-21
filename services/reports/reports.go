@@ -24,6 +24,8 @@ import (
 	"github.com/untangle/packetd/services/settings"
 )
 
+const eventLoggerInterval = 10 * time.Second
+
 // Event stores an arbitrary event
 type Event struct {
 	// Name - A human readable name for this event. (ie "session_new" is a new session event)
@@ -427,35 +429,49 @@ func eventLogger(eventBatchSize int) {
 
 	for {
 		// read data out of the eventQueue into the eventBatch
-		eventBatch = append(eventBatch, <-eventQueue)
+		select {
+		case grabEvent := <- eventQueue:
+			eventBatch = append(eventBatch, grabEvent)
 
-		// when the batch is larger than the configured batch insert size OR we haven't inserted anything in one minute, we need to insert some stuff
-		batchCount := len(eventBatch)
-		if batchCount >= eventBatchSize || time.Since(lastInsert).Seconds() > waitTime {
-			logger.Debug("%v Items ready for batch, starting transaction at %v...\n", batchCount, time.Now())
-
-			tx, err := dbMain.Begin()
-			if err != nil {
-				logger.Warn("Failed to begin transaction: %s\n", err.Error())
+			// when the batch is larger than the configured batch insert size OR we haven't inserted anything in one minute, we need to insert some stuff
+			batchCount := len(eventBatch)
+			if batchCount >= eventBatchSize || time.Since(lastInsert).Seconds() > waitTime {
+				eventBatch, lastInsert = batchTransaction(eventBatch, batchCount)
 			}
-
-			//iterate events in the batch and send them into the db transaction
-			for _, event := range eventBatch {
-				eventToTransaction(event, tx)
+		case <-time.After(eventLoggerInterval):
+			logger.Debug("No events seen for eventLogger\n")
+			if eventBatch != nil {
+				batchCount := len(eventBatch)
+				eventBatch, lastInsert = batchTransaction(eventBatch, batchCount)
 			}
-
-			// end transaction
-			err = tx.Commit()
-			if err != nil {
-				tx.Rollback()
-				logger.Warn("Failed to commit transaction: %s\n", err.Error())
-			}
-
-			logger.Debug("Transaction completed, %v items processed at %v .\n", batchCount, lastInsert)
-			eventBatch = nil
-			lastInsert = time.Now()
-		}
+		}	
 	}
+}
+
+func batchTransaction(eventBatch []Event, batchCount int) ([]Event, time.Time) {
+	logger.Debug("%v Items ready for batch, starting transaction at %v...\n", batchCount, time.Now())
+
+	tx, err := dbMain.Begin()
+	if err != nil {
+		logger.Warn("Failed to begin transaction: %s\n", err.Error())
+	}
+
+	//iterate events in the batch and send them into the db transaction
+	for _, event := range eventBatch {
+		eventToTransaction(event, tx)
+	}
+
+	// end transaction
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		logger.Warn("Failed to commit transaction: %s\n", err.Error())
+	}
+
+
+	logger.Debug("Transaction completed, %v items processed at %v .\n", batchCount, time.Now())
+
+	return nil, time.Now()
 }
 
 // eventToTransaction converts the Event object into a Sql Transaction and appends it into the current transaction context
