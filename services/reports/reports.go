@@ -420,6 +420,8 @@ func LogEvent(event Event) error {
 // eventLogger readns from the eventQueue and logs the events to sqlite
 // this processes the items in {eventBatchSize} batches, or after 60 seconds of being unread in the channel
 // items that are not in the current batch will remain
+// If the eventQueue has not received any events in 10 seconds, any remaining batch items will be processed
+// this is so the goroutine is not blocked by the channel waiting for a write
 // unread on the channel until the current batch is committed into the database
 // param eventBatchSize (int) - the size of the batch to commit into the database
 func eventLogger(eventBatchSize int) {
@@ -428,8 +430,8 @@ func eventLogger(eventBatchSize int) {
 	waitTime := 60.0
 
 	for {
-		// read data out of the eventQueue into the eventBatch
 		select {
+		// read data out of the eventQueue into the eventBatch
 		case grabEvent := <- eventQueue:
 			eventBatch = append(eventBatch, grabEvent)
 
@@ -438,6 +440,7 @@ func eventLogger(eventBatchSize int) {
 			if batchCount >= eventBatchSize || time.Since(lastInsert).Seconds() > waitTime {
 				eventBatch, lastInsert = batchTransaction(eventBatch, batchCount)
 			}
+		// If the channel hasn't had any data in eventLoggerInterval, commit any remaining batch items to DB
 		case <-time.After(eventLoggerInterval):
 			logger.Debug("No events seen for eventLogger\n")
 			if eventBatch != nil {
@@ -448,6 +451,10 @@ func eventLogger(eventBatchSize int) {
 	}
 }
 
+// batchTransaction will accept a batch and complete the transaction to the DB
+// param eventBatch ([]Event) - events to commit to DB
+// param batchCount (int) - numbers of events being commited to DB 
+// return ([]Event, time.Time) - return a nil eventBatch and the current time
 func batchTransaction(eventBatch []Event, batchCount int) ([]Event, time.Time) {
 	logger.Debug("%v Items ready for batch, starting transaction at %v...\n", batchCount, time.Now())
 
