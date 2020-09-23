@@ -68,11 +68,11 @@ func netloggerCallback(version uint8,
 			}
 			logger.Debug("Calling netlogger APP:%s PRIORITY:%d\n", key, priority)
 			wg.Add(1)
-			go func(val SubscriptionHolder) {
+			go func(val SubscriptionHolder, wg *sync.WaitGroup, key string, priority int) {
+				defer wg.Done()
 				val.NetloggerFunc(&netlogger)
-				wg.Done()
 				logger.Debug("Finished netlogger APP:%s PRIORITY:%d\n", key, priority)
-			}(val)
+			}(val, &wg, key, priority)
 			subcount++
 
 		}
