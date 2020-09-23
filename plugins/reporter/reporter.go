@@ -192,23 +192,31 @@ func doAccounting(entry *dispatch.Conntrack, sessionID int64, ctid uint32) {
 	dict.AddSessionEntry(ctid, "client_packet_rate", uint32(entry.ClientPacketRate))
 	dict.AddSessionEntry(ctid, "server_packet_rate", uint32(entry.ServerPacketRate))
 
-	if entry.TotalByteRate != 0 && entry.ClientByteRate != 0 && entry.ServerByteRate != 0 && entry.TotalPacketRate != 0 && entry.ClientPacketRate != 0 && entry.ServerPacketRate != 0 {
-		columns := map[string]interface{}{
-			"time_stamp":         time.Now(),
-			"session_id":         sessionID,
-			"client_bytes":       entry.ClientBytesDiff,
-			"server_bytes":       entry.ServerBytesDiff,
-			"bytes":              entry.TotalBytesDiff,
-			"client_byte_rate":   int32(entry.ClientByteRate),
-			"server_byte_rate":   int32(entry.ServerByteRate),
-			"byte_rate":          int32(entry.TotalByteRate),
-			"client_packets":     entry.ClientPacketsDiff,
-			"server_packets":     entry.ServerPacketsDiff,
-			"packets":            entry.TotalPacketsDiff,
-			"client_packet_rate": int32(entry.ClientPacketRate),
-			"server_packet_rate": int32(entry.ServerPacketRate),
-			"packet_rate":        int32(entry.TotalPacketRate),
-		}
-		reports.LogEvent(reports.CreateEvent("session_stat", "session_stats", 1, columns, nil))
+	// if no session traffic detected skip the database insert
+	if entry.TotalByteRate == 0 && entry.ClientByteRate == 0 && entry.ServerByteRate == 0 && entry.TotalPacketRate == 0 && entry.ClientPacketRate == 0 && entry.ServerPacketRate == 0 {
+		return
 	}
+
+	var values []interface{}
+
+	// build the values interface array by appending the columns in the same
+	// order they are defined in services/reports/events.go so it can be passed
+	// directly to the prepared INSERT statement created from that array
+	values = append(values, time.Now().UnixNano()/1000000)
+	values = append(values, sessionID)
+	values = append(values, entry.TotalBytesDiff)
+	values = append(values, int32(entry.TotalByteRate))
+	values = append(values, entry.ClientBytesDiff)
+	values = append(values, int32(entry.ClientByteRate))
+	values = append(values, entry.ServerBytesDiff)
+	values = append(values, int32(entry.ServerByteRate))
+	values = append(values, entry.TotalPacketsDiff)
+	values = append(values, int32(entry.TotalPacketRate))
+	values = append(values, entry.ClientPacketsDiff)
+	values = append(values, int32(entry.ClientPacketRate))
+	values = append(values, entry.ServerPacketsDiff)
+	values = append(values, int32(entry.ServerPacketRate))
+
+	// send the session_stats data to the database
+	reports.LogSessionStats(values)
 }

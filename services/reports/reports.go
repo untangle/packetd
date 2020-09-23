@@ -105,10 +105,24 @@ type ReportEntry struct {
 	QueryEvents          QueryEventsOptions           `json:"queryEvents"`
 }
 
+// the main database connection
 var dbMain *sql.DB
+
+// The queries map tracks async database requests from the admin interface. A call
+// is made to CreateQuery, the results are fetched via one or more calls to
+// GetData, followed by a final call to CloseQuery for cleanup.
 var queriesMap = make(map[uint64]*Query)
 var queriesLock sync.RWMutex
 var queryID uint64
+
+// queue and prepared statement for writing to the interface_stats database table
+var interfaceStatsQueue = make(chan []interface{}, 1000)
+var interfaceStatsStatement *sql.Stmt
+
+// queue and prepared statment for writing to the session_stats database table
+var sessionStatsQueue = make(chan []interface{}, 5000)
+var sessionStatsStatement *sql.Stmt
+
 var eventQueue = make(chan Event, 10000)
 var cloudQueue = make(chan Event, 1000)
 var preparedStatements = map[string]*sql.Stmt{}
@@ -175,7 +189,20 @@ func Startup() {
 
 	createTables()
 
+	// prepare the SQL used for interface_stats INSERT
+	interfaceStatsStatement, err = dbMain.Prepare(GetInterfaceStatsInsertQuery())
+	if err != nil {
+		logger.Err("Failed to prepare interface_stats database statement: %s\n", err.Error())
+	}
+
+	// prepare the SQL used for session_stats INSERT
+	sessionStatsStatement, err = dbMain.Prepare(GetSessionStatsInsertQuery())
+	if err != nil {
+		logger.Err("Failed to prepare session_stats database statement: %s\n", err.Error())
+	}
+
 	go eventLogger(eventBatchSize)
+	go statsLogger()
 	go dbCleaner()
 
 	if !kernel.FlagNoCloud {
@@ -326,7 +353,7 @@ func getPreparedStatement(reportEntry *ReportEntry) (*sql.Stmt, bool, error) {
 
 	// Complex UI series queries have embedded timestamps and such that make them unique so
 	// we return without adding to our cache and tell the caller to do statement cleanup.
-	if (reportEntry.Type == "SERIES" || reportEntry.Type == "CATEGORIES_SERIES") {
+	if reportEntry.Type == "SERIES" || reportEntry.Type == "CATEGORIES_SERIES" {
 		return stmt, true, nil
 	}
 
@@ -381,7 +408,7 @@ func LogEvent(event Event) error {
 	case eventQueue <- event:
 	default:
 		// log the message with the OC verb passing the counter name and the repeat message limit as the first two arguments
-		logger.Warn("%OC|Event queue at capacity[%d]. Dropping event: %v\n", "reports_event_queue_full", 100, cap(eventQueue), event)
+		logger.Warn("%OC|Event queue at capacity[%d]. Dropping event\n", "reports_event_queue_full", 100, cap(eventQueue))
 		return errors.New("Event Queue at Capacity")
 	}
 	return nil
@@ -428,7 +455,6 @@ func eventLogger(eventBatchSize int) {
 			lastInsert = time.Now()
 		}
 	}
-
 }
 
 // eventToTransaction converts the Event object into a Sql Transaction and appends it into the current transaction context
@@ -492,21 +518,6 @@ func eventToTransaction(event Event, tx *sql.Tx) {
 
 	rowCount, _ := res.RowsAffected()
 	logger.Debug("SQL:%s ROWS:%d\n", sqlStr, rowCount)
-}
-
-// CloudEvent adds an Event to the cloudQueue for later sending to the cloud
-func CloudEvent(event Event) error {
-	if kernel.FlagNoCloud {
-		return nil
-	}
-	select {
-	case cloudQueue <- event:
-	default:
-		// log the event with the OC verb passing the counter name and the repeat message limit as the first two arguments
-		logger.Warn("%OC|Cloud queue at capacity[%d]. Dropping message: %v\n", "reports_cloud_queue_full", 100, cap(cloudQueue), event)
-		return errors.New("Cloud Queue at Capacity")
-	}
-	return nil
 }
 
 // cloudSender reads from the cloudQueue and logs the events to the cloud
@@ -1078,4 +1089,67 @@ func runSQL(sqlStr string) string {
 	}
 
 	return result
+}
+
+// LogInterfaceStats is called to insert a row into the interface_stats database table
+func LogInterfaceStats(values []interface{}, isWan bool) {
+	select {
+	case interfaceStatsQueue <- values:
+	default:
+		// log the message with the OC verb passing the counter name and the repeat message limit as the first two arguments
+		logger.Warn("%OC|interfaceStatsQueue at capacity[%d]. Dropping event\n", "reports_interface_stats_overrun", 100, cap(interfaceStatsQueue))
+	}
+
+	// if the no-cloud flag is set or not a WAN interface do not send to cloud
+	if kernel.FlagNoCloud || !isWan {
+		return
+	}
+
+	// create an event we can send to the cloud
+	columns := make(map[string]interface{})
+	namelist := GetInterfaceStatsColumnList()
+
+	// build a columns map using the column list and argumented values
+	for x := 0; x < len(values); x++ {
+		name := namelist[x]
+		columns[name] = values[x]
+	}
+
+	// create the event and put it in the cloud queue
+	event := CreateEvent("interface_stats", "interface_stats", 1, columns, nil)
+
+	select {
+	case cloudQueue <- event:
+	default:
+		// log the event with the OC verb passing the counter name and the repeat message limit as the first two arguments
+		logger.Warn("%OC|Cloud queue at capacity[%d]. Dropping message\n", "reports_cloud_queue_full", 100, cap(cloudQueue))
+	}
+}
+
+// LogSessionStats is called to insert a row into the session_stats database table
+func LogSessionStats(values []interface{}) {
+	select {
+	case sessionStatsQueue <- values:
+	default:
+		// log the message with the OC verb passing the counter name and the repeat message limit as the first two arguments
+		logger.Warn("%OC|sessionStatsQueue at capacity[%d]. Dropping event\n", "reports_session_stats_overrun", 100, cap(interfaceStatsQueue))
+	}
+}
+
+func statsLogger() {
+	for {
+		select {
+		case interfaceStats := <-interfaceStatsQueue:
+			if logger.IsTraceEnabled() {
+				logger.Trace("INTERFACE_STATS: %v\n", interfaceStats)
+			}
+			interfaceStatsStatement.Exec(interfaceStats...)
+
+		case sessionStats := <-sessionStatsQueue:
+			if logger.IsTraceEnabled() {
+				logger.Trace("SESSION_STATS: %v\n", sessionStats)
+			}
+			sessionStatsStatement.Exec(sessionStats...)
+		}
+	}
 }
