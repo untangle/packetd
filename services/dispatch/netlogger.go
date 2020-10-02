@@ -68,11 +68,11 @@ func netloggerCallback(version uint8,
 			}
 			logger.Debug("Calling netlogger APP:%s PRIORITY:%d\n", key, priority)
 			wg.Add(1)
-			go func(val SubscriptionHolder) {
+			go func(val SubscriptionHolder, wg *sync.WaitGroup, key string, priority int) {
+				defer wg.Done()
 				val.NetloggerFunc(&netlogger)
-				wg.Done()
 				logger.Debug("Finished netlogger APP:%s PRIORITY:%d\n", key, priority)
-			}(val)
+			}(val, &wg, key, priority)
 			subcount++
 
 		}
@@ -80,10 +80,10 @@ func netloggerCallback(version uint8,
 		// Wait for all of this priority to finish. Calling the wait on a goroutine that closes a
 		// channel allows us to wait for either the channel to close or the subscriber timeout
 		c := make(chan bool)
-		go func() {
+		go func(c chan bool, wg *sync.WaitGroup) {
 			defer close(c)
 			wg.Wait()
-		}()
+		}(c, &wg)
 		select {
 		case <-timeoutTimer.C:
 			logger.Crit("%OC|Timeout while waiting for netlogger subcriber:%s\n", "timeout_netlogger", 0)
