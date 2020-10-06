@@ -26,24 +26,17 @@ type dataCollector struct {
 
 // addPacket adds a packet of server data to the a dataCollector
 func (ME *dataCollector) addPacket(buffer []byte, netseq uint32) {
-	var total int
+	// hold the lock long enough to get and increment the current buffer counter
+	ME.locker.Lock()
+	defer ME.locker.Unlock()
 
-	// hold the read lock long enough to get the current buffer counter
-	ME.locker.RLock()
-	total = ME.total
-	ME.locker.RUnlock()
-
-	// make sure we don't overflow the packet collector
-	if total == maxPacketCount {
+	if ME.total == maxPacketCount {
 		logger.Warn("Unable to add more data to collector\n")
 		return
 	}
 
-	// hold the full lock long enough to get and increment the current buffer counter
-	ME.locker.Lock()
 	spot := ME.total
 	ME.total++
-	ME.locker.Unlock()
 
 	// copy the argumented buffer and netseq value
 	ME.databuff[spot] = make([]byte, len(buffer))
@@ -59,9 +52,9 @@ func (ME *dataCollector) getBuffer() []byte {
 	var total int
 
 	// hold the lock long enough to gt the current buffer counter
-	ME.locker.RLock()
+	ME.locker.Lock()
+	defer ME.locker.Unlock()
 	total = ME.total
-	ME.locker.RUnlock()
 
 	// sort the buffers using the TCP sequence number
 	for j := 0; j < total-1; j++ {
