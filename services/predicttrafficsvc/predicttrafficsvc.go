@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/overseer"
 )
 
 // IPPROTO_ICMP is ip protocol 1
@@ -194,6 +195,8 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) (*ClassifiedTraffic, time.Duration) {
 	requestURL := formRequestURL(ipAdd, port, protoID)
 	logger.Debug("Prediction request: [%d]%s:%d\n", protoID, ipAdd.String(), port)
+
+	overseer.AddCounter("traffic_prediction_cloud_api_lookup", 1)
 
 	req, err := http.NewRequest("GET", requestURL, nil)
 	req.Header.Add("Content-Type", "application/json")
