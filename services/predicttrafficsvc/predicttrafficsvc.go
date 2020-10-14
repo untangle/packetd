@@ -220,13 +220,13 @@ func sendClassifyRequest(requestURL string) (*ClassifiedTraffic, time.Duration) 
 		// timeout requests are handled differently
 		if err.(net.Error).Timeout() {
 			// Add counter for this request URL
-			overseer.AddCounter(requestURL, 1)
+			//overseer.AddCounter(requestURL, 1)
 			logger.Warn("%OC|Cloud API request to %s has timed out, error: %v\n", "traffic_prediction_cloud_api_timeout", 10, cloudAPIEndpoint, err)
 			return unknownTrafficItem, negativeCacheTime
 		}
 
 		// Add counter for this request URL
-		overseer.AddCounter(requestURL, 1)
+		//overseer.AddCounter(requestURL, 1)
 		logger.Warn("%OC|Cloud API request to %s has failed, error details: %v\n", "traffic_prediction_cloud_api_failure", 10, cloudAPIEndpoint, err)
 		return unknownTrafficItem, negativeCacheTime
 	}
