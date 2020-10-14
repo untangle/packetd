@@ -1,11 +1,12 @@
 package predicttrafficsvc
 
 import (
-	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"runtime"
 	"strconv"
 	"strings"
@@ -204,7 +205,16 @@ func sendClassifyRequest(requestURL string) (*ClassifiedTraffic, time.Duration) 
 	req.Header.Add("AuthRequest", authRequestKey)
 	req.Header.Add("Connection", "Keep-Alive")
 
-	resp, err := client.Do(req)
+	var resp *http.Response
+
+	// If Debugging is enabled, lets calculate performance and TTFB with various request/responses to the cloud endpoint
+	// see this: https://stackoverflow.com/questions/48077098/getting-ttfb-time-to-first-byte-value-in-golang/48077762#48077762
+	if logger.IsDebugEnabled() {
+		resp, err = calcReqRespTTFB(req)
+
+	} else {
+		resp, err = client.Do(req)
+	}
 
 	if err != nil {
 		// timeout requests are handled differently
@@ -295,13 +305,39 @@ func formRequestURL(ipAdd net.IP, port uint16, protoID uint8) string {
 	return reqUrl.String()
 }
 
-// formMapKey will build the mapkey used in the cache stores and lookups
-func formMapKey(ipAdd net.IP, port uint16, protoID uint8) string {
-	var mapKey bytes.Buffer
-	mapKey.WriteString(ipAdd.String())
-	mapKey.WriteString("-")
-	mapKey.WriteString(strconv.Itoa(int(port)))
-	mapKey.WriteString("-")
-	mapKey.WriteString(strconv.Itoa(int(protoID)))
-	return mapKey.String()
+// This function can caclculate the Time to First Byte on an HTTP Request/Response, and will log the output to the logger
+// param - req (*http.Request) - The Http Request to calculate the timings on
+// return - *http.Response - The Http Response from the endpoint
+// return - error - Any associated errors
+func calcReqRespTTFB(req *http.Request) (*http.Response, error) {
+
+	var start, connect, dns, tlsHandshake time.Time
+
+	trace := &httptrace.ClientTrace{
+		DNSStart: func(dsi httptrace.DNSStartInfo) { dns = time.Now() },
+		DNSDone: func(ddi httptrace.DNSDoneInfo) {
+			logger.Debug("DNS Done: %v\n", time.Since(dns))
+		},
+
+		TLSHandshakeStart: func() { tlsHandshake = time.Now() },
+		TLSHandshakeDone: func(cs tls.ConnectionState, err error) {
+			logger.Debug("TLS Handshake: %v\n", time.Since(tlsHandshake))
+		},
+
+		ConnectStart: func(network, addr string) { connect = time.Now() },
+		ConnectDone: func(network, addr string, err error) {
+			logger.Debug("Connect time: %v\n", time.Since(connect))
+		},
+
+		GotFirstResponseByte: func() {
+			logger.Debug("Time from start to first byte: %v\n", time.Since(start))
+		},
+	}
+
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+	start = time.Now()
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	logger.Debug("Total time: %v\n", time.Since(start))
+
+	return resp, err
 }
