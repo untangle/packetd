@@ -129,7 +129,7 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 	var holder *trafficHolder
 	var result *ClassifiedTraffic
 	var cachetime time.Duration
-	var mapKey = formMapKey(ipAdd, port, protoID)
+	var mapKey = formRequestURL(ipAdd, port, protoID)
 
 	// lock the cache mutex and get the traffic holder
 	trafficMutex.RLock()
@@ -159,7 +159,7 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 			cachetime = longCacheTime
 		} else {
 			// send the request to the cloud
-			result, cachetime = sendClassifyRequest(ipAdd, port, protoID)
+			result, cachetime = sendClassifyRequest(mapKey)
 		}
 
 		// safely store the response and the cache time returned from the lookup
@@ -194,9 +194,8 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 
 // sendClassifyRequest will send the classification request to the API endpoint using the provided parameters
 // It returns the classification result or nil along with how long the response should be cached
-func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) (*ClassifiedTraffic, time.Duration) {
-	requestURL := formRequestURL(ipAdd, port, protoID)
-	logger.Debug("Prediction request: [%d]%s:%d\n", protoID, ipAdd.String(), port)
+func sendClassifyRequest(requestURL string) (*ClassifiedTraffic, time.Duration) {
+	logger.Debug("Prediction request: [%s]\n", requestURL)
 
 	overseer.AddCounter("traffic_prediction_cloud_api_lookup", 1)
 
@@ -242,7 +241,7 @@ func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) (*ClassifiedT
 	trafficResponse := new(ClassifiedTraffic)
 	bodyString := string(bodyBytes)
 	json.Unmarshal([]byte(bodyString), &trafficResponse)
-	logger.Debug("Prediction response: [%d]%s:%d = %v\n", protoID, ipAdd.String(), port, *trafficResponse)
+	logger.Debug("Prediction response: [%s] = %v\n", requestURL, *trafficResponse)
 	return trafficResponse, positiveCacheTime
 }
 
