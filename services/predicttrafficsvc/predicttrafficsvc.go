@@ -141,6 +141,7 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 	// rather than generating multiple cloud requests for the same information
 	if holder != nil {
 		logger.Trace("Loading prediction for %s\n", mapKey)
+		overseer.AddCounter("traffic_prediction_cloud_cache_found", 1)
 	} else {
 		trafficMutex.Lock()
 
