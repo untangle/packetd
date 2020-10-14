@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -283,15 +284,16 @@ func cleanupTrafficCache() {
 
 // formRequestURL will build the request URL
 func formRequestURL(ipAdd net.IP, port uint16, protoID uint8) string {
-	var bufferURL bytes.Buffer
-	bufferURL.WriteString(cloudAPIEndpoint)
-	bufferURL.WriteString("/v1/traffic?ip=")
-	bufferURL.WriteString(ipAdd.String())
-	bufferURL.WriteString("&port=")
-	bufferURL.WriteString(strconv.Itoa(int(port)))
-	bufferURL.WriteString("&protocolId=")
-	bufferURL.WriteString(strconv.Itoa(int(protoID)))
-	return bufferURL.String()
+	var reqUrl strings.Builder
+
+	reqUrl.WriteString(cloudAPIEndpoint)
+	reqUrl.WriteString("/v1/traffic?ip=")
+	reqUrl.WriteString(ipAdd.String())
+	reqUrl.WriteString("&port=")
+	reqUrl.WriteString(strconv.Itoa(int(port)))
+	reqUrl.WriteString("&protocolId=")
+	reqUrl.WriteString(strconv.Itoa(int(protoID)))
+	return reqUrl.String()
 }
 
 // formMapKey will build the mapkey used in the cache stores and lookups
