@@ -336,7 +336,8 @@ func calcReqRespTTFB(req *http.Request) (*http.Response, error) {
 
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 	start = time.Now()
-	resp, err := http.DefaultTransport.RoundTrip(req)
+
+	resp, err := client.Transport.RoundTrip(req)
 	logger.Debug("Total time: %v\n", time.Since(start))
 
 	return resp, err
