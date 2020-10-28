@@ -49,8 +49,8 @@ func GetSettings(segments []string) (interface{}, error) {
 }
 
 // SetSettings updates the settings
-func SetSettings(segments []string, value interface{}) (interface{}, error) {
-	return SetSettingsFile(segments, value, settingsFile)
+func SetSettings(segments []string, value interface{}, force bool) (interface{}, error) {
+	return SetSettingsFile(segments, value, settingsFile, force)
 }
 
 // TrimSettings trims the settings
@@ -82,7 +82,7 @@ func GetSettingsFile(segments []string, filename string) (interface{}, error) {
 }
 
 // SetSettingsFile updates the settings
-func SetSettingsFile(segments []string, value interface{}, filename string) (interface{}, error) {
+func SetSettingsFile(segments []string, value interface{}, filename string, force bool) (interface{}, error) {
 	var ok bool
 	var err error
 	var jsonSettings map[string]interface{}
@@ -103,7 +103,7 @@ func SetSettingsFile(segments []string, value interface{}, filename string) (int
 		return createJSONErrorObject(err), err
 	}
 
-	output, err := syncAndSave(jsonSettings, filename)
+	output, err := syncAndSave(jsonSettings, filename, force)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error(), "output": output}, err
 	}
@@ -272,7 +272,7 @@ func TrimSettingsFile(segments []string, filename string) (interface{}, error) {
 		}
 	}
 
-	output, err := syncAndSave(jsonSettings, filename)
+	output, err := syncAndSave(jsonSettings, filename, false)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error(), "output": output}, err
 	}
@@ -332,8 +332,8 @@ func getSettingsFromJSON(jsonObject interface{}, segments []string) (interface{}
 }
 
 // runSyncSettings runs sync-settings on the specified filename
-func runSyncSettings(filename string) (string, error) {
-	cmd := exec.Command("/usr/bin/sync-settings", "-o", "openwrt", "-f", filename)
+func runSyncSettings(filename string, force bool) (string, error) {
+	cmd := exec.Command("/usr/bin/sync-settings", "-o", "openwrt", "-f", filename, "-v", "force="+strconv.FormatBool(force))
 	outbytes, err := cmd.CombinedOutput()
 	output := string(outbytes)
 	if err != nil {
@@ -358,7 +358,7 @@ func runSyncSettings(filename string) (string, error) {
 // it copies the tmp file to the destination specified in filename
 // if sync-settings does not succeed it returns the error and output
 // returns stdout, stderr, and an error
-func syncAndSave(jsonObject map[string]interface{}, filename string) (string, error) {
+func syncAndSave(jsonObject map[string]interface{}, filename string, force bool) (string, error) {
 	tmpfile, err := tempFile("", "settings.json.")
 	if err != nil {
 		logger.Warn("Failed to generate tmpfile: %v\n", err.Error())
@@ -373,7 +373,7 @@ func syncAndSave(jsonObject map[string]interface{}, filename string) (string, er
 		return "Failed to write settings.", err
 	}
 
-	output, err := runSyncSettings(tmpfile.Name())
+	output, err := runSyncSettings(tmpfile.Name(), force)
 	scanner := bufio.NewScanner(strings.NewReader(output))
 	for scanner.Scan() {
 		logger.Info("sync-settings: %v\n", scanner.Text())
