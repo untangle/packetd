@@ -605,6 +605,8 @@ func getClassifyCatTable(c *gin.Context) {
 func setSettings(c *gin.Context) {
 	var segments []string
 	path := c.Param("path")
+	force := c.Query("force")
+	forceSync := false
 
 	if path == "" {
 		segments = nil
@@ -624,7 +626,15 @@ func setSettings(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 	}
 
-	jsonResult, err := settings.SetSettings(segments, bodyJSONObject)
+	if force != "" {
+		var parseErr error
+		forceSync, parseErr = strconv.ParseBool(force)
+
+		if parseErr != nil {
+			forceSync = false
+		}
+	}
+	jsonResult, err := settings.SetSettings(segments, bodyJSONObject, forceSync)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, jsonResult)
 	} else {
