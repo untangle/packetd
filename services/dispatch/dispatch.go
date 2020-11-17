@@ -14,6 +14,7 @@ import (
 
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/settings"
 )
 
 // SubscriptionHolder stores the details of a data callback subscription
@@ -98,6 +99,10 @@ var shutdownCleanerTask = make(chan bool)
 // stores the interval of conntrack updates
 var conntrackIntervalSeconds int
 
+// disabledServices holds any services that are disabled in the settings/system/disabledServices,
+// and prevents them from being loaded as a nfqueue subscription
+var disabledPlugins []interface{}
+
 // Startup starts the event handling service
 func Startup(ctInterval int) {
 	conntrackIntervalSeconds = ctInterval
@@ -125,6 +130,10 @@ func Startup(ctInterval int) {
 
 	// start cleaner tasks to clean tables
 	go cleanerTask()
+
+	// load disabled nfqueue options
+	disabledPlugins = loadDisabledPlugins()
+
 }
 
 // Shutdown stops the event handling service
@@ -167,6 +176,14 @@ func dupIP(ip net.IP) net.IP {
 func InsertNfqueueSubscription(owner string, priority int, function NfqueueHandlerFunction) {
 	var holder SubscriptionHolder
 	logger.Info("Adding NFQueue Event Subscription (%s, %d)\n", owner, priority)
+
+	// Check if this owner is in the disabledQueues setting
+	for _, value := range disabledPlugins {
+		if owner == value {
+			logger.Warn("The %s plugin will not be loaded, because it is currently disabled.\n", value)
+			return
+		}
+	}
 
 	holder.Owner = owner
 	holder.Priority = priority
@@ -284,4 +301,16 @@ func GetConntrackTable() map[uint32]*Conntrack {
 		newMap[k] = v
 	}
 	return newMap
+}
+
+// loadDisabledPlugins will use the settings (or on the fly?) to
+// figure out what nfqueue subscriptions are currently disabled
+func loadDisabledPlugins() []interface{} {
+
+	retServices, err := settings.GetSettingsSlice([]string{"system", "disabledPlugins"})
+	if err != nil {
+		logger.Warn("Unable to load disabled NFqueues, continuing without any services disabled\n")
+	}
+
+	return retServices
 }
