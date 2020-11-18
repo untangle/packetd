@@ -12,7 +12,6 @@ import (
 	"net/http/pprof"
 	"os"
 	"os/exec"
-	"reflect"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -691,18 +690,12 @@ func addTokenToSession(c *gin.Context) {
 // returns true if the setup wizard is completed, or false if not
 // if any error occurs it returns true (assumes the wizard is completed)
 func isSetupWizardCompleted() bool {
-	wizardCompletedJSON, err := settings.GetSettings([]string{"system", "setupWizard", "completed"})
-	if err != nil {
-		logger.Warn("Failed to read setup wizard completed settings: %v\n", err.Error())
-		return true
-	}
-	if wizardCompletedJSON == nil {
-		logger.Warn("Failed to read setup wizard completed settings: %v\n", wizardCompletedJSON)
-		return true
-	}
-	wizardCompletedBool, ok := wizardCompletedJSON.(bool)
+
+	setupWiz, _ := settings.GetSettingsValue([]string{"system", "setupWizard", "completed"})
+
+	wizardCompletedBool, ok := setupWiz.(bool)
 	if !ok {
-		logger.Warn("Invalid type of setup wizard completed setting: %v %v\n", wizardCompletedJSON, reflect.TypeOf(wizardCompletedJSON))
+		logger.Warn("Invalid type of setup wizard completed setting: %v \n", setupWiz)
 		return true
 	}
 
@@ -918,7 +911,7 @@ func wireguardKeyPair(c *gin.Context) {
 	// return the private and public keys to the caller
 	c.JSON(http.StatusOK, gin.H{
 		"privateKey": privateKey,
-		"publicKey": publicKey,
+		"publicKey":  publicKey,
 	})
 
 	return
@@ -1020,4 +1013,3 @@ func shutdownHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 	return
 }
-

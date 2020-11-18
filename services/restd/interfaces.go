@@ -50,16 +50,7 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 	var bridgeList map[string]string
 
 	// load the current network settings
-	networkRaw, err := settings.GetCurrentSettings([]string{"network", "interfaces"})
-	if networkRaw == nil || err != nil {
-		logger.Warn("Unable to read network settings\n")
-	}
-
-	// cast to an array of interfaces that we can access
-	networkMap, ok := networkRaw.([]interface{})
-	if !ok {
-		return nil, errors.New("Unable to identify network interfaces")
-	}
+	settingIntfs, err := settings.GetSettingsSlice([]string{"network", "interfaces"})
 
 	var ubusNetworkMap map[string]interface{}
 	var ubusDeviceMap map[string]interface{}
@@ -132,7 +123,7 @@ func getInterfaceStatus(getface string) ([]byte, error) {
 	}
 
 	// walk through all of the interfaces we find in settings
-	for _, value := range networkMap {
+	for _, value := range settingIntfs {
 		item, ok := value.(map[string]interface{})
 		if !ok || item == nil {
 			logger.Warn("Unexpected object type: %T\n", value)

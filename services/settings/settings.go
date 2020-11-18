@@ -31,6 +31,55 @@ func Shutdown() {
 
 }
 
+// GetSettingsSlice will return a slice of settings, pulled from the segments passed in
+// @param segments []string - The settings path that we are trying to load
+// @return []interface{} - A slice of the converted json settings
+// @return error - Any errors while loading the setting
+//
+func GetSettingsSlice(segments []string) ([]interface{}, error) {
+	var err error
+	jsonSettings, err := GetSettings(segments)
+	if jsonSettings == nil || err != nil {
+		err = errors.New(fmt.Sprintf("Unable to read settings: %s\n", strings.Join(segments, " ")))
+		logger.Warn(err.Error())
+		return nil, err
+	}
+
+	settingsMap, ok := jsonSettings.([]interface{})
+	if !ok {
+		err = errors.New(fmt.Sprintf("Unable to convert segments to interface{} slice: %s\n", strings.Join(segments, " ")))
+		logger.Warn(err.Error())
+		return nil, err
+	}
+
+	return settingsMap, nil
+}
+
+// GetSettingValue will return a setting value as an interface{} type
+// if this is run on an array, it will only return this FIRST element
+// @param segments []string - The settings path that we are trying to load
+// @return interface{} - The value, of the segment
+// @return error - Any errors while loading the setting
+//
+func GetSettingsValue(segments []string) (interface{}, error) {
+	var err error
+	jsonSettings, err := GetSettings(segments)
+	if jsonSettings == nil || err != nil {
+		err = errors.New(fmt.Sprintf("Unable to read settings: %s\n", strings.Join(segments, " ")))
+		logger.Warn(err.Error())
+		return nil, err
+	}
+
+	settingVal, ok := jsonSettings.(interface{})
+	if !ok {
+		err = errors.New(fmt.Sprintf("Unable to convert segment to interface{}: %s\n", strings.Join(segments, " ")))
+		logger.Warn(err.Error())
+		return nil, err
+	}
+
+	return settingVal, nil
+}
+
 // GetCurrentSettings returns the current settings from the specified path
 // the current settings are the settings after being synced
 func GetCurrentSettings(segments []string) (interface{}, error) {

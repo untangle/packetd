@@ -128,11 +128,25 @@ func createCACert() (ca *x509.Certificate, caPrivKey *ecdsa.PrivateKey) {
 func createCert(ca *x509.Certificate, caPrivKey *ecdsa.PrivateKey) (certBytes []byte, privateKey *ecdsa.PrivateKey) {
 	var hostIps []net.IP
 	var hostnames []string
-	domainName := getSystemSetting("domainName")
+	sysDn, _ := settings.GetSettingsValue([]string{"system", "domainName"})
+	domainName, ok := sysDn.(string)
+
+	if !ok {
+		logger.Warn("Unable to convert system/domainName to string, assuming null.")
+		domainName = ""
+	}
+
+	sysHn, _ := settings.GetSettingsValue([]string{"system", "hostName"})
+	hostName, ok := sysHn.(string)
+
+	if !ok {
+		logger.Warn("Unable to convert system/hostname setting to string, assuming null.")
+		hostName = ""
+	}
 
 	hostIps = append(hostIps, net.IPv4(127, 0, 0, 1))
 	hostnames = append(hostnames, "localhost")
-	hostnames = append(hostnames, getSystemSetting("hostName"))
+	hostnames = append(hostnames, hostName)
 
 	logger.Debug("Generating new private key...\n")
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -215,15 +229,4 @@ func pemBlockForKey(priv interface{}) *pem.Block {
 	default:
 		return nil
 	}
-}
-
-// getSystemSetting will use a setting name as input to retrieve system settings
-func getSystemSetting(settingName string) string {
-	settingValue, err := settings.GetSettings([]string{"system", settingName})
-	if err != nil {
-		logger.Warn("Failed to read setting value for setting %s, error: %v\n", settingName, err.Error())
-		return ""
-	}
-
-	return settingValue.(string)
 }

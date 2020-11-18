@@ -389,20 +389,10 @@ func refreshNetworkRegistry() {
 	networkMutex.Unlock()
 
 	// get the current network setings
-	networkJSON, err := settings.GetCurrentSettings([]string{"network", "interfaces"})
-	if networkJSON == nil || err != nil {
-		logger.Warn("Unable to read network settings\n")
-	}
-
-	// make sure we find the interfaces
-	networkSlice, ok := networkJSON.([]interface{})
-	if !ok {
-		logger.Warn("Unable to locate interfaces\n")
-		return
-	}
+	settingIntfs, _ := settings.GetSettingsSlice([]string{"network", "interfaces"})
 
 	// walk the list of interfaces and register each network address space
-	for _, value := range networkSlice {
+	for _, value := range settingIntfs {
 		item, ok := value.(map[string]interface{})
 		if !ok {
 			logger.Warn("Invalid interface in settings: %T\n", value)

@@ -464,16 +464,7 @@ func getInterfaceWanFlag(name string) bool {
 
 // loadInterfaceDetailMap creates a map of interface name to MFW interface ID values
 func loadInterfaceDetailMap() {
-	networkJSON, err := settings.GetCurrentSettings([]string{"network", "interfaces"})
-	if networkJSON == nil || err != nil {
-		logger.Warn("Unable to read network settings\n")
-	}
-
-	networkSlice, ok := networkJSON.([]interface{})
-	if !ok {
-		logger.Warn("Unable to locate interfaces\n")
-		return
-	}
+	settingIntfs, _ := settings.GetSettingsSlice([]string{"network", "interfaces"})
 
 	interfaceDetailLocker.Lock()
 	defer interfaceDetailLocker.Unlock()
@@ -482,7 +473,7 @@ func loadInterfaceDetailMap() {
 	interfaceDetailMap = make(map[string]*interfaceDetail)
 
 	// walk the list of interfaces and store each name and ID in the map
-	for _, value := range networkSlice {
+	for _, value := range settingIntfs {
 		item, ok := value.(map[string]interface{})
 		if !ok {
 			logger.Warn("Invalid interface in settings: %T\n", value)

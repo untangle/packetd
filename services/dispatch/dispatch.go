@@ -312,5 +312,9 @@ func loadDisabledPlugins() []interface{} {
 		logger.Warn("Unable to load disabled NFqueues, continuing without any services disabled\n")
 	}
 
-	return retServices
+	if retServices != nil {
+		return retServices
+	}
+
+	return nil
 }

@@ -366,18 +366,14 @@ func authStatus(c *gin.Context) {
 // getCredentials will retrieve configured credentials for a specific username
 // returns map[string]interface{} - the stored credentials for a specific username
 func getCredentials(username string) map[string]interface{} {
-	credentialsJSON, err := settings.GetCurrentSettings([]string{"accounts", "credentials"})
-	if credentialsJSON == nil || err != nil {
-		logger.Warn("Failed to read accounts settings: %v\n", credentialsJSON)
-		return nil
-	}
-	credentialsSlice, ok := credentialsJSON.([]interface{})
-	if !ok {
-		logger.Warn("Invalid type of accounts settings: %v %v\n", credentialsJSON, reflect.TypeOf(credentialsJSON))
+
+	accCreds, err := settings.GetSettingsSlice([]string{"accounts", "credentials"})
+	if err != nil {
+		logger.Warn("Invalid accounts/credentials slice of accounts settings\n")
 		return nil
 	}
 
-	for _, json := range credentialsSlice {
+	for _, json := range accCreds {
 		cred, ok := json.(map[string]interface{})
 		if !ok {
 			logger.Warn("Invalid type of accounts credentials settings: %v %v\n", json, reflect.TypeOf(json))
