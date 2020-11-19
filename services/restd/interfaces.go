@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strconv"
 
 	"github.com/untangle/packetd/plugins/stats"
 	"github.com/untangle/packetd/services/logger"
@@ -18,6 +19,10 @@ type interfaceInfo struct {
 	InterfaceID      int      `json:"interfaceId"`
 	InterfaceName    string   `json:"name"`
 	InterfaceType    string   `json:"type"`
+	InterfaceModes	 []string `json:"ethLinkSupported"`
+	InterfaceSpeed	 int	  `json:"ethSpeed"`
+	InterfaceDuplex	 string	  `json:"ethDuplex"`
+	InterfaceAuto	 bool     `json:"ethAutoneg"`
 	Wan              bool     `json:"wan"`
 	AddressSource    []string `json:"addressSource"`
 	Connected        bool     `json:"connected"`
@@ -338,6 +343,27 @@ func attachDeviceDetails(worker *interfaceInfo, ubusDeviceMap map[string]interfa
 			// look for and extract the carrier boolan
 			if ptr, ok := list["carrier"]; ok {
 				worker.Connected = ptr.(bool)
+			} 
+			// Get link supported modes.
+			if list["link-supported"] != nil {
+				if supported, ok := list["link-supported"].([]interface{}); ok {
+					for _, item := range supported {
+						worker.InterfaceModes = append(worker.InterfaceModes, item.(string))
+					}
+				}
+			}
+			// Get current speed, duplex and if autoneg is on/off, duplex is parsed from speed. E.g. "1000F"
+			if ptr, ok := list["speed"]; ok {
+				speedDuplex := ptr.(string)
+				worker.InterfaceSpeed, _ = strconv.Atoi(speedDuplex[0:len(speedDuplex)-1])
+				if speedDuplex[(len(speedDuplex)-1):] == "F" {
+					worker.InterfaceDuplex = "full"
+				} else {
+					worker.InterfaceDuplex = "half"
+				}
+			}
+			if ptr, ok := list["autoneg"]; ok {
+				worker.InterfaceAuto = ptr.(bool)
 			}
 		}
 	}
