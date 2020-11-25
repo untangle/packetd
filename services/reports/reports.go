@@ -431,7 +431,7 @@ func eventLogger(eventBatchSize int) {
 	for {
 		select {
 		// read data out of the eventQueue into the eventBatch
-		case grabEvent := <- eventQueue:
+		case grabEvent := <-eventQueue:
 			eventBatch = append(eventBatch, grabEvent)
 
 			// when the batch is larger than the configured batch insert size OR we haven't inserted anything in one minute, we need to insert some stuff
@@ -446,13 +446,13 @@ func eventLogger(eventBatchSize int) {
 				batchCount := len(eventBatch)
 				eventBatch, lastInsert = batchTransaction(eventBatch, batchCount)
 			}
-		}	
+		}
 	}
 }
 
 // batchTransaction will accept a batch and complete the transaction to the DB
 // param eventBatch ([]Event) - events to commit to DB
-// param batchCount (int) - numbers of events being commited to DB 
+// param batchCount (int) - numbers of events being commited to DB
 // return ([]Event, time.Time) - return a nil eventBatch and the current time
 func batchTransaction(eventBatch []Event, batchCount int) ([]Event, time.Time) {
 	logger.Debug("%v Items ready for batch, starting transaction at %v...\n", batchCount, time.Now())
@@ -473,7 +473,6 @@ func batchTransaction(eventBatch []Event, batchCount int) ([]Event, time.Time) {
 		tx.Rollback()
 		logger.Warn("Failed to commit transaction: %s\n", err.Error())
 	}
-
 
 	logger.Debug("Transaction completed, %v items processed at %v .\n", batchCount, time.Now())
 
@@ -788,6 +787,7 @@ func createTables() {
 		`CREATE TABLE IF NOT EXISTS interface_stats (
 			time_stamp bigint NOT NULL,
 			interface_id int1,
+			interface_name text,
 			device_name text,
 			is_wan boolean,
 			latency_1 real,

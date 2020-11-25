@@ -20,6 +20,7 @@ func GetInterfaceStatsColumnList() []string {
 	return []string{
 		"time_stamp",
 		"interface_id",
+		"interface_name",
 		"device_name",
 		"is_wan",
 		"latency_1",
