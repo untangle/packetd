@@ -3,6 +3,7 @@ package restd
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -12,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/c9s/goprocinfo/linux"
 	"github.com/gin-gonic/gin"
@@ -140,6 +142,19 @@ func statusUID(c *gin.Context) {
 	}
 
 	c.String(http.StatusOK, uid)
+}
+
+// statusCommandFindAccount command result from command center find_account api call.
+func statusCommandFindAccount(c *gin.Context) {
+	logger.Debug("statusCommandFindAccount()\n")
+
+	jsonO, err := getCommandFindAccount()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	c.JSON(http.StatusOK, jsonO)
 }
 
 // statusWANTest runs the WAN performance test and returns the result
@@ -449,6 +464,60 @@ func getBuildInfo() (map[string]interface{}, error) {
 
 	return jsonO, nil
 }
+
+// getCommandFindAccount returns result of calling command center find_account api.
+func getCommandFindAccount() (map[string]interface{}, error) {
+	jsonO := make(map[string]interface{})
+
+	uid, err := settings.GetUID()
+	if err != nil {
+		return nil, err
+	}
+
+	transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	client := &http.Client{Transport: transport, Timeout: time.Duration(5 * time.Second)}
+	req, err := http.NewRequest("GET", "https://www.untangle.com/store/open.php?action=find_account&uid=" + uid, nil)
+	if err != nil {
+		logger.Err("Error performing request for find_account: %v\n", err)
+		return jsonO, err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		// logger.Warn("Error calling client.Do: %s\n", err.Error())
+		logger.Err("Unable to process request");
+		return jsonO, err
+	}
+	defer resp.Body.Close()
+
+	if err != nil {
+		return jsonO, err
+	}
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		logger.Err("Error reading body of find_account: %v\n", err)
+		return jsonO, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		logger.Err("Error reading body of find_account: %v\n", err)
+		return jsonO, err
+	}
+
+	head := bytes.Index(bodyBytes, []byte("{"))
+	tail := bytes.LastIndex(bodyBytes, []byte("}"))
+	if head < 0 || tail < 0 {
+		return nil, errors.New("Invalid find_account api file format")
+	}
+	err = json.Unmarshal([]byte(bodyBytes[head:tail+1]), &jsonO)
+	if err != nil {
+		return nil, err
+	}
+
+	return jsonO, nil
+}
+
 
 // getLicenseInfo returns the license info as a json map
 func getLicenseInfo() (map[string]interface{}, error) {
