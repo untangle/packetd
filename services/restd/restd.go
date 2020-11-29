@@ -121,6 +121,7 @@ func Startup() {
 	api.GET("/status/wifimodelist/:device", statusWifiModelist)
 
 	api.GET("/wireguard/keypair", wireguardKeyPair)
+	api.POST("/wireguard/publickey", wireguardPublicKey)
 
 	api.GET("/classify/applications", getClassifyAppTable)
 	api.GET("/classify/categories", getClassifyCatTable)
@@ -875,6 +876,7 @@ func renewDhcp(c *gin.Context) {
 	return
 }
 
+// Create WireGuard private and public keys and return in JSON object
 func wireguardKeyPair(c *gin.Context) {
 	var privateKey string
 	var publicKey string
@@ -923,6 +925,68 @@ func wireguardKeyPair(c *gin.Context) {
 
 	return
 }
+
+// Create WireGuard public key and return both in JSON object
+func wireguardPublicKey(c *gin.Context) {
+	var privateKey string
+	var publicKey string
+	var out []byte
+	var cmd *exec.Cmd
+	var sin io.WriteCloser
+
+	var data map[string]string
+	var body []byte
+	var found bool
+	var err error
+
+	body, err = ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"error": err})
+		return
+	}
+
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"error": err})
+		return
+	}
+
+	privateKey, found = data["privateKey"]
+	if found != true {
+		c.JSON(http.StatusOK, gin.H{"error": "privateKey not specified"})
+		return
+	}
+
+	// generate the public key for the private key
+	cmd = exec.Command("/usr/bin/wg", "pubkey")
+	sin, err = cmd.StdinPipe()
+
+	// use a goroutine to write the private key to stdin because the
+	// wg utility will not return until stdin is closed
+	go func() {
+		defer sin.Close()
+		io.WriteString(sin, privateKey)
+	}()
+
+	out, err = cmd.Output()
+
+	if err != nil {
+		logger.Err("Error generating public key: %v\n", string(out))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": string(out)})
+		return
+	}
+
+	publicKey = strings.TrimRight(string(out), "\r\n")
+
+	// return the private and public keys to the caller
+	c.JSON(http.StatusOK, gin.H{
+		"privateKey": privateKey,
+		"publicKey": publicKey,
+	})
+
+	return
+}
+
 
 // called to request an unused network address block
 func netspaceRequest(c *gin.Context) {
