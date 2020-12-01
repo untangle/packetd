@@ -484,15 +484,10 @@ func getCommandFindAccount() (map[string]interface{}, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		// logger.Warn("Error calling client.Do: %s\n", err.Error())
-		logger.Err("Unable to process request");
+		logger.Warn("Error calling client.Do: %s\n", err.Error())
 		return jsonO, err
 	}
 	defer resp.Body.Close()
-
-	if err != nil {
-		return jsonO, err
-	}
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
