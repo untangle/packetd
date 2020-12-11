@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/mattn/go-sqlite3"
+	zmq "github.com/pebbe/zmq4"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/overseer"
@@ -156,6 +157,13 @@ func Startup() {
 	// eventBatchSize is the size of event batches for batching inserts/updates from the event queue
 	var eventBatchSize int
 
+	socket, err := setupZmqPubSocket()
+	if err != nil {
+		logger.Warn("Unable to setup ZMQ Publishing socket: %s\n", err)
+	} else {
+		defer socket.Close()
+	}
+
 	// get the file system stats for the path where the database will be stored
 	syscall.Statfs(dbFILEPATH, &stat)
 
@@ -248,6 +256,36 @@ func unmarshall(reportEntryStr string, reportEntry *ReportEntry) error {
 		return err
 	}
 	return nil
+}
+
+// setupZmqSocket sets up the reports ZMQ socket for publishing events
+func setupZmqPubSocket() (soc *zmq.Socket, err error) {
+	logger.Info("Setting up ZMQ Publishing socket...\n")
+
+	publisher, err := zmq.NewSocket(zmq.PUB)
+
+	if err != nil {
+		logger.Err("Unable to open ZMQ publisher socket: %s\n", err)
+		return nil, err
+	}
+
+	err = publisher.SetLinger(0)
+	if err != nil {
+		logger.Err("Unable to SetLinger on ZMQ socket: %s\n", err)
+		return nil, err
+	}
+	// TODO: We should create a common file for reportd to use,
+	// with a randomized ZMQ port (something outside of normal usage ports, ie: 22,80,443,etc)
+	err = publisher.Bind("tcp://*:5561")
+
+	if err != nil {
+		logger.Err("Unable to bind to ZMQ socket: %s\n", err)
+		return nil, err
+	}
+
+	logger.Info("ZMQ Publisher started!\n")
+
+	return publisher, nil
 }
 
 // CreateQuery submits a database query and returns the results

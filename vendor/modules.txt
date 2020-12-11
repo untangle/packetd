@@ -24,8 +24,8 @@ github.com/gin-gonic/gin/render
 # github.com/golang/protobuf v1.3.2
 github.com/golang/protobuf/proto
 # github.com/google/gopacket v1.1.17
-github.com/google/gopacket/layers
 github.com/google/gopacket
+github.com/google/gopacket/layers
 # github.com/gorilla/context v1.1.1
 github.com/gorilla/context
 # github.com/gorilla/securecookie v1.1.1
@@ -46,6 +46,8 @@ github.com/modern-go/reflect2
 github.com/oschwald/geoip2-golang
 # github.com/oschwald/maxminddb-golang v1.3.1
 github.com/oschwald/maxminddb-golang
+# github.com/pebbe/zmq4 v1.2.2
+github.com/pebbe/zmq4
 # github.com/ugorji/go/codec v1.1.7
 github.com/ugorji/go/codec
 # golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
