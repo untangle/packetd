@@ -20,6 +20,8 @@ RUN apk add libnetfilter_log-dev
 RUN apk add libnetfilter_conntrack-dev
 RUN apk add libnetfilter_queue-dev
 
+RUN apk add zeromq-dev
+
 # build packetd
 RUN mkdir -p /go/packetd
 VOLUME /go/packetd

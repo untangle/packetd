@@ -15,6 +15,8 @@ RUN apt-get install -y libnetfilter-log-dev
 RUN apt-get install -y libnetfilter-queue-dev
 RUN apt-get install -y libnetfilter-conntrack-dev
 
+RUN apt-get install -y libzmq3-dev
+
 RUN mkdir -p /go/packetd
 VOLUME /go/packetd
 WORKDIR /go/packetd
