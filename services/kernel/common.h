@@ -153,3 +153,5 @@ void warehouse_shutdown(void);
 void warehouse_capture(const char origin,void *buffer,uint32_t length,uint32_t mark,uint32_t ctid,uint32_t nfid,uint32_t family);
 void warehouse_playback(void);
 struct timespec calculate_pause(struct timespec start,struct timespec end,int speed);
+
+void bypass_via_nft_set(uint32_t ctid, uint64_t timeout);
