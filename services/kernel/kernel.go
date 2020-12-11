@@ -463,6 +463,9 @@ func WarehousePlaybackFile(nflist map[uint32]bool, ctlist map[uint32]bool) {
 	ctCleanTracker = nil
 }
 
+// BypassViaNftSet adds the given ct id to the bypass_dict set in the
+// packetd table.  The timeout parameter is in milliseconds, where a
+// value of zero means no timeout should be applied
 func BypassViaNftSet(ctid uint32, timeout uint64) {
 	C.bypass_via_nft_set(C.uint32_t(ctid), C.uint64_t(timeout))
 }
