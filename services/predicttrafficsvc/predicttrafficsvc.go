@@ -3,14 +3,13 @@ package predicttrafficsvc
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"net"
-	"net/http"
-	"runtime"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/google/gopacket/layers"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/overseer"
 )
@@ -18,26 +17,29 @@ import (
 // IPPROTO_ICMP is ip protocol 1
 const IPPROTO_ICMP = 1
 
-// cloudAPIEndpoint is the URL of the cloud endpoint
-const cloudAPIEndpoint = "https://labs.untangle.com"
+// the cloud server hostname or address
+var cloudServerAddress = "192.168.222.13"
 
-// authRequestKey contains the authrequestkey for authenticating against the cloud API endpoint
-const authRequestKey = "4E6FAB77-B2DF-4DEA-B6BD-2B434A3AE981"
+// the cloud server port
+var cloudServerPort = 21818
+
+// cloud request timeout
+const cloudLookupTimeout = time.Millisecond * 500
+
+// the sequence number used for cloud lookups
+var cloudSequence uint32
 
 // positiveCacheTime sets how long we store good prediction results received from the cloud
-const positiveCacheTime = time.Second * 86400
+const positiveCacheTime = time.Second * 14400
 
-// troubledCacheTime sets how long we store unknown result when there is an error or parsing the cloud response
-const troubledCacheTime = time.Second * 3600
+// unknownCacheTime sets how long we store unknown prediction results received from the cloud
+const unknownCacheTime = time.Second * 3600
 
-// negativeCacheTime sets how long we store an unknown result when we encouter a network error talking to the cloud
+// negativeCacheTime sets how long we store an unknown result when we encouter any error talking to the cloud
 const negativeCacheTime = time.Second * 60
 
 // longCacheTime sets how long we store a restult that we essentially want to be permanant
 const longCacheTime = time.Second * 60 * 60 * 24 * 365
-
-// cloud request timeout
-const cloudLookupTimeout = time.Millisecond * 500
 
 // ClassifiedTraffic struct contains the API response data
 type ClassifiedTraffic struct {
@@ -75,38 +77,12 @@ var trafficMutex sync.RWMutex
 // shutdownChannel is used when destroying the service to shutdown the cache cleaning utility safely
 var shutdownChannel = make(chan bool)
 
-var transport *http.Transport
-var client *http.Client
-
 // Startup is called during service startup
 func Startup() {
 	logger.Info("Starting up the traffic classification service\n")
 
 	classifiedTrafficCache = make(map[string]*trafficHolder)
 	go cleanStaleTrafficItems()
-
-	// Build a persistent transport based on the http.DefaultTransport but with
-	// shorter timeouts and idle settings that will keep the connections alive
-	// to allow for quick transactions. We set maximum idle to the number of
-	// CPU's to allow one active connection per nfqueue thread.
-	transport = &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   cloudLookupTimeout,
-			KeepAlive: 300 * time.Second,
-			DualStack: true,
-		}).DialContext,
-		MaxIdleConns:          runtime.NumCPU(),
-		MaxIdleConnsPerHost:   runtime.NumCPU(),
-		IdleConnTimeout:       300 * time.Second,
-		TLSHandshakeTimeout:   cloudLookupTimeout,
-		ExpectContinueTimeout: 0,
-	}
-
-	client = &http.Client{
-		Timeout:   cloudLookupTimeout,
-		Transport: transport,
-	}
 }
 
 // Shutdown is called to handle service shutdown
@@ -193,50 +169,104 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 // sendClassifyRequest will send the classification request to the API endpoint using the provided parameters
 // It returns the classification result or nil along with how long the response should be cached
 func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) (*ClassifiedTraffic, time.Duration) {
-	requestURL := formRequestURL(ipAdd, port, protoID)
-	logger.Debug("Prediction request: [%d]%s:%d\n", protoID, ipAdd.String(), port)
+	var question DNSQuestion
+	var query DNSQuery
+	var sock *net.UDPConn
+	var txlen int
+	var rxlen int
+	var err error
 
+	logger.Debug("Prediction request: [%d]%s:%d\n", protoID, ipAdd.String(), port)
 	overseer.AddCounter("traffic_prediction_cloud_api_lookup", 1)
 
-	req, err := http.NewRequest("GET", requestURL, nil)
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("AuthRequest", authRequestKey)
-	req.Header.Add("Connection", "Keep-Alive")
+	// the cloud expects the IP address in the QNAME field, the IP protocol
+	// in the QTYPE field, and the port in the QCLASS field
+	question.Name = ipAdd.String()
+	question.Type = uint16(protoID)
+	question.Class = port
 
-	resp, err := client.Do(req)
+	// use sequential query ID values and set other query fields
+	query.ID = uint16(atomic.AddUint32(&cloudSequence, 1) & 0xFFFF)
+	query.QR = 0
+	query.OpCode = 0
+	query.QDCount = 1
+	query.Questions = append(query.Questions, question)
 
+	// convert the query to a wire format packet and allocate the receive buffer
+	txbuff := query.encode()
+	rxbuff := make([]byte, 1024)
+
+	// resolve the server address and set the port
+	addr := net.UDPAddr{
+		IP:   net.ParseIP(cloudServerAddress),
+		Port: cloudServerPort,
+	}
+
+	// create a UDP socket endpoint to the server
+	sock, err = net.DialUDP("udp", nil, &addr)
 	if err != nil {
-		// timeout requests are handled differently
-		if err.(net.Error).Timeout() {
-			logger.Warn("%OC|Cloud API request to %s has timed out, error: %v\n", "traffic_prediction_cloud_api_timeout", 10, cloudAPIEndpoint, err)
-			return unknownTrafficItem, negativeCacheTime
-		}
-
-		logger.Warn("%OC|Cloud API request to %s has failed, error details: %v\n", "traffic_prediction_cloud_api_failure", 10, cloudAPIEndpoint, err)
+		logger.Err("Error calling DialUDP: %v\n", err)
 		return unknownTrafficItem, negativeCacheTime
 	}
 
-	// From the golang docs:
-	// If the returned error is nil, the Response will contain a non-nil Body which the user is expected to close. If the
-	// Body is not both read to EOF and closed, the Client's underlying RoundTripper (typically Transport) may not be
-	// able to re-use a persistent TCP connection to the server for a subsequent "keep-alive" request.
-	defer resp.Body.Close()
+	// make sure the socket gets closed when we return
+	defer sock.Close()
 
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	// send the request to the server
+	txlen, err = sock.Write(txbuff)
 	if err != nil {
-		logger.Err("Error reading body of prediction request: %v\n", err)
+		logger.Err("Error sending packet to server: %v\n", err)
 		return unknownTrafficItem, negativeCacheTime
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		logger.Err("Error code returned for prediction request: %v\n", err)
-		return unknownTrafficItem, troubledCacheTime
+	// set the socket timeout and read the response
+	sock.SetReadDeadline(time.Now().Add(cloudLookupTimeout))
+	rxlen, err = sock.Read(rxbuff)
+
+	// for timeout or any other error we just return the unknown response
+	if err != nil {
+		logger.Err("Error reading from socket: %v\n", err)
+		return unknownTrafficItem, negativeCacheTime
 	}
 
+	// we should get back at least the question we transmitted so we compare
+	// rxlent to txlen as a quick sanity check of the response
+	if rxlen < txlen {
+		logger.Err("Invalid response from server: %v\n", rxbuff)
+		return unknownTrafficItem, negativeCacheTime
+	}
+
+	// decode the DNS response from the server
+	dns := new(layers.DNS)
+	err = dns.DecodeFromBytes(rxbuff, nil)
+	if err != nil {
+		logger.Err("Error decoding packet: %v\n", err)
+		return unknownTrafficItem, negativeCacheTime
+	}
+
+	// we expect exactly one answer in the response
+	if dns.ANCount != 1 {
+		logger.Err("Invalid ANCount in server response\n")
+		return unknownTrafficItem, negativeCacheTime
+	}
+
+	// we expect a single TXT record
+	if dns.Answers[0].Type != layers.DNSTypeTXT {
+		logger.Err("Invalid record type in server response\n")
+		return unknownTrafficItem, negativeCacheTime
+	}
+
+	// parse the contents of the server response
 	trafficResponse := new(ClassifiedTraffic)
-	bodyString := string(bodyBytes)
-	json.Unmarshal([]byte(bodyString), &trafficResponse)
+	json.Unmarshal(dns.Answers[0].TXTs[0], &trafficResponse)
 	logger.Debug("Prediction response: [%d]%s:%d = %v\n", protoID, ipAdd.String(), port, *trafficResponse)
+
+	// for Unknown response return with the negative cache time
+	if trafficResponse.ID == "Unknown" {
+		return trafficResponse, unknownCacheTime
+	}
+
+	// for good response return with positive cache time
 	return trafficResponse, positiveCacheTime
 }
 
@@ -274,19 +304,6 @@ func cleanupTrafficCache() {
 	}
 
 	logger.Debug("Traffic Items Removed:%d Remaining:%d\n", counter, len(classifiedTrafficCache))
-}
-
-// formRequestURL will build the request URL
-func formRequestURL(ipAdd net.IP, port uint16, protoID uint8) string {
-	var bufferURL bytes.Buffer
-	bufferURL.WriteString(cloudAPIEndpoint)
-	bufferURL.WriteString("/v1/traffic?ip=")
-	bufferURL.WriteString(ipAdd.String())
-	bufferURL.WriteString("&port=")
-	bufferURL.WriteString(strconv.Itoa(int(port)))
-	bufferURL.WriteString("&protocolId=")
-	bufferURL.WriteString(strconv.Itoa(int(protoID)))
-	return bufferURL.String()
 }
 
 // formMapKey will build the mapkey used in the cache stores and lookups
