@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"strconv"
@@ -157,12 +158,7 @@ func Startup() {
 	// eventBatchSize is the size of event batches for batching inserts/updates from the event queue
 	var eventBatchSize int
 
-	socket, err := setupZmqPubSocket()
-	if err != nil {
-		logger.Warn("Unable to setup ZMQ Publishing socket: %s\n", err)
-	} else {
-		defer socket.Close()
-	}
+	go zmqPublisher()
 
 	// get the file system stats for the path where the database will be stored
 	syscall.Statfs(dbFILEPATH, &stat)
@@ -256,6 +252,27 @@ func unmarshall(reportEntryStr string, reportEntry *ReportEntry) error {
 		return err
 	}
 	return nil
+}
+
+func zmqPublisher() {
+	socket, err := setupZmqPubSocket()
+	if err != nil {
+		logger.Warn("Unable to setup ZMQ Publishing socket: %s\n", err)
+	} else {
+		defer socket.Close()
+	}
+
+	for {
+		s := fmt.Sprintf("%c-%05d", rand.Intn(10)+'A', rand.Intn(100000))
+
+		logger.Info("Sending: %s\n", s)
+		_, err := socket.SendMessage("untangle:packetd:events", s)
+		if err != nil {
+			logger.Err("Test publisher error: %s\n", err)
+			break //  Interrupted
+		}
+		time.Sleep(100 * time.Millisecond) //  Wait for 1/10th second
+	}
 }
 
 // setupZmqSocket sets up the reports ZMQ socket for publishing events
