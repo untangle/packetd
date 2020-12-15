@@ -5,6 +5,9 @@ GO111MODULE ?= "on"
 
 all: build-packetd build-settingsd
 
+compile-protobuffs:
+	protoc --proto_path=protobuffsrc --go_out=. --go_opt=module=github.com/untangle/packetd protobuffsrc/*
+
 build-%:
 	cd cmd/$* ; \
 	export GO111MODULE=$(GO111MODULE) ; \

@@ -20,7 +20,17 @@ RUN apk add libnetfilter_log-dev
 RUN apk add libnetfilter_conntrack-dev
 RUN apk add libnetfilter_queue-dev
 
+# ZMQ is used to compile our IPC libraries
 RUN apk add zeromq-dev
+
+# Protobuf is used to generate our golang protoc files
+RUN apk add protobuf-dev
+
+# Install protoc-gen-go
+RUN go get google.golang.org/protobuf/cmd/protoc-gen-go
+
+# Install protoc anypb type
+#RUN go get google.golang.org/protobuf
 
 # build packetd
 RUN mkdir -p /go/packetd

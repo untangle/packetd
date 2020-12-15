@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net"
 	"net/http"
 	"strconv"
@@ -24,6 +23,7 @@ import (
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/overseer"
 	"github.com/untangle/packetd/services/settings"
+	spb "google.golang.org/protobuf/types/known/structpb"
 )
 
 const eventLoggerInterval = 10 * time.Second
@@ -127,6 +127,7 @@ var interfaceStatsStatement *sql.Stmt
 var sessionStatsQueue = make(chan []interface{}, 5000)
 var sessionStatsStatement *sql.Stmt
 
+var protoBufEventQueue = make(chan *ProtoBuffEvent, 10000)
 var eventQueue = make(chan Event, 10000)
 var cloudQueue = make(chan Event, 1000)
 var preparedStatements = map[string]*sql.Stmt{}
@@ -258,20 +259,27 @@ func zmqPublisher() {
 	socket, err := setupZmqPubSocket()
 	if err != nil {
 		logger.Warn("Unable to setup ZMQ Publishing socket: %s\n", err)
+		return
 	} else {
 		defer socket.Close()
 	}
 
 	for {
-		s := fmt.Sprintf("%c-%05d", rand.Intn(10)+'A', rand.Intn(100000))
 
-		logger.Info("Sending: %s\n", s)
-		_, err := socket.SendMessage("untangle:packetd:events", s)
-		if err != nil {
-			logger.Err("Test publisher error: %s\n", err)
-			break //  Interrupted
+		select {
+		// read data out of the eventQueue into the eventBatch
+		case evt := <-protoBufEventQueue:
+
+			// protobuffer the event and send it to the ZMQ socket
+			logger.Info("Sending: %v\n", evt)
+
+			// convert to protobuff
+			_, err := socket.SendMessage("untangle:packetd:events", evt)
+			if err != nil {
+				logger.Err("Test publisher error: %s\n", err)
+				break //  Interrupted
+			}
 		}
-		time.Sleep(100 * time.Millisecond) //  Wait for 1/10th second
 	}
 }
 
@@ -451,6 +459,43 @@ func CloseQuery(queryID uint64) (string, error) {
 	}
 	cleanupQuery(q)
 	return "Success", nil
+}
+
+// CreateProtoBufEvent creates a CreateProtoBufEvent type for registering in the queue
+func CreateProtoBufEvent(name string, table string, sqlOp int32, columns map[string]interface{}, modifiedColumns map[string]interface{}) *ProtoBuffEvent {
+
+	colStruct, err := spb.NewStruct(columns)
+	if err != nil {
+		logger.Err("Unable to convert columns to struct: %s\n", err)
+		return nil
+	}
+
+	modColStruct, err := spb.NewStruct(modifiedColumns)
+	if err != nil {
+		logger.Err("Unable to convert modifiedColumns to struct: %s\n", err)
+		return nil
+	}
+
+	event := &ProtoBuffEvent{Name: name, Table: table, SQLOp: sqlOp, Columns: colStruct, ModifiedColumns: modColStruct}
+
+	return event
+}
+
+// LogEvent adds a ProtoBuffEvent to the eventQueue for later logging
+func LogProtoBufEvent(pbuffEvt *ProtoBuffEvent) error {
+	// Don't add nil events into the eventQueue
+	if pbuffEvt == nil {
+		return nil
+	}
+
+	select {
+	case protoBufEventQueue <- pbuffEvt:
+	default:
+		// log the message with the OC verb passing the counter name and the repeat message limit as the first two arguments
+		logger.Warn("%OC|ProtoBuffEvent queue at capacity[%d]. Dropping event\n", "reports_event_queue_full", 100, cap(eventQueue))
+		return errors.New("ProtoBuffEvent Queue at Capacity")
+	}
+	return nil
 }
 
 // CreateEvent creates an Event
