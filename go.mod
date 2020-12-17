@@ -11,10 +11,11 @@ require (
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/gin-gonic/contrib v0.0.0-20190526021735-7fb7810ed2a0
 	github.com/gin-gonic/gin v1.4.0
-	github.com/golang/protobuf v1.4.1
+	github.com/golang/protobuf v1.4.1 // indirect
 	github.com/google/go-cmp v0.5.0 // indirect
 	github.com/google/gopacket v1.1.17
 	github.com/gorilla/sessions v1.2.0 // indirect
+	github.com/jsommerville-untangle/golang-shared v0.0.0-20201217001014-bd21309fb0b1
 	github.com/json-iterator/go v1.1.7 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/mattn/go-isatty v0.0.8 // indirect

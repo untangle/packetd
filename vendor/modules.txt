@@ -46,6 +46,9 @@ github.com/gorilla/securecookie
 # github.com/gorilla/sessions v1.2.0
 ## explicit
 github.com/gorilla/sessions
+# github.com/jsommerville-untangle/golang-shared v0.0.0-20201217001014-bd21309fb0b1
+## explicit
+github.com/jsommerville-untangle/golang-shared/structs/ProtoBuffEvent
 # github.com/json-iterator/go v1.1.7
 ## explicit
 github.com/json-iterator/go

@@ -17,12 +17,14 @@ import (
 	"syscall"
 	"time"
 
+	pbe "github.com/jsommerville-untangle/golang-shared/structs/ProtoBuffEvent"
 	"github.com/mattn/go-sqlite3"
 	zmq "github.com/pebbe/zmq4"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/overseer"
 	"github.com/untangle/packetd/services/settings"
+	"google.golang.org/protobuf/proto"
 	spb "google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -127,7 +129,7 @@ var interfaceStatsStatement *sql.Stmt
 var sessionStatsQueue = make(chan []interface{}, 5000)
 var sessionStatsStatement *sql.Stmt
 
-var protoBufEventQueue = make(chan *ProtoBuffEvent, 10000)
+var protoBufEventQueue = make(chan *pbe.ProtoBuffEvent, 10000)
 var eventQueue = make(chan Event, 10000)
 var cloudQueue = make(chan Event, 1000)
 var preparedStatements = map[string]*sql.Stmt{}
@@ -271,10 +273,13 @@ func zmqPublisher() {
 		case evt := <-protoBufEventQueue:
 
 			// protobuffer the event and send it to the ZMQ socket
-			logger.Info("Sending: %v\n", evt)
-
 			// convert to protobuff
-			_, err := socket.SendMessage("untangle:packetd:events", evt)
+			evtOut, err := proto.Marshal(evt)
+			if err != nil {
+				logger.Err("Failed to encode event for sending:", err)
+				break
+			}
+			_, err = socket.SendMessage("untangle:packetd:events", evtOut)
 			if err != nil {
 				logger.Err("Test publisher error: %s\n", err)
 				break //  Interrupted
@@ -462,27 +467,27 @@ func CloseQuery(queryID uint64) (string, error) {
 }
 
 // CreateProtoBufEvent creates a CreateProtoBufEvent type for registering in the queue
-func CreateProtoBufEvent(name string, table string, sqlOp int32, columns map[string]interface{}, modifiedColumns map[string]interface{}) *ProtoBuffEvent {
+func CreateEvent(name string, table string, sqlOp int32, columns map[string]interface{}, modifiedColumns map[string]interface{}) *pbe.ProtoBuffEvent {
 
 	colStruct, err := spb.NewStruct(columns)
 	if err != nil {
-		logger.Err("Unable to convert columns to struct: %s\n", err)
+		logger.Err("Unable to convert columns to struct: %s this is coming from: %s - %s\n", err, name, table)
 		return nil
 	}
 
 	modColStruct, err := spb.NewStruct(modifiedColumns)
 	if err != nil {
-		logger.Err("Unable to convert modifiedColumns to struct: %s\n", err)
+		logger.Err("Unable to convert modifiedColumns to struct: %s this is coming from: %s - %s\n", err, name, table)
 		return nil
 	}
 
-	event := &ProtoBuffEvent{Name: name, Table: table, SQLOp: sqlOp, Columns: colStruct, ModifiedColumns: modColStruct}
+	event := &pbe.ProtoBuffEvent{Name: name, Table: table, SQLOp: sqlOp, Columns: colStruct, ModifiedColumns: modColStruct}
 
 	return event
 }
 
 // LogEvent adds a ProtoBuffEvent to the eventQueue for later logging
-func LogProtoBufEvent(pbuffEvt *ProtoBuffEvent) error {
+func LogEvent(pbuffEvt *pbe.ProtoBuffEvent) error {
 	// Don't add nil events into the eventQueue
 	if pbuffEvt == nil {
 		return nil
@@ -499,13 +504,13 @@ func LogProtoBufEvent(pbuffEvt *ProtoBuffEvent) error {
 }
 
 // CreateEvent creates an Event
-func CreateEvent(name string, table string, sqlOp int, columns map[string]interface{}, modifiedColumns map[string]interface{}) Event {
+func oldCreateEvent(name string, table string, sqlOp int, columns map[string]interface{}, modifiedColumns map[string]interface{}) Event {
 	event := Event{Name: name, Table: table, SQLOp: sqlOp, Columns: columns, ModifiedColumns: modifiedColumns}
 	return event
 }
 
 // LogEvent adds an event to the eventQueue for later logging
-func LogEvent(event Event) error {
+func oldLogEvent(event Event) error {
 	select {
 	case eventQueue <- event:
 	default:
@@ -1239,14 +1244,14 @@ func LogInterfaceStats(values []interface{}, isWan bool) {
 	}
 
 	// create the event and put it in the cloud queue
-	event := CreateEvent("interface_stats", "interface_stats", 1, columns, nil)
+	//event := CreateEvent("interface_stats", "interface_stats", 1, columns, nil)
 
-	select {
-	case cloudQueue <- event:
-	default:
-		// log the event with the OC verb passing the counter name and the repeat message limit as the first two arguments
-		logger.Warn("%OC|Cloud queue at capacity[%d]. Dropping message\n", "reports_cloud_queue_full", 100, cap(cloudQueue))
-	}
+	//	select {
+	//	case cloudQueue <- event:
+	//	default:
+	// log the event with the OC verb passing the counter name and the repeat message limit as the first two arguments
+	//		logger.Warn("%OC|Cloud queue at capacity[%d]. Dropping message\n", "reports_cloud_queue_full", 100, cap(cloudQueue))
+	//	}
 }
 
 // LogSessionStats is called to insert a row into the session_stats database table
