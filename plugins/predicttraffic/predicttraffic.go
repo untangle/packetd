@@ -102,9 +102,9 @@ func addPredictionToSession(session *dispatch.Session, currentTraffic *predicttr
 }
 
 // round confidence converts the confidence from a float32 into a uint8, with very basic logic to round up or down
-func roundConfidence(conf float32) uint8 {
+func roundConfidence(conf float32) uint {
 	if conf < 0 {
-		return uint8(conf - 0.5)
+		return uint(conf - 0.5)
 	}
-	return uint8(conf + 0.5)
+	return uint(conf + 0.5)
 }

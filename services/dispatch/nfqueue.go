@@ -86,12 +86,12 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 
 	if ip4Layer != nil {
 		mess.IP4Layer = ip4Layer.(*layers.IPv4)
-		mess.MsgTuple.Protocol = uint8(mess.IP4Layer.Protocol)
+		mess.MsgTuple.Protocol = uint(mess.IP4Layer.Protocol)
 		mess.MsgTuple.ClientAddress = dupIP(mess.IP4Layer.SrcIP)
 		mess.MsgTuple.ServerAddress = dupIP(mess.IP4Layer.DstIP)
 	} else if ip6Layer != nil {
 		mess.IP6Layer = ip6Layer.(*layers.IPv6)
-		mess.MsgTuple.Protocol = uint8(mess.IP6Layer.NextHeader)
+		mess.MsgTuple.Protocol = uint(mess.IP6Layer.NextHeader)
 		mess.MsgTuple.ClientAddress = dupIP(mess.IP6Layer.SrcIP)
 		mess.MsgTuple.ServerAddress = dupIP(mess.IP6Layer.DstIP)
 	} else {
@@ -111,16 +111,16 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 	tcpLayer := mess.Packet.Layer(layers.LayerTypeTCP)
 	if tcpLayer != nil {
 		mess.TCPLayer = tcpLayer.(*layers.TCP)
-		mess.MsgTuple.ClientPort = uint16(mess.TCPLayer.SrcPort)
-		mess.MsgTuple.ServerPort = uint16(mess.TCPLayer.DstPort)
+		mess.MsgTuple.ClientPort = uint(mess.TCPLayer.SrcPort)
+		mess.MsgTuple.ServerPort = uint(mess.TCPLayer.DstPort)
 	}
 
 	// get the UDP layer
 	udpLayer := mess.Packet.Layer(layers.LayerTypeUDP)
 	if udpLayer != nil {
 		mess.UDPLayer = udpLayer.(*layers.UDP)
-		mess.MsgTuple.ClientPort = uint16(mess.UDPLayer.SrcPort)
-		mess.MsgTuple.ServerPort = uint16(mess.UDPLayer.DstPort)
+		mess.MsgTuple.ClientPort = uint(mess.UDPLayer.SrcPort)
+		mess.MsgTuple.ServerPort = uint(mess.UDPLayer.DstPort)
 	}
 
 	// get the Application layer
@@ -216,16 +216,16 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 
 	// if this is a new session set the client side interface index and type
 	if newSession {
-		session.SetClientInterfaceID(uint8((pmark & 0x000000FF)))
-		session.SetClientInterfaceType(uint8((pmark & 0x03000000) >> 24))
+		session.SetClientInterfaceID(uint((pmark & 0x000000FF)))
+		session.SetClientInterfaceType(uint((pmark & 0x03000000) >> 24))
 	}
 
 	// if this is a server-to-client packet and the server interface info is not
 	// set yet, we can set it now (normally this is set during the conntrack new event)
 	// but in some cases we get the response packet first
 	if !mess.ClientToServer && session.GetServerInterfaceID() == 0 {
-		session.SetServerInterfaceID(uint8((pmark & 0x000000FF)))
-		session.SetServerInterfaceType(uint8((pmark & 0x03000000) >> 24))
+		session.SetServerInterfaceID(uint((pmark & 0x000000FF)))
+		session.SetServerInterfaceType(uint((pmark & 0x03000000) >> 24))
 	}
 
 	// Update some accounting bits
@@ -336,7 +336,7 @@ func createSession(mess NfqueueMessage, ctid uint32) *Session {
 	session.SetEventCount(1)
 	session.SetLastActivity(time.Now())
 	session.SetClientSideTuple(mess.MsgTuple)
-	session.SetFamily(uint8(mess.Family))
+	session.SetFamily(uint(mess.Family))
 	session.SetConntrackConfirmed(false)
 	session.attachments = make(map[string]interface{})
 	AttachNfqueueSubscriptions(session)

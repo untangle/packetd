@@ -45,8 +45,8 @@ type ClassifiedTraffic struct {
 	Name         string  `json:"ApplicationName"`
 	Confidence   float32 `json:"Confidence"`
 	ProtoChain   string  `json:"Protocolchain"`
-	Productivity uint8   `json:"ApplicationProductivity"`
-	Risk         uint8   `json:"ApplicationRisk"`
+	Productivity uint    `json:"ApplicationProductivity"`
+	Risk         uint    `json:"ApplicationRisk"`
 	Category     string  `json:"ApplicationCategory"`
 }
 
@@ -124,7 +124,7 @@ func Shutdown() {
 }
 
 // GetTrafficClassification will retrieve the predicted traffic classification, first from memory cache then from cloud API endpoint
-func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *ClassifiedTraffic {
+func GetTrafficClassification(ipAdd net.IP, port uint, protoID uint) *ClassifiedTraffic {
 	var holder *trafficHolder
 	var result *ClassifiedTraffic
 	var cachetime time.Duration
@@ -192,7 +192,7 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 
 // sendClassifyRequest will send the classification request to the API endpoint using the provided parameters
 // It returns the classification result or nil along with how long the response should be cached
-func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) (*ClassifiedTraffic, time.Duration) {
+func sendClassifyRequest(ipAdd net.IP, port uint, protoID uint) (*ClassifiedTraffic, time.Duration) {
 	requestURL := formRequestURL(ipAdd, port, protoID)
 	logger.Debug("Prediction request: [%d]%s:%d\n", protoID, ipAdd.String(), port)
 
@@ -277,7 +277,7 @@ func cleanupTrafficCache() {
 }
 
 // formRequestURL will build the request URL
-func formRequestURL(ipAdd net.IP, port uint16, protoID uint8) string {
+func formRequestURL(ipAdd net.IP, port uint, protoID uint) string {
 	var bufferURL bytes.Buffer
 	bufferURL.WriteString(cloudAPIEndpoint)
 	bufferURL.WriteString("/v1/traffic?ip=")
@@ -290,7 +290,7 @@ func formRequestURL(ipAdd net.IP, port uint16, protoID uint8) string {
 }
 
 // formMapKey will build the mapkey used in the cache stores and lookups
-func formMapKey(ipAdd net.IP, port uint16, protoID uint8) string {
+func formMapKey(ipAdd net.IP, port uint, protoID uint) string {
 	var mapKey bytes.Buffer
 	mapKey.WriteString(ipAdd.String())
 	mapKey.WriteString("-")

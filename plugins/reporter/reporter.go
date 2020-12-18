@@ -64,8 +64,11 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		localAddress = session.GetClientSideTuple().ServerAddress
 	}
 	clientSideTuple := session.GetClientSideTuple()
+
+	tStamp := time.Now()
+
 	columns := map[string]interface{}{
-		"time_stamp":            time.Now(),
+		"time_stamp":            tStamp,
 		"session_id":            session.GetSessionID(),
 		"ip_protocol":           clientSideTuple.Protocol,
 		"client_interface_id":   session.GetClientInterfaceID(),
@@ -78,7 +81,6 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		"server_port":           clientSideTuple.ServerPort,
 		"family":                session.GetFamily(),
 	}
-	reports.LogEvent(reports.CreateEvent("session_new", "sessions", 1, columns, nil))
 	for k, v := range columns {
 		session.PutAttachment(k, v)
 		if k == "time_stamp" {
@@ -86,6 +88,16 @@ func PluginNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession 
 		}
 		dict.AddSessionEntry(session.GetConntrackID(), k, v)
 	}
+
+	// After sending to dict, switch the time_stamp and address type columns for sending to reportd
+	columns["time_stamp"] = tStamp.UnixNano() / 1e6
+	columns["local_address"] = localAddress.String()
+	columns["remote_address"] = remoteAddress.String()
+	columns["client_address"] = clientSideTuple.ClientAddress.String()
+	columns["server_address"] = clientSideTuple.ServerAddress.String()
+
+	reports.LogEvent(reports.CreateEvent("session_new", "sessions", 1, columns, nil))
+
 	return result
 }
 
@@ -114,11 +126,16 @@ func PluginConntrackHandler(message int, entry *dispatch.Conntrack) {
 				"server_interface_id":   session.GetServerInterfaceID(),
 				"server_interface_type": session.GetServerInterfaceType(),
 			}
-			reports.LogEvent(reports.CreateEvent("session_nat", "sessions", 2, columns, modifiedColumns))
 			for k, v := range modifiedColumns {
 				session.PutAttachment(k, v)
 				dict.AddSessionEntry(session.GetConntrackID(), k, v)
 			}
+
+			// After sending to dict, switch the time_stamp and address type columns for sending to reportd
+			modifiedColumns["client_address_new"] = serverSideTuple.ClientAddress.String()
+			modifiedColumns["server_address_new"] = serverSideTuple.ServerAddress.String()
+
+			reports.LogEvent(reports.CreateEvent("session_nat", "sessions", 2, columns, modifiedColumns))
 
 		} else {
 			// We should not receive a new conntrack event for something that is not in the session table

@@ -24,12 +24,12 @@ const cloudUploadInterval = 60 * time.Minute
 const cloudTableLimit = 1000
 
 type cloudReport struct {
-	Protocol    uint8  `json:"protocol"`
+	Protocol    uint   `json:"protocol"`
 	Application string `json:"application_control_application"`
 	Protochain  string `json:"application_control_protochain"`
 	Detail      string `json:"application_control_detail"`
 	ServerAddr  string `json:"s_server_addr"`
-	ServerPort  uint16 `json:"s_server_port"`
+	ServerPort  uint   `json:"s_server_port"`
 	Count       int    `json:"count"`
 }
 

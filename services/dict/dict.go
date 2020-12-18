@@ -447,6 +447,10 @@ func generateValue(value interface{}) string {
 		return generateIP6(value.(net.IP))
 	case bool:
 		return generateBool(value.(bool))
+	case int:
+		return generateInt(int32((value.(int))))
+	case uint:
+		return generateInt(int32((value.(uint))))
 	case int8:
 		return generateInt(int32((value.(int8))))
 	case uint8:

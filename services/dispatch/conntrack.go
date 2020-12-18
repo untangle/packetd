@@ -84,11 +84,11 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 	// sanity check tuple for all eventType
 	if conntrackFound && conntrack != nil {
 		var clientSideTuple Tuple
-		clientSideTuple.Protocol = protocol
+		clientSideTuple.Protocol = uint(protocol)
 		clientSideTuple.ClientAddress = dupIP(client)
-		clientSideTuple.ClientPort = clientPort
+		clientSideTuple.ClientPort = uint(clientPort)
 		clientSideTuple.ServerAddress = dupIP(server)
-		clientSideTuple.ServerPort = serverPort
+		clientSideTuple.ServerPort = uint(serverPort)
 		if eventType == 'N' {
 			conntrack.Guardian.RLock()
 			// if this is a new conntrack event, we should not have found a conntrack with that ctid
@@ -192,14 +192,14 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 		if session != nil {
 			var serverSideTuple Tuple
 
-			serverSideTuple.Protocol = protocol
+			serverSideTuple.Protocol = uint(protocol)
 			serverSideTuple.ClientAddress = dupIP(clientNew)
-			serverSideTuple.ClientPort = clientPortNew
+			serverSideTuple.ClientPort = uint(clientPortNew)
 			serverSideTuple.ServerAddress = dupIP(serverNew)
-			serverSideTuple.ServerPort = serverPortNew
+			serverSideTuple.ServerPort = uint(serverPortNew)
 			session.SetServerSideTuple(serverSideTuple)
-			session.SetServerInterfaceID(uint8((conntrack.ConnMark & 0x0000FF00) >> 8))
-			session.SetServerInterfaceType(uint8((conntrack.ConnMark & 0x0C000000) >> 26))
+			session.SetServerInterfaceID(uint((conntrack.ConnMark & 0x0000FF00) >> 8))
+			session.SetServerInterfaceType(uint((conntrack.ConnMark & 0x0C000000) >> 26))
 			session.SetConntrackConfirmed(true)
 			session.SetConntrackPointer(conntrack)
 			session.SetLastActivity(time.Now())
@@ -387,16 +387,16 @@ func createConntrack(ctid uint32, connmark uint32, family uint8, eventType uint8
 	conntrack.Family = family
 	conntrack.LastActivityTime = time.Now()
 	conntrack.EventCount = 1
-	conntrack.ClientSideTuple.Protocol = protocol
+	conntrack.ClientSideTuple.Protocol = uint(protocol)
 	conntrack.ClientSideTuple.ClientAddress = dupIP(client)
-	conntrack.ClientSideTuple.ClientPort = clientPort
+	conntrack.ClientSideTuple.ClientPort = uint(clientPort)
 	conntrack.ClientSideTuple.ServerAddress = dupIP(server)
-	conntrack.ClientSideTuple.ServerPort = serverPort
-	conntrack.ServerSideTuple.Protocol = protocol
+	conntrack.ClientSideTuple.ServerPort = uint(serverPort)
+	conntrack.ServerSideTuple.Protocol = uint(protocol)
 	conntrack.ServerSideTuple.ClientAddress = dupIP(clientNew)
-	conntrack.ServerSideTuple.ClientPort = clientPortNew
+	conntrack.ServerSideTuple.ClientPort = uint(clientPortNew)
 	conntrack.ServerSideTuple.ServerAddress = dupIP(serverNew)
-	conntrack.ServerSideTuple.ServerPort = serverPortNew
+	conntrack.ServerSideTuple.ServerPort = uint(serverPortNew)
 	conntrack.ClientBytes = clientBytes
 	conntrack.ServerBytes = serverBytes
 	conntrack.TotalBytes = serverBytes + clientBytes

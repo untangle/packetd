@@ -191,45 +191,45 @@ func (sess *Session) SetServerSideTuple(tuple Tuple) {
 }
 
 // GetServerInterfaceID gets the server interface ID
-func (sess *Session) GetServerInterfaceID() uint8 {
-	return uint8(atomic.LoadUint32(&sess.serverInterfaceID))
+func (sess *Session) GetServerInterfaceID() uint {
+	return uint(atomic.LoadUint32(&sess.serverInterfaceID))
 }
 
 // SetServerInterfaceID sets the server interface ID
-func (sess *Session) SetServerInterfaceID(value uint8) uint8 {
+func (sess *Session) SetServerInterfaceID(value uint) uint {
 	atomic.StoreUint32(&sess.serverInterfaceID, uint32(value))
 	return value
 }
 
 // GetServerInterfaceType gets the server interface type
-func (sess *Session) GetServerInterfaceType() uint8 {
-	return uint8(atomic.LoadUint32(&sess.serverInterfaceType))
+func (sess *Session) GetServerInterfaceType() uint {
+	return uint(atomic.LoadUint32(&sess.serverInterfaceType))
 }
 
 // SetServerInterfaceType sets the server interface type
-func (sess *Session) SetServerInterfaceType(value uint8) uint8 {
+func (sess *Session) SetServerInterfaceType(value uint) uint {
 	atomic.StoreUint32(&sess.serverInterfaceType, uint32(value))
 	return value
 }
 
 // GetClientInterfaceID gets the client interface ID
-func (sess *Session) GetClientInterfaceID() uint8 {
-	return uint8(atomic.LoadUint32(&sess.clientInterfaceID))
+func (sess *Session) GetClientInterfaceID() uint {
+	return uint(atomic.LoadUint32(&sess.clientInterfaceID))
 }
 
 // SetClientInterfaceID sets the client interface ID
-func (sess *Session) SetClientInterfaceID(value uint8) uint8 {
+func (sess *Session) SetClientInterfaceID(value uint) uint {
 	atomic.StoreUint32(&sess.clientInterfaceID, uint32(value))
 	return value
 }
 
 // GetClientInterfaceType gets the client interface type
-func (sess *Session) GetClientInterfaceType() uint8 {
-	return uint8(atomic.LoadUint32(&sess.clientInterfaceType))
+func (sess *Session) GetClientInterfaceType() uint {
+	return uint(atomic.LoadUint32(&sess.clientInterfaceType))
 }
 
 // SetClientInterfaceType sets the client interface type
-func (sess *Session) SetClientInterfaceType(value uint8) uint8 {
+func (sess *Session) SetClientInterfaceType(value uint) uint {
 	atomic.StoreUint32(&sess.clientInterfaceType, uint32(value))
 	return value
 }
@@ -361,12 +361,12 @@ func (sess *Session) SetConntrackPointer(pointer *Conntrack) {
 }
 
 // GetFamily gets the session family type
-func (sess *Session) GetFamily() uint8 {
-	return uint8(atomic.LoadUint32(&sess.family))
+func (sess *Session) GetFamily() uint {
+	return uint(atomic.LoadUint32(&sess.family))
 }
 
 // SetFamily sets the session family type
-func (sess *Session) SetFamily(value uint8) uint8 {
+func (sess *Session) SetFamily(value uint) uint {
 	atomic.StoreUint32(&sess.family, uint32(value))
 	return value
 }

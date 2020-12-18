@@ -206,8 +206,8 @@ func classifyTraffic(mess *dispatch.NfqueueMessage) string {
 	var fixer gopacket.Packet
 	var IP4Layer *layers.IPv4
 	var IP6Layer *layers.IPv6
-	var srcport uint16
-	var dstport uint16
+	var srcport uint
+	var dstport uint
 	var command string
 	var proto string
 	var reply string
@@ -288,9 +288,9 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 	var detail string
 	var confidence int32
 	var category string
-	var productivity uint8
+	var productivity uint
 	var state int
-	var risk uint8
+	var risk uint
 	var attachments map[string]interface{}
 
 	// parse update classd information from reply
@@ -359,7 +359,7 @@ func processReply(reply string, mess dispatch.NfqueueMessage, ctid uint32) (int,
 
 // parseReply parses a reply from classd and returns
 // (appid, name, protochain, detail, confidence, category, state)
-func parseReply(replyString string) (string, string, string, string, int32, string, int, uint8, uint8) {
+func parseReply(replyString string) (string, string, string, string, int32, string, int, uint, uint) {
 	var err error
 	var appid string
 	var name string
@@ -368,9 +368,9 @@ func parseReply(replyString string) (string, string, string, string, int32, stri
 	var confidence int32
 	var conparse uint64
 	var category string
-	var productivity uint8
+	var productivity uint
 	var state int
-	var risk uint8
+	var risk uint
 
 	rawinfo := strings.Split(replyString, "\r\n")
 

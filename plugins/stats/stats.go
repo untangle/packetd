@@ -656,7 +656,7 @@ func logHopCount(ctid uint32, mess dispatch.NfqueueMessage, name string) {
 	}
 
 	modifiedColumns := make(map[string]interface{})
-	modifiedColumns[name] = hops
+	modifiedColumns[name] = uint(hops)
 
 	reports.LogEvent(reports.CreateEvent(name, "sessions", 2, columns, modifiedColumns))
 }

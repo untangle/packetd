@@ -18,8 +18,8 @@ type ApplicationInfo struct {
 	Name         string `json:"name"`
 	Description  string `json:"description"`
 	Category     string `json:"category"`
-	Productivity uint8  `json:"productivity"`
-	Risk         uint8  `json:"risk"`
+	Productivity uint   `json:"productivity"`
+	Risk         uint   `json:"risk"`
 	Flags        uint64 `json:"flags"`
 	Reference    string `json:"reference"`
 	Plugin       string `json:"plugin"`
@@ -160,12 +160,12 @@ func loadApplicationTable() {
 		if err != nil {
 			logger.Warn("Invalid productivity: %s\n", list[5])
 		}
-		info.Productivity = uint8(tempProd)
+		info.Productivity = uint(tempProd)
 		tempRisk, err := strconv.ParseUint(list[6], 10, 8)
 		if err != nil {
 			logger.Warn("Invalid risk: %s\n", list[6])
 		}
-		info.Risk = uint8(tempRisk)
+		info.Risk = uint(tempRisk)
 		info.Flags, err = strconv.ParseUint(list[7], 10, 64)
 		if err != nil {
 			logger.Warn("Invalid flags: %s %s\n", list[7], err)

@@ -8,11 +8,11 @@ import (
 
 // Tuple represent a session using the protocol and source and destination address and port values.
 type Tuple struct {
-	Protocol      uint8
+	Protocol      uint
 	ClientAddress net.IP
-	ClientPort    uint16
+	ClientPort    uint
 	ServerAddress net.IP
-	ServerPort    uint16
+	ServerPort    uint
 }
 
 // String returns string representation of tuple
