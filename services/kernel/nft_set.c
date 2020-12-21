@@ -20,7 +20,7 @@
 
 static char*	logsrc = "nft_set";
 
-int add_set_elem(char *fam, char *table, char *set, uint32_t ctid, uint64_t timeout)
+int manage_set_elem(uint16_t nft_msg_type, char *fam, char *table, char *set, uint32_t ctid, uint64_t timeout)
 {
 	struct mnl_socket *nl;
 	char buf[MNL_SOCKET_BUFFER_SIZE];
@@ -29,17 +29,8 @@ int add_set_elem(char *fam, char *table, char *set, uint32_t ctid, uint64_t time
 	uint32_t portid, seq, family;
 	struct nftnl_set *s;
 	struct nftnl_set_elem *e;
-	uint16_t nft_msg_type = NFT_MSG_NEWSETELEM;
 	uint32_t data;
-	//uint64_t timeout;
 	int ret;
-
-#if 0
-	if (argc != 3 && argc != 7) {
-		fprintf(stderr, "%s <family> <table> <set> <add/del> <id> [<timeout>]\n", argv[0]);
-		exit(EXIT_FAILURE);
-	}
-#endif
 
 	s = nftnl_set_alloc();
 	if (s == NULL) {
@@ -67,15 +58,7 @@ int add_set_elem(char *fam, char *table, char *set, uint32_t ctid, uint64_t time
 	nftnl_set_set_str(s, NFTNL_SET_TABLE, table);
 	nftnl_set_set_str(s, NFTNL_SET_NAME, set);
 
-#if 0
-	if(0 == strcmp("add", argv[4]))
-		nft_msg_type = NFT_MSG_NEWSETELEM;
-	else
-		nft_msg_type = NFT_MSG_DELSETELEM;
-#endif
-
 	data = htonl(ctid);
-	//data = ctid;
 
 	e = nftnl_set_elem_alloc();
 	if (e == NULL) {
@@ -144,9 +127,24 @@ int add_set_elem(char *fam, char *table, char *set, uint32_t ctid, uint64_t time
 	return EXIT_SUCCESS;
 }
 
+int del_set_elem(char *fam, char *table, char *set, uint32_t ctid)
+{
+	return manage_set_elem(NFT_MSG_DELSETELEM, fam, table, set, ctid, 0);
+}
+
+int add_set_elem(char *fam, char *table, char *set, uint32_t ctid, uint64_t timeout)
+{
+	return manage_set_elem(NFT_MSG_NEWSETELEM, fam, table, set, ctid, timeout);
+}
+
 void bypass_via_nft_set(uint32_t ctid, uint64_t timeout)
 {
 	add_set_elem("inet", "packetd", "bypass_packetd", ctid, timeout);
+}
+
+void remove_bypass_entry(uint32_t ctid)
+{
+	del_set_elem("inet", "packetd", "bypass_packetd", ctid);
 }
 
 

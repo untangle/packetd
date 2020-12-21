@@ -16,7 +16,7 @@ const NfDrop = 0
 const NfAccept = 1
 
 // PacketdBypassTimeout defines the time a bypass_packetd set entry should live in milliseconds
-const PacketdBypassTimeout = 600000
+const PacketdBypassTimeout = 0
 
 //NfqueueHandlerFunction defines a pointer to a nfqueue callback function
 type NfqueueHandlerFunction func(NfqueueMessage, uint32, bool) NfqueueResult

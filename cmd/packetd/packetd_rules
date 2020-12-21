@@ -25,7 +25,7 @@ insert_packetd_rules()
     ${NFT} add table inet ${TABLE_NAME}
 
     # create the bypass set
-    ${NFT} add set inet ${TABLE_NAME} bypass_packetd "{ type ct_id ; flags timeout ; }"
+    ${NFT} add set inet ${TABLE_NAME} bypass_packetd "{ type ct_id ; }"
 
     # create chains
     ${NFT} add chain inet ${TABLE_NAME} packetd-prerouting "{ type filter hook prerouting priority $QUEUE_PRIORITY ; }"
@@ -50,7 +50,7 @@ insert_packetd_rules()
     ${NFT} add rule inet ${TABLE_NAME} packetd-prerouting goto packetd-queue
 
     # Don't catch bypassed traffic
-    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct id @bypass_packetd update @bypass_packetd { ct id timeout 10m } counter return
+    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct id @bypass_packetd counter return
     ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct mark and 0x80000000 == 0x80000000 counter return
 
     # In case we are quickly reusing a conntrack id, flush the sessions dictionary on new connections

@@ -469,3 +469,7 @@ func WarehousePlaybackFile(nflist map[uint32]bool, ctlist map[uint32]bool) {
 func BypassViaNftSet(ctid uint32, timeout uint64) {
 	C.bypass_via_nft_set(C.uint32_t(ctid), C.uint64_t(timeout))
 }
+
+func RemoveBypassEntry(ctid uint32) {
+	C.remove_bypass_entry(C.uint32_t(ctid))
+}

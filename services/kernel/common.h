@@ -155,3 +155,4 @@ void warehouse_playback(void);
 struct timespec calculate_pause(struct timespec start,struct timespec end,int speed);
 
 void bypass_via_nft_set(uint32_t ctid, uint64_t timeout);
+void remove_bypass_entry(uint32_t ctid);
