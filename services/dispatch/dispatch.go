@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 )
@@ -271,9 +272,78 @@ func HandleWarehouseCleanup() {
 	}
 }
 
+// getSessions returns the fully merged list of sessions
+// as a list of map[string]interface{}
+// It reads the session list from /proc/net/nf_conntrack
+// and merges in the values for each session in dict
+func GetSessions() ([]map[string]interface{}, error) {
+	var sessions []map[string]interface{}
+
+	conntrackTable := GetConntrackTable()
+
+	for _, v := range conntrackTable {
+		v.Guardian.RLock()
+		m := parseConntrack(v)
+		v.Guardian.RUnlock()
+		if m != nil {
+			sessions = append(sessions, m)
+		}
+	}
+
+	// build a tuple map to store the sessions
+	tupleMap := make(map[uint32]map[string]interface{})
+	for _, s := range sessions {
+		var ctidx interface{} = s["conntrack_id"]
+		ctid, ok := ctidx.(uint32)
+		if !ok {
+			logger.Warn("Invalid conntrack_id type: %T\n", ctidx)
+			continue
+		}
+		if ctid == 0 {
+			logger.Warn("Invalid conntrack_id: %d\n", ctid)
+			continue
+		}
+		tupleMap[ctid] = s
+	}
+
+	// read the data from dict "sessions" table
+	sessionTable, err := dict.GetSessions()
+	if err != nil {
+		logger.Warn("Unable to get sessions: %v\n", err)
+	}
+
+	// for all the data in the dict "sessions" table, merge it into the matching tupleMap entries
+	for ctid, session := range sessionTable {
+		_, ok := tupleMap[ctid]
+		if !ok {
+			// matching session not found, continue
+			continue
+		}
+
+		// matching session found, merge the (new) values into the map
+		for key, value := range session {
+			_, alreadyFound := tupleMap[ctid][key]
+			if alreadyFound {
+				continue
+			} else {
+				tupleMap[ctid][key] = value
+			}
+		}
+	}
+
+	// return all the merged values from the tupleMap
+	var sessionList []map[string]interface{}
+	for _, v := range tupleMap {
+		sessionList = append(sessionList, v)
+	}
+
+	return sessionList, nil
+}
+
 // GetConntrackTable table
 // Note: this returns a copy of the table, but with the same pointers
 // do not modify the values in the conntrack entries
+// TODO make private when restd goes away
 func GetConntrackTable() map[uint32]*Conntrack {
 	newMap := make(map[uint32]*Conntrack)
 

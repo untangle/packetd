@@ -44,6 +44,7 @@ import (
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/restd"
 	"github.com/untangle/packetd/services/settings"
+	"github.com/untangle/packetd/services/zmqd"
 )
 
 const rulesScript = "packetd_rules"
@@ -291,6 +292,7 @@ func startServices() {
 	overseer.Startup()
 	certmanager.Startup()
 	appclassmanager.Startup()
+	zmqd.Startup()
 
 	if !kernel.FlagNoCloud {
 		predicttrafficsvc.Startup()
@@ -312,6 +314,7 @@ func stopServices() {
 		restd.Shutdown()
 		dict.Shutdown()
 		reports.Shutdown()
+		zmqd.Shutdown()
 		settings.Shutdown()
 		dispatch.Shutdown()
 		kernel.Shutdown()

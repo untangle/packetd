@@ -9,7 +9,6 @@ require (
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/gin-gonic/contrib v0.0.0-20190526021735-7fb7810ed2a0
 	github.com/gin-gonic/gin v1.4.0
-	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/google/gopacket v1.1.17
 	github.com/gorilla/sessions v1.2.0 // indirect
 	github.com/json-iterator/go v1.1.7 // indirect
@@ -18,9 +17,12 @@ require (
 	github.com/mattn/go-sqlite3 v1.11.0
 	github.com/oschwald/geoip2-golang v1.3.0
 	github.com/oschwald/maxminddb-golang v1.3.1 // indirect
+	github.com/pebbe/zmq4 v1.2.2 // indirect
 	github.com/ugorji/go v1.1.7 // indirect
+	github.com/untangle/golang-shared v0.0.0-20201223215520-4ba782916042
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4 // indirect
 	golang.org/x/net v0.0.0-20190724013045-ca1201d0de80
 	golang.org/x/sys v0.0.0-20190726091711-fc99dfbffb4e // indirect
+	google.golang.org/protobuf v1.25.0
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 )
