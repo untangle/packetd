@@ -1,14 +1,10 @@
 package reports
 
 import (
-	"bytes"
-	"crypto/tls"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,11 +15,9 @@ import (
 	zmq "github.com/pebbe/zmq4"
 	"github.com/untangle/golang-shared/services/logger"
 	"github.com/untangle/golang-shared/services/overseer"
-	"github.com/untangle/golang-shared/services/settings"
 	ise "github.com/untangle/golang-shared/structs/protocolbuffers/InterfaceStatsEvent"
 	pbe "github.com/untangle/golang-shared/structs/protocolbuffers/SessionEvent"
 	sse "github.com/untangle/golang-shared/structs/protocolbuffers/SessionStatsEvent"
-	"github.com/untangle/packetd/services/kernel"
 	"google.golang.org/protobuf/proto"
 	spb "google.golang.org/protobuf/types/known/structpb"
 )
@@ -128,7 +122,6 @@ var sessionChannel = make(chan *pbe.SessionEvent, 1000)
 var interfaceStatsChannel = make(chan *ise.InterfaceStatsEvent, 1000)
 var sessionStatsChannel = make(chan *sse.SessionStatsEvent, 1000)
 var messageChannel = make(chan *zmqMessage, 1000)
-var cloudQueue = make(chan Event, 1000)
 var preparedStatements = map[string]*sql.Stmt{}
 var preparedStatementsMutex = sync.RWMutex{}
 
@@ -150,9 +143,6 @@ func Startup() {
 	go zmqPublisher()
 	go fillMessageChannel()
 
-	if !kernel.FlagNoCloud {
-		go cloudSender()
-	}
 }
 
 // Shutdown stops the reports service
@@ -442,57 +432,6 @@ func LogEvent(pbuffEvt *pbe.SessionEvent, oldEvent *Event) error {
 	return nil
 }
 
-// cloudSender reads from the cloudQueue and logs the events to the cloud
-func cloudSender() {
-	var uid string
-	var err error
-
-	uid, err = settings.GetUID()
-	if err != nil {
-		uid = "00000000-0000-0000-0000-000000000000"
-		logger.Warn("Unable to read UID: %s - Using all zeros\n", err.Error())
-	}
-
-	// FIXME - We disable cert checking on our http.Client for now
-	transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-	client := &http.Client{Transport: transport, Timeout: time.Duration(5 * time.Second)}
-	target := fmt.Sprintf("https://database.untangle.com/v1/put?source=%s&type=db&queueName=mfw_events", uid)
-
-	for {
-		event := <-cloudQueue
-		message, err := json.Marshal(event)
-		if err != nil {
-			logger.Warn("Error calling json.Marshal: %s\n", err.Error())
-			continue
-		}
-
-		request, err := http.NewRequest("POST", target, bytes.NewBuffer(message))
-		if err != nil {
-			logger.Warn("Error calling http.NewRequest: %s\n", err.Error())
-			continue
-		}
-
-		request.Header.Set("AuthRequest", "93BE7735-E9F2-487A-9DD4-9D05B95640F5")
-
-		response, err := client.Do(request)
-		if err != nil {
-			logger.Warn("Error calling client.Do: %s\n", err.Error())
-			continue
-		}
-
-		_, err = ioutil.ReadAll(response.Body)
-		response.Body.Close()
-
-		if err != nil {
-			logger.Warn("Error calling ioutil.ReadAll: %s\n", err.Error())
-		}
-
-		if logger.IsDebugEnabled() {
-			logger.Debug("CloudURL:%s CloudRequest:%s CloudResponse: [%d] %s %s\n", target, string(message), response.StatusCode, response.Proto, response.Status)
-		}
-	}
-}
-
 func getRows(rows *sql.Rows, limit int) ([]map[string]interface{}, error) {
 	if rows == nil {
 		return nil, errors.New("Invalid argument")
@@ -625,31 +564,6 @@ func LogInterfaceStats(intfStat *ise.InterfaceStatsEvent) {
 		// log the message with the OC verb passing the counter name and the repeat message limit as the first two arguments
 		logger.Warn("%OC|interfaceStatsQueue at capacity[%d]. Dropping event\n", "reports_interface_stats_overrun", 100, cap(interfaceStatsChannel))
 	}
-
-	// if the no-cloud flag is set or not a WAN interface do not send to cloud
-	// if kernel.FlagNoCloud || !isWan {
-	// 	return
-	// }
-
-	// // create an event we can send to the cloud
-	// columns := make(map[string]interface{})
-	// namelist := GetInterfaceStatsColumnList()
-
-	// // build a columns map using the column list and argumented values
-	// for x := 0; x < len(values); x++ {
-	// 	name := namelist[x]
-	// 	columns[name] = values[x]
-	// }
-
-	// create the event and put it in the cloud queue
-	//event := CreateEvent("interface_stats", "interface_stats", 1, columns, nil)
-
-	//	select {
-	//	case cloudQueue <- event:
-	//	default:
-	// log the event with the OC verb passing the counter name and the repeat message limit as the first two arguments
-	//		logger.Warn("%OC|Cloud queue at capacity[%d]. Dropping message\n", "reports_cloud_queue_full", 100, cap(cloudQueue))
-	//	}
 }
 
 // LogSessionStats is called to insert a sessionStats protocol buffer into the sessionStatsChannel
