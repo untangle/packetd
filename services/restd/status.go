@@ -17,8 +17,8 @@ import (
 
 	"github.com/c9s/goprocinfo/linux"
 	"github.com/gin-gonic/gin"
-	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/settings"
+	"github.com/untangle/golang-shared/services/logger"
+	"github.com/untangle/golang-shared/services/settings"
 )
 
 // statusSystem is the RESTD /api/status/system handler
@@ -476,7 +476,7 @@ func getCommandFindAccount() (map[string]interface{}, error) {
 
 	transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 	client := &http.Client{Transport: transport, Timeout: time.Duration(5 * time.Second)}
-	req, err := http.NewRequest("GET", "https://www.untangle.com/store/open.php?action=find_account&uid=" + uid, nil)
+	req, err := http.NewRequest("GET", "https://www.untangle.com/store/open.php?action=find_account&uid="+uid, nil)
 	if err != nil {
 		logger.Err("Error performing request for find_account: %v\n", err)
 		return jsonO, err
@@ -512,7 +512,6 @@ func getCommandFindAccount() (map[string]interface{}, error) {
 
 	return jsonO, nil
 }
-
 
 // getLicenseInfo returns the license info as a json map
 func getLicenseInfo() (map[string]interface{}, error) {

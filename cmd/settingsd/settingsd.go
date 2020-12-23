@@ -21,9 +21,9 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
-	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/golang-shared/services/logger"
+	"github.com/untangle/golang-shared/services/settings"
 	"github.com/untangle/packetd/services/restd"
-	"github.com/untangle/packetd/services/settings"
 )
 
 var shutdownFlag = false

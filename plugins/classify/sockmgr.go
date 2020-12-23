@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/golang-shared/services/logger"
 )
 
 var daemonSocket net.Conn

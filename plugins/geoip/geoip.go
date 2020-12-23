@@ -13,11 +13,11 @@ import (
 	"time"
 
 	"github.com/oschwald/geoip2-golang"
+	"github.com/untangle/golang-shared/services/logger"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
-	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/reports"
-	"github.com/untangle/packetd/services/settings"
+	"github.com/untangle/golang-shared/services/settings"
 )
 
 const pluginName = "geoip"

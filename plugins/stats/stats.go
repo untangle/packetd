@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/c9s/goprocinfo/linux"
+	"github.com/untangle/golang-shared/services/logger"
+	"github.com/untangle/golang-shared/services/overseer"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
-	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/overseer"
 	"github.com/untangle/packetd/services/reports"
-	"github.com/untangle/packetd/services/settings"
+	"github.com/untangle/golang-shared/services/settings"
 )
 
 const pluginName = "stats"

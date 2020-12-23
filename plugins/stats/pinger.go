@@ -20,7 +20,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/golang-shared/services/logger"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"

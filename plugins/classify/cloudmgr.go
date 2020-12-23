@@ -15,9 +15,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/overseer"
-	"github.com/untangle/packetd/services/settings"
+	"github.com/untangle/golang-shared/services/logger"
+	"github.com/untangle/golang-shared/services/overseer"
+	"github.com/untangle/golang-shared/services/settings"
 )
 
 const cloudUploadInterval = 60 * time.Minute

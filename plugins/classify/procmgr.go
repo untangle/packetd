@@ -15,8 +15,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/untangle/golang-shared/services/logger"
 	"github.com/untangle/packetd/services/kernel"
-	"github.com/untangle/packetd/services/logger"
 )
 
 const daemonBinary = "/usr/bin/classd"

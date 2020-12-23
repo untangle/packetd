@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/settings"
+	"github.com/untangle/golang-shared/services/logger"
+	"github.com/untangle/golang-shared/services/settings"
 )
 
 /*

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/untangle/packetd/services/dict"
-	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/golang-shared/services/logger"
 )
 
 // ConntrackHandlerFunction defines a pointer to a conntrack callback function

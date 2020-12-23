@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/overseer"
+	"github.com/untangle/golang-shared/services/logger"
+	"github.com/untangle/golang-shared/services/overseer"
 )
 
 // IPPROTO_ICMP is ip protocol 1

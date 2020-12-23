@@ -8,8 +8,8 @@ import (
 	"strconv"
 
 	"github.com/untangle/packetd/plugins/stats"
-	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/settings"
+	"github.com/untangle/golang-shared/services/logger"
+	"github.com/untangle/golang-shared/services/settings"
 )
 
 type interfaceInfo struct {

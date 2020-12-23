@@ -19,9 +19,9 @@ import (
 	zmq "github.com/pebbe/zmq4"
 	pbe "github.com/untangle/golang-shared/structs/protocolbuffers/SessionEvent"
 	"github.com/untangle/packetd/services/kernel"
-	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/overseer"
-	"github.com/untangle/packetd/services/settings"
+	"github.com/untangle/golang-shared/services/logger"
+	"github.com/untangle/golang-shared/services/overseer"
+	"github.com/untangle/golang-shared/services/settings"
 	"google.golang.org/protobuf/proto"
 	spb "google.golang.org/protobuf/types/known/structpb"
 )

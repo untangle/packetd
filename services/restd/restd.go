@@ -20,15 +20,15 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"github.com/untangle/golang-shared/services/logger"
+	"github.com/untangle/golang-shared/services/overseer"
 	"github.com/untangle/packetd/services/appclassmanager"
 	"github.com/untangle/packetd/services/certmanager"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/kernel"
-	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/netspace"
-	"github.com/untangle/packetd/services/overseer"
 	"github.com/untangle/packetd/services/reports"
-	"github.com/untangle/packetd/services/settings"
+	"github.com/untangle/golang-shared/services/settings"
 )
 
 var engine *gin.Engine
@@ -921,7 +921,7 @@ func wireguardKeyPair(c *gin.Context) {
 	// return the private and public keys to the caller
 	c.JSON(http.StatusOK, gin.H{
 		"privateKey": privateKey,
-		"publicKey": publicKey,
+		"publicKey":  publicKey,
 	})
 
 	return
@@ -982,12 +982,11 @@ func wireguardPublicKey(c *gin.Context) {
 	// return the private and public keys to the caller
 	c.JSON(http.StatusOK, gin.H{
 		"privateKey": privateKey,
-		"publicKey": publicKey,
+		"publicKey":  publicKey,
 	})
 
 	return
 }
-
 
 // called to request an unused network address block
 func netspaceRequest(c *gin.Context) {
@@ -1085,4 +1084,3 @@ func shutdownHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 	return
 }
-

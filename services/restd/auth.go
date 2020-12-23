@@ -20,8 +20,8 @@ import (
 	"github.com/gbrlsnchs/jwt/v3"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/settings"
+	"github.com/untangle/golang-shared/services/logger"
+	"github.com/untangle/golang-shared/services/settings"
 )
 
 // CustomJWTPayload stores the custom part of the JWT payload

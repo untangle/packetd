@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/untangle/packetd/services/dict"
-	"github.com/untangle/packetd/services/logger"
-	"github.com/untangle/packetd/services/overseer"
+	"github.com/untangle/golang-shared/services/logger"
+	"github.com/untangle/golang-shared/services/overseer"
 )
 
 // Session stores information about a packetd session

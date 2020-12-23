@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/untangle/golang-shared/services/logger"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
-	"github.com/untangle/packetd/services/logger"
 )
 
 // ReverseHolder is used to cache a list of DNS names for an IP address

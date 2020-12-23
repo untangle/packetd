@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/golang-shared/services/logger"
 )
 
 // makeSQLString makes a SQL string from a ReportEntry

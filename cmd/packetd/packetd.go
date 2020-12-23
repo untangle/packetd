@@ -20,6 +20,9 @@ import (
 	"time"
 
 	"github.com/c9s/goprocinfo/linux"
+	"github.com/untangle/golang-shared/services/logger"
+	"github.com/untangle/golang-shared/services/overseer"
+	"github.com/untangle/golang-shared/services/settings"
 	"github.com/untangle/packetd/plugins/certfetch"
 	"github.com/untangle/packetd/plugins/certsniff"
 	"github.com/untangle/packetd/plugins/classify"
@@ -37,13 +40,10 @@ import (
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/kernel"
-	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/netspace"
-	"github.com/untangle/packetd/services/overseer"
 	"github.com/untangle/packetd/services/predicttrafficsvc"
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/restd"
-	"github.com/untangle/packetd/services/settings"
 )
 
 const rulesScript = "packetd_rules"

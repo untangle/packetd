@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/golang-shared/services/logger"
 )
 
 //NetloggerHandlerFunction defines a pointer to a netlogger callback function

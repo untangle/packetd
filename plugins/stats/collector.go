@@ -5,7 +5,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/golang-shared/services/logger"
 )
 
 // RunningVariance tallies an running variance

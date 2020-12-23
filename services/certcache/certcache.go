@@ -8,7 +8,7 @@ import (
 
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
-	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/golang-shared/services/logger"
 	"github.com/untangle/packetd/services/reports"
 )
 

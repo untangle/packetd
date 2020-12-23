@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/untangle/packetd/services/kernel"
-	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/golang-shared/services/logger"
 )
 
 // SubscriptionHolder stores the details of a data callback subscription
