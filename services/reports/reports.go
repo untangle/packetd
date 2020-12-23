@@ -15,9 +15,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	pbe "github.com/jsommerville-untangle/golang-shared/structs/ProtoBuffEvent"
 	"github.com/mattn/go-sqlite3"
 	zmq "github.com/pebbe/zmq4"
+	pbe "github.com/untangle/golang-shared/structs/protocolbuffers/SessionEvent"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/overseer"
@@ -122,7 +122,7 @@ type zmqMessage struct {
 	Message []byte
 }
 
-var sessionChannel = make(chan *pbe.ProtoBuffEvent, 1000)
+var sessionChannel = make(chan *pbe.SessionEvent, 1000)
 var interfaceStatsChannel = make(chan []interface{}, 1000)
 var sessionStatsChannel = make(chan []interface{}, 5000)
 var messageChannel = make(chan *zmqMessage, 1000)
@@ -393,7 +393,7 @@ func CloseQuery(queryID uint64) (string, error) {
 }
 
 // CreateProtoBufEvent creates a CreateProtoBufEvent type for registering in the queue
-func CreateEvent(name string, table string, sqlOp int32, columns map[string]interface{}, modifiedColumns map[string]interface{}) (*pbe.ProtoBuffEvent, *Event) {
+func CreateEvent(name string, table string, sqlOp int32, columns map[string]interface{}, modifiedColumns map[string]interface{}) (*pbe.SessionEvent, *Event) {
 
 	colStruct, err := spb.NewStruct(columns)
 	if err != nil {
@@ -407,15 +407,15 @@ func CreateEvent(name string, table string, sqlOp int32, columns map[string]inte
 		return nil, nil
 	}
 
-	event := &pbe.ProtoBuffEvent{Name: name, Table: table, SQLOp: sqlOp, Columns: colStruct, ModifiedColumns: modColStruct}
+	event := &pbe.SessionEvent{Name: name, Table: table, SQLOp: sqlOp, Columns: colStruct, ModifiedColumns: modColStruct}
 
 	oldEvent := &Event{Name: name, Table: table, SQLOp: int(sqlOp), Columns: columns, ModifiedColumns: modifiedColumns}
 
 	return event, oldEvent
 }
 
-// LogEvent adds a ProtoBuffEvent to the eventQueue for later logging
-func LogEvent(pbuffEvt *pbe.ProtoBuffEvent, oldEvent *Event) error {
+// LogEvent adds a SessionEvent to the eventQueue for later logging
+func LogEvent(pbuffEvt *pbe.SessionEvent, oldEvent *Event) error {
 	// Don't add nil events into the eventQueue
 	if pbuffEvt == nil {
 		return nil
@@ -425,8 +425,8 @@ func LogEvent(pbuffEvt *pbe.ProtoBuffEvent, oldEvent *Event) error {
 	case sessionChannel <- pbuffEvt:
 	default:
 		// log the message with the OC verb passing the counter name and the repeat message limit as the first two arguments
-		logger.Warn("%OC|ProtoBuffEvent queue at capacity[%d]. Dropping event\n", "reports_event_queue_full", 100, cap(sessionChannel))
-		return errors.New("ProtoBuffEvent Queue at Capacity")
+		logger.Warn("%OC|SessionEvent queue at capacity[%d]. Dropping event\n", "reports_event_queue_full", 100, cap(sessionChannel))
+		return errors.New("SessionEvent Queue at Capacity")
 	}
 	return nil
 }

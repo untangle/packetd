@@ -30,11 +30,8 @@ github.com/gin-gonic/gin/binding
 github.com/gin-gonic/gin/internal/json
 github.com/gin-gonic/gin/render
 # github.com/golang/protobuf v1.4.1
-## explicit
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes/struct
-# github.com/google/go-cmp v0.5.0
-## explicit
 # github.com/google/gopacket v1.1.17
 ## explicit
 github.com/google/gopacket
@@ -46,9 +43,6 @@ github.com/gorilla/securecookie
 # github.com/gorilla/sessions v1.2.0
 ## explicit
 github.com/gorilla/sessions
-# github.com/jsommerville-untangle/golang-shared v0.0.0-20201217001014-bd21309fb0b1
-## explicit
-github.com/jsommerville-untangle/golang-shared/structs/ProtoBuffEvent
 # github.com/json-iterator/go v1.1.7
 ## explicit
 github.com/json-iterator/go
@@ -77,6 +71,9 @@ github.com/pebbe/zmq4
 ## explicit
 # github.com/ugorji/go/codec v1.1.7
 github.com/ugorji/go/codec
+# github.com/untangle/golang-shared v0.0.0-20201222205052-b828877d0598
+## explicit
+github.com/untangle/golang-shared/structs/protocolbuffers/SessionEvent
 # golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 ## explicit
 golang.org/x/crypto/ed25519
