@@ -13,10 +13,11 @@ import (
 	"github.com/c9s/goprocinfo/linux"
 	"github.com/untangle/golang-shared/services/logger"
 	"github.com/untangle/golang-shared/services/overseer"
+	"github.com/untangle/golang-shared/services/settings"
+	ise "github.com/untangle/golang-shared/structs/protocolbuffers/InterfaceStatsEvent"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/reports"
-	"github.com/untangle/golang-shared/services/settings"
 )
 
 const pluginName = "stats"
@@ -314,7 +315,6 @@ func collectInterfaceStats(seconds uint64) {
 }
 
 func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive Collector, active Collector, jitter Collector, diffInfo *linux.NetworkStat, diffMetric *interfaceMetric) {
-	var values []interface{}
 	var isWan bool
 	var intfName string
 	var intfDetails *interfaceDetail
@@ -330,67 +330,70 @@ func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive
 		intfName = intfDetails.interfaceName
 	}
 
-	// build the values interface array by appending the columns in the same
-	// order they are defined in services/reports/events.go so it can be passed
-	// directly to the prepared INSERT statement created from that array
-	values = append(values, time.Now().UnixNano()/1000000)
-	values = append(values, interfaceID)
-	values = append(values, intfName)
-	values = append(values, diffInfo.Iface)
-	values = append(values, isWan)
-	values = append(values, combo.Latency1Min.Value)
-	values = append(values, combo.Latency5Min.Value)
-	values = append(values, combo.Latency15Min.Value)
-	values = append(values, combo.LatencyVariance.StdDeviation)
-	values = append(values, passive.Latency1Min.Value)
-	values = append(values, passive.Latency5Min.Value)
-	values = append(values, passive.Latency15Min.Value)
-	values = append(values, passive.LatencyVariance.StdDeviation)
-	values = append(values, active.Latency1Min.Value)
-	values = append(values, active.Latency5Min.Value)
-	values = append(values, active.Latency15Min.Value)
-	values = append(values, active.LatencyVariance.StdDeviation)
-	values = append(values, jitter.Latency1Min.Value)
-	values = append(values, jitter.Latency5Min.Value)
-	values = append(values, jitter.Latency15Min.Value)
-	values = append(values, jitter.LatencyVariance.StdDeviation)
-	values = append(values, diffMetric.PingTimeout)
-	values = append(values, diffMetric.PingTimeout/seconds)
-	values = append(values, diffInfo.RxBytes)
-	values = append(values, diffInfo.RxBytes/seconds)
-	values = append(values, diffInfo.RxPackets)
-	values = append(values, diffInfo.RxPackets/seconds)
-	values = append(values, diffInfo.RxErrs)
-	values = append(values, diffInfo.RxErrs/seconds)
-	values = append(values, diffInfo.RxDrop)
-	values = append(values, diffInfo.RxDrop/seconds)
-	values = append(values, diffInfo.RxFifo)
-	values = append(values, diffInfo.RxFifo/seconds)
-	values = append(values, diffInfo.RxFrame)
-	values = append(values, diffInfo.RxFrame/seconds)
-	values = append(values, diffInfo.RxCompressed)
-	values = append(values, diffInfo.RxCompressed/seconds)
-	values = append(values, diffInfo.RxMulticast)
-	values = append(values, diffInfo.RxMulticast/seconds)
-	values = append(values, diffInfo.TxBytes)
-	values = append(values, diffInfo.TxBytes/seconds)
-	values = append(values, diffInfo.TxPackets)
-	values = append(values, diffInfo.TxPackets/seconds)
-	values = append(values, diffInfo.TxErrs)
-	values = append(values, diffInfo.TxErrs/seconds)
-	values = append(values, diffInfo.TxDrop)
-	values = append(values, diffInfo.TxDrop/seconds)
-	values = append(values, diffInfo.TxFifo)
-	values = append(values, diffInfo.TxFifo/seconds)
-	values = append(values, diffInfo.TxColls)
-	values = append(values, diffInfo.TxColls/seconds)
-	values = append(values, diffInfo.TxCarrier)
-	values = append(values, diffInfo.TxCarrier/seconds)
-	values = append(values, diffInfo.TxCompressed)
-	values = append(values, diffInfo.TxCompressed/seconds)
+	intfStatsEvent := &ise.InterfaceStatsEvent{}
+	intfStatsEvent.TimeStamp = time.Now().UnixNano() / 1000000
+	intfStatsEvent.InterfaceID = int32(interfaceID)
+	intfStatsEvent.InterfaceName = intfName
+	intfStatsEvent.DeviceName = diffInfo.Iface
+	intfStatsEvent.IsWan = isWan
+	intfStatsEvent.Latency1 = combo.Latency1Min.Value
+	intfStatsEvent.Latency5 = combo.Latency5Min.Value
+	intfStatsEvent.Latency15 = combo.Latency15Min.Value
+	intfStatsEvent.LatencyVariance = combo.LatencyVariance.StdDeviation
 
+	intfStatsEvent.PassiveLatency1 = passive.Latency1Min.Value
+	intfStatsEvent.PassiveLatency5 = passive.Latency5Min.Value
+	intfStatsEvent.PassiveLatency15 = passive.Latency15Min.Value
+	intfStatsEvent.PassiveLatencyVariance = passive.LatencyVariance.StdDeviation
+
+	intfStatsEvent.ActiveLatency1 = active.Latency1Min.Value
+	intfStatsEvent.ActiveLatency5 = active.Latency5Min.Value
+	intfStatsEvent.ActiveLatency15 = active.Latency15Min.Value
+	intfStatsEvent.ActiveLatencyVariance = active.LatencyVariance.StdDeviation
+
+	intfStatsEvent.Jitter1 = jitter.Latency1Min.Value
+	intfStatsEvent.Jitter5 = jitter.Latency5Min.Value
+	intfStatsEvent.Jitter15 = jitter.Latency15Min.Value
+	intfStatsEvent.JitterVariance = jitter.LatencyVariance.StdDeviation
+
+	intfStatsEvent.PingTimeout = diffMetric.PingTimeout
+	intfStatsEvent.PingTimeoutRate = (diffMetric.PingTimeout / seconds)
+
+	intfStatsEvent.RxBytes = diffInfo.RxBytes
+	intfStatsEvent.RxBytesRate = diffInfo.RxBytes / seconds
+	intfStatsEvent.RxPackets = diffInfo.RxPackets
+	intfStatsEvent.RxPacketsRate = diffInfo.RxPackets / seconds
+	intfStatsEvent.RxErrs = diffInfo.RxErrs
+	intfStatsEvent.RxErrsRate = diffInfo.RxErrs / seconds
+	intfStatsEvent.RxDrop = diffInfo.RxDrop
+	intfStatsEvent.RxDropRate = diffInfo.RxDrop / seconds
+	intfStatsEvent.RxFifo = diffInfo.RxFifo
+	intfStatsEvent.RxFifoRate = diffInfo.RxFifo / seconds
+	intfStatsEvent.RxFrame = diffInfo.RxFrame
+	intfStatsEvent.RxFrameRate = diffInfo.RxFrame / seconds
+	intfStatsEvent.RxCompressed = diffInfo.RxCompressed
+	intfStatsEvent.RxCompressedRate = diffInfo.RxCompressed / seconds
+	intfStatsEvent.RxMulticast = diffInfo.RxMulticast
+	intfStatsEvent.RxMulticastRate = diffInfo.RxMulticast / seconds
+
+	intfStatsEvent.TxBytes = diffInfo.TxBytes
+	intfStatsEvent.TxBytesRate = diffInfo.TxBytes / seconds
+	intfStatsEvent.TxPackets = diffInfo.TxPackets
+	intfStatsEvent.TxPacketsRate = diffInfo.TxPackets / seconds
+	intfStatsEvent.TxErrs = diffInfo.TxErrs
+	intfStatsEvent.TxErrsRate = diffInfo.TxErrs / seconds
+	intfStatsEvent.TxDrop = diffInfo.TxDrop
+	intfStatsEvent.TxDropRate = diffInfo.TxDrop / seconds
+	intfStatsEvent.TxFifo = diffInfo.TxFifo
+	intfStatsEvent.TxFifoRate = diffInfo.TxFifo / seconds
+	intfStatsEvent.TxColls = diffInfo.TxColls
+	intfStatsEvent.TxCollsRate = diffInfo.TxColls / seconds
+	intfStatsEvent.TxCarrier = diffInfo.TxCarrier
+	intfStatsEvent.TxCarrierRate = diffInfo.TxCarrier / seconds
+	intfStatsEvent.TxCompressed = diffInfo.TxCompressed
+	intfStatsEvent.TxCompressedRate = diffInfo.TxCompressed / seconds
 	// send the interface_stats data to the database
-	reports.LogInterfaceStats(values, isWan)
+	reports.LogInterfaceStats(intfStatsEvent)
 }
 
 // calculateDifference determines the difference between the two argumented values

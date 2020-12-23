@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/untangle/golang-shared/services/logger"
+	sse "github.com/untangle/golang-shared/structs/protocolbuffers/SessionStatsEvent"
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/reports"
@@ -214,26 +215,22 @@ func doAccounting(entry *dispatch.Conntrack, sessionID int64, ctid uint32) {
 		return
 	}
 
-	var values []interface{}
-
-	// build the values interface array by appending the columns in the same
-	// order they are defined in services/reports/events.go so it can be passed
-	// directly to the prepared INSERT statement created from that array
-	values = append(values, time.Now().UnixNano()/1000000)
-	values = append(values, sessionID)
-	values = append(values, entry.TotalBytesDiff)
-	values = append(values, int32(entry.TotalByteRate))
-	values = append(values, entry.ClientBytesDiff)
-	values = append(values, int32(entry.ClientByteRate))
-	values = append(values, entry.ServerBytesDiff)
-	values = append(values, int32(entry.ServerByteRate))
-	values = append(values, entry.TotalPacketsDiff)
-	values = append(values, int32(entry.TotalPacketRate))
-	values = append(values, entry.ClientPacketsDiff)
-	values = append(values, int32(entry.ClientPacketRate))
-	values = append(values, entry.ServerPacketsDiff)
-	values = append(values, int32(entry.ServerPacketRate))
+	statsEvent := &sse.SessionStatsEvent{}
+	statsEvent.TimeStamp = time.Now().UnixNano() / 1000000
+	statsEvent.SessionID = sessionID
+	statsEvent.Bytes = entry.TotalBytesDiff
+	statsEvent.ByteRate = entry.TotalByteRate
+	statsEvent.ClientBytes = entry.ClientBytesDiff
+	statsEvent.ServerBytes = entry.ServerBytesDiff
+	statsEvent.ClientByteRate = entry.ClientByteRate
+	statsEvent.ServerByteRate = entry.ServerByteRate
+	statsEvent.Packets = entry.TotalPacketsDiff
+	statsEvent.ClientPackets = entry.ClientPacketsDiff
+	statsEvent.ServerPackets = entry.ServerPacketsDiff
+	statsEvent.PacketRate = entry.TotalPacketRate
+	statsEvent.ClientPacketRate = entry.ClientPacketRate
+	statsEvent.ServerPacketRate = entry.ServerPacketRate
 
 	// send the session_stats data to the database
-	reports.LogSessionStats(values)
+	reports.LogSessionStats(statsEvent)
 }

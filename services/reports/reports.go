@@ -17,11 +17,13 @@ import (
 
 	"github.com/mattn/go-sqlite3"
 	zmq "github.com/pebbe/zmq4"
-	pbe "github.com/untangle/golang-shared/structs/protocolbuffers/SessionEvent"
-	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/golang-shared/services/logger"
 	"github.com/untangle/golang-shared/services/overseer"
 	"github.com/untangle/golang-shared/services/settings"
+	ise "github.com/untangle/golang-shared/structs/protocolbuffers/InterfaceStatsEvent"
+	pbe "github.com/untangle/golang-shared/structs/protocolbuffers/SessionEvent"
+	sse "github.com/untangle/golang-shared/structs/protocolbuffers/SessionStatsEvent"
+	"github.com/untangle/packetd/services/kernel"
 	"google.golang.org/protobuf/proto"
 	spb "google.golang.org/protobuf/types/known/structpb"
 )
@@ -123,8 +125,8 @@ type zmqMessage struct {
 }
 
 var sessionChannel = make(chan *pbe.SessionEvent, 1000)
-var interfaceStatsChannel = make(chan []interface{}, 1000)
-var sessionStatsChannel = make(chan []interface{}, 5000)
+var interfaceStatsChannel = make(chan *ise.InterfaceStatsEvent, 1000)
+var sessionStatsChannel = make(chan *sse.SessionStatsEvent, 1000)
 var messageChannel = make(chan *zmqMessage, 1000)
 var cloudQueue = make(chan Event, 1000)
 var preparedStatements = map[string]*sql.Stmt{}
@@ -236,10 +238,19 @@ func fillMessageChannel() {
 			}
 			messageChannel <- &zmqMessage{Topic: "untangle:packetd:sessions", Message: sessOut}
 		case intf := <-interfaceStatsChannel:
-			logger.Debug("Interface stats need to be parsed into a protobuffer %s\n", intf)
+			intfOut, err := proto.Marshal(intf)
+			if err != nil {
+				logger.Err("Cannot parse proto buff: %s\n", err)
+				continue
+			}
+			messageChannel <- &zmqMessage{Topic: "untangle:packetd:interface-stats", Message: intfOut}
 		case sessStats := <-sessionStatsChannel:
-			logger.Debug("Session stats need to be parsed into a protobuffer %s\n", sessStats)
-
+			sessStatsOut, err := proto.Marshal(sessStats)
+			if err != nil {
+				logger.Err("Cannot parse proto buff: %s\n", err)
+				continue
+			}
+			messageChannel <- &zmqMessage{Topic: "untangle:packetd:session-stats", Message: sessStatsOut}
 		}
 	}
 }
@@ -606,10 +617,10 @@ func mergeConditions(reportEntry *ReportEntry) {
 }
 
 // LogInterfaceStats is called to insert a row into the interface_stats database table
-func LogInterfaceStats(values []interface{}, isWan bool) {
+func LogInterfaceStats(intfStat *ise.InterfaceStatsEvent) {
 	// TODO: send to ZMQ, move cloud logging to ZMQ processor
 	select {
-	case interfaceStatsChannel <- values:
+	case interfaceStatsChannel <- intfStat:
 	default:
 		// log the message with the OC verb passing the counter name and the repeat message limit as the first two arguments
 		logger.Warn("%OC|interfaceStatsQueue at capacity[%d]. Dropping event\n", "reports_interface_stats_overrun", 100, cap(interfaceStatsChannel))
@@ -642,11 +653,10 @@ func LogInterfaceStats(values []interface{}, isWan bool) {
 }
 
 // LogSessionStats is called to insert a sessionStats protocol buffer into the sessionStatsChannel
-func LogSessionStats(values []interface{}) {
+func LogSessionStats(sessStat *sse.SessionStatsEvent) {
 
-	// TODO: send to ZMQ
 	select {
-	case sessionStatsChannel <- values:
+	case sessionStatsChannel <- sessStat:
 	default:
 		// log the message with the OC verb passing the counter name and the repeat message limit as the first two arguments
 		logger.Warn("%OC|sessionStatsQueue at capacity[%d]. Dropping event\n", "reports_session_stats_overrun", 100, cap(interfaceStatsChannel))
