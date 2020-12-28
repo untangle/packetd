@@ -326,7 +326,6 @@ func GetSessions() ([]map[string]interface{}, error) {
 			if alreadyFound {
 				continue
 			} else {
-				logger.Info(key)
 				tupleMap[ctid][key] = value
 			}
 		}
