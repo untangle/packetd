@@ -19,7 +19,7 @@ require (
 	github.com/oschwald/maxminddb-golang v1.3.1 // indirect
 	github.com/pebbe/zmq4 v1.2.2 // indirect
 	github.com/ugorji/go v1.1.7 // indirect
-	github.com/untangle/golang-shared v0.0.0-20201223215520-4ba782916042
+	github.com/untangle/golang-shared v0.0.0-20201228152641-b47da6361e88
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4 // indirect
 	golang.org/x/net v0.0.0-20190724013045-ca1201d0de80
 	golang.org/x/sys v0.0.0-20190726091711-fc99dfbffb4e // indirect

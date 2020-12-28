@@ -46,7 +46,7 @@ func socketServer(processer Processer) {
 				logger.Info("Shutdown is seen\n")
 				return
 			case <-tick:
-				logger.Info("Listening for requests\n")
+				logger.Debug("Listening for requests\n")
 				requestRaw, err := socket.RecvMessageBytes(zmq.DONTWAIT)
 				if err != nil {
 					if zmq.AsErrno(err) != zmq.AsErrno(syscall.EAGAIN) {
