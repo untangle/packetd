@@ -117,13 +117,13 @@ func parseConntrack(ct *dispatch.Conntrack) map[string]interface{} {
 	m["timeout_seconds"] = uint(ct.TimeoutSeconds)
 	m["tcp_state"] = uint(ct.TCPState)
 
-	m["client_address"] = uint(ct.ClientSideTuple.ClientAddress)
+	m["client_address"] = ct.ClientSideTuple.ClientAddress.String()
 	m["client_port"] = uint(ct.ClientSideTuple.ClientPort)
-	m["server_address"] = uint(ct.ClientSideTuple.ServerAddress)
+	m["server_address"] = ct.ClientSideTuple.ServerAddress.String()
 	m["server_port"] = uint(ct.ClientSideTuple.ServerPort)
-	m["client_address_new"] = uint(ct.ServerSideTuple.ClientAddress)
+	m["client_address_new"] = ct.ServerSideTuple.ClientAddress.String()
 	m["client_port_new"] = uint(ct.ServerSideTuple.ClientPort)
-	m["server_address_new"] = uint(ct.ServerSideTuple.ServerAddress)
+	m["server_address_new"] = ct.ServerSideTuple.ServerAddress.String()
 	m["server_port_new"] = uint(ct.ServerSideTuple.ServerPort)
 
 	m["bytes"] = uint(ct.TotalBytes)
