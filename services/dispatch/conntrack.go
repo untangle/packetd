@@ -28,7 +28,7 @@ type Conntrack struct {
 	TimeoutSeconds    uint32
 	TimestampStart    uint64
 	TimestampStop     uint64
-	TCPState          uint
+	TCPState          uint8
 	EventCount        uint64
 	ClientBytes       uint64
 	ServerBytes       uint64
@@ -64,7 +64,7 @@ func conntrackCallback(ctid uint32, connmark uint32, family uint8, eventType uin
 	client net.IP, server net.IP, clientPort uint16, serverPort uint16,
 	clientNew net.IP, serverNew net.IP, clientPortNew uint16, serverPortNew uint16,
 	clientBytes uint64, serverBytes uint64, clientPackets uint64, serverPackets uint64,
-	timestampStart uint64, timestampStop uint64, timeout uint32, tcpState uint) {
+	timestampStart uint64, timestampStop uint64, timeout uint32, tcpState uint8) {
 
 	if logger.IsTraceEnabled() {
 		logger.Trace("conntrack event[%c]: %v %v:%v->%v:%v\n", eventType, ctid, client, clientPort, server, serverPort)
@@ -379,7 +379,7 @@ func createConntrack(ctid uint32, connmark uint32, family uint8, eventType uint8
 	client net.IP, server net.IP, clientPort uint16, serverPort uint16,
 	clientNew net.IP, serverNew net.IP, clientPortNew uint16, serverPortNew uint16,
 	clientBytes uint64, serverBytes uint64, clientPackets uint64, serverPackets uint64,
-	timestampStart uint64, timestampStop uint64, timeout uint32, tcpState uint) *Conntrack {
+	timestampStart uint64, timestampStop uint64, timeout uint32, tcpState uint8) *Conntrack {
 	conntrack := new(Conntrack)
 	conntrack.ConntrackID = ctid
 	conntrack.ConnMark = connmark

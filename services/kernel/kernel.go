@@ -20,7 +20,7 @@ import (
 )
 
 // ConntrackCallback is a function to handle conntrack events
-type ConntrackCallback func(uint32, uint32, uint8, uint8, uint8, net.IP, net.IP, uint16, uint16, net.IP, net.IP, uint16, uint16, uint64, uint64, uint64, uint64, uint64, uint64, uint32, uint)
+type ConntrackCallback func(uint32, uint32, uint8, uint8, uint8, net.IP, net.IP, uint16, uint16, net.IP, net.IP, uint16, uint16, uint64, uint64, uint64, uint64, uint64, uint64, uint32, uint8)
 
 // NfqueueCallback is a function to handle nfqueue events
 type NfqueueCallback func(uint32, uint32, gopacket.Packet, int, uint32) int
@@ -310,7 +310,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info, playflag C.int) {
 	var clientPortNew uint16
 	var serverPortNew uint16
 	var connmark uint32
-	var tcpState uint
+	var tcpState uint8
 	var timestampStart uint64
 	var timestampStop uint64
 	var timeout uint32
@@ -336,7 +336,7 @@ func go_conntrack_callback(info *C.struct_conntrack_info, playflag C.int) {
 
 	protocol = uint8(info.orig_proto)
 	connmark = uint32(info.conn_mark)
-	tcpState = uint(info.tcp_state)
+	tcpState = uint8(info.tcp_state)
 	timestampStart = uint64(info.timestamp_start)
 	timestampStop = uint64(info.timestamp_stop)
 	timeout = uint32(info.timeout)
