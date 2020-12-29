@@ -8,6 +8,7 @@
 package dispatch
 
 import (
+	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -326,7 +327,22 @@ func GetSessions() ([]map[string]interface{}, error) {
 			if alreadyFound {
 				continue
 			} else {
-				tupleMap[ctid][key] = value
+				newValue := value
+				switch v := value.(type) {
+				case uint8, uint16, uint32, uint64:
+					integer, ok := value.(uint)
+					if ok {
+						newValue = integer
+					} else {
+						logger.Debug("Failure to create uint: %v\n", value)
+					}
+				case net.IP:
+					newValue = fmt.Sprintf("%v", value)
+				default:
+					logger.Debug("%v", v)
+				}
+
+				tupleMap[ctid][key] = newValue
 			}
 		}
 	}
