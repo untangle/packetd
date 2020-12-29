@@ -6,7 +6,7 @@
         {
             "label": "Build & install packetd",
             "type": "shell",
-            "command": "./.vscode/vsbuild.sh 192.168.0.65",
+            "command": "./.vscode/vsbuild.sh mfw_ip_address",
             "group": {
                 "kind": "build",
                 "isDefault": true

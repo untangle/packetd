@@ -2,7 +2,9 @@ package zmqd
 
 import (
 	"errors"
+	"net"
 
+	"github.com/untangle/golang-shared/services/logger"
 	rzs "github.com/untangle/golang-shared/services/restdZmqServer"
 	prep "github.com/untangle/golang-shared/structs/protocolbuffers/PacketdReply"
 	zreq "github.com/untangle/golang-shared/structs/protocolbuffers/ZMQRequest"
@@ -59,6 +61,16 @@ func (p packetdProc) Process(request *zreq.ZMQRequest) (processedReply []byte, p
 	return encodedReply, nil
 }
 
+func (p packetdProc) ProcessError(serverErr string) (processedReply []byte, processErr error) {
+	errReply := &prep.PacketdReply{ServerError: serverErr}
+	reply, replyErr := proto.Marshal(errReply)
+	if replyErr != nil {
+		logger.Err("Error on creating error message ", replyErr.Error())
+		return nil, replyErr
+	}
+	return reply, nil
+}
+
 func dataToProtobufStruct(info []map[string]interface{}) ([]*spb.Struct, error) {
 	var protobufStruct []*spb.Struct
 	for _, v := range info {
@@ -78,7 +90,7 @@ func retrieveTestInfo() []map[string]interface{} {
 	var tests []map[string]interface{}
 	m1 := make(map[string]interface{})
 	m1["ping"] = "pong"
-	m1["tennis"] = "ball"
+	m1["tennis"] = make(net.IP, 4)
 	tests = append(tests, m1)
 	tests = append(tests, m1)
 	m2 := make(map[string]interface{})
