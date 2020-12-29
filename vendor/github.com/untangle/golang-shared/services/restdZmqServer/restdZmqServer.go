@@ -1,4 +1,4 @@
-package restdZmqServer
+package restdzmqserver
 
 import (
 	"sync"
@@ -14,20 +14,24 @@ import (
 var isShutdown = make(chan struct{})
 var wg sync.WaitGroup
 
+// Processer is function for processing server functions
 type Processer interface {
 	Process(request *zreq.ZMQRequest) (processedReply []byte, processErr error) 
 }
 
+// Startup the server function 
 func Startup(processer Processer) {
 	logger.Info("Starting zmq service...\n")
 	socketServer(processer)
 }
 
+// Shutdown the server function 
 func Shutdown() {
 	close(isShutdown)
 	wg.Wait()
 }
 
+/* Main server funcion, creates socket and runs goroutine to keep server open */
 func socketServer(processer Processer) {
 	zmqSocket, err := zmq.NewSocket(zmq.REP)
 	if err != nil {
@@ -76,6 +80,7 @@ func socketServer(processer Processer) {
 	}(&wg, zmqSocket, processer)
 }
 
+/* helper function that calls the interface's process function */
 func processMessage(proc Processer, request *zreq.ZMQRequest) (processedReply []byte, processErr error) {
 	return proc.Process(request)
 }

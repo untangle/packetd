@@ -13,6 +13,11 @@ import (
 
 type packetdProc int 
 
+const (
+	GET_SESSIONS = zreq.ZMQRequest_GET_SESSIONS
+	TEST_INFO = zreq.ZMQRequest_TEST_INFO
+)
+
 func Startup() {
 	processer := packetdProc(0)
 	rzs.Startup(processer)
@@ -26,22 +31,24 @@ func (p packetdProc) Process(request *zreq.ZMQRequest) (processedReply []byte, p
 	function := request.Function
 	reply := &prep.PacketdReply{}
 
-	if function == "GetConntrackTable" {
+	switch function {
+	case GET_SESSIONS:
 		conntrackTable, err := dispatch.GetSessions()
 		if err != nil {
 			return nil, errors.New("Error getting conntrack table " + err.Error())
 		}
-		for _, v := range conntrackTable {
-			conntrackStruct, err := spb.NewStruct(v)
-
-			if err != nil {
-				return nil, errors.New("Error getting conntrack table: " + err.Error())
-			}
-
-			reply.Conntracks = append(reply.Conntracks, conntrackStruct)
+		var conntrackError error
+		reply.Conntracks, conntrackError = dataToProtobufStruct(conntrackTable)
+		if conntrackError != nil {
+			return nil, errors.New("Error translating conntrack table to protobuf " + conntrackError.Error())
 		}
-		
-		
+	case TEST_INFO:
+		info := retrieveTestInfo()
+		var testInfoErr error
+		reply.TestInfo, testInfoErr = dataToProtobufStruct(info)
+		if testInfoErr != nil {
+			return nil, errors.New("Error translating test info to protobuf: " + testInfoErr.Error())
+		}
 	}
 
 	encodedReply, err := proto.Marshal(reply)
@@ -50,4 +57,35 @@ func (p packetdProc) Process(request *zreq.ZMQRequest) (processedReply []byte, p
 	}
 
 	return encodedReply, nil
+}
+
+func dataToProtobufStruct(info []map[string]interface{}) ([]*spb.Struct, error) {
+	var protobufStruct []*spb.Struct
+	for _, v := range info {
+		infoStruct, err := spb.NewStruct(v)
+
+		if err != nil {
+			return nil, errors.New("Error getting conntrack table: " + err.Error())
+		}
+
+		protobufStruct = append(protobufStruct, infoStruct)
+	}
+
+	return protobufStruct, nil
+}
+
+func retrieveTestInfo() []map[string]interface{} {
+	var tests []map[string]interface{}
+	m1 := make(map[string]interface{})
+	m1["ping"] = "pong"
+	m1["tennis"] = "ball"
+	tests = append(tests, m1)
+	tests = append(tests, m1)
+	m2 := make(map[string]interface{})
+	m2["pong"] = "ping"
+	m2["ball"] = "tennis"
+	tests = append(tests, m2)
+	tests = append(tests, m2)
+
+	return tests
 }

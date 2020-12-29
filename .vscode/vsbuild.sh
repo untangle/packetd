@@ -4,7 +4,7 @@
 ##
 TARGET=$1
 
-docker-compose -f build/docker-compose.build.yml up --build musl
+docker-compose -f build/docker-compose.build.yml up --build musl-local
 ssh root@$TARGET "/etc/init.d/packetd stop"; 
 sleep 5
 scp ./cmd/packetd/packetd root@$TARGET:/usr/bin/; 
