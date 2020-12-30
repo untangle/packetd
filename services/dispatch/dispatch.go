@@ -273,7 +273,7 @@ func HandleWarehouseCleanup() {
 	}
 }
 
-// getSessions returns the fully merged list of sessions
+// GetSessions returns the fully merged list of sessions
 // as a list of map[string]interface{}
 // It reads the session list from /proc/net/nf_conntrack
 // and merges in the values for each session in dict

@@ -51,7 +51,7 @@ github.com/oschwald/maxminddb-golang
 github.com/pebbe/zmq4
 # github.com/ugorji/go/codec v1.1.7
 github.com/ugorji/go/codec
-# github.com/untangle/golang-shared v0.0.0-20201229232111-b260da908617
+# github.com/untangle/golang-shared v0.0.0-20201230190626-67681d2a9c25
 github.com/untangle/golang-shared/services/logger
 github.com/untangle/golang-shared/services/restdZmqServer
 github.com/untangle/golang-shared/structs/protocolbuffers/PacketdReply
