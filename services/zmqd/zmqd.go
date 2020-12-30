@@ -2,8 +2,7 @@ package zmqd
 
 import (
 	"errors"
-	"net"
-
+	
 	"github.com/untangle/golang-shared/services/logger"
 	rzs "github.com/untangle/golang-shared/services/restdZmqServer"
 	prep "github.com/untangle/golang-shared/structs/protocolbuffers/PacketdReply"
@@ -16,6 +15,7 @@ import (
 type packetdProc int 
 
 const (
+	PACKETD_SERVICE = zreq.ZMQRequest_PACKETD
 	GET_SESSIONS = zreq.ZMQRequest_GET_SESSIONS
 	TEST_INFO = zreq.ZMQRequest_TEST_INFO
 )
@@ -30,6 +30,10 @@ func Shutdown() {
 }
 
 func (p packetdProc) Process(request *zreq.ZMQRequest) (processedReply []byte, processErr error) {
+	service := request.Service 
+	if service != PACKETD_SERVICE {
+		return nil, errors.New("Attempting to process a non-packetd request: " + service.String())
+	}
 	function := request.Function
 	reply := &prep.PacketdReply{}
 
@@ -51,6 +55,8 @@ func (p packetdProc) Process(request *zreq.ZMQRequest) (processedReply []byte, p
 		if testInfoErr != nil {
 			return nil, errors.New("Error translating test info to protobuf: " + testInfoErr.Error())
 		}
+	default:
+		reply.ServerError = "Unknown function request to packetd"
 	}
 
 	encodedReply, err := proto.Marshal(reply)
@@ -77,7 +83,7 @@ func dataToProtobufStruct(info []map[string]interface{}) ([]*spb.Struct, error) 
 		infoStruct, err := spb.NewStruct(v)
 
 		if err != nil {
-			return nil, errors.New("Error getting conntrack table: " + err.Error())
+			return nil, errors.New("Error translating data to a protobuf: " + err.Error())
 		}
 
 		protobufStruct = append(protobufStruct, infoStruct)
@@ -90,7 +96,7 @@ func retrieveTestInfo() []map[string]interface{} {
 	var tests []map[string]interface{}
 	m1 := make(map[string]interface{})
 	m1["ping"] = "pong"
-	m1["tennis"] = make(net.IP, 4)
+	m1["tennis"] = "ball"
 	tests = append(tests, m1)
 	tests = append(tests, m1)
 	m2 := make(map[string]interface{})
