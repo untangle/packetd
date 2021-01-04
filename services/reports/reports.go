@@ -1007,6 +1007,7 @@ func dbCleaner() {
 
 		if err != nil {
 			logger.Warn("Failed to begin transaction: %s\n", err.Error())
+			continue
 		}
 
 		trimPercent("sessions", .10, tx)
@@ -1020,6 +1021,7 @@ func dbCleaner() {
 		if err != nil {
 			tx.Rollback()
 			logger.Warn("Failed to commit transaction: %s\n", err.Error())
+			continue
 		}
 		logger.Info("Database trim operation completed\n")
 
