@@ -164,6 +164,7 @@ func Startup() {
 
 	// set the event log processing batch size
 	eventBatchSize = 1000
+	logger.Info("PACKETD TESTING PACKAGE 1\n")
 
 	// register a custom driver with a connect hook where we can set our pragma's for
 	// all connections that get created. This is needed because pragma's are applied
@@ -458,12 +459,12 @@ func batchTransaction(eventBatch []Event, batchCount int) ([]Event, time.Time) {
 	logger.Debug("%v Items ready for batch, starting transaction at %v...\n", batchCount, time.Now())
 
 	tx, err := dbMain.Begin()
-	defer tx.Rollback()
 
 	if err != nil {
 		logger.Warn("Failed to begin transaction: %s\n", err.Error())
 		return eventBatch, time.Now()
 	}
+	defer tx.Rollback()
 
 	//iterate events in the batch and send them into the db transaction
 	for _, event := range eventBatch {
