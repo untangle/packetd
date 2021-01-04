@@ -462,6 +462,7 @@ func batchTransaction(eventBatch []Event, batchCount int) ([]Event, time.Time) {
 
 	if err != nil {
 		logger.Warn("Failed to begin transaction: %s\n", err.Error())
+		return eventBatch, time.Now()
 	}
 
 	//iterate events in the batch and send them into the db transaction
@@ -474,6 +475,7 @@ func batchTransaction(eventBatch []Event, batchCount int) ([]Event, time.Time) {
 	if err != nil {
 		tx.Rollback()
 		logger.Warn("Failed to commit transaction: %s\n", err.Error())
+		return eventBatch, time.Now()
 	}
 
 	logger.Debug("Transaction completed, %v items processed at %v .\n", batchCount, time.Now())
