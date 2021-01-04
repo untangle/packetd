@@ -1053,21 +1053,25 @@ func loadDbStats() (currentSize int64, pageSize int64, pageCount int64, maxPageC
 	pageSize, err = strconv.ParseInt(runSQL("PRAGMA page_size"), 10, 64)
 	if err != nil || pageSize == 0 {
 		logger.Crit("Unable to parse database page_size: %v\n", err)
+		return 0, 0, 0, 0, 0, err
 	}
 
 	pageCount, err = strconv.ParseInt(runSQL("PRAGMA page_count"), 10, 64)
 	if err != nil {
 		logger.Crit("Unable to parse database page_count: %v\n", err)
+		return 0, 0, 0, 0, 0, err
 	}
 
 	maxPageCount, err = strconv.ParseInt(runSQL("PRAGMA max_page_count"), 10, 64)
 	if err != nil {
 		logger.Crit("Unable to parse database page_count: %v\n", err)
+		return 0, 0, 0, 0, 0, err
 	}
 
 	freeCount, err = strconv.ParseInt(runSQL("PRAGMA freelist_count"), 10, 64)
 	if err != nil {
 		logger.Crit("Unable to parse database freelist_count: %v\n", err)
+		return 0, 0, 0, 0, 0, err
 	}
 
 	currentSize = (pageSize * pageCount)
