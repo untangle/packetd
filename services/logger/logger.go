@@ -439,6 +439,7 @@ func initLoggerConfig() {
 	config["dispatch"] = "INFO"
 	config["kernel"] = "INFO"
 	config["logger"] = "INFO"
+	config["netspace"] = "INFO"
 	config["overseer"] = "INFO"
 	config["predicttrafficsvc"] = "INFO"
 	config["reports"] = "INFO"

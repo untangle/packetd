@@ -11,9 +11,9 @@ import (
 	"github.com/untangle/packetd/services/logger"
 )
 
-// applicationInfo stores the details for each know application
+// ApplicationInfo stores the details for each know application
 type ApplicationInfo struct {
-	Guid         string `json:"guid"`
+	GUID         string `json:"guid"`
 	Index        int    `json:"index"`
 	Name         string `json:"name"`
 	Description  string `json:"description"`
@@ -25,20 +25,20 @@ type ApplicationInfo struct {
 	Plugin       string `json:"plugin"`
 }
 
-// Category info contains details about a category (used when converting ApplicationTable to categories for extjs store)
+// CategoryInfo contains details about a category (used when converting ApplicationTable to categories for extjs store)
 type CategoryInfo struct {
 	Name string `json:"name"`
 }
 
 const guidInfoFile = "/usr/share/untangle-classd/protolist.csv"
 
+// ApplicationTable stores the details for each known application
 var ApplicationTable map[string]*ApplicationInfo
 
 // Startup is called when the packetd service starts
 func Startup() {
 	logger.Info("Starting up the Application Classification Table manager service\n")
 	loadApplicationTable()
-
 }
 
 // Shutdown is called when the packetd service stops
@@ -148,7 +148,7 @@ func loadApplicationTable() {
 		// create a object to store the details
 		info := new(ApplicationInfo)
 
-		info.Guid = list[0]
+		info.GUID = list[0]
 		info.Index, err = strconv.Atoi(list[1])
 		if err != nil {
 			logger.Warn("Invalid index: %s\n", list[1])
@@ -174,7 +174,7 @@ func loadApplicationTable() {
 		info.Plugin = list[9]
 
 		// store the object in the table using the guid as the index
-		ApplicationTable[info.Guid] = info
+		ApplicationTable[info.GUID] = info
 		infocount++
 	}
 

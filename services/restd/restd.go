@@ -25,6 +25,7 @@ import (
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/netspace"
 	"github.com/untangle/packetd/services/overseer"
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/settings"
@@ -96,6 +97,8 @@ func Startup() {
 	api.GET("/warehouse/status", warehouseStatus)
 	api.POST("/control/traffic", trafficControl)
 
+	api.POST("/netspace/request", netspaceRequest)
+
 	api.GET("/status/sessions", statusSessions)
 	api.GET("/status/system", statusSystem)
 	api.GET("/status/hardware", statusHardware)
@@ -104,6 +107,7 @@ func Startup() {
 	api.GET("/status/license", statusLicense)
 	api.GET("/status/wantest/:device", statusWANTest)
 	api.GET("/status/uid", statusUID)
+	api.GET("/status/command/find_account", statusCommandFindAccount)
 	api.GET("/status/interfaces/:device", statusInterfaces)
 	api.GET("/status/arp/", statusArp)
 	api.GET("/status/arp/:device", statusArp)
@@ -117,6 +121,9 @@ func Startup() {
 	api.GET("/status/wifichannels/:device", statusWifiChannels)
 	api.GET("/status/wifimodelist/:device", statusWifiModelist)
 
+	api.GET("/wireguard/keypair", wireguardKeyPair)
+	api.POST("/wireguard/publickey", wireguardPublicKey)
+
 	api.GET("/classify/applications", getClassifyAppTable)
 	api.GET("/classify/categories", getClassifyCatTable)
 
@@ -128,6 +135,9 @@ func Startup() {
 	api.POST("/factory-reset", factoryResetHandler)
 	api.POST("/sysupgrade", sysupgradeHandler)
 	api.POST("/upgrade", upgradeHandler)
+
+	api.POST("/reboot", rebootHandler)
+	api.POST("/shutdown", shutdownHandler)
 
 	api.POST("/releasedhcp/:device", releaseDhcp)
 	api.POST("/renewdhcp/:device", renewDhcp)
@@ -597,6 +607,8 @@ func getClassifyCatTable(c *gin.Context) {
 func setSettings(c *gin.Context) {
 	var segments []string
 	path := c.Param("path")
+	force := c.Query("force")
+	forceSync := false
 
 	if path == "" {
 		segments = nil
@@ -616,7 +628,15 @@ func setSettings(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 	}
 
-	jsonResult, err := settings.SetSettings(segments, bodyJSONObject)
+	if force != "" {
+		var parseErr error
+		forceSync, parseErr = strconv.ParseBool(force)
+
+		if parseErr != nil {
+			forceSync = false
+		}
+	}
+	jsonResult, err := settings.SetSettings(segments, bodyJSONObject, forceSync)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, jsonResult)
 	} else {
@@ -856,3 +876,213 @@ func renewDhcp(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 	return
 }
+
+// Create WireGuard private and public keys and return in JSON object
+func wireguardKeyPair(c *gin.Context) {
+	var privateKey string
+	var publicKey string
+	var out []byte
+	var err error
+	var cmd *exec.Cmd
+	var sin io.WriteCloser
+
+	// first generate a private key
+	cmd = exec.Command("/usr/bin/wg", "genkey")
+	out, err = cmd.Output()
+
+	if err != nil {
+		logger.Err("Error generating private key: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": string(out)})
+		return
+	}
+
+	// generate the public key for the private key
+	privateKey = strings.TrimRight(string(out), "\r\n")
+	cmd = exec.Command("/usr/bin/wg", "pubkey")
+	sin, err = cmd.StdinPipe()
+
+	// use a goroutine to write the private key to stdin because the
+	// wg utility will not return until stdin is closed
+	go func() {
+		defer sin.Close()
+		io.WriteString(sin, privateKey)
+	}()
+
+	out, err = cmd.Output()
+
+	if err != nil {
+		logger.Err("Error generating public key: %v\n", string(out))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": string(out)})
+		return
+	}
+
+	publicKey = strings.TrimRight(string(out), "\r\n")
+
+	// return the private and public keys to the caller
+	c.JSON(http.StatusOK, gin.H{
+		"privateKey": privateKey,
+		"publicKey": publicKey,
+	})
+
+	return
+}
+
+// Create WireGuard public key and return both in JSON object
+func wireguardPublicKey(c *gin.Context) {
+	var privateKey string
+	var publicKey string
+	var out []byte
+	var cmd *exec.Cmd
+	var sin io.WriteCloser
+
+	var data map[string]string
+	var body []byte
+	var found bool
+	var err error
+
+	body, err = ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"error": err})
+		return
+	}
+
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"error": err})
+		return
+	}
+
+	privateKey, found = data["privateKey"]
+	if found != true {
+		c.JSON(http.StatusOK, gin.H{"error": "privateKey not specified"})
+		return
+	}
+
+	// generate the public key for the private key
+	cmd = exec.Command("/usr/bin/wg", "pubkey")
+	sin, err = cmd.StdinPipe()
+
+	// use a goroutine to write the private key to stdin because the
+	// wg utility will not return until stdin is closed
+	go func() {
+		defer sin.Close()
+		io.WriteString(sin, privateKey)
+	}()
+
+	out, err = cmd.Output()
+
+	if err != nil {
+		logger.Err("Error generating public key: %v\n", string(out))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": string(out)})
+		return
+	}
+
+	publicKey = strings.TrimRight(string(out), "\r\n")
+
+	// return the private and public keys to the caller
+	c.JSON(http.StatusOK, gin.H{
+		"privateKey": privateKey,
+		"publicKey": publicKey,
+	})
+
+	return
+}
+
+
+// called to request an unused network address block
+func netspaceRequest(c *gin.Context) {
+	var data map[string]string
+	var body []byte
+	var rawdata string
+	var ipVersion int
+	var hostID int
+	var networkSize int
+	var found bool
+	var err error
+
+	body, err = ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"error": err})
+		return
+	}
+
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"error": err})
+		return
+	}
+
+	rawdata, found = data["ipVersion"]
+	if found != true {
+		c.JSON(http.StatusOK, gin.H{"error": "ipVersion not specified"})
+		return
+	}
+
+	ipVersion, err = strconv.Atoi(rawdata)
+	if err != nil {
+		ipVersion = 4
+	}
+
+	rawdata, found = data["hostID"]
+	if found != true {
+		c.JSON(http.StatusOK, gin.H{"error": "hostID not specified"})
+		return
+	}
+
+	hostID, err = strconv.Atoi(rawdata)
+	if err != nil {
+		hostID = 1
+	}
+
+	rawdata, found = data["networkSize"]
+	if found != true {
+		c.JSON(http.StatusOK, gin.H{"error": "networkSize not specified"})
+		return
+	}
+
+	networkSize, err = strconv.Atoi(rawdata)
+	if err != nil {
+		networkSize = 24
+	}
+
+	network := netspace.GetAvailableAddressSpace(ipVersion, hostID, networkSize)
+	if network == nil {
+		c.JSON(http.StatusOK, gin.H{"error": "unable to find an unused network"})
+		return
+	}
+
+	addr := network.IP.String()
+	size, _ := network.Mask.Size()
+	cidr := fmt.Sprintf("%s/%d", addr, size)
+
+	c.JSON(http.StatusOK, gin.H{
+		"network": addr,
+		"netsize": size,
+		"cidr":    cidr,
+	})
+}
+
+// called when rebooting device
+func rebootHandler(c *gin.Context) {
+	err := exec.Command("reboot").Run()
+	if err != nil {
+		logger.Warn("Failed to reboot system: %s\n", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+	return
+}
+
+// called when shutdown device
+func shutdownHandler(c *gin.Context) {
+	err := exec.Command("halt").Run()
+	if err != nil {
+		logger.Warn("Failed to shutdown system: %s\n", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+	return
+}
+
