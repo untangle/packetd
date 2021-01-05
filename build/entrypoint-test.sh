@@ -14,6 +14,9 @@ settingsd &
 # this fails to start right now
 #packetd
 
+# Sometimes curl runs before settingsd/gin is ready to listen for connections
+sleep 3
+
 # /static without the trailing slash gives a 301, which curl -f
 # considers a success
 curl -f http://localhost/static
