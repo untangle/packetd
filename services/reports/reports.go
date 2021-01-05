@@ -458,9 +458,12 @@ func batchTransaction(eventBatch []Event, batchCount int) ([]Event, time.Time) {
 	logger.Debug("%v Items ready for batch, starting transaction at %v...\n", batchCount, time.Now())
 
 	tx, err := dbMain.Begin()
+
 	if err != nil {
 		logger.Warn("Failed to begin transaction: %s\n", err.Error())
+		return eventBatch, time.Now()
 	}
+	defer tx.Rollback()
 
 	//iterate events in the batch and send them into the db transaction
 	for _, event := range eventBatch {
@@ -472,6 +475,7 @@ func batchTransaction(eventBatch []Event, batchCount int) ([]Event, time.Time) {
 	if err != nil {
 		tx.Rollback()
 		logger.Warn("Failed to commit transaction: %s\n", err.Error())
+		return eventBatch, time.Now()
 	}
 
 	logger.Debug("Transaction completed, %v items processed at %v .\n", batchCount, time.Now())
@@ -999,8 +1003,11 @@ func dbCleaner() {
 		logger.Info("Database starting trim operation\n")
 
 		tx, err := dbMain.Begin()
+		defer tx.Rollback()
+
 		if err != nil {
 			logger.Warn("Failed to begin transaction: %s\n", err.Error())
+			continue
 		}
 
 		trimPercent("sessions", .10, tx)
@@ -1014,6 +1021,7 @@ func dbCleaner() {
 		if err != nil {
 			tx.Rollback()
 			logger.Warn("Failed to commit transaction: %s\n", err.Error())
+			continue
 		}
 		logger.Info("Database trim operation completed\n")
 
@@ -1045,21 +1053,25 @@ func loadDbStats() (currentSize int64, pageSize int64, pageCount int64, maxPageC
 	pageSize, err = strconv.ParseInt(runSQL("PRAGMA page_size"), 10, 64)
 	if err != nil || pageSize == 0 {
 		logger.Crit("Unable to parse database page_size: %v\n", err)
+		return 0, 0, 0, 0, 0, err
 	}
 
 	pageCount, err = strconv.ParseInt(runSQL("PRAGMA page_count"), 10, 64)
 	if err != nil {
 		logger.Crit("Unable to parse database page_count: %v\n", err)
+		return 0, 0, 0, 0, 0, err
 	}
 
 	maxPageCount, err = strconv.ParseInt(runSQL("PRAGMA max_page_count"), 10, 64)
 	if err != nil {
 		logger.Crit("Unable to parse database page_count: %v\n", err)
+		return 0, 0, 0, 0, 0, err
 	}
 
 	freeCount, err = strconv.ParseInt(runSQL("PRAGMA freelist_count"), 10, 64)
 	if err != nil {
 		logger.Crit("Unable to parse database freelist_count: %v\n", err)
+		return 0, 0, 0, 0, 0, err
 	}
 
 	currentSize = (pageSize * pageCount)
