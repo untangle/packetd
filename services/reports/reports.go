@@ -164,6 +164,7 @@ func Startup() {
 
 	// set the event log processing batch size
 	eventBatchSize = 1000
+	logger.Info("PACKETD TESTING PACKAGE 1\n")
 
 	// register a custom driver with a connect hook where we can set our pragma's for
 	// all connections that get created. This is needed because pragma's are applied
@@ -276,7 +277,7 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	sqlStmt, clean, err = getPreparedStatement(reportEntry)
 	if err != nil {
 		logger.Warn("Failed to get prepared SQL: %v\n", err)
-		return nil, nil
+		return nil, err
 	}
 	values := conditionValues(reportEntry.Conditions)
 
@@ -295,7 +296,7 @@ func CreateQuery(reportEntryStr string) (*Query, error) {
 	// now check for any error returned from sqlStmt.Query
 	if err != nil {
 		logger.Err("sqlStmt.Query error: %s\n", err)
-		return nil, nil
+		return nil, err
 	}
 
 	q := new(Query)
