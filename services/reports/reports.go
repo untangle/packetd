@@ -164,7 +164,6 @@ func Startup() {
 
 	// set the event log processing batch size
 	eventBatchSize = 1000
-	logger.Info("PACKETD TESTING PACKAGE 1\n")
 
 	// register a custom driver with a connect hook where we can set our pragma's for
 	// all connections that get created. This is needed because pragma's are applied
