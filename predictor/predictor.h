@@ -29,6 +29,9 @@
 #ifndef VERSION
 #define VERSION "DEVVER"
 #endif
+#ifndef BUILDID
+#define BUILDID __DATE__ " " __TIME__
+#endif
 /*---------------------------------------------------------------------------*/
 #define UNKNOWN_TRAFFIC	"{\"Application\":\"Unknown\",\"Confidence\":0}"
 #define THREAD_LIMIT	32		// sets the maximum number of threads supported
