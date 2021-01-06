@@ -58,7 +58,7 @@ func addPredictionToDict(ctid uint32, currentTraffic *predicttrafficsvc.Classifi
 	if len(currentTraffic.Name) > 0 {
 		dict.AddSessionEntry(ctid, "application_name_inferred", currentTraffic.Name)
 	}
-	dict.AddSessionEntry(ctid, "application_confidence_inferred", roundConfidence(currentTraffic.Confidence))
+	dict.AddSessionEntry(ctid, "application_confidence_inferred", currentTraffic.Confidence)
 	if len(currentTraffic.ProtoChain) > 0 {
 		dict.AddSessionEntry(ctid, "application_protochain_inferred", currentTraffic.ProtoChain)
 	}
@@ -80,7 +80,7 @@ func addPredictionToReport(mess dispatch.NfqueueMessage, currentTraffic *predict
 	modifiedColumns := make(map[string]interface{})
 	modifiedColumns["application_id_inferred"] = currentTraffic.ID
 	modifiedColumns["application_name_inferred"] = currentTraffic.Name
-	modifiedColumns["application_confidence_inferred"] = roundConfidence(currentTraffic.Confidence)
+	modifiedColumns["application_confidence_inferred"] = currentTraffic.Confidence
 	modifiedColumns["application_protochain_inferred"] = currentTraffic.ProtoChain
 	modifiedColumns["application_productivity_inferred"] = currentTraffic.Productivity
 	modifiedColumns["application_risk_inferred"] = currentTraffic.Risk
@@ -94,17 +94,9 @@ func addPredictionToSession(session *dispatch.Session, currentTraffic *predicttr
 	logger.Debug("Sending prediction info to session attachments: %d\n", session.GetSessionID())
 	session.PutAttachment("application_id_inferred", currentTraffic.ID)
 	session.PutAttachment("application_name_inferred", currentTraffic.Name)
-	session.PutAttachment("application_confidence_inferred", roundConfidence(currentTraffic.Confidence))
+	session.PutAttachment("application_confidence_inferred", currentTraffic.Confidence)
 	session.PutAttachment("application_protochain_inferred", currentTraffic.ProtoChain)
 	session.PutAttachment("application_productivity_inferred", currentTraffic.Productivity)
 	session.PutAttachment("application_risk_inferred", currentTraffic.Risk)
 	session.PutAttachment("application_category_inferred", currentTraffic.Category)
-}
-
-// round confidence converts the confidence from a float32 into a uint8, with very basic logic to round up or down
-func roundConfidence(conf float32) uint8 {
-	if conf < 0 {
-		return uint8(conf - 0.5)
-	}
-	return uint8(conf + 0.5)
 }

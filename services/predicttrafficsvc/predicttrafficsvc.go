@@ -6,12 +6,11 @@ import (
 	"net"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 
-	"github.com/google/gopacket/layers"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/overseer"
+	"github.com/untangle/packetd/services/settings"
 )
 
 // IPPROTO_ICMP is ip protocol 1
@@ -25,9 +24,6 @@ var cloudServerPort = 21818
 
 // cloud request timeout
 const cloudLookupTimeout = time.Millisecond * 500
-
-// the sequence number used for cloud lookups
-var cloudSequence uint32
 
 // positiveCacheTime sets how long we store good prediction results received from the cloud
 const positiveCacheTime = time.Second * 14400
@@ -43,13 +39,13 @@ const longCacheTime = time.Second * 60 * 60 * 24 * 365
 
 // ClassifiedTraffic struct contains the API response data
 type ClassifiedTraffic struct {
-	ID           string  `json:"Application"`
-	Name         string  `json:"ApplicationName"`
-	Confidence   float32 `json:"Confidence"`
-	ProtoChain   string  `json:"Protocolchain"`
-	Productivity uint8   `json:"ApplicationProductivity"`
-	Risk         uint8   `json:"ApplicationRisk"`
-	Category     string  `json:"ApplicationCategory"`
+	ID           string  `json:"ID"`
+	Name         string  `json:"Name"`
+	Confidence   uint8   `json:"Confidence"`
+	ProtoChain   string  `json:"ProtoChain"`
+	Productivity uint8   `json:"Productivity"`
+	Risk         uint8   `json:"Risk"`
+	Category     string  `json:"Category"`
 }
 
 // trafficHolder struct contains the cached traffic data and the expiration time
@@ -77,9 +73,18 @@ var trafficMutex sync.RWMutex
 // shutdownChannel is used when destroying the service to shutdown the cache cleaning utility safely
 var shutdownChannel = make(chan bool)
 
+var machineUID = "00000000-0000-0000-0000-000000000000"
+
 // Startup is called during service startup
 func Startup() {
+	var err error
+
 	logger.Info("Starting up the traffic classification service\n")
+
+	machineUID, err = settings.GetUID()
+	if err != nil {
+		logger.Warn("Unable to read UID: %s\n", err.Error())
+	}
 
 	classifiedTrafficCache = make(map[string]*trafficHolder)
 	go cleanStaleTrafficItems()
@@ -169,8 +174,6 @@ func GetTrafficClassification(ipAdd net.IP, port uint16, protoID uint8) *Classif
 // sendClassifyRequest will send the classification request to the API endpoint using the provided parameters
 // It returns the classification result or nil along with how long the response should be cached
 func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) (*ClassifiedTraffic, time.Duration) {
-	var question DNSQuestion
-	var query DNSQuery
 	var sock *net.UDPConn
 	var txlen int
 	var rxlen int
@@ -179,22 +182,10 @@ func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) (*ClassifiedT
 	logger.Debug("Prediction request: [%d]%s:%d\n", protoID, ipAdd.String(), port)
 	overseer.AddCounter("traffic_prediction_cloud_api_lookup", 1)
 
-	// the cloud expects the IP address in the QNAME field, the IP protocol
-	// in the QTYPE field, and the port in the QCLASS field
-	question.Name = ipAdd.String()
-	question.Type = uint16(protoID)
-	question.Class = port
 
-	// use sequential query ID values and set other query fields
-	query.ID = uint16(atomic.AddUint32(&cloudSequence, 1) & 0xFFFF)
-	query.QR = 0
-	query.OpCode = 0
-	query.QDCount = 1
-	query.Questions = append(query.Questions, question)
-
-	// convert the query to a wire format packet and allocate the receive buffer
-	txbuff := query.encode()
-	rxbuff := make([]byte, 1024)
+	// create a request string with the arguments and allocate the receive buffer
+	txbuffer := formRequestString(ipAdd, port, protoID)
+	rxbuffer := make([]byte, 1024)
 
 	// resolve the server address and set the port
 	addr := net.UDPAddr{
@@ -213,15 +204,21 @@ func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) (*ClassifiedT
 	defer sock.Close()
 
 	// send the request to the server
-	txlen, err = sock.Write(txbuff)
+	txlen, err = sock.Write(txbuffer)
 	if err != nil {
 		logger.Err("Error sending packet to server: %v\n", err)
 		return unknownTrafficItem, negativeCacheTime
 	}
 
+	// make sure we sent the entire buffer
+	if txlen != len(txbuffer) {
+		logger.Err("Short transmit %d of %d bytes\n", txlen, len(txbuffer))
+		return unknownTrafficItem, negativeCacheTime
+	}
+
 	// set the socket timeout and read the response
 	sock.SetReadDeadline(time.Now().Add(cloudLookupTimeout))
-	rxlen, err = sock.Read(rxbuff)
+	rxlen, err = sock.Read(rxbuffer)
 
 	// for timeout or any other error we just return the unknown response
 	if err != nil {
@@ -229,36 +226,14 @@ func sendClassifyRequest(ipAdd net.IP, port uint16, protoID uint8) (*ClassifiedT
 		return unknownTrafficItem, negativeCacheTime
 	}
 
-	// we should get back at least the question we transmitted so we compare
-	// rxlent to txlen as a quick sanity check of the response
-	if rxlen < txlen {
-		logger.Err("Invalid response from server: %v\n", rxbuff)
-		return unknownTrafficItem, negativeCacheTime
-	}
-
-	// decode the DNS response from the server
-	dns := new(layers.DNS)
-	err = dns.DecodeFromBytes(rxbuff, nil)
-	if err != nil {
-		logger.Err("Error decoding packet: %v\n", err)
-		return unknownTrafficItem, negativeCacheTime
-	}
-
-	// we expect exactly one answer in the response
-	if dns.ANCount != 1 {
-		logger.Err("Invalid ANCount in server response\n")
-		return unknownTrafficItem, negativeCacheTime
-	}
-
-	// we expect a single TXT record
-	if dns.Answers[0].Type != layers.DNSTypeTXT {
-		logger.Err("Invalid record type in server response\n")
-		return unknownTrafficItem, negativeCacheTime
-	}
-
 	// parse the contents of the server response
 	trafficResponse := new(ClassifiedTraffic)
-	json.Unmarshal(dns.Answers[0].TXTs[0], &trafficResponse)
+	err = json.Unmarshal(rxbuffer[:rxlen], &trafficResponse)
+	if err != nil {
+		logger.Err("Error parsing server response: %v\n", err)
+		return unknownTrafficItem, negativeCacheTime
+	}
+
 	logger.Debug("Prediction response: [%d]%s:%d = %v\n", protoID, ipAdd.String(), port, *trafficResponse)
 
 	// for Unknown response return with the negative cache time
@@ -315,4 +290,20 @@ func formMapKey(ipAdd net.IP, port uint16, protoID uint8) string {
 	mapKey.WriteString("-")
 	mapKey.WriteString(strconv.Itoa(int(protoID)))
 	return mapKey.String()
+}
+
+// formRequestString will build the prediction request string in the format required by the server
+// version+guid+ipaddr+port+protocol
+func formRequestString(ipAdd net.IP, port uint16, protoID uint8) []byte {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("1+")
+	buffer.WriteString(machineUID)
+	buffer.WriteByte('+')
+	buffer.WriteString(ipAdd.String())
+	buffer.WriteByte('+')
+	buffer.WriteString(strconv.Itoa(int(port)))
+	buffer.WriteByte('+')
+	buffer.WriteString(strconv.Itoa(int(protoID)))
+	return buffer.Bytes()
 }
