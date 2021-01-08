@@ -308,7 +308,10 @@ func reportsGetData(c *gin.Context) {
 
 	str, err := reports.GetData(queryID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		//c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		// FIXME the UI pukes if you respond with 500 currently
+		// once its fixed, we should change this back
+		c.JSON(http.StatusOK, gin.H{"error": err})
 		return
 	}
 
