@@ -394,8 +394,12 @@ func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive
 }
 
 // calculateDifference determines the difference between the two argumented values
-// FIXME - need to handle integer wrap
 func calculateDifference(previous uint64, current uint64) uint64 {
+	if previous > current {
+		// Likely due to interface being renamed and then back to original again.
+		// In any event, result is invalid; set to 0.
+		return 0
+	}
 	diff := (current - previous)
 	return diff
 }
