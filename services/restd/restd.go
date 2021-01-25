@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -98,6 +99,7 @@ func Startup() {
 	api.POST("/control/traffic", trafficControl)
 
 	api.POST("/netspace/request", netspaceRequest)
+	api.POST("/netspace/check", netspaceCheck)
 
 	api.GET("/status/sessions", statusSessions)
 	api.GET("/status/system", statusSystem)
@@ -921,7 +923,7 @@ func wireguardKeyPair(c *gin.Context) {
 	// return the private and public keys to the caller
 	c.JSON(http.StatusOK, gin.H{
 		"privateKey": privateKey,
-		"publicKey": publicKey,
+		"publicKey":  publicKey,
 	})
 
 	return
@@ -982,12 +984,11 @@ func wireguardPublicKey(c *gin.Context) {
 	// return the private and public keys to the caller
 	c.JSON(http.StatusOK, gin.H{
 		"privateKey": privateKey,
-		"publicKey": publicKey,
+		"publicKey":  publicKey,
 	})
 
 	return
 }
-
 
 // called to request an unused network address block
 func netspaceRequest(c *gin.Context) {
@@ -1062,6 +1063,50 @@ func netspaceRequest(c *gin.Context) {
 	})
 }
 
+// called to see if an address conflicts with any registered network space
+func netspaceCheck(c *gin.Context) {
+	var data map[string]string
+	var body []byte
+	var rawdata string
+	var found bool
+	var err error
+
+	body, err = ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"error": err})
+		return
+	}
+
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"error": err})
+		return
+	}
+
+	rawdata, found = data["cidr"]
+	if found != true {
+		c.JSON(http.StatusOK, gin.H{"error": "cidr not specified"})
+		return
+	}
+
+	_, netobj, err := net.ParseCIDR(rawdata)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+		return
+	}
+
+	// pass empty owner since we want to check for conflicts with all netspace registrations
+	network := netspace.IsNetworkAvailableNet("", *netobj)
+
+	if network == nil {
+		c.JSON(http.StatusOK, gin.H{"success": true})
+		return
+	}
+
+	problem := "Address conflict with " + network.OwnerName + "/" + network.OwnerPurpose
+	c.JSON(http.StatusOK, gin.H{"error": problem})
+}
+
 // called when rebooting device
 func rebootHandler(c *gin.Context) {
 	err := exec.Command("reboot").Run()
@@ -1085,4 +1130,3 @@ func shutdownHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 	return
 }
-
