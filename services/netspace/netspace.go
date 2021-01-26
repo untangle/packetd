@@ -170,7 +170,7 @@ func IsNetworkAvailableNet(ownerName string, networkInfo net.IPNet) *NetworkSpac
 
 	for item := networkRegistry.Front(); item != nil; item = item.Next() {
 		space = item.Value.(*NetworkSpace)
-		if space.OwnerName != ownerName {
+		if len(ownerName) == 0 || space.OwnerName != ownerName {
 			if checkForConflict(&networkInfo, &space.Network) {
 				logger.Debug("Found conflict: %v %v\n", networkInfo, space)
 				return space
@@ -178,6 +178,7 @@ func IsNetworkAvailableNet(ownerName string, networkInfo net.IPNet) *NetworkSpac
 		}
 	}
 
+	logger.Debug("Available network: %v\n", networkInfo)
 	return nil
 }
 
