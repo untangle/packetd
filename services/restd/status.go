@@ -387,6 +387,20 @@ func statusWifiModelist(c *gin.Context) {
 	return
 }
 
+// Peform diagnostics and return results in JSON format.
+func statusDiagnostics(c *gin.Context) {
+
+	result, err := getStatusDiagnostics()
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+	return
+}
+
 type dhcpInfo struct {
 	LeaseExpiration uint   `json:"leaseExpiration"`
 	MACAddress      string `json:"macAddress"`
@@ -647,6 +661,151 @@ func getWifiModelist(device string) ([]wifiModeInfo, error) {
 	}
 
 	return availableModes, nil
+}
+
+// diagnostics result root
+type diagnosticsResult struct {
+	DnsResolver []*diagnosticsDnsResult `json:"dnsResolver"`
+}
+
+// DNS resolver diagnostics result root
+type diagnosticsDnsResult struct {
+	Name string `json:"name"`
+	ResolverAddress string `json:"resolverAddress"`
+	Pass bool   `json:"pass"`
+}
+
+// Get diagnostics results
+func getStatusDiagnostics() (*diagnosticsResult, error) {
+	var diagnosticsResult = new(diagnosticsResult)
+
+	// DNS resolver
+	dnsResolverResults, err := getStatusDiagnosticsDns()
+	if err == nil {
+		diagnosticsResult.DnsResolver = dnsResolverResults
+	}
+
+	return diagnosticsResult, err
+}
+
+// Get DNS resolver results
+func getStatusDiagnosticsDns() ([]*diagnosticsDnsResult, error) {
+	var diagnosticsDnsResults = []*diagnosticsDnsResult{}
+
+	// Get resolvers from settings
+	networkRaw, err := settings.GetCurrentSettings([]string{"network", "interfaces"})
+	if networkRaw == nil || err != nil {
+		logger.Warn("Unable to read network settings\n")
+	}
+	// cast to an array of interfaces that we can access
+	networkMap, ok := networkRaw.([]interface{})
+	if !ok {
+		return nil, errors.New("Unable to identify network interfaces")
+	}
+
+	// Walk through interfaces in settings
+	for _, value := range networkMap {
+		item, ok := value.(map[string]interface{})
+		if !ok || item == nil {
+			logger.Warn("Unexpected object type: %T\n", value)
+			continue
+		}
+
+		// ignore hidden interfaces
+		if val, found := item["hidden"]; found {
+			if val.(bool) {
+				continue
+			}
+		}
+
+		// ignore disabled interfaces
+		if val, found := item["enabled"]; found {
+			if !val.(bool) {
+				continue
+			}
+		}
+
+		// we must have the device, interfaceId, and configType
+		if item["device"] == nil || item["interfaceId"] == nil || item["configType"] == nil || item ["configType"] != "ADDRESSED" {
+			continue
+		}
+		if item["v4ConfigType"] == "STATIC" {
+			if item["v4StaticDNS1"] != nil {
+				dnsDiagnostic := new(diagnosticsDnsResult)
+				dnsDiagnostic.Name = item["name"].(string)
+				dnsDiagnostic.ResolverAddress = item["v4StaticDNS1"].(string)
+				diagnosticsDnsResults = append(diagnosticsDnsResults, dnsDiagnostic)
+			}
+			if item["v4StaticDNS2"] != nil {
+				dnsDiagnostic := new(diagnosticsDnsResult)
+				dnsDiagnostic.Name = item["name"].(string)
+				dnsDiagnostic.ResolverAddress = item["v4StaticDNS2"].(string)
+				diagnosticsDnsResults = append(diagnosticsDnsResults, dnsDiagnostic)
+			}
+		}
+		if item["v6ConfigType"] == "STATIC" {
+			if item["v6StaticDNS1"] != nil {
+				dnsDiagnostic := new(diagnosticsDnsResult)
+				dnsDiagnostic.Name = item["name"].(string)
+				dnsDiagnostic.ResolverAddress = item["v6StaticDNS1"].(string)
+				diagnosticsDnsResults = append(diagnosticsDnsResults, dnsDiagnostic)
+			}
+			if item["v6StaticDNS2"] != nil {
+				dnsDiagnostic := new(diagnosticsDnsResult)
+				dnsDiagnostic.Name = item["name"].(string)
+				dnsDiagnostic.ResolverAddress = item["v6StaticDNS2"].(string)
+				diagnosticsDnsResults = append(diagnosticsDnsResults, dnsDiagnostic)
+			}
+		}
+	}
+
+	// Get resolvers from statistics (openWRT)
+	// This includes DNS overrides for DHCP and PPPoE.
+	interfaceStatus, err := getInterfaceStatus("all")
+	if err != nil {
+		return nil, err
+	}
+	var interfaceStatuses []interfaceInfo
+	// convert the ubus data to a map of items
+	err = json.Unmarshal([]byte(interfaceStatus), &interfaceStatuses)
+	if err != nil {
+		logger.Warn("Error calling json.Unmarshal(interfaceStatus):\n")
+		return nil, err
+	}
+
+	for _, status := range interfaceStatuses {
+		if status.DNSServers == nil {
+			continue
+		}
+		for _, server := range status.DNSServers {
+			logger.Warn("DNS Server: %v\n", server)
+			dnsDiagnostic := new(diagnosticsDnsResult)
+			dnsDiagnostic.Name = status.InterfaceName
+			dnsDiagnostic.ResolverAddress = server
+			diagnosticsDnsResults = append(diagnosticsDnsResults, dnsDiagnostic)
+		}
+	}
+
+	// Walk diagnosticsDnsResult and perform dig commands
+	for _, status := range diagnosticsDnsResults {
+		// Perform DNS lookup using dig with a 1 second timeout per default (3) queries.
+		// Result of 0 means lookup succeeded.
+		cmd := exec.Command("/usr/bin/dig", "+timeout=1", "@"+status.ResolverAddress, "www.google.com")
+		err := cmd.Run()
+		if err != nil {
+			if exitError, ok := err.(*exec.ExitError); ok {
+				if exitError.ExitCode() == 0{
+					status.Pass = true;
+				}else{
+					status.Pass = false;
+				}
+			}
+		}else{
+			status.Pass = true
+		}
+	}
+
+	return diagnosticsDnsResults, nil
 }
 
 // runIPCommand is used to run various commands using iproute2, the results from the output are byte arrays which represent json strings
