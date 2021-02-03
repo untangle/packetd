@@ -31,7 +31,6 @@ type NfqueueMessage struct {
 	IP6Layer       *layers.IPv6
 	TCPLayer       *layers.TCP
 	UDPLayer       *layers.UDP
-	ICMPv4Layer    *layers.ICMPv4
 	Payload        []byte
 }
 
@@ -132,7 +131,6 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 	if logger.IsTraceEnabled() {
 		logger.Trace("nfqueue event[%d]: %v 0x%08x\n", ctid, mess.MsgTuple, pmark)
 	}
-
 	session := findSession(ctid)
 
 	if session == nil {
@@ -155,8 +153,9 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 		session = createSession(mess, ctid)
 		mess.Session = session
 	} else {
+		clientSideTuple := session.GetClientSideTuple()
 		if newSession {
-			if mess.MsgTuple.Equal(session.GetClientSideTuple()) {
+			if mess.MsgTuple.Equal(clientSideTuple) {
 				// netfilter considers this a "new" session, but the tuple is identical.
 				// this happens because netfilter's session tracking is more advanced
 				// and often parses deeper headers (ping/dns) to track sessions
@@ -180,9 +179,27 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 				logger.Debug("Conflicting session [%d] %v != %v\n", ctid, mess.MsgTuple, session.GetClientSideTuple())
 				// We don't need to flush here - this is a new session its already been flushed
 				// session.flushDict()
+				if !mess.ClientToServer && session.GetServerInterfaceID() == 0 {
+					// Set server information if not found.
+					session.SetServerInterfaceID(uint8((pmark & 0x000000FF)))
+					session.SetServerInterfaceType(uint8((pmark & 0x03000000) >> 24))
+				}
 				session.removeFromSessionTable()
 				session = createSession(mess, ctid)
 				mess.Session = session
+			}
+		}else{
+			if mess.MsgTuple.Protocol != clientSideTuple.Protocol {
+				// If the protocol does not match (e.g.,was TCP but we received ICMP), end this session.
+				if !mess.ClientToServer && session.GetServerInterfaceID() == 0 {
+					// Set server information if not found.
+					session.SetServerInterfaceID(uint8((pmark & 0x000000FF)))
+					session.SetServerInterfaceType(uint8((pmark & 0x03000000) >> 24))
+				}
+				session.removeFromSessionTable()
+				dict.AddSessionEntry(ctid, "bypass_packetd", true)
+				removeConntrack(ctid)
+				return NfAccept
 			}
 		}
 
