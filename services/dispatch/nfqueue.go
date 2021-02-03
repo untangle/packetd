@@ -179,23 +179,12 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 				logger.Debug("Conflicting session [%d] %v != %v\n", ctid, mess.MsgTuple, session.GetClientSideTuple())
 				// We don't need to flush here - this is a new session its already been flushed
 				// session.flushDict()
-				if !mess.ClientToServer && session.GetServerInterfaceID() == 0 {
-					// Set server information if not found.
-					session.SetServerInterfaceID(uint8((pmark & 0x000000FF)))
-					session.SetServerInterfaceType(uint8((pmark & 0x03000000) >> 24))
-				}
 				session.removeFromSessionTable()
 				session = createSession(mess, ctid)
 				mess.Session = session
 			}
 		}else{
 			if mess.MsgTuple.Protocol != clientSideTuple.Protocol {
-				// If the protocol does not match (e.g.,was TCP but we received ICMP), end this session.
-				if !mess.ClientToServer && session.GetServerInterfaceID() == 0 {
-					// Set server information if not found.
-					session.SetServerInterfaceID(uint8((pmark & 0x000000FF)))
-					session.SetServerInterfaceType(uint8((pmark & 0x03000000) >> 24))
-				}
 				session.removeFromSessionTable()
 				dict.AddSessionEntry(ctid, "bypass_packetd", true)
 				removeConntrack(ctid)
