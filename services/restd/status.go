@@ -788,6 +788,10 @@ func getStatusDiagnosticsDns() ([]*diagnosticsDnsResult, error) {
 
 	// Walk diagnosticsDnsResult and perform dig commands
 	for _, status := range diagnosticsDnsResults {
+		if strings.Contains(status.ResolverAddress,":") {
+			// ipv6 queries are problematic at this time.  Ignore them.
+			continue
+		}
 		// Perform DNS lookup using dig with a 1 second timeout per default (3) queries.
 		// Result of 0 means lookup succeeded.
 		cmd := exec.Command("/usr/bin/dig", "+timeout=1", "@"+status.ResolverAddress, "www.google.com")
