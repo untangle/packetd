@@ -790,6 +790,7 @@ func getStatusDiagnosticsDns() ([]*diagnosticsDnsResult, error) {
 	for _, status := range diagnosticsDnsResults {
 		if strings.Contains(status.ResolverAddress,":") {
 			// ipv6 queries are problematic at this time.  Ignore them.
+			status.Pass = true;
 			continue
 		}
 		// Perform DNS lookup using dig with a 1 second timeout per default (3) queries.
