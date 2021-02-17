@@ -19,7 +19,7 @@ import (
 const IPPROTO_ICMP = 1
 
 // cloudAPIEndpoint is the URL of the cloud endpoint
-const cloudAPIEndpoint = "https://labs.untangle.com"
+const cloudAPIEndpoint = "https://classify.untangle.com"
 
 // authRequestKey contains the authrequestkey for authenticating against the cloud API endpoint
 const authRequestKey = "4E6FAB77-B2DF-4DEA-B6BD-2B434A3AE981"
