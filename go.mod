@@ -3,6 +3,7 @@ module github.com/untangle/packetd
 require (
 	github.com/GehirnInc/crypt v0.0.0-20190301055215-6c0105aabd46
 	github.com/c9s/goprocinfo v0.0.0-20190309065803-0b2ad9ac246b
+	github.com/fatih/pool v3.0.0+incompatible
 	github.com/gbrlsnchs/jwt/v3 v3.0.0-beta.0
 	github.com/gin-contrib/location v0.0.0-20190528141421-4d994432eb13
 	github.com/gin-contrib/sessions v0.0.0-20190512062852-3cb4c4f2d615

@@ -44,6 +44,7 @@ import (
 	"github.com/untangle/packetd/services/reports"
 	"github.com/untangle/packetd/services/restd"
 	"github.com/untangle/packetd/services/settings"
+	"github.com/untangle/packetd/services/webroot"
 )
 
 const rulesScript = "packetd_rules"
@@ -291,6 +292,7 @@ func startServices() {
 	overseer.Startup()
 	certmanager.Startup()
 	appclassmanager.Startup()
+	webroot.Startup()
 
 	if !kernel.FlagNoCloud {
 		predicttrafficsvc.Startup()
@@ -315,6 +317,7 @@ func stopServices() {
 		settings.Shutdown()
 		dispatch.Shutdown()
 		kernel.Shutdown()
+		webroot.Shutdown()
 		logger.Shutdown()
 		c <- true
 	}()

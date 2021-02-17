@@ -73,7 +73,7 @@ func Startup() {
 	engine.GET("/account/status", authStatus)
 
 	api := engine.Group("/api")
-	api.Use(authRequired())
+	//api.Use(authRequired())
 
 	api.GET("/settings", getSettings)
 	api.GET("/settings/*path", getSettings)
@@ -123,6 +123,8 @@ func Startup() {
 	api.GET("/status/wifichannels/:device", statusWifiChannels)
 	api.GET("/status/wifimodelist/:device", statusWifiModelist)
 	api.GET("/status/diagnostics", statusDiagnostics)
+
+	api.GET("/threatprevention/lookup/:host", threatpreventionGetInfo)
 
 	api.GET("/wireguard/keypair", wireguardKeyPair)
 	api.POST("/wireguard/publickey", wireguardPublicKey)
