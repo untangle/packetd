@@ -267,7 +267,7 @@ func classifyTraffic(mess *dispatch.NfqueueMessage) string {
 	}
 
 	// if we have a UDP layer update with the ports we saved above
-	udpPtr := mess.Packet.Layer(layers.LayerTypeUDP)
+	udpPtr := fixer.Layer(layers.LayerTypeUDP)
 	if udpPtr != nil {
 		UDPlayer := udpPtr.(*layers.UDP)
 		UDPlayer.SrcPort = layers.UDPPort(srcport)

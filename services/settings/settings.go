@@ -413,6 +413,7 @@ func syncAndSave(jsonObject map[string]interface{}, filename string, force bool)
 		logger.Warn("Failed to generate tmpfile: %v\n", err.Error())
 		return "Failed to generate tmpfile.", err
 	}
+	defer os.Remove(tmpfile.Name())
 	defer tmpfile.Close()
 
 	logger.Info("Writing settings to %v\n", tmpfile.Name())

@@ -2,7 +2,7 @@ package stats
 
 /*
 	Functions to ping multiple target addresss from each local interface and calculate the latency.
-	For each active WAN interface we open an icmp.PacketConn and start a goroutine that listens
+	For each active WAN interface we open an net.IPConn and start a goroutine that listens
 	for replies. The sequence number is used to lookup the transmit time, calculate the latency,
 	and record it in the corresponding interface stats Collector.
 
@@ -17,6 +17,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/untangle/packetd/services/logger"
@@ -57,7 +58,7 @@ type pingTarget struct {
 
 // pingSocket holds the details of a packet connection that is open and active for sending and receiving pings
 type pingSocket struct {
-	conn        *icmp.PacketConn
+	conn        *net.IPConn
 	interfaceID int
 	protocol    int
 	netAddress  string
@@ -185,12 +186,34 @@ func openNetworkSockets() {
 		socket.protocol = item.pingMode
 		socket.interfaceID = item.interfaceID
 		socket.netAddress = item.netAddress
-		socket.conn, err = icmp.ListenPacket(proto, item.netAddress)
+		socket.conn, err = net.ListenIP(proto, &net.IPAddr{IP: net.IPv4zero})
 		if err != nil {
-			logger.Err("Error %v returned from icmp.ListenPacket(%d:%s)\n", err, item.pingMode, item.netAddress)
+			logger.Err("Error %v returned from ListenIP()\n", err)
 			continue
 		}
-		logger.Debug("ICMP listening on ADDR:%s PROTO:%d\n", socket.netAddress, socket.protocol)
+
+		file, err := socket.conn.File()
+		if err != nil {
+			logger.Err("Error %v returned from socket.conn.File()\n", err)
+			continue
+		}
+		fd := file.Fd()
+
+		err = syscall.BindToDevice(int(fd), item.deviceName)
+		if err != nil {
+			logger.Err("Error %v returned from syscall.BindToDevice()\n", err)
+			syscall.SetNonblock(int(fd), true)
+			file.Close()
+			continue
+		}
+
+		// Calling socket.conn.File() above causes the
+		// underlying socket to be switched to blocking
+		// so switch it back before closing
+		syscall.SetNonblock(int(fd), true)
+		file.Close()
+
+		logger.Debug("ICMP listening on INT:%s PROTO:%d\n", item.deviceName, socket.protocol)
 		socketList[item.netAddress] = socket
 		go watchNetworkSocket(socket)
 	}
@@ -212,7 +235,7 @@ func watchNetworkSocket(socket *pingSocket) {
 		size, peer, err := socket.conn.ReadFrom(buffer)
 		logger.Trace("ICMP RECV SIZE:%v PEER:%v ERR:%v\n", size, peer, err)
 		if err != nil {
-			// we close the icmp.PacketConn to interrupt the blocking ReadFrom on shutdown
+			// we close the net.IPConn to interrupt the blocking ReadFrom on shutdown
 			// so we look for and squelch that specific error since it is expected
 			if !strings.Contains(err.Error(), "use of closed network connection") {
 				logger.Warn("Error %v calling conn.ReadFrom()\n", err)
@@ -325,7 +348,7 @@ func pingNetworkAddress(socket *pingSocket, protocol int, srcAddress string, dst
 		return 0
 	}
 
-	size, err = socket.conn.WriteTo(data, &net.IPAddr{IP: netaddr.IP})
+	size, err = socket.conn.WriteToIP(data, &net.IPAddr{IP: netaddr.IP})
 	logger.Trace("ICMP XMIT SIZE:%v PEER:%v ERR:%v\n", size, netaddr, err)
 
 	if err != nil {

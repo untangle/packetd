@@ -49,11 +49,12 @@ var interfaceChannel = make(chan bool, 1)
 var pingerChannel = make(chan bool, 1)
 
 type interfaceDetail struct {
-	interfaceID int
-	deviceName  string
-	netAddress  string
-	pingMode    int
-	wanFlag     bool
+	interfaceID   int
+	interfaceName string
+	deviceName    string
+	netAddress    string
+	pingMode      int
+	wanFlag       bool
 }
 
 type interfaceMetric struct {
@@ -315,17 +316,26 @@ func collectInterfaceStats(seconds uint64) {
 func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive Collector, active Collector, jitter Collector, diffInfo *linux.NetworkStat, diffMetric *interfaceMetric) {
 	var values []interface{}
 	var isWan bool
+	var intfName string
+	var intfDetails *interfaceDetail
 
 	// MFW-1012 - we want to show LAN interface stats in the user interface
 	// but don't want them skewing the interface stats graphs so we added
 	// the is_wan boolean so the UI can decide what to show
-	isWan = getInterfaceWanFlag(diffInfo.Iface)
+	// MFW-1203 - we also need to pass the interface name to the cloud, so lets just attach it here
+	intfDetails = getInterfaceDetails(diffInfo.Iface)
+
+	if intfDetails != nil {
+		isWan = intfDetails.wanFlag
+		intfName = intfDetails.interfaceName
+	}
 
 	// build the values interface array by appending the columns in the same
 	// order they are defined in services/reports/events.go so it can be passed
 	// directly to the prepared INSERT statement created from that array
 	values = append(values, time.Now().UnixNano()/1000000)
 	values = append(values, interfaceID)
+	values = append(values, intfName)
 	values = append(values, diffInfo.Iface)
 	values = append(values, isWan)
 	values = append(values, combo.Latency1Min.Value)
@@ -384,8 +394,12 @@ func logInterfaceStats(seconds uint64, interfaceID int, combo Collector, passive
 }
 
 // calculateDifference determines the difference between the two argumented values
-// FIXME - need to handle integer wrap
 func calculateDifference(previous uint64, current uint64) uint64 {
+	if previous > current {
+		// Likely due to interface being renamed and then back to original again.
+		// In any event, result is invalid; set to 0.
+		return 0
+	}
 	diff := (current - previous)
 	return diff
 }
@@ -447,8 +461,8 @@ func getInterfaceIDValue(name string) int {
 	return -1
 }
 
-// getInterfaceWanFlag is called to get the WAN flag for the argumented interface name
-func getInterfaceWanFlag(name string) bool {
+// getInterfaceDetails is called to get the intf details for the argumented interface name
+func getInterfaceDetails(name string) *interfaceDetail {
 	var val *interfaceDetail
 
 	interfaceDetailLocker.RLock()
@@ -456,10 +470,10 @@ func getInterfaceWanFlag(name string) bool {
 	interfaceDetailLocker.RUnlock()
 
 	if val != nil {
-		return val.wanFlag
+		return val
 	}
 
-	return false
+	return nil
 }
 
 // loadInterfaceDetailMap creates a map of interface name to MFW interface ID values
@@ -497,6 +511,7 @@ func loadInterfaceDetailMap() {
 		holder := new(interfaceDetail)
 		holder.interfaceID = int(item["interfaceId"].(float64))
 		holder.deviceName = item["device"].(string)
+		holder.interfaceName = item["name"].(string)
 
 		// Special case for PPPOE handling
 		// This is "fast" to just use the same naming convention we are using
