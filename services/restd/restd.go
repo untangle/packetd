@@ -998,7 +998,6 @@ func netspaceRequest(c *gin.Context) {
 	var rawdata string
 	var ipVersion int
 	var hostID int
-	var networkSize int
 	var found bool
 	var err error
 
@@ -1036,18 +1035,7 @@ func netspaceRequest(c *gin.Context) {
 		hostID = 1
 	}
 
-	rawdata, found = data["networkSize"]
-	if found != true {
-		c.JSON(http.StatusOK, gin.H{"error": "networkSize not specified"})
-		return
-	}
-
-	networkSize, err = strconv.Atoi(rawdata)
-	if err != nil {
-		networkSize = 24
-	}
-
-	network := netspace.GetAvailableAddressSpace(ipVersion, hostID, networkSize)
+	network := netspace.GetAvailableAddressSpace(ipVersion, hostID)
 	if network == nil {
 		c.JSON(http.StatusOK, gin.H{"error": "unable to find an unused network"})
 		return

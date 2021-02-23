@@ -17,7 +17,10 @@ import (
 	applications and services.
 */
 
-const generationAttempts = 16
+// this is the total number of private class C networks in the RFC1918
+// reserved blocks so we use that as the retry limit when trying to find
+// an unused address block for calls to getAvailableAddressSpace
+const generationAttempts = 4096 + 256 + 65536
 
 // NetworkSpace stores details about a network address block
 type NetworkSpace struct {
@@ -29,6 +32,11 @@ type NetworkSpace struct {
 var networkRegistry *list.List
 var networkMutex sync.RWMutex
 var randomGenerator *rand.Rand
+
+// Used to keep track of the last unused private subnet we provided
+var nextAval = 172
+var nextBval = 16
+var nextCval = 0
 
 // Startup is called to handle service startup
 func Startup() {
@@ -195,9 +203,8 @@ func checkForConflict(one *net.IPNet, two *net.IPNet) bool {
 // IPv6 generation will pick something in the unique local address (ULA) range
 // @param ipVersion - The IP Version (4 or 6) to generate a space for
 // @param hostID - The host ID
-// @param networkSize - The size of the address space requested
 // @returns - A net.IPNet address that is not conflicting with other address spaces on the appliance
-func GetAvailableAddressSpace(ipVersion int, hostID int, networkSize int) *net.IPNet {
+func GetAvailableAddressSpace(ipVersion int, hostID int) *net.IPNet {
 	if ipVersion != 4 && ipVersion != 6 {
 		logger.Warn("Invalid ipVersion %d passed to GetAvailableAddressSpace\n", ipVersion)
 		return nil
@@ -213,37 +220,15 @@ func GetAvailableAddressSpace(ipVersion int, hostID int, networkSize int) *net.I
 		hostID = 0
 	}
 
-	// validate the networkSize
-	if ipVersion == 4 && networkSize > 32 || networkSize < 24 {
-		logger.Warn("Invalid IPv4 networkSize %d passed to GetAvailableAddressSpace\n", networkSize)
-		networkSize = 24
-	}
-
-	if ipVersion == 6 && networkSize > 64 || networkSize < 0 {
-		logger.Warn("Invalid IPv6 networkSize %d passed to GetAvailableAddressSpace\n", networkSize)
-		networkSize = 64
-	}
-
-	testMap := make(map[string]bool)
 	var randNet *net.IPNet
 
 	// loop until we find an available network or reach the attempt limit
-	for len(testMap) < generationAttempts {
+	for randCount := 0; randCount < generationAttempts; randCount++ {
 		if ipVersion == 6 {
-			randNet = getRandomLocalIP6Address(networkSize)
+			randNet = getRandomLocalIP6Address(hostID)
 		} else {
-			randNet = getRandomPrivateIP4Address(hostID, networkSize)
+			randNet = getPrivateIP4Address(hostID)
 		}
-
-		randTxt := randNet.String()
-
-		// if we get a network we already tried don't count as an attempt
-		if testMap[randTxt] {
-			continue
-		}
-
-		// got a network we havent tried yet so add to test map
-		testMap[randTxt] = true
 
 		networkMutex.RLock()
 
@@ -265,55 +250,73 @@ func GetAvailableAddressSpace(ipVersion int, hostID int, networkSize int) *net.I
 		}
 	}
 
-	// if we get here we could not find an available address space
-	return nil
+	// if we get here we could not find an available unused address space but we have to return something
+
+	// for IPv4 we return TEST-NET-2 which is at least private, valid, and usable
+	if ipVersion == 4 {
+		text := fmt.Sprintf("198.51.100.%d/24", hostID)
+		_, result, _ := net.ParseCIDR(text)
+		return result
+	}
+
+	// for IPv6 we return a generic /64 in the ULA block that is valid and usable
+	text := fmt.Sprintf("fdfd:fcfc:fbfb:fafa::%d", +hostID)
+	_, result, _ := net.ParseCIDR(text)
+	return result
 }
 
-// used internally to generate a random IPv4 network address space
+// used internally to generate an unused IPv4 network address space
 // @param hostID - The host ID
-// @param networkSize - The size of the address space requested
 // @returns - A random IPv4 private address space
-func getRandomPrivateIP4Address(hostID int, networkSize int) *net.IPNet {
-	var aval, bval, cval int
+func getPrivateIP4Address(hostID int) *net.IPNet {
+	// the result will always be aaa.bbb.ccc.hostId so we set it now and
+	// will return it later as we work through the increment and wrap logic
+	text := fmt.Sprintf("%d.%d.%d.%d/24", nextAval, nextBval, nextCval, hostID)
+	_, result, _ := net.ParseCIDR(text)
 
-	// randomly pick the first octet as 192, 172, or 10 and assign the
-	// second octet appropriately based on the first octet
-	index := randomGenerator.Intn(3)
-
-	// force requests for a block larger than /24 to use 10.x.x.x/8 space
-	if networkSize < 24 {
-		index = 2
+	// we always increment the ccc value and if it did not wrap our work
+	// is done and we simply return the result
+	nextCval += 1
+	if nextCval < 256 {
+		return result
 	}
 
-	switch index {
-	case 0:
-		// 192 must be in the 192.168 space
-		aval = 192
-		bval = 168
-	case 1:
-		// 172 must be in the 172.16 - 172.31 spaces
-		aval = 172
-		bval = randomGenerator.Intn(16) + 16
-	case 2:
-		// everything in the 10 space is valid
-		aval = 10
-		bval = randomGenerator.Intn(256)
+	// if ccc hits 256 we set back to zero, increment bbb, and check more
+	nextCval = 0
+	nextBval++
+
+	// if aaa is in the 172 space and bbb hits 32 we advance to the
+	// 192.168 space and return our result
+	if (nextAval == 172) && (nextBval > 31) {
+		nextAval = 192
+		nextBval = 168
+		return result
 	}
 
-	// randomly generate the third octet
-	cval = randomGenerator.Intn(256)
+	// if aaa is in the 192 space we know bbb can only be 168 which means
+	// we advance to the 10.0.0.0 space and return our result
+	if nextAval == 192 {
+		nextAval = 10
+		nextBval = 0
+		return result
+	}
 
-	// create a CIDR string from all of the different parts and use it to create a net.IPNet object
-	text := fmt.Sprintf("%d.%d.%d.%d/%d", aval, bval, cval, hostID, networkSize)
-	_, netobj, _ := net.ParseCIDR(text)
+	// if aaa is in the 10 space and bbb has hit 256 we've tried everything
+	// in 10/8 so we reset back to the beginning of the 172 space
+	if (nextAval == 10) && (nextBval > 255) {
+		nextAval = 172
+		nextBval = 16
+		return result
+	}
 
-	return netobj
+	// the bbb increment didn't cause a wrap so we return our result
+	return result
 }
 
 // used internally to generate a random IPv6 network address space
-// @param networkSize - The size of the address space requested
+// @param hostID - the host identifier
 // @returns - A random IPv6 unique local address space
-func getRandomLocalIP6Address(networkSize int) *net.IPNet {
+func getRandomLocalIP6Address(hostID int) *net.IPNet {
 	var aa, bb, cc, dd, ee, ff, gg, hh int
 
 	// use 0xFD as the first octet and randomly generate the next 7
@@ -327,7 +330,8 @@ func getRandomLocalIP6Address(networkSize int) *net.IPNet {
 	hh = randomGenerator.Intn(256)
 
 	// create a CIDR string from all of the different parts and use it to create a net.IPNet object
-	text := fmt.Sprintf("%02X%02X:%02X%02X:%02X%02X:%02X%02X::/%d", aa, bb, cc, dd, ee, ff, gg, hh, 128-networkSize)
+	// that represents something like this 1122:3344:5566:7788:1/64
+	text := fmt.Sprintf("%02X%02X:%02X%02X:%02X%02X:%02X%02X::%X/64", aa, bb, cc, dd, ee, ff, gg, hh, hostID)
 	_, netobj, _ := net.ParseCIDR(text)
 
 	return netobj
