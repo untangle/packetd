@@ -2,6 +2,7 @@ package webroot
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"net"
     "strings"
@@ -9,6 +10,15 @@ import (
 	"github.com/fatih/pool"
 	"github.com/untangle/packetd/services/logger"
 )
+
+type LookupResult struct {
+	Ip string `json:"ip"`
+	Ipint int `json:"ipint"`
+	Reputation int `json:"reputation"`
+	Status int `json:"status"`
+	ThreatMask int `json:"threat_mask"`
+	Source string `json:"source"`
+}
 
 const URI_SLASH string = "/"
 const DOMAIN_PORT string = ":"
@@ -22,19 +32,19 @@ var webrootConn = func() (net.Conn, error) { return net.Dial("tcp", "localhost:8
 // Startup is called when the packetd service starts
 func Startup() {
 	var err error
-	logger.Info("Starting up the webroot service\n")
+	logger.Info("Starting up the threatprevention service\n")
 	// Create a socket pool to handle request to the bcdtid daemon
 	connPool, err = pool.NewChannelPool(5, 30, webrootConn)
 	
 	if err != nil {
-		logger.Info("webroot not able to create connection pool\n")
+		logger.Info("threatprevention not able to create connection pool\n")
 	}
 	logger.Info("Pool connections available " + strconv.Itoa(connPool.Len()) + "\n")
 }
 
 // Shutdown is called when the packetd service stops
 func Shutdown() {
-	logger.Info("Shutting down the webroot service\n")
+	logger.Info("Shutting down the threatprevention service\n")
 	connPool.Close()
 }
 
@@ -80,7 +90,7 @@ func apiQuery(cmd string, retry bool) (string, error) {
 	fmt.Fprintf(s, "%s\r\n", cmd)
 	result, err := bufio.NewReader(s).ReadString('\n')
 	if err != nil {
-		logger.Info("webroot, not able to obtain connection to bctid\n")
+		logger.Info("threatprevention, not able to obtain connection to bctid\n")
 	}
 	s.Close()
 
@@ -107,4 +117,14 @@ func QueryIP(ips string) (string, error) {
 func QueryUrl(hosts string) (string, error) {
 	cmd := "{\"url/getinfo\" : {\"urls\": [\"" + hosts + "\"]}}"
 	return apiQuery(cmd, false)
+}
+
+func IPLookup(ip string) (int, error) {
+	var res, err = QueryIP(ip)
+	if err != nil {
+		return -1, err
+	}
+	var result []LookupResult
+	json.Unmarshal([]byte(res), &result)
+	return result[0].Reputation, nil
 }

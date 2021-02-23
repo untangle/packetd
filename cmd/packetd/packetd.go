@@ -31,6 +31,7 @@ import (
 	"github.com/untangle/packetd/plugins/revdns"
 	"github.com/untangle/packetd/plugins/sni"
 	"github.com/untangle/packetd/plugins/stats"
+	"github.com/untangle/packetd/plugins/threatprevention"
 	"github.com/untangle/packetd/services/appclassmanager"
 	"github.com/untangle/packetd/services/certcache"
 	"github.com/untangle/packetd/services/certmanager"
@@ -340,6 +341,7 @@ func startPlugins() {
 		example.PluginStartup,
 		classify.PluginStartup,
 		geoip.PluginStartup,
+		threatprevention.PluginStartup,
 		certfetch.PluginStartup,
 		certsniff.PluginStartup,
 		dns.PluginStartup,
@@ -369,6 +371,7 @@ func stopPlugins() {
 		example.PluginShutdown,
 		classify.PluginShutdown,
 		geoip.PluginShutdown,
+		threatprevention.PluginShutdown,
 		certfetch.PluginShutdown,
 		certsniff.PluginShutdown,
 		dns.PluginShutdown,

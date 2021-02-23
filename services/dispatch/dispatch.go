@@ -77,6 +77,9 @@ const RevDNSPriority = 2
 // SniPriority ...
 const SniPriority = 2
 
+// ThreatPreventionPriority ...
+const ThreatPreventionPriority = 2
+
 // list of subscribers to each of the three data sources
 var nfqueueSubList map[string]SubscriptionHolder
 var conntrackSubList map[string]SubscriptionHolder
