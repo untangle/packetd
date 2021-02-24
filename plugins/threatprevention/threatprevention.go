@@ -3,19 +3,13 @@ package threatprevention
 import (
 	"net"
 	"encoding/hex"
+	"strconv"
+
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
 	"github.com/untangle/packetd/services/settings"
 	"github.com/untangle/packetd/services/webroot"
 )
-
-var severityMap = map[string]int{
-	"Trustworth" : 80,
-	"Low Risk" : 60,
-	"Moederate Risk" : 40,
-	"Suspcious" : 20,
-	"High Risk" : 0,
-}
 
 const pluginName = "threatprevention"
 var tpLevel int
@@ -52,7 +46,11 @@ func PluginStartup() {
 	if err != nil {
 		logger.Warn("Failed to read setting value for setting threatprevention/sensitivity, error: %v\n", err.Error())
 	}
-	tpLevel = severityMap[sensitivity.(string)]
+	tpLevel, err = strconv.Atoi(sensitivity.(string))
+	if err != nil {
+		tpLevel = 80
+	}
+	logger.Debug("tpLevel is %v\n", tpLevel)
 
 	dispatch.InsertNfqueueSubscription(pluginName, dispatch.ThreatPreventionPriority, TpNfqueueHandler)
 }
@@ -78,15 +76,15 @@ func TpNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool
 		logger.Debug("NfqueueHandler received %d BYTES from %s to %s\n%s\n", mess.Length, mess.IP6Layer.SrcIP, mess.IP6Layer.DstIP, hex.Dump(mess.Packet.Data()))
 	}
 
-	// var srcAddr net.IP
-	var dstAddr net.IP
-
 	// We only care about HTTP or HTTPS request.
 	// TODO: Anyway to filter this before we even get here..?
-	if mess.TCPLayer.DstPort != 80 || mess.TCPLayer.DstPort != 443 {
+	if mess.TCPLayer == nil || mess.MsgTuple.ServerPort != 443 {
 		result.SessionRelease = true
 		return result
 	}
+
+	// var srcAddr net.IP
+	var dstAddr net.IP
 
 	if mess.IP6Layer != nil {
 		// srcAddr = mess.IP6Layer.SrcIP
@@ -101,20 +99,28 @@ func TpNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool
 	// Release if the request is to private address space.
 	if dstAddr != nil && isPrivateIP(dstAddr) {
 		result.SessionRelease = true
+		logger.Info("Address is private %s\n", dstAddr)
 		return result
-	}
+	} 
 	
 	// Lookup and get a score.
+	
 	score, err := webroot.IPLookup(dstAddr.String())
 
+	logger.Trace("lookup %s, score %v\n", dstAddr.String(), score)
 	if err != nil {
-		logger.Debug("threatprevention: Not able to lookup %s\n", dstAddr.String())
+		logger.Warn("Not able to lookup %s\n", dstAddr.String())
+	}
+	if score == 0 { // Not scoring..
+		result.SessionRelease = true
+		return result
 	}
 
 	// Check if something should be blocked.
 	if score < tpLevel {
-		logger.Debug("threatprevention: blocked %s, score %i\n", dstAddr.String(), score)
+		logger.Info("blocked %s:%v, score %v\n", dstAddr.String(), mess.MsgTuple.ServerPort, score)
 		// Need to mark packet so it can be redirected and handled.
+		
 	}
 	result.SessionRelease = true
 	return result
