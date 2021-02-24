@@ -37,12 +37,14 @@ type NfqueueMessage struct {
 // NfqueueResult returns status and other information from a subscription handler function
 type NfqueueResult struct {
 	SessionRelease bool
+	Pmark uint32 `default: 0`
 }
 
 // subscriberResult returns status and other information from a subscription handler function
 type subscriberResult struct {
 	owner          string
 	sessionRelease bool
+	pmark uint32 `default: 0`
 }
 
 // ReleaseSession is called by a subscriber to stop receiving traffic for a session
@@ -70,7 +72,7 @@ func ReleaseSession(session *Session, owner string) {
 
 // nfqueueCallback is the callback for the packet
 // return the mark to set on the packet
-func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetLength int, pmark uint32) int {
+func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetLength int, pmark uint32) (int, uint32) {
 	var mess NfqueueMessage
 	//printSessionTable()
 
@@ -94,14 +96,14 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 		mess.MsgTuple.ClientAddress = dupIP(mess.IP6Layer.SrcIP)
 		mess.MsgTuple.ServerAddress = dupIP(mess.IP6Layer.DstIP)
 	} else {
-		return NfAccept
+		return NfAccept, pmark
 	}
 
 	// we shouldn't be queueing loopback packets
 	// if we catch one throw a warning
 	if mess.MsgTuple.ClientAddress.IsLoopback() || mess.MsgTuple.ServerAddress.IsLoopback() {
 		logger.Warn("nfqueue event for loopback packet: %v\n", mess.MsgTuple)
-		return NfAccept
+		return NfAccept, pmark
 	}
 
 	newSession := ((pmark & 0x10000000) != 0)
@@ -148,7 +150,7 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 			}
 
 			dict.AddSessionEntry(ctid, "bypass_packetd", true)
-			return NfAccept
+			return NfAccept, pmark
 		}
 		session = createSession(mess, ctid)
 		mess.Session = session
@@ -189,7 +191,7 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 				session.removeFromSessionTable()
 				dict.AddSessionEntry(ctid, "bypass_packetd", true)
 				removeConntrack(ctid)
-				return NfAccept
+				return NfAccept, pmark
 			}
 		}
 
@@ -247,7 +249,7 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 
 // callSubscribers calls all the nfqueue message subscribers (plugins)
 // and returns a verdict and the new mark
-func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark uint32, newSession bool) int {
+func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark uint32, newSession bool) (int, uint32) {
 	resultsChannel := make(chan subscriberResult)
 
 	// We loop and increment the priority until all subscriptions have been called
@@ -257,7 +259,7 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 	// If there are no subscribers anymore, just release now
 	if subtotal == 0 {
 		dict.AddSessionEntry(session.GetConntrackID(), "bypass_packetd", true)
-		return NfAccept
+		return NfAccept, pmark
 	}
 
 	subcount := 0
@@ -289,7 +291,7 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 					// if we stopped the timer then stat will be true and we need to write the subscriber result
 					// to the channel, otherwise don't bother since a release was written by the timeout handler
 					if stat == true {
-						c <- subscriberResult{owner: key, sessionRelease: result.SessionRelease}
+						c <- subscriberResult{owner: key, sessionRelease: result.SessionRelease, pmark: result.Pmark}
 					}
 				}()
 
@@ -301,7 +303,7 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 				case <-timeoutTimer.C:
 					// the subscriber took too long so put a release in the result channel on behalf of the subscriber
 					logger.Crit("%OC|Timeout while processing nfqueue - subscriber:%s\n", "timeout_nfqueue_"+key, 0, key)
-					resultsChannel <- subscriberResult{owner: key, sessionRelease: true}
+					resultsChannel <- subscriberResult{owner: key, sessionRelease: true, pmark: pmark}
 				}
 			}(key, val, priority)
 			hitcount++
@@ -313,6 +315,7 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 		for i := 0; i < hitcount; i++ {
 			select {
 			case result := <-resultsChannel:
+				pmark |= result.pmark
 				if result.sessionRelease {
 					ReleaseSession(session, result.owner)
 				}
@@ -328,7 +331,7 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 	}
 
 	// return the updated mark to be set on the packet
-	return NfAccept
+	return NfAccept, pmark
 }
 
 // createSession creates a new session and inserts the forward mapping

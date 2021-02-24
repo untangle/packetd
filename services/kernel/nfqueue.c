@@ -137,6 +137,19 @@ int nfqueue_set_verdict(int index, uint32_t nfid, uint32_t verdict)
     return ret;
 }
 
+int nfqueue_set_verdict2(int index, uint32_t nfid, uint32_t verdict, uint32_t pmark)
+{
+    if (nfqqh[index] == NULL)
+        return -1;
+
+	int ret = nfq_set_verdict2(nfqqh[index],nfid,verdict,pmark,0,NULL);
+    if (ret < 1) {
+        logmessage(LOG_ERR,logsrc,"nfq_set_verdict2(): %s\n",strerror(errno));
+    }
+
+    return ret;
+}
+
 int nfqueue_startup(int index)
 {
 	int		ret;

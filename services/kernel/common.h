@@ -137,6 +137,7 @@ int nfq_get_ct_info(struct nfq_data *nfad, unsigned char **data);
 uint32_t nfq_get_conntrack_id(struct nfq_data *nfad, int l3num);
 int netq_callback(struct nfq_q_handle *qh,struct nfgenmsg *nfmsg,struct nfq_data *nfad,void *data);
 int nfqueue_set_verdict(int index, uint32_t nfid, uint32_t verdict);
+int nfqueue_set_verdict2(int index, uint32_t nfid, uint32_t verdict, uint32_t pmark);
 int nfqueue_startup(int index);
 void nfqueue_shutdown(int index);
 int nfqueue_thread(int index);
