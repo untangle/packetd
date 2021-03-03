@@ -14,6 +14,7 @@ RUN apt-get update -q
 RUN apt-get install -y libnetfilter-log-dev
 RUN apt-get install -y libnetfilter-queue-dev
 RUN apt-get install -y libnetfilter-conntrack-dev
+RUN apt-get install -y libnftnl-dev
 
 RUN mkdir -p /go/packetd
 VOLUME /go/packetd

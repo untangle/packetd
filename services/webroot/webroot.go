@@ -119,12 +119,12 @@ func QueryUrl(hosts string) (string, error) {
 	return apiQuery(cmd, false)
 }
 
-func IPLookup(ip string) (int, error) {
+func IPLookup(ip string) ([]LookupResult, error) {
 	var res, err = QueryIP(ip)
 	if err != nil {
-		return -1, err
+		return []LookupResult{}, err
 	}
 	var result []LookupResult
 	json.Unmarshal([]byte(res), &result)
-	return result[0].Reputation, nil
+	return result, nil
 }

@@ -1,5 +1,5 @@
  # this is based on alpine:3.7
-FROM golang:1.12.1-alpine3.9
+FROM golang:1.16.0-alpine3.13
 LABEL maintainer="Sebastien Delafond <sdelafond@gmail.com>"
 
 RUN apk update
@@ -19,6 +19,8 @@ RUN apk add git
 RUN apk add libnetfilter_log-dev
 RUN apk add libnetfilter_conntrack-dev
 RUN apk add libnetfilter_queue-dev
+RUN apk add libnftnl-dev
+run apk add libmnl
 
 # build packetd
 RUN mkdir -p /go/packetd

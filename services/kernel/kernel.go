@@ -3,7 +3,7 @@ package kernel
 /*
 #include "common.h"
 #cgo CFLAGS: -D_GNU_SOURCE
-#cgo LDFLAGS: -lnetfilter_queue -lnfnetlink -lnetfilter_conntrack -lnetfilter_log
+#cgo LDFLAGS: -lnetfilter_queue -lnfnetlink -lnetfilter_conntrack -lnetfilter_log -lnftnl -lmnl
 */
 import "C"
 
@@ -461,4 +461,8 @@ func WarehousePlaybackFile(nflist map[uint32]bool, ctlist map[uint32]bool) {
 	C.warehouse_playback()
 	nfCleanTracker = nil
 	ctCleanTracker = nil
+}
+
+func NftSet(system string, pkg string, queue string, ctid uint32, timeout uint64) {
+	C.nft_add_set_elem(C.CString(system), C.CString(pkg), C.CString(queue), C.uint32_t(ctid), C.uint64_t(timeout))
 }

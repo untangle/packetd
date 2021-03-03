@@ -1,12 +1,16 @@
 package threatprevention
 
 import (
+	"context"
+	"fmt"
 	"net"
+	"net/http"
 	"encoding/hex"
 	"strconv"
 
 	"github.com/untangle/packetd/services/dispatch"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/settings"
 	"github.com/untangle/packetd/services/webroot"
 )
@@ -16,6 +20,12 @@ var tpLevel int
 var tpEnabled bool = false
 
 var privateIPBlocks []*net.IPNet
+var rejectInfo map[string]interface{}
+
+type contextKey struct {
+	key string
+  }
+var ConnContextKey = &contextKey{"http-conn"}
 
 // PluginStartup function is called to allow plugin specific initialization. We
 // increment the argumented WaitGroup so the main process can wait for
@@ -36,6 +46,41 @@ func PluginStartup() {
 		privateIPBlocks = append(privateIPBlocks, block)
 	}
 
+	// Read in threat prevetion settings, and register callback for changes
+	syncCallbackHandler()
+	settings.RegisterSyncCallback(syncCallbackHandler)
+
+	// Need basic http server to respond to redirect to inform user why they were blocked.
+	server := http.Server{
+	  Addr: ":8485",
+	  ConnContext: SaveConnInContext,
+	  Handler: http.HandlerFunc(tpRedirectHandler),
+	}
+	go server.ListenAndServe()
+
+	// Need basic https server to respond to redirect to inform user why they were blocked.
+	sslserver := http.Server{
+		Addr: ":8486",
+		ConnContext: SaveConnInContext,
+		Handler: http.HandlerFunc(tpRedirectHandler),
+	  }
+	go sslserver.ListenAndServeTLS("/tmp/cert.pem", "/tmp/cert.key")
+
+
+	rejectInfo = make(map[string]interface{})
+	
+
+	dispatch.InsertNfqueueSubscription(pluginName, dispatch.ThreatPreventionPriority, TpNfqueueHandler)
+}
+
+// PluginShutdown function called when the daemon is shutting down. We call Done
+// for the argumented WaitGroup to let the main process know we're finished.
+func PluginShutdown() {
+	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
+}
+
+// Is called when we do a sync setting. Need to update threat level.
+func syncCallbackHandler() {
 	enabled, err := settings.GetSettings([]string{"threatprevention", "enabled"})
 	if err != nil {
 		logger.Warn("Failed to read setting value for setting threatprevention/enabled, error: %v\n", err.Error())
@@ -48,17 +93,9 @@ func PluginStartup() {
 	}
 	tpLevel, err = strconv.Atoi(sensitivity.(string))
 	if err != nil {
+		logger.Info("Failed to get threatprevention level. Default to level 80\n")
 		tpLevel = 80
 	}
-	logger.Debug("tpLevel is %v\n", tpLevel)
-
-	dispatch.InsertNfqueueSubscription(pluginName, dispatch.ThreatPreventionPriority, TpNfqueueHandler)
-}
-
-// PluginShutdown function called when the daemon is shutting down. We call Done
-// for the argumented WaitGroup to let the main process know we're finished.
-func PluginShutdown() {
-	logger.Info("PluginShutdown(%s) has been called\n", pluginName)
 }
 
 // PluginNfqueueHandler receives a NfqueueMessage which includes a Tuple and
@@ -76,8 +113,6 @@ func TpNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool
 		logger.Debug("NfqueueHandler received %d BYTES from %s to %s\n%s\n", mess.Length, mess.IP6Layer.SrcIP, mess.IP6Layer.DstIP, hex.Dump(mess.Packet.Data()))
 	}
 
-	// We only care about HTTP or HTTPS request.
-	// TODO: Anyway to filter this before we even get here..?
 	if mess.TCPLayer == nil || mess.MsgTuple.ServerPort != 443 {
 		result.SessionRelease = true
 		return result
@@ -104,9 +139,8 @@ func TpNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool
 	} 
 	
 	// Lookup and get a score.
-	
-	score, err := webroot.IPLookup(dstAddr.String())
-
+	webrootResult, err := webroot.IPLookup(dstAddr.String())
+	score := webrootResult[0].Reputation
 	logger.Trace("lookup %s, score %v\n", dstAddr.String(), score)
 	if err != nil {
 		logger.Warn("Not able to lookup %s\n", dstAddr.String())
@@ -117,10 +151,21 @@ func TpNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool
 	}
 
 	// Check if something should be blocked.
+	logger.Info("pmark %b\n", mess.PacketMark)
 	if score < tpLevel {
 		logger.Info("blocked %s:%v, score %v\n", dstAddr.String(), mess.MsgTuple.ServerPort, score)
-		// Need to mark packet so it can be redirected and handled.
+		result.SessionRelease = true // Is this right...
+		// result.Pmark = mess.PacketMark | 0x02
+		// Insert info on why it was rejected if http or https
 		
+		if mess.TCPLayer == nil || mess.MsgTuple.ServerPort != 443 {
+			srcTpl := net.JoinHostPort(mess.MsgTuple.ServerAddress.String(), string(mess.MsgTuple.ClientPort))
+			rejectInfo[srcTpl] = webrootResult
+			// Need to redirect packet to localhost:8485
+			kernel.NftSet("inet", "packetd", "tp_redirect", ctid, 0)
+		} else {
+			// Not HTTP or HTTPS, lets drop packet.
+		}
 	}
 	result.SessionRelease = true
 	return result
@@ -133,4 +178,18 @@ func isPrivateIP(ip net.IP) bool {
 		}
 	}
 	return false
+}
+
+func SaveConnInContext(ctx context.Context, c net.Conn) (context.Context) {
+return context.WithValue(ctx, ConnContextKey, c)
+}
+func GetConn(r *http.Request) (net.Conn) {
+return r.Context().Value(ConnContextKey).(net.Conn)
+}
+
+func tpRedirectHandler(w http.ResponseWriter, r *http.Request) {
+	conn := GetConn(r)
+	ip := conn.RemoteAddr()
+	logger.Info("Look up reason for %v, %v\n", ip, rejectInfo[ip.String()])
+	fmt.Fprintf(w, "<HTML><PRE> Your connection to %v was blocked by threat prevetion.</PRE></HTML>", rejectInfo[ip.String()])
 }

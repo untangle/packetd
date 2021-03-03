@@ -22,6 +22,8 @@ const settingsFile = "/etc/config/settings.json"
 const defaultsFile = "/etc/config/defaults.json"
 const currentFile = "/etc/config/current.json"
 
+var syncCallbacks []func()
+
 // Startup settings service
 func Startup() {
 }
@@ -110,6 +112,13 @@ func SetSettingsFile(segments []string, value interface{}, filename string, forc
 
 	return map[string]interface{}{"result": "OK", "output": output}, err
 }
+
+// Register a callback. Will be called after sync-settings complete.
+func RegisterSyncCallback(callback func()){
+	// Insert callback 
+	syncCallbacks = append(syncCallbacks, callback)
+}
+
 
 // readSettingsFileJSON reads the settings file and return the corresponding JSON object
 func readSettingsFileJSON(filename string) (map[string]interface{}, error) {
@@ -398,6 +407,10 @@ func syncAndSave(jsonObject map[string]interface{}, filename string, force bool)
 		return output, err
 	}
 
+	logger.Info("Calling registered callbacks\n")
+	for _, cb := range syncCallbacks {
+		cb()
+	}
 	return output, nil
 }
 
