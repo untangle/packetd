@@ -37,7 +37,7 @@ func Startup() {
 	connPool, err = pool.NewChannelPool(5, 30, webrootConn)
 	
 	if err != nil {
-		logger.Info("threatprevention not able to create connection pool\n")
+		logger.Info("threatprevention not able to create connection pool %v\n", err)
 	}
 	logger.Info("Pool connections available " + strconv.Itoa(connPool.Len()) + "\n")
 }

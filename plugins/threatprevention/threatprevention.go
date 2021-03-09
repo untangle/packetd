@@ -161,8 +161,8 @@ func TpNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool
 		if mess.TCPLayer == nil || mess.MsgTuple.ServerPort != 443 {
 			srcTpl := net.JoinHostPort(mess.MsgTuple.ServerAddress.String(), string(mess.MsgTuple.ClientPort))
 			rejectInfo[srcTpl] = webrootResult
-			// Need to redirect packet to localhost:8485
-			kernel.NftSet("inet", "packetd", "tp_redirect", ctid, 0)
+			// Need to redirect packet to localhost:8485/8586
+			kernel.NftSet("ip", "nat", "tp_redirect", ctid, 0)
 		} else {
 			// Not HTTP or HTTPS, lets drop packet.
 		}

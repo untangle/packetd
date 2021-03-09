@@ -4,6 +4,7 @@ NFT=${NFT:-nft}
 QUEUE_PRIORITY="-145"
 MANGLE_PRIORITY="-145"
 TABLE_NAME="packetd"
+TABLE_NAT_NAME="nat"
 
 remove_packetd_rules()
 {
@@ -11,12 +12,15 @@ remove_packetd_rules()
     ${NFT} flush chain inet ${TABLE_NAME} packetd-input 2>/dev/null
     ${NFT} flush chain inet ${TABLE_NAME} packetd-output 2>/dev/null
     ${NFT} flush chain inet ${TABLE_NAME} packetd-queue 2>/dev/null
+    ${NFT} flush chain ip ${TABLE_NAT_NAME} prerouting 2>/dev/null
+    ${NFT} flush chain ip ${TABLE_NAT_NAME} postrouting 2>/dev/null
     ${NFT} delete chain inet ${TABLE_NAME} packetd-prerouting 2>/dev/null
     ${NFT} delete chain inet ${TABLE_NAME} packetd-input 2>/dev/null
     ${NFT} delete chain inet ${TABLE_NAME} packetd-output 2>/dev/null
     ${NFT} delete chain inet ${TABLE_NAME} packetd-queue 2>/dev/null
-    ${NFT} delete set inet ${TABLE_NAME} tp_redirect 2>/dev/null
+    ${NFT} delete set ip ${TABLE_NAT_NAME} tp_redirect 2>/dev/null
     ${NFT} delete table inet ${TABLE_NAME} 2>/dev/null
+    ${NFT} delete table ip ${TABLE_NAT_NAME}
 }
 
 insert_packetd_rules()
@@ -24,8 +28,11 @@ insert_packetd_rules()
     # create the tables if needed
     ${NFT} add table inet ${TABLE_NAME}
 
-    # create threatprevention set
-     ${NFT} add set inet ${TABLE_NAME} tp_redirect "{ type ct_id ; flags timeout ; }"
+    # create threatprevention nat table, chains and set
+    ${NFT} add table ip ${TABLE_NAT_NAME}
+    ${NFT} add chain nat prerouting "{type nat hook prerouting priority -100;}"
+    ${NFT} add chain nat postrouting "{type nat hook postrouting priority 100 ;}"
+    ${NFT} add set ip ${TABLE_NAT_NAME} tp_redirect "{ type ct_id ; }"
     
     # create chains
     ${NFT} add chain inet ${TABLE_NAME} packetd-prerouting "{ type filter hook prerouting priority $QUEUE_PRIORITY ; }"
@@ -54,8 +61,8 @@ insert_packetd_rules()
     ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct mark and 0x80000000 == 0x80000000 counter return
 
     # Redirect threatprevention traffic to our block page.
-    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct id @tp_redirect and dport == 80 set dport 8485
-    ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct id @tp_redirect and dport == 443 set dport 8486
+    ${NFT} add rule ${TABLE_NAT_NAME} prerouting ct id @tp_redirect tcp dport 80 dnat 127.0.0.1:8485
+    ${NFT} add rule ${TABLE_NAT_NAME} prerouting ct id @tp_redirect tcp dport 443 dnat 127.0.0.1:8486
 
    # In case we are quickly reusing a conntrack id, flush the sessions dictionary on new connections
     ${NFT} add rule inet ${TABLE_NAME} packetd-queue ct state new counter dict sessions ct id flush
