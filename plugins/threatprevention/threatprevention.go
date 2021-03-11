@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"encoding/hex"
+ //	"encoding/json"
 	"strconv"
 
 	"github.com/untangle/packetd/services/dispatch"
@@ -64,7 +65,7 @@ func PluginStartup() {
 		ConnContext: SaveConnInContext,
 		Handler: http.HandlerFunc(tpRedirectHandler),
 	  }
-	go sslserver.ListenAndServeTLS("/tmp/cert.pem", "/tmp/cert.key")
+	go sslserver.ListenAndServeTLS("/tmp/cert-https.pem", "/tmp/cert-https.key")
 
 
 	rejectInfo = make(map[string]interface{})
@@ -96,6 +97,7 @@ func syncCallbackHandler() {
 		logger.Info("Failed to get threatprevention level. Default to level 80\n")
 		tpLevel = 80
 	}
+	logger.Info("Threat prevention level set to %v\n", tpLevel)
 }
 
 // PluginNfqueueHandler receives a NfqueueMessage which includes a Tuple and
@@ -151,18 +153,20 @@ func TpNfqueueHandler(mess dispatch.NfqueueMessage, ctid uint32, newSession bool
 	}
 
 	// Check if something should be blocked.
-	logger.Info("pmark %b\n", mess.PacketMark)
 	if score < tpLevel {
 		logger.Info("blocked %s:%v, score %v\n", dstAddr.String(), mess.MsgTuple.ServerPort, score)
 		result.SessionRelease = true // Is this right...
 		// result.Pmark = mess.PacketMark | 0x02
 		// Insert info on why it was rejected if http or https
 		
-		if mess.TCPLayer == nil || mess.MsgTuple.ServerPort != 443 {
-			srcTpl := net.JoinHostPort(mess.MsgTuple.ServerAddress.String(), string(mess.MsgTuple.ClientPort))
-			rejectInfo[srcTpl] = webrootResult
+		if mess.TCPLayer != nil || mess.MsgTuple.ServerPort != 443 {
+			sport := int(mess.Session.GetClientSideTuple().ClientPort)
+			srcTpl := mess.MsgTuple.ClientAddress.String()+":"+strconv.Itoa(sport)
+			rejectInfo[srcTpl] = webrootResult[0]
 			// Need to redirect packet to localhost:8485/8586
+			logger.Info("Adding ctid %v, %v\n", ctid, webrootResult[0])
 			kernel.NftSet("ip", "nat", "tp_redirect", ctid, 0)
+			// logger.Info("Session %v\n", mess.Session)
 		} else {
 			// Not HTTP or HTTPS, lets drop packet.
 		}
@@ -190,6 +194,31 @@ return r.Context().Value(ConnContextKey).(net.Conn)
 func tpRedirectHandler(w http.ResponseWriter, r *http.Request) {
 	conn := GetConn(r)
 	ip := conn.RemoteAddr()
-	logger.Info("Look up reason for %v, %v\n", ip, rejectInfo[ip.String()])
-	fmt.Fprintf(w, "<HTML><PRE> Your connection to %v was blocked by threat prevetion.</PRE></HTML>", rejectInfo[ip.String()])
+	var entry webroot.LookupResult
+	entry = rejectInfo[ip.String()].(webroot.LookupResult)
+
+	logger.Info("Look up reason for %v, %T\n", ip, entry.Ip)
+
+	fmt.Fprintf(w, "<HTML><PRE> Your connection to %v was blocked by threat prevetion. Risk level for this site is %v</PRE></HTML>",
+	 entry.Ip, getRiskLevel(entry.Reputation))
+	// delete(rejectInfo, ip.String())
+	// TODO Need to delete the ctid out of nft set. So must included ctid into our rejectInfo map.
+}
+
+func getRiskLevel(risk int ) string {
+	var result string
+	result = "Trustworthy"
+	if risk < 80 {
+		result = "Low Risk"
+	}
+	if risk < 60 {
+		result = "Moderate Risk"
+	}
+	if risk < 40 {
+		result = "Suspicious"
+	}
+	if risk < 20 {
+		result = "High Risk"
+	}
+	return result
 }
