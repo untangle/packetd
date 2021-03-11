@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/untangle/packetd/services/dict"
+	"github.com/untangle/packetd/services/kernel"
 	"github.com/untangle/packetd/services/logger"
 )
 
@@ -14,6 +14,9 @@ const NfDrop = 0
 
 // NfAccept is the NF_ACCEPT constant
 const NfAccept = 1
+
+// PacketdBypassTimeout defines the time a bypass_packetd set entry should live in milliseconds
+const PacketdBypassTimeout = 0
 
 //NfqueueHandlerFunction defines a pointer to a nfqueue callback function
 type NfqueueHandlerFunction func(NfqueueMessage, uint32, bool) NfqueueResult
@@ -63,7 +66,7 @@ func ReleaseSession(session *Session, owner string) {
 	}
 	if len == 0 {
 		logger.Debug("Zero subscribers reached - settings bypass_packetd=true for session %d\n", session.GetConntrackID())
-		dict.AddSessionEntry(session.GetConntrackID(), "bypass_packetd", true)
+		kernel.BypassViaNftSet(session.GetConntrackID(), PacketdBypassTimeout)
 	}
 	session.subLocker.Unlock()
 }
@@ -147,7 +150,7 @@ func nfqueueCallback(ctid uint32, family uint32, packet gopacket.Packet, packetL
 				logger.Info("Ignoring mid-session packet: %s %d\n", mess.MsgTuple, ctid)
 			}
 
-			dict.AddSessionEntry(ctid, "bypass_packetd", true)
+			kernel.BypassViaNftSet(ctid, PacketdBypassTimeout)
 			return NfAccept
 		}
 		session = createSession(mess, ctid)
@@ -256,7 +259,7 @@ func callSubscribers(ctid uint32, session *Session, mess NfqueueMessage, pmark u
 
 	// If there are no subscribers anymore, just release now
 	if subtotal == 0 {
-		dict.AddSessionEntry(session.GetConntrackID(), "bypass_packetd", true)
+		kernel.BypassViaNftSet(session.GetConntrackID(), PacketdBypassTimeout)
 		return NfAccept
 	}
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/untangle/packetd/services/dict"
 	"github.com/untangle/packetd/services/logger"
+	"github.com/untangle/packetd/services/kernel"
 )
 
 // ConntrackHandlerFunction defines a pointer to a conntrack callback function
@@ -337,6 +338,7 @@ func removeConntrack(ctid uint32) {
 func removeConntrackStale(ctid uint32, conntrack *Conntrack) {
 	removeConntrack(ctid)
 	dict.DeleteSession(ctid)
+	kernel.RemoveBypassEntry(ctid)
 
 	// We only want to remove the specific session
 	// There is a race, we may get this DELETE event after the ctid has been reused by a new session

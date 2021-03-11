@@ -19,6 +19,7 @@ RUN apk add git
 RUN apk add libnetfilter_log-dev
 RUN apk add libnetfilter_conntrack-dev
 RUN apk add libnetfilter_queue-dev
+RUN apk add libnftnl-dev
 
 # build packetd
 RUN mkdir -p /go/packetd
